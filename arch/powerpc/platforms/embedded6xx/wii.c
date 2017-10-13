@@ -20,6 +20,7 @@
 #include <linux/seq_file.h>
 #include <linux/of_platform.h>
 #include <linux/memblock.h>
+#include <linux/exi.h>
 #include <mm/mmu_decl.h>
 
 #include <asm/io.h>
@@ -212,6 +213,7 @@ static int __init wii_probe(void)
 
 static void wii_shutdown(void)
 {
+	exi_quiesce();
 	hlwd_quiesce();
 	flipper_quiesce();
 }

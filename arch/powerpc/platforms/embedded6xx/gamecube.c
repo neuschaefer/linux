@@ -18,6 +18,7 @@
 #include <linux/kexec.h>
 #include <linux/seq_file.h>
 #include <linux/of_platform.h>
+#include <linux/exi.h>
 
 #include <asm/io.h>
 #include <asm/machdep.h>
@@ -68,6 +69,7 @@ static int __init gamecube_probe(void)
 
 static void gamecube_shutdown(void)
 {
+	exi_quiesce();
 	flipper_quiesce();
 }
 
