@@ -31,6 +31,7 @@ available subsections can be seen below.
    spi
    i2c
    hsi
+   exi
    edac
    scsi
    libata
