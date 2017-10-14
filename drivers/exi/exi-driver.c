@@ -46,6 +46,7 @@ static void exi_bus_device_release(struct device *dev);
 static int exi_bus_match(struct device *dev, struct device_driver *drv);
 
 
+/* const? */
 static struct bus_type exi_bus_type = {
 	.name = "exi",
 	.match = exi_bus_match,
@@ -203,12 +204,12 @@ static void exi_device_release(struct device *dev)
 }
 
 /**
- *	exi_device_get - Increments the reference count of the exi device
- *	@exi_device:	device being referenced
+ * exi_device_get - Increments the reference count of the exi device
+ * @exi_device:	device being referenced
  *
- *	Each live reference to an exi device should be refcounted.
- *	A pointer to the device with the incremented reference counter
- *	is returned.
+ * Each live reference to an exi device should be refcounted.
+ * A pointer to the device with the incremented reference counter
+ * is returned.
  */
 struct exi_device *exi_device_get(struct exi_device *exi_device)
 {
@@ -219,10 +220,10 @@ struct exi_device *exi_device_get(struct exi_device *exi_device)
 EXPORT_SYMBOL(exi_device_get);
 
 /**
- *	exi_device_put  -  Releases a use of the exi device
- *	@exi_device:	device that's been disconnected
+ * exi_device_put - Releases a use of the exi device
+ * @exi_device:	device that's been disconnected
  *
- *	Must be called when a user of a device is finished with it.
+ * Must be called when a user of a device is finished with it.
  */
 void exi_device_put(struct exi_device *exi_device)
 {
@@ -232,9 +233,9 @@ void exi_device_put(struct exi_device *exi_device)
 EXPORT_SYMBOL(exi_device_put);
 
 /**
- *	exi_get_exi_device  -  Returns a reference to an exi device
- *	@exi_channel:	exi channel where the device is located
- *	@device:	device number within the channel
+ * exi_get_exi_device - Returns a reference to an exi device
+ * @exi_channel:	exi channel where the device is located
+ * @device:		device number within the channel
  */
 struct exi_device *exi_get_exi_device(struct exi_channel *exi_channel,
 				      int device)
@@ -286,11 +287,11 @@ static int exi_device_remove(struct device *dev)
 
 
 /**
- *      exi_driver_register - register an EXI device driver.
- *      @driver: driver structure to register.
+ * exi_driver_register - register an EXI device driver.
+ * @driver: driver structure to register.
  *
- *      Registers an EXI device driver with the bus
- *      and consequently with the driver model core.
+ * Registers an EXI device driver with the bus
+ * and consequently with the driver model core.
  */
 int exi_driver_register(struct exi_driver *driver)
 {
@@ -304,11 +305,11 @@ int exi_driver_register(struct exi_driver *driver)
 EXPORT_SYMBOL(exi_driver_register);
 
 /**
- *      exi_driver_unregister - unregister an EXI device driver.
- *      @driver: driver structure to unregister.
+ * exi_driver_unregister - unregister an EXI device driver.
+ * @driver: driver structure to unregister.
  *
- *      Unregisters an EXI device driver with the bus
- *      and consequently with the driver model core.
+ * Unregisters an EXI device driver with the bus
+ * and consequently with the driver model core.
  */
 void exi_driver_unregister(struct exi_driver *driver)
 {
@@ -433,9 +434,6 @@ void exi_quiesce(void)
 	exi_hw_quiesce();
 }
 
-/*
- *
- */
 static int exi_init(struct resource *mem, unsigned int irq)
 {
 	struct exi_channel *exi_channel;
@@ -471,7 +469,7 @@ static int exi_init(struct resource *mem, unsigned int irq)
 	/* now enumerate through the bus and add all detected devices */
 	exi_bus_rescan();
 
-	/* setup a thread to manage plugable devices */
+	/* setup a thread to manage pluggable devices */
 	init_waitqueue_head(&exi_bus_waitq);
 	exi_bus_task = kthread_run(exi_bus_thread, NULL, "kexid");
 	if (IS_ERR(exi_bus_task))
@@ -488,9 +486,12 @@ err_hw_init:
 	return retval;
 }
 
-/*
- *
- */
+static const struct of_device_id node_matches[] __initconst = {
+	{ .compatible = "nintendo,flipper-exi" },
+	{ .compatible = "nintendo,hollywood-exi" },
+	{}
+};
+
 static int __init exi_layer_init(void)
 {
 	struct device_node *np;
@@ -500,13 +501,9 @@ static int __init exi_layer_init(void)
 	drv_printk(KERN_INFO, "%s - version %s\n", DRV_DESCRIPTION,
 		   exi_driver_version);
 
-	np = of_find_compatible_node(NULL, NULL, "nintendo,flipper-exi");
-	if (!np) {
-		np = of_find_compatible_node(NULL, NULL,
-					     "nintendo,hollywood-exi");
-		if (!np)
-			return -ENODEV;
-	}
+	np = of_find_matching_node(NULL, node_matches);
+	if (!np)
+		return -ENODEV;
 
 	retval = of_address_to_resource(np, 0, &res);
 	if (retval) {
@@ -524,4 +521,3 @@ postcore_initcall(exi_layer_init);
 MODULE_AUTHOR(DRV_AUTHOR);
 MODULE_DESCRIPTION(DRV_DESCRIPTION);
 MODULE_LICENSE("GPL");
-
