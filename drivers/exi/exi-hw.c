@@ -1,7 +1,7 @@
 /*
  * drivers/exi/exi-hw.c
  *
- * Nintendo GameCube EXpansion Interface support. Hardware routines.
+ * Nintendo GameCube EXternal Interface support. Hardware routines.
  * Copyright (C) 2004-2009 The GameCube Linux Team
  * Copyright (C) 2004,2005 Todd Jeffreys <todd@voidpointer.org>
  * Copyright (C) 2005,2006,2007,2008,2009 Albert Herranz
@@ -126,10 +126,10 @@ static struct exi_channel exi_channels[EXI_MAX_CHANNELS] = {
 #define __to_channel(exi_channel) (exi_channel->channel)
 
 /**
- *	to_exi_channel  -  returns an exi_channel given a channel number
- *	@channel:	channel number
+ * to_exi_channel - returns an exi_channel given a channel number
+ * @channel:	channel number
  *
- *	Return the exi_channel structure associated to a given channel.
+ * Return the exi_channel structure associated to a given channel.
  */
 struct exi_channel *to_exi_channel(unsigned int channel)
 {
@@ -141,10 +141,10 @@ struct exi_channel *to_exi_channel(unsigned int channel)
 EXPORT_SYMBOL(to_exi_channel);
 
 /**
- *	to_channel  -  returns a channel number given an exi channel
- *	@exi_channel:	channel
+ * to_channel - returns a channel number given an exi channel
+ * @exi_channel:	channel
  *
- *	Return the channel number for a given exi_channel structure.
+ * Return the channel number for a given exi_channel structure.
  */
 unsigned int to_channel(struct exi_channel *exi_channel)
 {
@@ -155,10 +155,10 @@ unsigned int to_channel(struct exi_channel *exi_channel)
 EXPORT_SYMBOL(to_channel);
 
 /**
- *	exi_channel_owner  -  returns the owner of the given channel
- *	@exi_channel:	channel
+ * exi_channel_owner - returns the owner of the given channel
+ * @exi_channel:	channel
  *
- *	Return the device owning a given exi_channel structure.
+ * Return the device owning a given exi_channel structure.
  */
 struct exi_device *exi_channel_owner(struct exi_channel *exi_channel)
 {
@@ -166,19 +166,14 @@ struct exi_device *exi_channel_owner(struct exi_channel *exi_channel)
 }
 
 
-/*
- *
- *
- */
-
 /**
- *	exi_select_raw  -  selects a device on an exi channel
- *	@exi_channel:	channel
- *	@device:	device number on channel
- *	@freq:		clock frequency index
+ * exi_select_raw - selects a device on an exi channel
+ * @exi_channel:	channel
+ * @device:		device number on channel
+ * @freq:		clock frequency index
  *
- *	Select a given device on a specified EXI channel by setting its
- *	CS line, and use the specified clock frequency when doing transfers.
+ * Select a given device on a specified EXI channel by setting its
+ * CS line, and use the specified clock frequency when doing transfers.
  */
 void exi_select_raw(struct exi_channel *exi_channel, unsigned int device,
 		   unsigned int freq)
@@ -204,11 +199,11 @@ EXPORT_SYMBOL(exi_select_raw);
 
 
 /**
- *	exi_deselect_raw  -  deselects all devices on an exi channel
- *	@exi_channel:	channel
+ * exi_deselect_raw - deselects all devices on an exi channel
+ * @exi_channel:	channel
  *
- *	Deselect any device previously selected on the specified EXI
- *	channel by unsetting all CS lines.
+ * Deselect any device previously selected on the specified EXI
+ * channel by unsetting all CS lines.
  */
 void exi_deselect_raw(struct exi_channel *exi_channel)
 {
@@ -228,14 +223,13 @@ void exi_deselect_raw(struct exi_channel *exi_channel)
 EXPORT_SYMBOL(exi_deselect_raw);
 
 /**
- *	exi_transfer_raw  -  performs an exi transfer using immediate mode
- *	@exi_channel:	channel
- *	@data:		pointer to data being read/writen
- *	@len:		length of data
- *	@mode:		direction of transfer (EXI_OP_{READ,READWRITE,WRITE})
+ * exi_transfer_raw - performs an exi transfer using immediate mode
+ * @exi_channel:	channel
+ * @data:		pointer to data being read/writen
+ * @len:		length of data
+ * @mode:		direction of transfer (EXI_OP_{READ,READWRITE,WRITE})
  *
- *	Read or write data on a given EXI channel.
- *
+ * Read or write data on a given EXI channel.
  */
 void exi_transfer_raw(struct exi_channel *exi_channel,
 		      void *data, size_t len, int mode)
@@ -396,7 +390,7 @@ static void exi_wait_for_transfer_raw(struct exi_channel *exi_channel)
 	u32 __iomem *csr_reg = exi_channel->io_base + EXI_CSR;
 	unsigned long flags;
 	unsigned long deadline = jiffies + 2*HZ;
-	int borked = 0;
+	int timed_out = 0;
 
 	/* we don't want TCINTs to disturb us while waiting */
 	spin_lock_irqsave(&exi_channel->io_lock, flags);
@@ -404,12 +398,12 @@ static void exi_wait_for_transfer_raw(struct exi_channel *exi_channel)
 	spin_unlock_irqrestore(&exi_channel->io_lock, flags);
 
 	/* busy-wait for transfer complete */
-	while ((in_be32(cr_reg)&EXI_CR_TSTART) && !borked) {
+	while ((in_be32(cr_reg)&EXI_CR_TSTART) && !timed_out) {
 		cpu_relax();
-		borked = time_after(jiffies, deadline);
+		timed_out = time_after(jiffies, deadline);
 	}
 
-	if (borked) {
+	if (timed_out) {
 		drv_printk(KERN_ERR, "exi transfer took too long, "
 			   "is your hardware ok?");
 	}
@@ -420,11 +414,6 @@ static void exi_wait_for_transfer_raw(struct exi_channel *exi_channel)
 	spin_unlock_irqrestore(&exi_channel->io_lock, flags);
 }
 
-
-/*
- *
- *
- */
 
 static void exi_command_done(struct exi_command *cmd);
 
@@ -490,7 +479,6 @@ static void exi_end_dma_transfer(struct exi_channel *exi_channel)
  *
  * If more data is pending transfer, it schedules a new transfer.
  * Returns zero if no more transfers are required, non-zero otherwise.
- *
  */
 static int exi_end_idi_transfer(struct exi_channel *exi_channel)
 {
@@ -605,8 +593,7 @@ static int exi_take_channel(struct exi_channel *exi_channel,
 		spin_unlock_irqrestore(&exi_channel->lock, flags);
 		if (!wait)
 			return -EBUSY;
-		wait_event(exi_channel->wait_queue,
-			   !exi_channel->owner);
+		wait_event(exi_channel->wait_queue, !exi_channel->owner);
 		spin_lock_irqsave(&exi_channel->lock, flags);
 	}
 	exi_channel->owner = exi_device;
@@ -775,13 +762,12 @@ done:
 }
 
 /**
- *	exi_run_command  -  executes a single exi command
- *	@cmd:	the command to execute
+ * exi_run_command - executes a single exi command
+ * @cmd:	the command to execute
  *
- *	Context: user
+ * Context: user
  *
- *	Run just one command.
- *
+ * Run just one command.
  */
 static int exi_run_command(struct exi_command *cmd)
 {
@@ -863,11 +849,11 @@ static int exi_run_command_and_wait(struct exi_command *cmd)
 }
 
 /**
- *	exi_take  -  reserves an exi channel for exclusive use by a device
- *	@exi_device:	exi device making the reservation
- *	@wait:		wait for the operation to complete
+ * exi_take - reserves an exi channel for exclusive use by a device
+ * @exi_device:	exi device making the reservation
+ * @wait:	wait for the operation to complete
  *
- *	Reserves the channel of a given EXI device.
+ * Reserves the channel of a given EXI device.
  */
 int exi_take(struct exi_device *exi_device, int wait)
 {
@@ -881,10 +867,10 @@ int exi_take(struct exi_device *exi_device, int wait)
 EXPORT_SYMBOL(exi_take);
 
 /**
- *	exi_give  -  releases an exi channel
- *	@exi_device:	exi device making the release
+ * exi_give - releases an exi channel
+ * @exi_device:		exi device making the release
  *
- *	Releases the channel of a given EXI device.
+ * Releases the channel of a given EXI device.
  */
 int exi_give(struct exi_device *exi_device)
 {
@@ -896,10 +882,10 @@ int exi_give(struct exi_device *exi_device)
 EXPORT_SYMBOL(exi_give);
 
 /**
- *	exi_select  -  selects a exi device
- *	@exi_device:	exi device being selected
+ * exi_select - selects a exi device
+ * @exi_device:		exi device being selected
  *
- *	Selects a given EXI device.
+ * Selects a given EXI device.
  */
 void exi_select(struct exi_device *exi_device)
 {
@@ -911,11 +897,10 @@ void exi_select(struct exi_device *exi_device)
 EXPORT_SYMBOL(exi_select);
 
 /**
- *	exi_deselect  -  deselects all devices on an exi channel
- *	@exi_channel:	channel
+ * exi_deselect - deselects all devices on an exi channel
+ * @exi_channel:	channel
  *
- *	Deselects all EXI devices on the given channel.
- *
+ * Deselects all EXI devices on the given channel.
  */
 void exi_deselect(struct exi_channel *exi_channel)
 {
@@ -927,13 +912,14 @@ void exi_deselect(struct exi_channel *exi_channel)
 EXPORT_SYMBOL(exi_deselect);
 
 /**
- *	exi_transfer  -  Performs a read or write EXI transfer.
- *	@exi_channel:	channel
- *	@data:		pointer to data being read/written
- *	@len:		length of data
- *	@opcode:	operation code (EXI_OP_{READ,READWRITE,WRITE})
+ * exi_transfer - Performs a read or write EXI transfer.
+ * @exi_channel:	channel
+ * @data:		pointer to data being read/written
+ * @len:		length of data
+ * @opcode:		operation code (EXI_OP_{READ,READWRITE,WRITE})
+ * @flags:		EXI_CMD_* flags
  *
- *	Read or write data on a given EXI channel.
+ * Read or write data on a given EXI channel.
  */
 void exi_transfer(struct exi_channel *exi_channel, void *data, size_t len,
 		   int opcode, unsigned long flags)
@@ -1190,14 +1176,16 @@ static int exi_disable_event(struct exi_channel *exi_channel,
 }
 
 /**
- *	exi_event_register  -  Registers an event on a given channel.
- *	@exi_channel:	channel
- *	@event_id:	event id
- *	@handler:	event handler
- *	@data:		data passed to event handler
+ * exi_event_register - Registers an event on a given channel.
+ * @exi_channel:	channel
+ * @event_id:		event id
+ * @exi_device:		the new owner of the event
+ * @handler:		event handler
+ * @data:		data passed to event handler
+ * @channel_mask:	TODO
  *
- *	Register a handler to be called whenever a specified event happens
- *	on the given channel.
+ * Register a handler to be called whenever a specified event happens
+ * on the given channel.
  */
 int exi_event_register(struct exi_channel *exi_channel, unsigned int event_id,
 		       struct exi_device *exi_device,
@@ -1229,11 +1217,11 @@ out:
 EXPORT_SYMBOL(exi_event_register);
 
 /**
- *	exi_event_unregister  -  Unregisters an event on a given channel.
- *	@exi_channel:	channel
- *	@event_id:	event id
+ * exi_event_unregister - Unregisters an event on a given channel.
+ * @exi_channel:	channel
+ * @event_id:		event id
  *
- *	Unregister a previously registered event handler.
+ * Unregister a previously registered event handler.
  */
 int exi_event_unregister(struct exi_channel *exi_channel, unsigned int event_id)
 {
@@ -1266,7 +1254,7 @@ static void exi_quiesce_channel(struct exi_channel *exi_channel, u32 csr_mask)
 
 	/* ack and mask all interrupts */
 	out_be32(exi_channel->io_base + EXI_CSR,
-		EXI_CSR_TCINT  | EXI_CSR_EXIINT | EXI_CSR_EXTIN | csr_mask);
+		EXI_CSR_TCINT | EXI_CSR_EXIINT | EXI_CSR_EXTIN | csr_mask);
 }
 
 /*
@@ -1282,13 +1270,11 @@ static void exi_quiesce_all_channels(u32 csr_mask)
 }
 
 /**
- *	exi_get_id  -  Returns the EXI ID of a device
- *	@exi_channel:	channel
- *	@device:	device number on channel
- *	@freq:		clock frequency index
+ * exi_get_id - Returns the EXI ID of a device
+ * @exi_device:		the device to be identified
  *
- *	Returns the EXI ID of an EXI device on a given channel.
- *	Might sleep.
+ * Returns the EXI ID of an EXI device on a given channel.
+ * Might sleep.
  */
 u32 exi_get_id(struct exi_device *exi_device)
 {

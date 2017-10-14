@@ -1,7 +1,7 @@
 /*
  * drivers/exi/exi-hw.h
  *
- * Nintendo GameCube EXpansion Interface support. Hardware routines.
+ * Nintendo GameCube EXternal Interface support. Hardware routines.
  * Copyright (C) 2004-2009 The GameCube Linux Team
  * Copyright (C) 2004,2005 Todd Jeffreys <todd@voidpointer.org>
  * Copyright (C) 2005,2006,2007,2008,2009 Albert Herranz
@@ -90,7 +90,7 @@ enum {
  */
 struct exi_event {
 	int			id;		/* event id */
-	struct exi_device	*owner;		/* device owning of the event */
+	struct exi_device	*owner;		/* device owning the event */
 	exi_event_handler_t	handler;
 	void			*data;
 	unsigned int		channel_mask;	/* channels used by handler */
