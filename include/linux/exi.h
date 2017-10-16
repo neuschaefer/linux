@@ -1,7 +1,7 @@
 /*
  * include/linux/exi.h
  *
- * Nintendo GameCube EXpansion Interface definitions
+ * Nintendo GameCube EXternal Interface definitions
  * Copyright (C) 2004-2009 The GameCube Linux Team
  * Copyright (C) 2004 Arthur Othieno <a.othieno@bluewin.ch>
  * Copyright (C) 2004,2005 Todd Jeffreys <todd@voidpointer.org>
@@ -25,8 +25,16 @@
 
 struct exi_channel;
 
-/*
+/**
+ * struct exi_device_id - Information for the EXI core to identify an EXI device
  *
+ * @channel:		The channel where the device can be found, or
+ * 			%EXI_CHANNEL_ANY to match devices on any channel.
+ * @device:		The device index where the device can be found, or
+ * 			%EXI_CHANNEL_ANY to match devices with any device
+ * 			index.
+ * @id:			The ID of the device, or %EXI_ID_NONE to match only by
+ * 			position.
  */
 struct exi_device_id {
 	unsigned int		channel;
@@ -40,8 +48,15 @@ struct exi_device_id {
 #define	EXI_ID_NONE	(EXI_ID_INVALID-1)
 };
 
-/*
+/**
+ * struct exi_device - An EXI device instance
  *
+ * @exi_channel:	The EXI channel for this device
+ * @eid:		The &struct exi_device_id that identifies the device
+ * @frequency:		The frequency to be used for transfers
+ * @flags:		Either 0 or %EXI_DEV_DYING
+ * @dev:		The &struct device to connect this struct with the
+ * 			kernel's driver model.
  */
 struct exi_device {
 	struct exi_channel	*exi_channel;
@@ -60,8 +75,19 @@ struct exi_device {
 struct exi_device *exi_get_exi_device(struct exi_channel *exi_channel,
 				      int device);
 
-/*
+/**
+ * struct exi_driver - A driver for an EXI device
  *
+ * @name:		The driver's name
+ * @eid_table:		A table of &struct exi_device_id to find compatible
+ * 			devices on the bus
+ * @frequency:		The frequency at which to run devices controlled by
+ * 			this driver. One of %EXI_CLK_1MHZ through
+ * 			%EXI_CLK_32MHZ.
+ * @probe:		The probe function
+ * @remove:		The remove function
+ * @driver:		The &struct device_driver to integrate with the
+ * 			kernel's driver model
  */
 struct exi_driver {
 	char			*name;
@@ -78,7 +104,7 @@ struct exi_driver {
 
 
 /*
- * EXpansion Interface devices and drivers.
+ * EXternal Interface devices and drivers.
  *
  */
 extern struct exi_device *exi_device_get(struct exi_device *exi_device);
@@ -117,7 +143,7 @@ extern u32 exi_get_id(struct exi_device *exi_device);
 extern void exi_quiesce(void);
 
 /*
- * EXpansion Interface channels.
+ * EXternal Interface channels.
  *
  */
 
@@ -148,10 +174,20 @@ extern int exi_event_unregister(struct exi_channel *exi_channel,
 				unsigned int event_id);
 
 
-/*
- * Commands.
- *
- *
+/**
+ * struct exi_command - An EXI bus command
+ * @opcode:		The bus operation to be performed. See EXI_OP_* below.
+ * @flags:		Flags to configure the bus operation: See EXI_CMD_*
+ * 			below.
+ * @data:		A pointer to the data to be read or written.
+ * @len:		The length of the data to be read or written.
+ * @bytes_left:		TODO
+ * @dma_addr:		A pointer to a buffer to be used for EXI DMA
+ * @dma_len:		The length of the buffer to be used for EXI DMA
+ * @done_data:		A parameter for ``done``
+ * @done:		Completion callback
+ * @exi_channel:	The channel that this command will be performed on
+ * @exi_device:		The device that this command will be performed on
  */
 struct exi_command {
 	int			opcode;
@@ -244,7 +280,7 @@ static inline void exi_op_transfer(struct exi_command *cmd,
 
 
 /*
- * EXpansion Interface interfaces.
+ * EXternal Interface interfaces.
  *
  */
 
