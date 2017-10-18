@@ -60,6 +60,8 @@
 
 /*#define EXI_DEBUG 1*/
 
+#define pr_fmt(fmt) "exi: " fmt
+
 #include <linux/types.h>
 #include <linux/dma-mapping.h>
 #include <linux/wait.h>
@@ -70,9 +72,6 @@
 #include <linux/exi.h>
 #include "exi-hw.h"
 
-
-#define drv_printk(level, format, arg...) \
-	printk(level "exi: " format , ## arg)
 
 #ifdef EXI_DEBUG
 #  define DBG(fmt, args...) \
@@ -403,10 +402,8 @@ static void exi_wait_for_transfer_raw(struct exi_channel *exi_channel)
 		timed_out = time_after(jiffies, deadline);
 	}
 
-	if (timed_out) {
-		drv_printk(KERN_ERR, "exi transfer took too long, "
-			   "is your hardware ok?");
-	}
+	if (timed_out)
+		pr_err("exi transfer took too long, is your hardware ok?\n");
 
 	/* ack the Transfer Complete interrupt */
 	spin_lock_irqsave(&exi_channel->io_lock, flags);
@@ -1348,7 +1345,7 @@ int exi_hw_init(char *module_name, struct resource *mem, unsigned int irq)
 
 	exi_io_mem = ioremap(mem->start, mem->end - mem->start + 1);
 	if (!exi_io_mem) {
-		drv_printk(KERN_ERR, "ioremap failed\n");
+		pr_err("ioremap failed\n");
 		return -ENOMEM;
 	}
 
@@ -1365,7 +1362,7 @@ int exi_hw_init(char *module_name, struct resource *mem, unsigned int irq)
 	/* register the exi interrupt handler */
 	result = request_irq(irq, exi_irq_handler, 0, module_name, NULL);
 	if (result)
-		drv_printk(KERN_ERR, "failed to register IRQ %d\n", irq);
+		pr_err("failed to register IRQ %d\n", irq);
 
 	return result;
 }
