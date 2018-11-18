@@ -54,6 +54,7 @@
 
 #define KBC_ROW_CFG0_0	0x8
 #define KBC_COL_CFG0_0	0x18
+#define KBC_TO_CNT_0	0x24
 #define KBC_INIT_DLY_0	0x28
 #define KBC_RPT_DLY_0	0x2c
 #define KBC_KP_ENT0_0	0x30
@@ -61,6 +62,8 @@
 #define KBC_ROW0_MASK_0	0x38
 
 #define KBC_ROW_SHIFT	3
+#define DEFAULT_SCAN_COUNT 2
+#define DEFAULT_INIT_DLY   5
 
 struct tegra_kbc {
 	void __iomem *mmio;
@@ -78,6 +81,9 @@ struct tegra_kbc {
 	unsigned int num_pressed_keys;
 	struct timer_list timer;
 	struct clk *clk;
+	int is_open;
+	unsigned long scan_timeout_count;
+	unsigned long one_scan_time;
 };
 
 static const u32 tegra_kbc_default_keymap[] = {
@@ -418,11 +424,14 @@ static void tegra_kbc_config_pins(struct tegra_kbc *kbc)
 		row_cfg &= ~r_mask;
 		col_cfg &= ~c_mask;
 
-		if (pdata->pin_cfg[i].is_row)
-			row_cfg |= ((pdata->pin_cfg[i].num << 1) | 1) << r_shft;
-		else
-			col_cfg |= ((pdata->pin_cfg[i].num << 1) | 1) << c_shft;
-
+		if (pdata->pin_cfg[i].en) {
+			if (pdata->pin_cfg[i].is_row)
+				row_cfg |= ((pdata->pin_cfg[i].num << 1) | 1)
+						<< r_shft;
+			else
+				col_cfg |= ((pdata->pin_cfg[i].num << 1) | 1)
+						<< c_shft;
+		}
 		writel(row_cfg, kbc->mmio + r_offs);
 		writel(col_cfg, kbc->mmio + c_offs);
 	}
@@ -436,6 +445,7 @@ static int tegra_kbc_start(struct tegra_kbc *kbc)
 	u32 val = 0;
 
 	clk_enable(kbc->clk);
+	kbc->is_open = 1;
 
 	/* Reset the KBC controller to clear all previous status.*/
 	tegra_periph_reset_assert(kbc->clk);
@@ -455,6 +465,9 @@ static int tegra_kbc_start(struct tegra_kbc *kbc)
 	val |= KBC_CONTROL_FIFO_CNT_INT_EN;  /* interrupt on FIFO threshold */
 	val |= KBC_CONTROL_KBC_EN;     /* enable */
 	writel(val, kbc->mmio + KBC_CONTROL_0);
+
+	writel(DEFAULT_INIT_DLY, kbc->mmio + KBC_INIT_DLY_0);
+	writel(kbc->scan_timeout_count, kbc->mmio + KBC_TO_CNT_0);
 
 	/*
 	 * Compute the delay(ns) from interrupt mode to continuous polling
@@ -502,6 +515,7 @@ static void tegra_kbc_stop(struct tegra_kbc *kbc)
 	del_timer_sync(&kbc->timer);
 
 	clk_disable(kbc->clk);
+	kbc->is_open = 0;
 }
 
 static int tegra_kbc_open(struct input_dev *dev)
@@ -563,6 +577,9 @@ static int __devinit tegra_kbc_probe(struct platform_device *pdev)
 	int num_rows = 0;
 	unsigned int debounce_cnt;
 	unsigned int scan_time_rows;
+	unsigned long scan_tc;
+
+	dev_dbg(&pdev->dev, "KBC: tegra_kbc_probe\n");
 
 	if (!pdata)
 		return -EINVAL;
@@ -583,12 +600,13 @@ static int __devinit tegra_kbc_probe(struct platform_device *pdev)
 	}
 
 	kbc = kzalloc(sizeof(*kbc), GFP_KERNEL);
+	if (!kbc)
+		return -ENOMEM;
 	input_dev = input_allocate_device();
-	if (!kbc || !input_dev) {
+	if (!input_dev) {
 		err = -ENOMEM;
-		goto err_free_mem;
+		goto err_free_kbc;
 	}
-
 	kbc->pdata = pdata;
 	kbc->idev = input_dev;
 	kbc->irq = irq;
@@ -599,7 +617,7 @@ static int __devinit tegra_kbc_probe(struct platform_device *pdev)
 	if (!res) {
 		dev_err(&pdev->dev, "failed to request I/O memory\n");
 		err = -EBUSY;
-		goto err_free_mem;
+		goto err_free_input_dev;
 	}
 
 	kbc->mmio = ioremap(res->start, resource_size(res));
@@ -616,6 +634,7 @@ static int __devinit tegra_kbc_probe(struct platform_device *pdev)
 		goto err_iounmap;
 	}
 
+	kbc->is_open = 0;
 	kbc->wake_enable_rows = 0;
 	kbc->wake_enable_cols = 0;
 	for (i = 0; i < pdata->wake_cnt; i++) {
@@ -633,6 +652,17 @@ static int __devinit tegra_kbc_probe(struct platform_device *pdev)
 	scan_time_rows = (KBC_ROW_SCAN_TIME + debounce_cnt) * num_rows;
 	kbc->repoll_dly = KBC_ROW_SCAN_DLY + scan_time_rows + pdata->repeat_cnt;
 	kbc->repoll_dly = ((kbc->repoll_dly * KBC_CYCLE_USEC) + 999) / 1000;
+
+	if (pdata->scan_count)
+		scan_tc = DEFAULT_INIT_DLY + (scan_time_rows +
+				pdata->repeat_cnt) * pdata->scan_count;
+	else
+		scan_tc = DEFAULT_INIT_DLY + (scan_time_rows +
+				pdata->repeat_cnt) * DEFAULT_SCAN_COUNT;
+
+	kbc->one_scan_time = scan_time_rows + pdata->repeat_cnt;
+	/* Bit 19:0 is for scan timeout count */
+	kbc->scan_timeout_count = scan_tc & 0xFFFFF;
 
 	input_dev->name = pdev->name;
 	input_dev->id.bustype = BUS_HOST;
@@ -684,10 +714,10 @@ err_iounmap:
 	iounmap(kbc->mmio);
 err_free_mem_region:
 	release_mem_region(res->start, resource_size(res));
-err_free_mem:
+err_free_input_dev:
 	input_free_device(kbc->idev);
+err_free_kbc:
 	kfree(kbc);
-
 	return err;
 }
 
@@ -716,8 +746,31 @@ static int tegra_kbc_suspend(struct device *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev);
 	struct tegra_kbc *kbc = platform_get_drvdata(pdev);
+	int timeout;
+	unsigned long int_st;
+
+	dev_dbg(&pdev->dev, "KBC: tegra_kbc_suspend\n");
+
+	if (!kbc->is_open)
+		return 0;
 
 	if (device_may_wakeup(&pdev->dev)) {
+		timeout = DIV_ROUND_UP((kbc->scan_timeout_count +
+				kbc->one_scan_time), 32);
+		timeout = DIV_ROUND_UP(timeout, 10);
+		while (timeout--) {
+			int_st = readl(kbc->mmio + KBC_INT_0);
+			if (int_st & 0x8) {
+				msleep(10);
+				continue;
+			}
+			break;
+		}
+		int_st = readl(kbc->mmio + KBC_INT_0);
+		if (int_st & 0x8)
+			dev_err(&pdev->dev, "KBC: Controller is not in "
+				"wakeupmode\n");
+
 		tegra_kbc_setup_wakekeys(kbc, true);
 		enable_irq_wake(kbc->irq);
 		/* Forcefully clear the interrupt status */
@@ -738,6 +791,9 @@ static int tegra_kbc_resume(struct device *dev)
 	struct platform_device *pdev = to_platform_device(dev);
 	struct tegra_kbc *kbc = platform_get_drvdata(pdev);
 	int err = 0;
+
+	if (!kbc->is_open)
+		return tegra_kbc_start(kbc);
 
 	if (device_may_wakeup(&pdev->dev)) {
 		disable_irq_wake(kbc->irq);

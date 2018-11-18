@@ -9,3 +9,6 @@ obj-$(CONFIG_MSDOS_FS) += msdos.o
 fat-y := cache.o dir.o fatent.o file.o inode.o misc.o
 vfat-y := namei_vfat.o
 msdos-y := namei_msdos.o
+
+fat-$(CONFIG_SNSC_FS_FAT_GC)	+= gc.o
+fat-$(CONFIG_SNSC_FS_FAT_TIMEZONE)	+= tz.o

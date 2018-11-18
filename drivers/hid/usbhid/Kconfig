@@ -44,6 +44,12 @@ config USB_HIDDEV
 
 	  If unsure, say Y.
 
+config USB_HID_SONY_CTRL
+	tristate "USB Sony WirelessController support"
+	depends on USB
+	---help---
+	Support for Sony Wireless Controller.
+
 menu "USB HID Boot Protocol drivers"
 	depends on USB!=n && USB_HID!=y && EXPERT
 

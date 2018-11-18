@@ -2,9 +2,12 @@
  * arch/arch/mach-tegra/timer.c
  *
  * Copyright (C) 2010 Google, Inc.
+ * Copyright (C) 2011 NVIDIA Corporation.
  *
  * Author:
  *	Colin Cross <ccross@google.com>
+ *
+ * Copyright (C) 2010-2011 NVIDIA Corporation.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -27,39 +30,30 @@
 #include <linux/clocksource.h>
 #include <linux/clk.h>
 #include <linux/io.h>
+#include <linux/syscore_ops.h>
 
 #include <asm/mach/time.h>
 #include <asm/localtimer.h>
+#include <asm/smp_twd.h>
 #include <asm/sched_clock.h>
 
 #include <mach/iomap.h>
 #include <mach/irqs.h>
-#include <mach/suspend.h>
 
 #include "board.h"
 #include "clock.h"
-
-#define RTC_SECONDS            0x08
-#define RTC_SHADOW_SECONDS     0x0c
-#define RTC_MILLISECONDS       0x10
-
-#define TIMERUS_CNTR_1US 0x10
-#define TIMERUS_USEC_CFG 0x14
-#define TIMERUS_CNTR_FREEZE 0x4c
-
-#define TIMER1_BASE 0x0
-#define TIMER2_BASE 0x8
-#define TIMER3_BASE 0x50
-#define TIMER4_BASE 0x58
-
-#define TIMER_PTV 0x0
-#define TIMER_PCR 0x4
+#include "timer.h"
 
 static void __iomem *timer_reg_base = IO_ADDRESS(TEGRA_TMR1_BASE);
 static void __iomem *rtc_base = IO_ADDRESS(TEGRA_RTC_BASE);
 
 static struct timespec persistent_ts;
 static u64 persistent_ms, last_persistent_ms;
+static u32 usec_config;
+static u32 usec_offset;
+static bool usec_suspended;
+
+static u32 system_timer;
 
 #define timer_writel(value, reg) \
 	__raw_writel(value, (u32)timer_reg_base + (reg))
@@ -72,7 +66,7 @@ static int tegra_timer_set_next_event(unsigned long cycles,
 	u32 reg;
 
 	reg = 0x80000000 | ((cycles > 1) ? (cycles-1) : 0);
-	timer_writel(reg, TIMER3_BASE + TIMER_PTV);
+	timer_writel(reg, system_timer + TIMER_PTV);
 
 	return 0;
 }
@@ -82,12 +76,12 @@ static void tegra_timer_set_mode(enum clock_event_mode mode,
 {
 	u32 reg;
 
-	timer_writel(0, TIMER3_BASE + TIMER_PTV);
+	timer_writel(0, system_timer + TIMER_PTV);
 
 	switch (mode) {
 	case CLOCK_EVT_MODE_PERIODIC:
 		reg = 0xC0000000 | ((1000000/HZ)-1);
-		timer_writel(reg, TIMER3_BASE + TIMER_PTV);
+		timer_writel(reg, system_timer + TIMER_PTV);
 		break;
 	case CLOCK_EVT_MODE_ONESHOT:
 		break;
@@ -128,15 +122,23 @@ static DEFINE_CLOCK_DATA(cd);
 #define SC_MULT		4194304000u
 #define SC_SHIFT	22
 
+static u32 notrace tegra_read_usec(void)
+{
+	u32 cyc = usec_offset;
+	if (!usec_suspended)
+		cyc += timer_readl(TIMERUS_CNTR_1US);
+	return cyc;
+}
+
 unsigned long long notrace sched_clock(void)
 {
-	u32 cyc = timer_readl(TIMERUS_CNTR_1US);
+	u32 cyc = tegra_read_usec();
 	return cyc_to_fixed_sched_clock(&cd, cyc, (u32)~0, SC_MULT, SC_SHIFT);
 }
 
 static void notrace tegra_update_sched_clock(void)
 {
-	u32 cyc = timer_readl(TIMERUS_CNTR_1US);
+	u32 cyc = tegra_read_usec();
 	update_sched_clock(&cd, cyc, (u32)~0);
 }
 
@@ -146,7 +148,7 @@ static void notrace tegra_update_sched_clock(void)
  * tegra_rtc driver could be executing to avoid race conditions
  * on the RTC shadow register
  */
-u64 tegra_rtc_read_ms(void)
+static u64 tegra_rtc_read_ms(void)
 {
 	u32 ms = readl(rtc_base + RTC_MILLISECONDS);
 	u32 s = readl(rtc_base + RTC_SHADOW_SECONDS);
@@ -179,7 +181,7 @@ void read_persistent_clock(struct timespec *ts)
 static irqreturn_t tegra_timer_interrupt(int irq, void *dev_id)
 {
 	struct clock_event_device *evt = (struct clock_event_device *)dev_id;
-	timer_writel(1<<30, TIMER3_BASE + TIMER_PCR);
+	timer_writel(1<<30, system_timer + TIMER_PCR);
 	evt->event_handler(evt);
 	return IRQ_HANDLED;
 }
@@ -189,13 +191,60 @@ static struct irqaction tegra_timer_irq = {
 	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_TRIGGER_HIGH,
 	.handler	= tegra_timer_interrupt,
 	.dev_id		= &tegra_clockevent,
-	.irq		= INT_TMR3,
 };
+
+static int tegra_timer_suspend(void)
+{
+	usec_config = timer_readl(TIMERUS_USEC_CFG);
+
+	usec_offset += timer_readl(TIMERUS_CNTR_1US);
+	usec_suspended = true;
+
+	return 0;
+}
+
+static void tegra_timer_resume(void)
+{
+	timer_writel(usec_config, TIMERUS_USEC_CFG);
+
+	usec_offset -= timer_readl(TIMERUS_CNTR_1US);
+	usec_suspended = false;
+}
+
+static struct syscore_ops tegra_timer_syscore_ops = {
+	.suspend = tegra_timer_suspend,
+	.resume = tegra_timer_resume,
+};
+
+#ifdef CONFIG_HAVE_ARM_TWD
+void tegra_twd_suspend(struct tegra_twd_context *context)
+{
+	context->twd_ctrl = readl(twd_base + TWD_TIMER_CONTROL);
+	context->twd_load = readl(twd_base + TWD_TIMER_LOAD);
+	if ((context->twd_load == 0) &&
+	    (context->twd_ctrl & TWD_TIMER_CONTROL_PERIODIC) &&
+	    (context->twd_ctrl & (TWD_TIMER_CONTROL_ENABLE |
+				  TWD_TIMER_CONTROL_IT_ENABLE))) {
+		WARN("%s: TWD enabled but counter was 0\n", __func__);
+		context->twd_load = 1;
+	}
+	__raw_writel(0, twd_base + TWD_TIMER_CONTROL);
+}
+
+void tegra_twd_resume(struct tegra_twd_context *context)
+{
+	BUG_ON((context->twd_load == 0) &&
+	       (context->twd_ctrl & TWD_TIMER_CONTROL_PERIODIC) &&
+	       (context->twd_ctrl & (TWD_TIMER_CONTROL_ENABLE |
+				     TWD_TIMER_CONTROL_IT_ENABLE)));
+	writel(context->twd_load, twd_base + TWD_TIMER_LOAD);
+	writel(context->twd_ctrl, twd_base + TWD_TIMER_CONTROL);
+}
+#endif
 
 static void __init tegra_init_timer(void)
 {
 	struct clk *clk;
-	unsigned long rate = clk_measure_input_freq();
 	int ret;
 
 	clk = clk_get_sys("timer", NULL);
@@ -214,22 +263,11 @@ static void __init tegra_init_timer(void)
 	twd_base = IO_ADDRESS(TEGRA_ARM_PERIF_BASE + 0x600);
 #endif
 
-	switch (rate) {
-	case 12000000:
-		timer_writel(0x000b, TIMERUS_USEC_CFG);
-		break;
-	case 13000000:
-		timer_writel(0x000c, TIMERUS_USEC_CFG);
-		break;
-	case 19200000:
-		timer_writel(0x045f, TIMERUS_USEC_CFG);
-		break;
-	case 26000000:
-		timer_writel(0x0019, TIMERUS_USEC_CFG);
-		break;
-	default:
-		WARN(1, "Unknown clock rate");
-	}
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+	tegra2_init_timer(&system_timer, &tegra_timer_irq.irq);
+#else
+	tegra3_init_timer(&system_timer, &tegra_timer_irq.irq);
+#endif
 
 	init_fixed_sched_clock(&cd, tegra_update_sched_clock, 32,
 			       1000000, SC_MULT, SC_SHIFT);
@@ -253,22 +291,10 @@ static void __init tegra_init_timer(void)
 	tegra_clockevent.cpumask = cpu_all_mask;
 	tegra_clockevent.irq = tegra_timer_irq.irq;
 	clockevents_register_device(&tegra_clockevent);
+
+	register_syscore_ops(&tegra_timer_syscore_ops);
 }
 
 struct sys_timer tegra_timer = {
 	.init = tegra_init_timer,
 };
-
-#ifdef CONFIG_PM
-static u32 usec_config;
-
-void tegra_timer_suspend(void)
-{
-	usec_config = timer_readl(TIMERUS_USEC_CFG);
-}
-
-void tegra_timer_resume(void)
-{
-	timer_writel(usec_config, TIMERUS_USEC_CFG);
-}
-#endif

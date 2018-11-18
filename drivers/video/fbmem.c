@@ -1,3 +1,4 @@
+/* 2012-04-12: File changed by Sony Corporation */
 /*
  *  linux/drivers/video/fbmem.c
  *
@@ -32,6 +33,9 @@
 #include <linux/device.h>
 #include <linux/efi.h>
 #include <linux/fb.h>
+#ifdef CONFIG_MACH_NBX03
+#include <linux/delay.h>
+#endif
 
 #include <asm/fb.h>
 
@@ -1045,6 +1049,10 @@ fb_blank(struct fb_info *info, int blank)
 
 		event.info = info;
 		event.data = &blank;
+#ifdef CONFIG_MACH_NBX03
+		/* wait over 200ms from data out to pwm enable */
+		msleep(200);
+#endif
 		fb_notifier_call_chain(FB_EVENT_BLANK, &event);
 	}
 

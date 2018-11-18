@@ -1,6 +1,8 @@
+# 2012-04-12: File changed by Sony Corporation
 #
 # Makefile for the input core drivers.
 #
+GCOV_PROFILE_tegra-kbc.o := y
 
 # Each configuration option enables a list of files.
 
@@ -14,6 +16,7 @@ obj-$(CONFIG_KEYBOARD_DAVINCI)		+= davinci_keyscan.o
 obj-$(CONFIG_KEYBOARD_EP93XX)		+= ep93xx_keypad.o
 obj-$(CONFIG_KEYBOARD_GPIO)		+= gpio_keys.o
 obj-$(CONFIG_KEYBOARD_GPIO_POLLED)	+= gpio_keys_polled.o
+obj-$(CONFIG_KEYBOARD_INTERRUPT)	+= interrupt_keys.o
 obj-$(CONFIG_KEYBOARD_TCA6416)		+= tca6416-keypad.o
 obj-$(CONFIG_KEYBOARD_HIL)		+= hil_kbd.o
 obj-$(CONFIG_KEYBOARD_HIL_OLD)		+= hilkbd.o
@@ -48,3 +51,4 @@ obj-$(CONFIG_KEYBOARD_TNETV107X)	+= tnetv107x-keypad.o
 obj-$(CONFIG_KEYBOARD_TWL4030)		+= twl4030_keypad.o
 obj-$(CONFIG_KEYBOARD_XTKBD)		+= xtkbd.o
 obj-$(CONFIG_KEYBOARD_W90P910)		+= w90p910_keypad.o
+obj-$(CONFIG_KEYBOARD_NBX_EC_POWERKEY)	+= nbx_ec_powerkey.o

@@ -18,12 +18,16 @@
 #define __ASM_ARM_ARCH_TEGRA_SDHCI_H
 
 #include <linux/mmc/host.h>
+#include <asm/mach/mmc.h>
 
 struct tegra_sdhci_platform_data {
 	int cd_gpio;
 	int wp_gpio;
 	int power_gpio;
 	int is_8bit;
+	unsigned int max_clk_limit;
+	unsigned int tap_delay;
+	struct mmc_platform_data mmc_data;
 };
 
 #endif

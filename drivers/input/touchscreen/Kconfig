@@ -1,3 +1,4 @@
+# 2012-04-12: File changed by Sony Corporation
 #
 # Touchscreen driver configuration
 #
@@ -362,6 +363,19 @@ config TOUCHSCREEN_MIGOR
 	  To compile this driver as a module, choose M here: the
 	  module will be called migor_ts.
 
+config TOUCHSCREEN_PANJIT_I2C
+	tristate "PANJIT I2C touchscreen driver"
+	depends on I2C
+	default n
+	help
+	  Say Y here to enable PANJIT I2C capacitive touchscreen support,
+	  covering devices such as the MGG1010AI06 and EGG1010AI06
+
+	  If unsure, say N
+
+	  To compile this driver as a module, choose M here: the module will
+	  be called panjit_i2c.
+
 config TOUCHSCREEN_TNETV107X
 	tristate "TI TNETV107X touchscreen support"
 	depends on ARCH_DAVINCI_TNETV107X
@@ -370,6 +384,12 @@ config TOUCHSCREEN_TNETV107X
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called tnetv107x-ts.
+
+config TOUCHSCREEN_SYNAPTICS_I2C_RMI
+	tristate "Synaptics i2c touchscreen"
+	depends on I2C
+	help
+	  This enables support for Synaptics RMI over I2C based touchscreens.
 
 config TOUCHSCREEN_TOUCHRIGHT
 	tristate "Touchright serial touchscreen"
@@ -713,5 +733,20 @@ config TOUCHSCREEN_TPS6507X
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called tps6507x_ts.
+
+config TOUCHSCREEN_TMA300
+        tristate "NBX TOUCH based touchscreens"
+
+config TOUCHSCREEN_TMA300_ROTATE_180
+        bool "Rotate lower coordinate system 180 degrees"
+        depends on TOUCHSCREEN_TMA300
+
+config TOUCHSCREEN_CYTTSP_I2C
+	tristate "Cypress touchscreen i2c driver"
+	help
+	  Say Y here if you have a Cypress based touchscreen.
+	  This is the i2c version of the driver.
+
+	  To compile this driver as a module, choose M here.
 
 endif

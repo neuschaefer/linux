@@ -1,0 +1,153 @@
+comment "SNSC related options"
+	depends on SNSC
+
+config SNSC_FS_FLUSH_HARDWARE_CACHE
+	bool "Flush hardware cache"
+	depends on SNSC
+	default y
+	help
+	  If you want to flush hardware cache after syncing blockdev buffers,
+	  say Y.
+
+config SNSC_FS_OSYNC_INODE_ONLY
+	bool "Add generic_osync_inode_only()"
+	depends on SNSC
+	default n
+	help
+
+	  Add generic_osync_inode_only() for fs-osync-inode.
+	  fs-osync-inode patch called generic_osync_inode().
+	  But it was obsoleted. So make new function generic_osync_inode_only().
+	  This function has a function that is simpler than generic_osync_inode().
+
+config SNSC_FS_OSYNC_ATTR
+	bool "Sync inode when attribute is changed"
+	depends on SNSC_FS_OSYNC_INODE_ONLY
+	default y
+	help
+	  This option add sync operation after attribute changed, if
+	  sync mount option specified.
+
+config SNSC_FS_IOCTL_SYNC
+	bool "Enable ioctl command to sync specified file system"
+	depends on SNSC
+	default n
+
+config SNSC_FS_CLEAR_MAPPING_ERRORS
+	bool "Clear mapping errors when partition is rescaned."
+	depends on SNSC
+	default n
+
+config SNSC_FS_VFAT_POSIX_ATTR
+	bool "VFAT POSIX attribute support"
+	depends on SNSC && VFAT_FS
+	default n
+
+config SNSC_FS_FAT_LOOKUP_HINT
+	bool "Use hint on scanning directories for FAT"
+	depends on SNSC && (MSDOS_FS || VFAT_FS)
+	default n
+
+config SNSC_FS_VFAT_AVOID_DOUBLE_LINK
+	bool "Fix write ordering issue on rename for VFAT"
+	depends on SNSC && VFAT_FS
+	default n
+
+config SNSC_FS_VFAT_AVOID_DOUBLE_LINK_DEFAULT
+	int "Default value of avoiding double link"
+	depends on SNSC_FS_VFAT_AVOID_DOUBLE_LINK
+	default 1
+
+config SNSC_FS_FAT12_NO_SECTOR_BOUNDARY
+	bool "Allocate no new entry which accross sector boundary for FAT12"
+	depends on SNSC && (MSDOS_FS || VFAT_FS)
+	default n
+
+config SNSC_FS_FAT_UNIX_DATE
+	bool "Check and correct invalid date over time_t range for FAT"
+	depends on SNSC && (MSDOS_FS || VFAT_FS)
+	default n
+
+config SNSC_FS_FAT_RELAX_SYNC
+	bool "Loose I/O submission ordering control with 'sync' for FAT"
+	depends on SNSC && (MSDOS_FS || VFAT_FS)
+	default n
+	help
+	  This option introduces an new option "relax_sync", works with "sync".
+	  This makes I/O submission ordering control loose a little bit.  For
+	  instance, with this option, fat permits potential I/O request merge
+	  for file allocation table and async file allocation table mirroring.
+
+config SNSC_FS_FAT_GC
+	bool "Enable 'gc' option for FAT"
+	depends on SNSC && (MSDOS_FS || VFAT_FS)
+	default n
+	help
+	  This option introduces an new option "gc".
+
+config SNSC_FS_FAT_BATCH_SYNC
+	bool "Enable 'batch_sync' option for FAT"
+	depends on SNSC && (MSDOS_FS || VFAT_FS)
+	default n
+	help
+	  This option introduces an new option "batch_sync".
+
+config SNSC_FS_FAT_FIX_UTF8
+	bool "Enable to skip long name over d_name length"
+	depends on SNSC && (MSDOS_FS || VFAT_FS)
+	default y
+
+config SNSC_FS_ROOT_VFAT
+	bool "Root file system on VFAT"
+	depends on SNSC_FS_VFAT_POSIX_ATTR
+	help
+	  If you have enabled VFAT POSIX attribute support, and you want
+	  to be able to use the VFAT image as a root file system, say Y.
+
+config SNSC_FS_VFAT_COMPARE_UNICODE
+	bool "Enable 'comp_uni' option for VFAT"
+	depends on SNSC && VFAT_FS
+	default n
+	help
+	  This option introduces an new option "comp_uni".
+
+config SNSC_FS_FAT_TIMEZONE
+	bool "Enable 'timezone' option for FAT"
+	depends on SNSC && (MSDOS_FS || VFAT_FS)
+	default n
+	help
+	  This option introduces an new option "timezone".
+
+config SNSC_FS_VFAT_CLEAN_SHUTDOWN_BIT
+	bool "Enable 'clnshutbit' option for VFAT"
+	depends on SNSC && VFAT_FS
+	default n
+	help
+	  This option introduces an new option "clnshutbit".
+
+config SNSC_FS_VFAT_IGNORE_CRTIME
+	bool "Enable 'ignore_crtime' option for VFAT"
+	depends on SNSC && VFAT_FS
+	default n
+	help
+	  This option introduces an new option "ignore_crtime".
+
+config SNSC_FS_FAT_STRICT_CHECK_ON_BOOT_SECTOR
+	bool "Enables strict check on fat boot sector"
+	depends on SNSC && (MSDOS_FS || VFAT_FS)
+
+config SNSC_FS_VFAT_CHECK_DISK
+	bool "Enables 'check_disk' option for VFAT"
+	depends on SNSC && VFAT_FS && SNSC_BLOCK_K3D
+
+config SNSC_FS_FAT_FLUSH_NO_WAIT_AT_CLOSING_CLEAN_FILES
+	bool "Avoid wait at closing clean files"
+	depends on SNSC && (MSDOS_FS || VFAT_FS)
+	default y
+	help
+	  Avoid wait at closing clean files when 'flush' option is specified.
+
+config SNSC_FS_FAT_IOCTL_EXPAND_SIZE
+	bool "Enable ioctl command to expand file size without filling a gap"
+	depends on SNSC && (MSDOS_FS || VFAT_FS)
+	default n

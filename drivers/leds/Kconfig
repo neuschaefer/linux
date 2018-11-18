@@ -1,3 +1,5 @@
+# 2012-04-12: File changed by Sony Corporation
+
 menuconfig NEW_LEDS
 	bool "LED Support"
 	help
@@ -379,6 +381,12 @@ config LEDS_NETXBIG
 	  and 5Big Network v2 boards. The LEDs are wired to a CPLD and are
 	  controlled through a GPIO extension bus.
 
+config LEDS_NBX_EC
+	tristate "LED Support for NBX EC"
+	depends on LEDS_CLASS && NBX_EC_IPC
+	help
+	  This option enables support for NBX EC
+
 config LEDS_TRIGGERS
 	bool "LED Trigger support"
 	depends on LEDS_CLASS
@@ -445,6 +453,12 @@ config LEDS_TRIGGER_DEFAULT_ON
 	help
 	  This allows LEDs to be initialised in the ON state.
 	  If unsure, say Y.
+
+config LEDS_TRIGGER_SLEEP
+	tristate "LED Sleep Mode Trigger"
+	depends on LEDS_TRIGGERS && HAS_EARLYSUSPEND
+	help
+	  This turns LEDs on when the screen is off but the cpu still running.
 
 comment "iptables trigger is under Netfilter config (LED target)"
 	depends on LEDS_TRIGGERS

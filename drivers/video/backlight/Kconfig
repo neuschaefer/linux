@@ -1,3 +1,4 @@
+# 2012-04-12: File changed by Sony Corporation
 #
 # Backlight & LCD drivers configuration
 #
@@ -230,6 +231,15 @@ config BACKLIGHT_PWM
 	  If you have a LCD backlight adjustable by PWM, say Y to enable
 	  this driver.
 
+config BACKLIGHT_TEGRA_PWM
+	bool "Tegra PMx based PWM Backlight Driver"
+	depends on TEGRA_DC
+	help
+	  Enable support for Tegra2 DC pwm backlight.
+
+	  If you have a pwm backlight adjustable by the DC PM0 or PM1 signal
+	  control on tegra, say Y to enable this driver.
+
 config BACKLIGHT_DA903X
 	tristate "Backlight Driver for DA9030/DA9034 using WLED"
 	depends on PMIC_DA903X
@@ -314,6 +324,21 @@ config BACKLIGHT_PCF50633
 	help
 	  If you have a backlight driven by a NXP PCF50633 MFD, say Y here to
 	  enable its driver.
+
+config BACKLIGHT_AAT2870
+	bool "AnalogicTech AAT2870 Backlight"
+	depends on BACKLIGHT_CLASS_DEVICE && MFD_AAT2870_CORE
+	default n
+	help
+	  If you have a AnalogicTech AAT2870 say Y to enable the
+	  backlight driver.
+
+config BACKLIGHT_NBX02
+	tristate "nbx02 PWM based Backlight Driver"
+	depends on HAVE_PWM
+	help
+	  If you have a LCD backlight adjustable by nbx02, say Y to enable
+	  this driver.
 
 endif # BACKLIGHT_CLASS_DEVICE
 

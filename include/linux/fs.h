@@ -317,6 +317,7 @@ struct inodes_stat_t {
 #define BMAP_IOCTL 1		/* obsolete - kept for compatibility */
 #define FIBMAP	   _IO(0x00,1)	/* bmap access */
 #define FIGETBSZ   _IO(0x00,2)	/* get the block size used for bmap */
+#define FIOFLSBUF  _IO(0x00,3)  /* sync a file system */
 #define FIFREEZE	_IOWR('X', 119, int)	/* Freeze */
 #define FITHAW		_IOWR('X', 120, int)	/* Thaw */
 #define FITRIM		_IOWR('X', 121, struct fstrim_range)	/* Trim */
@@ -1787,8 +1788,16 @@ static inline void file_accessed(struct file *file)
 		touch_atime(file->f_path.mnt, file->f_path.dentry);
 }
 
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC
+void mark_inode_clean(struct inode *inode);
+#endif
+
 int sync_inode(struct inode *inode, struct writeback_control *wbc);
 int sync_inode_metadata(struct inode *inode, int wait);
+
+#ifdef CONFIG_SNSC_FS_OSYNC_INODE_ONLY
+int generic_osync_inode_only(struct inode *inode);
+#endif
 
 struct file_system_type {
 	const char *name;

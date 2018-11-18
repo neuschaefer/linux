@@ -83,6 +83,10 @@
 #define	HIDP_WAITING_FOR_RETURN		10
 #define HIDP_WAITING_FOR_SEND_ACK	11
 
+#ifdef CONFIG_BT_HID_SONY_CTRL
+#define HIDP_DATA_SIZE_TRUE 0x08
+#endif //CONFIG_BT_HID_SONY_CTRL
+
 struct hidp_connadd_req {
 	int   ctrl_sock;	// Connected control socket
 	int   intr_sock;	// Connteted interrupt socket

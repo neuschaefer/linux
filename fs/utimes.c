@@ -103,6 +103,10 @@ static int utimes_common(struct path *path, struct timespec *times)
 	}
 	mutex_lock(&inode->i_mutex);
 	error = notify_change(path->dentry, &newattrs);
+#ifdef CONFIG_SNSC_FS_OSYNC_ATTR
+	if (!error && IS_SYNC(inode))
+		generic_osync_inode_only(inode);
+#endif
 	mutex_unlock(&inode->i_mutex);
 
 mnt_drop_write_and_out:

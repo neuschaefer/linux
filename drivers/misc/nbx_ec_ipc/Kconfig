@@ -1,0 +1,20 @@
+# 2012-04-12: File added and changed by Sony Corporation
+# NBX EC IPC
+
+config NBX_EC_IPC
+       tristate "Enable NBX EC IPC driver"
+       depends on MACH_NBX02 || MACH_NBX03
+       help
+         This option enables support NBX EC IPC
+
+config NBX_EC_TTY
+       tristate "Enable NBX EC IR tty driver"
+       depends on NBX_EC_IPC
+       help
+         This option enables support NBX EC IR tty
+
+config NBX_EC_IPC_LID_SWITCH
+       tristate "Enable NBX EC lid switch driver"
+       depends on NBX_EC_IPC
+       help
+         This option enables support NBX EC lid switch

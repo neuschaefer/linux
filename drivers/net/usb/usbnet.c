@@ -65,7 +65,7 @@
  */
 #define RX_MAX_QUEUE_MEMORY (60 * 1518)
 #define	RX_QLEN(dev) (((dev)->udev->speed == USB_SPEED_HIGH) ? \
-			(RX_MAX_QUEUE_MEMORY/(dev)->rx_urb_size) : 4)
+			((dev)->rx_queue_enable ? (RX_MAX_QUEUE_MEMORY/(dev)->rx_urb_size) : 1) : 4)
 #define	TX_QLEN(dev) (((dev)->udev->speed == USB_SPEED_HIGH) ? \
 			(RX_MAX_QUEUE_MEMORY/(dev)->hard_mtu) : 4)
 
@@ -522,9 +522,6 @@ static void intr_complete (struct urb *urb)
 		break;
 	}
 
-	if (!netif_running (dev->net))
-		return;
-
 	memset(urb->transfer_buffer, 0, urb->transfer_buffer_length);
 	status = usb_submit_urb (urb, GFP_ATOMIC);
 	if (status != 0)
@@ -668,7 +665,7 @@ int usbnet_stop (struct net_device *net)
 	if (!(info->flags & FLAG_AVOID_UNLINK_URBS))
 		usbnet_terminate_urbs(dev);
 
-	usb_kill_urb(dev->interrupt);
+	/* usb_kill_urb(dev->interrupt); */
 
 	usbnet_purge_paused_rxq(dev);
 
@@ -728,14 +725,14 @@ int usbnet_open (struct net_device *net)
 	}
 
 	/* start any status interrupt transfer */
-	if (dev->interrupt) {
-		retval = usb_submit_urb (dev->interrupt, GFP_KERNEL);
-		if (retval < 0) {
-			netif_err(dev, ifup, dev->net,
-				  "intr submit %d\n", retval);
-			goto done;
-		}
-	}
+	/* if (dev->interrupt) { */
+	/* 	retval = usb_submit_urb (dev->interrupt, GFP_KERNEL); */
+	/* 	if (retval < 0) { */
+	/* 		netif_err(dev, ifup, dev->net, */
+	/* 			  "intr submit %d\n", retval); */
+	/* 		goto done; */
+	/* 	} */
+	/* } */
 
 	set_bit(EVENT_DEV_OPEN, &dev->flags);
 	netif_start_queue (net);
@@ -1363,6 +1360,7 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 	 * bind() should set rx_urb_size in that case.
 	 */
 	dev->hard_mtu = net->mtu + net->hard_header_len;
+	dev->rx_queue_enable = 1;
 #if 0
 // dma_supported() is deeply broken on almost all architectures
 	// possible with some EHCI controllers
@@ -1416,6 +1414,16 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 	if (status < 0)
 		goto out3;
 
+	if (dev->interrupt) {
+		status = usb_submit_urb (dev->interrupt, GFP_KERNEL);
+		if (status < 0) {
+			netif_err(dev, ifup, dev->net,
+				"intr submit %d\n", status);
+			goto out3;
+		}
+	}
+
+
 	if (!dev->rx_urb_size)
 		dev->rx_urb_size = dev->hard_mtu;
 	dev->maxpacket = usb_maxpacket (dev->udev, dev->out, 1);
@@ -1427,7 +1435,7 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 
 	status = register_netdev (net);
 	if (status)
-		goto out3;
+		goto out4;
 	netif_info(dev, probe, dev->net,
 		   "register '%s' at usb-%s-%s, %s, %pM\n",
 		   udev->dev.driver->name,
@@ -1445,6 +1453,8 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 
 	return 0;
 
+out4:
+	usb_kill_urb(dev->interrupt);
 out3:
 	if (info->unbind)
 		info->unbind (dev, udev);
@@ -1472,6 +1482,8 @@ int usbnet_suspend (struct usb_interface *intf, pm_message_t message)
 		/* don't autosuspend while transmitting */
 		if (dev->txq.qlen && (message.event & PM_EVENT_AUTO)) {
 			spin_unlock_irq(&dev->txq.lock);
+			dev->suspend_count--;
+			printk("%s return EBUSY, suspend_count=%d\n", __func__, dev->suspend_count);
 			return -EBUSY;
 		} else {
 			set_bit(EVENT_DEV_ASLEEP, &dev->flags);
@@ -1504,7 +1516,7 @@ int usbnet_resume (struct usb_interface *intf)
 
 	if (!--dev->suspend_count) {
 		/* resume interrupt URBs */
-		if (dev->interrupt && test_bit(EVENT_DEV_OPEN, &dev->flags))
+		if (dev->interrupt)
 			usb_submit_urb(dev->interrupt, GFP_NOIO);
 
 		spin_lock_irq(&dev->txq.lock);

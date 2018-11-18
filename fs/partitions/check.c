@@ -366,10 +366,21 @@ static void part_release(struct device *dev)
 	kfree(p);
 }
 
+static int part_uevent(struct device *dev, struct kobj_uevent_env *env)
+{
+	struct hd_struct *part = dev_to_part(dev);
+
+	add_uevent_var(env, "PARTN=%u", part->partno);
+	if (part->info && part->info->volname[0])
+		add_uevent_var(env, "PARTNAME=%s", part->info->volname);
+	return 0;
+}
+
 struct device_type part_type = {
 	.name		= "partition",
 	.groups		= part_attr_groups,
 	.release	= part_release,
+	.uevent		= part_uevent,
 };
 
 static void delete_partition_rcu_cb(struct rcu_head *head)
@@ -545,6 +556,9 @@ int rescan_partitions(struct gendisk *disk, struct block_device *bdev)
 	struct disk_part_iter piter;
 	struct hd_struct *part;
 	int p, highest, res;
+#ifdef CONFIG_SNSC_FS_CLEAR_MAPPING_ERRORS
+	struct block_device *pdev;
+#endif
 rescan:
 	if (state && !IS_ERR(state)) {
 		kfree(state);
@@ -566,6 +580,10 @@ rescan:
 		disk->fops->revalidate_disk(disk);
 	check_disk_size_change(disk, bdev);
 	bdev->bd_invalidated = 0;
+#ifdef CONFIG_SNSC_FS_CLEAR_MAPPING_ERRORS
+	clear_bit(AS_EIO, &bdev->bd_inode->i_mapping->flags);
+	clear_bit(AS_ENOSPC, &bdev->bd_inode->i_mapping->flags);
+#endif
 	if (!get_capacity(disk) || !(state = check_partition(disk, bdev)))
 		return 0;
 	if (IS_ERR(state)) {
@@ -656,6 +674,14 @@ rescan:
 			       disk->disk_name, p, -PTR_ERR(part));
 			continue;
 		}
+#ifdef CONFIG_SNSC_FS_CLEAR_MAPPING_ERRORS
+		pdev = bdget_disk(disk, p);
+		if (pdev) {
+			clear_bit(AS_EIO, &pdev->bd_inode->i_mapping->flags);
+			clear_bit(AS_ENOSPC, &pdev->bd_inode->i_mapping->flags);
+			bdput(pdev);
+		}
+#endif
 #ifdef CONFIG_BLK_DEV_MD
 		if (state->parts[p].flags & ADDPART_FLAG_RAID)
 			md_autodetect_dev(part_to_dev(part)->devt);

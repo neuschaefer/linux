@@ -7,6 +7,7 @@
 #include <linux/fs.h>
 #include <linux/msdos_fs.h>
 #include <linux/blkdev.h>
+#include <linux/ratelimit.h>
 #include "fat.h"
 
 struct fatent_operations {
@@ -14,7 +15,19 @@ struct fatent_operations {
 	void (*ent_set_ptr)(struct fat_entry *, int);
 	int (*ent_bread)(struct super_block *, struct fat_entry *,
 			 int, sector_t);
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC
+#ifdef CONFIG_SNSC_FS_VFAT_CLEAN_SHUTDOWN_BIT
+	int (*ent_get)(struct fat_entry *, struct inode *, int);
+#else
+	int (*ent_get)(struct fat_entry *, struct inode *);
+#endif
+#else
+#ifdef CONFIG_SNSC_FS_VFAT_CLEAN_SHUTDOWN_BIT
+	int (*ent_get)(struct fat_entry *, int);
+#else
 	int (*ent_get)(struct fat_entry *);
+#endif
+#endif
 	void (*ent_put)(struct fat_entry *, int);
 	int (*ent_next)(struct fat_entry *);
 };
@@ -26,7 +39,9 @@ static void fat12_ent_blocknr(struct super_block *sb, int entry,
 {
 	struct msdos_sb_info *sbi = MSDOS_SB(sb);
 	int bytes = entry + (entry >> 1);
+#ifndef CONFIG_SNSC_FS_VFAT_CLEAN_SHUTDOWN_BIT
 	WARN_ON(entry < FAT_START_ENT || sbi->max_cluster <= entry);
+#endif
 	*offset = bytes & (sb->s_blocksize - 1);
 	*blocknr = sbi->fat_start + (bytes >> sb->s_blocksize_bits);
 }
@@ -36,7 +51,9 @@ static void fat_ent_blocknr(struct super_block *sb, int entry,
 {
 	struct msdos_sb_info *sbi = MSDOS_SB(sb);
 	int bytes = (entry << sbi->fatent_shift);
+#ifndef CONFIG_SNSC_FS_VFAT_CLEAN_SHUTDOWN_BIT
 	WARN_ON(entry < FAT_START_ENT || sbi->max_cluster <= entry);
+#endif
 	*offset = bytes & (sb->s_blocksize - 1);
 	*blocknr = sbi->fat_start + (bytes >> sb->s_blocksize_bits);
 }
@@ -108,7 +125,7 @@ static int fat_ent_bread(struct super_block *sb, struct fat_entry *fatent,
 	fatent->fat_inode = MSDOS_SB(sb)->fat_inode;
 	fatent->bhs[0] = sb_bread(sb, blocknr);
 	if (!fatent->bhs[0]) {
-		printk(KERN_ERR "FAT: FAT read failed (blocknr %llu)\n",
+		printk_ratelimited(KERN_ERR "FAT: FAT read failed (blocknr %llu)\n",
 		       (llu)blocknr);
 		return -EIO;
 	}
@@ -117,7 +134,41 @@ static int fat_ent_bread(struct super_block *sb, struct fat_entry *fatent,
 	return 0;
 }
 
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC
+static void ent_get_fixup(struct fat_entry *fatent, struct inode *inode, int *next)
+{
+	if (unlikely(inode && MSDOS_I(inode)->i_last_dclus)) {
+		struct super_block *sb = inode->i_sb;
+		struct msdos_sb_info *sbi = MSDOS_SB(sb);
+
+		if (sbi->options.batch_sync &&
+		    fatent->entry == MSDOS_I(inode)->i_last_dclus) {
+			pr_debug("%s :%d, %d - %d, %d\n",
+				 __func__,
+				 fatent->entry,
+				 MSDOS_I(inode)->i_last_dclus,
+				 MSDOS_I(inode)->i_new_dclus,
+				 *next);
+
+			*next = MSDOS_I(inode)->i_new_dclus;
+		}
+	}
+}
+#endif
+
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC
+#ifdef CONFIG_SNSC_FS_VFAT_CLEAN_SHUTDOWN_BIT
+static int fat12_ent_get(struct fat_entry *fatent, struct inode *inode, int raw)
+#else
+static int fat12_ent_get(struct fat_entry *fatent, struct inode *inode)
+#endif
+#else
+#ifdef CONFIG_SNSC_FS_VFAT_CLEAN_SHUTDOWN_BIT
+static int fat12_ent_get(struct fat_entry *fatent, int raw)
+#else
 static int fat12_ent_get(struct fat_entry *fatent)
+#endif
+#endif
 {
 	u8 **ent12_p = fatent->u.ent12_p;
 	int next;
@@ -130,26 +181,71 @@ static int fat12_ent_get(struct fat_entry *fatent)
 	spin_unlock(&fat12_entry_lock);
 
 	next &= 0x0fff;
+#ifdef CONFIG_SNSC_FS_VFAT_CLEAN_SHUTDOWN_BIT
+	if (!raw && next >= BAD_FAT12)
+#else
 	if (next >= BAD_FAT12)
+#endif
 		next = FAT_ENT_EOF;
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC
+	ent_get_fixup(fatent, inode, &next);
+#endif
 	return next;
 }
 
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC
+#ifdef CONFIG_SNSC_FS_VFAT_CLEAN_SHUTDOWN_BIT
+static int fat16_ent_get(struct fat_entry *fatent, struct inode *inode, int raw)
+#else
+static int fat16_ent_get(struct fat_entry *fatent, struct inode *inode)
+#endif
+#else
+#ifdef CONFIG_SNSC_FS_VFAT_CLEAN_SHUTDOWN_BIT
+static int fat16_ent_get(struct fat_entry *fatent, int raw)
+#else
 static int fat16_ent_get(struct fat_entry *fatent)
+#endif
+#endif
 {
 	int next = le16_to_cpu(*fatent->u.ent16_p);
 	WARN_ON((unsigned long)fatent->u.ent16_p & (2 - 1));
+#ifdef CONFIG_SNSC_FS_VFAT_CLEAN_SHUTDOWN_BIT
+	if (!raw && next >= BAD_FAT16)
+#else
 	if (next >= BAD_FAT16)
+#endif
 		next = FAT_ENT_EOF;
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC
+	ent_get_fixup(fatent, inode, &next);
+#endif
 	return next;
 }
 
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC
+#ifdef CONFIG_SNSC_FS_VFAT_CLEAN_SHUTDOWN_BIT
+static int fat32_ent_get(struct fat_entry *fatent, struct inode *inode, int raw)
+#else
+static int fat32_ent_get(struct fat_entry *fatent, struct inode *inode)
+#endif
+#else
+#ifdef CONFIG_SNSC_FS_VFAT_CLEAN_SHUTDOWN_BIT
+static int fat32_ent_get(struct fat_entry *fatent, int raw)
+#else
 static int fat32_ent_get(struct fat_entry *fatent)
+#endif
+#endif
 {
 	int next = le32_to_cpu(*fatent->u.ent32_p) & 0x0fffffff;
 	WARN_ON((unsigned long)fatent->u.ent32_p & (4 - 1));
+#ifdef CONFIG_SNSC_FS_VFAT_CLEAN_SHUTDOWN_BIT
+	if (!raw && next >= BAD_FAT32)
+#else
 	if (next >= BAD_FAT32)
+#endif
 		next = FAT_ENT_EOF;
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC
+	ent_get_fixup(fatent, inode, &next);
+#endif
 	return next;
 }
 
@@ -225,6 +321,41 @@ static int fat12_ent_next(struct fat_entry *fatent)
 	return 0;
 }
 
+#ifdef CONFIG_SNSC_FS_FAT12_NO_SECTOR_BOUNDARY
+static int fat12_ent_next_no_sect_bndry(struct fat_entry *fatent)
+{
+	u8 **ent12_p = fatent->u.ent12_p;
+	struct buffer_head **bhs = fatent->bhs;
+	u8 *nextp = ent12_p[1] + 1 + (fatent->entry & 1);
+
+	fatent->entry++;
+	if (fatent->nr_bhs == 1) {
+		WARN_ON(ent12_p[0] > (u8 *)(bhs[0]->b_data + (bhs[0]->b_size - 2)));
+		WARN_ON(ent12_p[1] > (u8 *)(bhs[0]->b_data + (bhs[0]->b_size - 1)));
+		if (nextp < (u8 *)(bhs[0]->b_data + (bhs[0]->b_size - 1))) {
+			ent12_p[0] = nextp - 1;
+			ent12_p[1] = nextp;
+			return 1;
+		} else if (nextp == (u8 *)(bhs[0]->b_data + bhs[0]->b_size)) {
+			/* To avoid acrossing sector boundary */
+			fatent->entry++;
+		}
+	} else {
+		WARN_ON(ent12_p[0] != (u8 *)(bhs[0]->b_data + (bhs[0]->b_size - 1)));
+		WARN_ON(ent12_p[1] != (u8 *)bhs[1]->b_data);
+		ent12_p[0] = nextp - 1;
+		ent12_p[1] = nextp;
+		brelse(bhs[0]);
+		bhs[0] = bhs[1];
+		fatent->nr_bhs = 1;
+		return 1;
+	}
+	ent12_p[0] = NULL;
+	ent12_p[1] = NULL;
+	return 0;
+}
+#endif
+
 static int fat16_ent_next(struct fat_entry *fatent)
 {
 	const struct buffer_head *bh = fatent->bhs[0];
@@ -257,6 +388,17 @@ static struct fatent_operations fat12_ops = {
 	.ent_put	= fat12_ent_put,
 	.ent_next	= fat12_ent_next,
 };
+
+#ifdef CONFIG_SNSC_FS_FAT12_NO_SECTOR_BOUNDARY
+static struct fatent_operations fat12_ops_no_sect_bndry = {
+	.ent_blocknr	= fat12_ent_blocknr,
+	.ent_set_ptr	= fat12_ent_set_ptr,
+	.ent_bread	= fat12_ent_bread,
+	.ent_get	= fat12_ent_get,
+	.ent_put	= fat12_ent_put,
+	.ent_next	= fat12_ent_next_no_sect_bndry,
+};
+#endif
 
 static struct fatent_operations fat16_ops = {
 	.ent_blocknr	= fat_ent_blocknr,
@@ -303,7 +445,15 @@ void fat_ent_access_init(struct super_block *sb)
 		break;
 	case 12:
 		sbi->fatent_shift = -1;
+#ifdef CONFIG_SNSC_FS_FAT12_NO_SECTOR_BOUNDARY
+		if (sbi->options.no_sect_bndry) {
+			sbi->fatent_ops = &fat12_ops_no_sect_bndry;
+		} else {
+			sbi->fatent_ops = &fat12_ops;
+		}
+#else
 		sbi->fatent_ops = &fat12_ops;
+#endif
 		break;
 	}
 }
@@ -361,8 +511,52 @@ int fat_ent_read(struct inode *inode, struct fat_entry *fatent, int entry)
 		if (err)
 			return err;
 	}
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC
+#ifdef CONFIG_SNSC_FS_VFAT_CLEAN_SHUTDOWN_BIT
+	return ops->ent_get(fatent, inode, 0);
+#else
+	return ops->ent_get(fatent, inode);
+#endif
+#else
+#ifdef CONFIG_SNSC_FS_VFAT_CLEAN_SHUTDOWN_BIT
+	return ops->ent_get(fatent, 0);
+#else
 	return ops->ent_get(fatent);
+#endif
+#endif
 }
+
+#ifdef CONFIG_SNSC_FS_VFAT_CLEAN_SHUTDOWN_BIT
+int fat_ent_raw_read(struct super_block *sb, struct fat_entry *fatent,
+		     int entry)
+{
+	struct msdos_sb_info *sbi = MSDOS_SB(sb);
+	struct fatent_operations *ops = sbi->fatent_ops;
+	int err, offset;
+	sector_t blocknr;
+
+	if (sbi->max_cluster <= entry) {
+		fatent_brelse(fatent);
+		fat_fs_error(sb, "invalid access to FAT (entry 0x%08x)", entry);
+		return -EIO;
+	}
+
+	fatent_set_entry(fatent, entry);
+	ops->ent_blocknr(sb, entry, &offset, &blocknr);
+
+	if (!fat_ent_update_ptr(sb, fatent, offset, blocknr)) {
+		fatent_brelse(fatent);
+		err = ops->ent_bread(sb, fatent, offset, blocknr);
+		if (err)
+			return err;
+	}
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC
+	return ops->ent_get(fatent, NULL, 1);
+#else
+	return ops->ent_get(fatent, 1);
+#endif
+}
+#endif
 
 /* FIXME: We can write the blocks as more big chunk. */
 static int fat_mirror_bhs(struct super_block *sb, struct buffer_head **bhs,
@@ -386,7 +580,12 @@ static int fat_mirror_bhs(struct super_block *sb, struct buffer_head **bhs,
 			set_buffer_uptodate(c_bh);
 			mark_buffer_dirty_inode(c_bh, sbi->fat_inode);
 			if (sb->s_flags & MS_SYNCHRONOUS)
+#ifdef CONFIG_SNSC_FS_FAT_RELAX_SYNC
+				if (!sbi->options.relax_sync)
+					err = sync_dirty_buffer(c_bh);
+#else
 				err = sync_dirty_buffer(c_bh);
+#endif
 			brelse(c_bh);
 			if (err)
 				goto error;
@@ -400,17 +599,63 @@ int fat_ent_write(struct inode *inode, struct fat_entry *fatent,
 		  int new, int wait)
 {
 	struct super_block *sb = inode->i_sb;
+#if defined(CONFIG_SNSC_FS_FAT_RELAX_SYNC) || defined(CONFIG_SNSC_FS_FAT_BATCH_SYNC)
+	struct msdos_sb_info *sbi = MSDOS_SB(sb);
+#endif
 	struct fatent_operations *ops = MSDOS_SB(sb)->fatent_ops;
 	int err;
 
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC
+	if (!fatent_lock(sbi, fatent))
+		return -EIO;
+#endif
 	ops->ent_put(fatent, new);
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC
+	fatent_unlock(sbi, fatent);
+#endif
 	if (wait) {
+#ifdef CONFIG_SNSC_FS_FAT_RELAX_SYNC
+		err = sbi->options.relax_sync ?
+			fat_flush_bhs(fatent->bhs, fatent->nr_bhs)
+			: fat_sync_bhs(fatent->bhs, fatent->nr_bhs);
+#else
 		err = fat_sync_bhs(fatent->bhs, fatent->nr_bhs);
+#endif
 		if (err)
 			return err;
 	}
 	return fat_mirror_bhs(sb, fatent->bhs, fatent->nr_bhs);
 }
+
+#ifdef CONFIG_SNSC_FS_VFAT_CLEAN_SHUTDOWN_BIT
+int fat_ent_raw_write(struct super_block *sb, struct fat_entry *fatent, int new)
+{
+#if defined(CONFIG_SNSC_FS_FAT_RELAX_SYNC) || defined(CONFIG_SNSC_FS_FAT_BATCH_SYNC)
+	struct msdos_sb_info *sbi = MSDOS_SB(sb);
+#endif
+	struct fatent_operations *ops = MSDOS_SB(sb)->fatent_ops;
+	int err;
+
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC
+	if (!fatent_lock(sbi, fatent))
+		return -EIO;
+#endif
+	ops->ent_put(fatent, new);
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC
+	fatent_unlock(sbi, fatent);
+#endif
+#ifdef CONFIG_SNSC_FS_FAT_RELAX_SYNC
+	err = sbi->options.relax_sync ?
+		fat_flush_bhs(fatent->bhs, fatent->nr_bhs)
+		: fat_sync_bhs(fatent->bhs, fatent->nr_bhs);
+#else
+	err = fat_sync_bhs(fatent->bhs, fatent->nr_bhs);
+#endif
+	if (err)
+		return err;
+	return fat_mirror_bhs(sb, fatent->bhs, fatent->nr_bhs);
+}
+#endif
 
 static inline int fat_ent_next(struct msdos_sb_info *sbi,
 			       struct fat_entry *fatent)
@@ -460,6 +705,10 @@ int fat_alloc_clusters(struct inode *inode, int *cluster, int nr_cluster)
 	struct fat_entry fatent, prev_ent;
 	struct buffer_head *bhs[MAX_BUF_PER_PAGE];
 	int i, count, err, nr_bhs, idx_clus;
+#ifdef CONFIG_SNSC_FS_FAT12_NO_SECTOR_BOUNDARY
+	int start_from_prev = ((sbi->fat_bits == 12) &&
+				sbi->options.no_sect_bndry);
+#endif
 
 	BUG_ON(nr_cluster > (MAX_BUF_PER_PAGE / 2));	/* fixed limit */
 
@@ -474,7 +723,13 @@ int fat_alloc_clusters(struct inode *inode, int *cluster, int nr_cluster)
 	count = FAT_START_ENT;
 	fatent_init(&prev_ent);
 	fatent_init(&fatent);
+#ifdef CONFIG_SNSC_FS_FAT12_NO_SECTOR_BOUNDARY
+	/* if START_FROM_PREV is set, find free cluster from PREV_FREE,
+	   because PREV_FREE+1 may across sector boundary */
+	fatent_set_entry(&fatent, sbi->prev_free + (start_from_prev ? 0 : 1));
+#else
 	fatent_set_entry(&fatent, sbi->prev_free + 1);
+#endif
 	while (count < sbi->max_cluster) {
 		if (fatent.entry >= sbi->max_cluster)
 			fatent.entry = FAT_START_ENT;
@@ -485,13 +740,48 @@ int fat_alloc_clusters(struct inode *inode, int *cluster, int nr_cluster)
 
 		/* Find the free entries in a block */
 		do {
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC
+#ifdef CONFIG_SNSC_FS_VFAT_CLEAN_SHUTDOWN_BIT
+			if (ops->ent_get(&fatent, inode, 0) == FAT_ENT_FREE) {
+#else
+			if (ops->ent_get(&fatent, inode) == FAT_ENT_FREE) {
+#endif
+#else
+#ifdef CONFIG_SNSC_FS_VFAT_CLEAN_SHUTDOWN_BIT
+			if (ops->ent_get(&fatent, 0) == FAT_ENT_FREE) {
+#else
 			if (ops->ent_get(&fatent) == FAT_ENT_FREE) {
+#endif
+#endif
 				int entry = fatent.entry;
 
+#ifdef CONFIG_SNSC_FS_FAT_GC
+				fat_gc_mark_cluster_valid(sbi, entry);
+#endif
+
 				/* make the cluster chain */
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC
+				if (!fatent_lock(sbi, &fatent)) {
+					err = -EIO;
+					goto out;
+				}
+#endif
 				ops->ent_put(&fatent, FAT_ENT_EOF);
-				if (prev_ent.nr_bhs)
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC
+				fatent_unlock(sbi, &fatent);
+#endif
+				if (prev_ent.nr_bhs) {
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC
+					if (!fatent_lock(sbi, &prev_ent)) {
+						err = -EIO;
+						goto out;
+					}
+#endif
 					ops->ent_put(&prev_ent, entry);
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC
+					fatent_unlock(sbi, &prev_ent);
+#endif
+				}
 
 				fat_collect_bhs(bhs, &nr_bhs, &fatent);
 
@@ -528,7 +818,13 @@ out:
 	fatent_brelse(&fatent);
 	if (!err) {
 		if (inode_needs_sync(inode))
+#ifdef CONFIG_SNSC_FS_FAT_RELAX_SYNC
+			err = sbi->options.relax_sync ?
+				fat_flush_bhs(bhs, nr_bhs)
+				: fat_sync_bhs(bhs, nr_bhs);
+#else
 			err = fat_sync_bhs(bhs, nr_bhs);
+#endif
 		if (!err)
 			err = fat_mirror_bhs(sb, bhs, nr_bhs);
 	}
@@ -555,6 +851,10 @@ int fat_free_clusters(struct inode *inode, int cluster)
 	fatent_init(&fatent);
 	lock_fat(sbi);
 	do {
+#ifdef CONFIG_SNSC_FS_FAT_GC
+		fat_gc_mark_cluster_valid(sbi, cluster);
+#endif
+
 		cluster = fat_ent_read(inode, &fatent, cluster);
 		if (cluster < 0) {
 			err = cluster;
@@ -584,7 +884,16 @@ int fat_free_clusters(struct inode *inode, int cluster)
 			}
 		}
 
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC
+		if (!fatent_lock(sbi, &fatent)) {
+			err = -EIO;
+			goto error;
+		}
+#endif
 		ops->ent_put(&fatent, FAT_ENT_FREE);
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC
+		fatent_unlock(sbi, &fatent);
+#endif
 		if (sbi->free_clusters != -1) {
 			sbi->free_clusters++;
 			sb->s_dirt = 1;
@@ -592,7 +901,13 @@ int fat_free_clusters(struct inode *inode, int cluster)
 
 		if (nr_bhs + fatent.nr_bhs > MAX_BUF_PER_PAGE) {
 			if (sb->s_flags & MS_SYNCHRONOUS) {
+#ifdef CONFIG_SNSC_FS_FAT_RELAX_SYNC
+				err = sbi->options.relax_sync ?
+					fat_flush_bhs(bhs, nr_bhs)
+					: fat_sync_bhs(bhs, nr_bhs);
+#else
 				err = fat_sync_bhs(bhs, nr_bhs);
+#endif
 				if (err)
 					goto error;
 			}
@@ -607,7 +922,13 @@ int fat_free_clusters(struct inode *inode, int cluster)
 	} while (cluster != FAT_ENT_EOF);
 
 	if (sb->s_flags & MS_SYNCHRONOUS) {
+#ifdef CONFIG_SNSC_FS_FAT_RELAX_SYNC
+		err = sbi->options.relax_sync ?
+			fat_flush_bhs(bhs, nr_bhs)
+			: fat_sync_bhs(bhs, nr_bhs);
+#else
 		err = fat_sync_bhs(bhs, nr_bhs);
+#endif
 		if (err)
 			goto error;
 	}
@@ -671,7 +992,19 @@ int fat_count_free_clusters(struct super_block *sb)
 			goto out;
 
 		do {
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC
+#ifdef CONFIG_SNSC_FS_VFAT_CLEAN_SHUTDOWN_BIT
+			if (ops->ent_get(&fatent, NULL, 0) == FAT_ENT_FREE)
+#else
+			if (ops->ent_get(&fatent, NULL) == FAT_ENT_FREE)
+#endif
+#else
+#ifdef CONFIG_SNSC_FS_VFAT_CLEAN_SHUTDOWN_BIT
+			if (ops->ent_get(&fatent, 0) == FAT_ENT_FREE)
+#else
 			if (ops->ent_get(&fatent) == FAT_ENT_FREE)
+#endif
+#endif
 				free++;
 		} while (fat_ent_next(sbi, &fatent));
 	}

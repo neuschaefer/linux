@@ -39,6 +39,12 @@ struct hidraw_devinfo {
 #define HIDIOCSFEATURE(len)    _IOC(_IOC_WRITE|_IOC_READ, 'H', 0x06, len)
 #define HIDIOCGFEATURE(len)    _IOC(_IOC_WRITE|_IOC_READ, 'H', 0x07, len)
 
+#ifdef CONFIG_HID_SONY_CTRL
+#define HIDIOCGFEATURE_WITHDATASIZE(len)   _IOC(_IOC_WRITE|_IOC_READ, 'H', 0x08, len)
+#define HIDIOCSFEATURE_SKIPREPORTID(len)   _IOC(_IOC_WRITE|_IOC_READ, 'H', 0x09, len)
+#define HIDIOCSOUTPUT_SKIPREPORTID(len)    _IOC(_IOC_WRITE|_IOC_READ, 'H', 0x0A, len)
+#endif //CONFIG_HID_SONY_CTRL
+
 #define HIDRAW_FIRST_MINOR 0
 #define HIDRAW_MAX_DEVICES 64
 /* number of reports to buffer */

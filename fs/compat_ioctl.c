@@ -880,6 +880,9 @@ COMPATIBLE_IOCTL(FS_IOC_FIEMAP)
 /* 0x00 */
 COMPATIBLE_IOCTL(FIBMAP)
 COMPATIBLE_IOCTL(FIGETBSZ)
+#ifdef CONFIG_SNSC_FS_IOCTL_SYNC
+COMPATIBLE_IOCTL(FIOFLSBUF)
+#endif
 /* 'X' - originally XFS but some now in the VFS */
 COMPATIBLE_IOCTL(FIFREEZE)
 COMPATIBLE_IOCTL(FITHAW)
@@ -1578,6 +1581,9 @@ asmlinkage long compat_sys_ioctl(unsigned int fd, unsigned int cmd,
 	case FIONBIO:
 	case FIOASYNC:
 	case FIOQSIZE:
+#ifdef CONFIG_SNSC_FS_IOCTL_SYNC
+	case FIOFLSBUF:
+#endif
 		break;
 
 #if defined(CONFIG_IA64) || defined(CONFIG_X86_64)

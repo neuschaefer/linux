@@ -23,6 +23,7 @@
 #include <linux/log2.h>
 #include <linux/regulator/consumer.h>
 #include <linux/pm_runtime.h>
+#include <linux/wakelock.h>
 
 #include <linux/mmc/card.h>
 #include <linux/mmc/host.h>
@@ -39,6 +40,7 @@
 #include "sdio_ops.h"
 
 static struct workqueue_struct *workqueue;
+static struct wake_lock mmc_delayed_work_wake_lock;
 
 /*
  * Enabling software CRCs on the data blocks can be a significant (30%)
@@ -71,6 +73,7 @@ MODULE_PARM_DESC(
 static int mmc_schedule_delayed_work(struct delayed_work *work,
 				     unsigned long delay)
 {
+	wake_lock(&mmc_delayed_work_wake_lock);
 	return queue_delayed_work(workqueue, work, delay);
 }
 
@@ -106,6 +109,11 @@ void mmc_request_done(struct mmc_host *host, struct mmc_request *mrq)
 
 		cmd->retries--;
 		cmd->error = 0;
+		if (mrq->data) {
+			mrq->data->error = 0;
+			if (mrq->stop)
+				mrq->stop->error = 0;
+		}
 		host->ops->request(host, mrq);
 	} else {
 		led_trigger_event(host->led, LED_OFF);
@@ -223,6 +231,110 @@ void mmc_wait_for_req(struct mmc_host *host, struct mmc_request *mrq)
 }
 
 EXPORT_SYMBOL(mmc_wait_for_req);
+
+/**
+ *	mmc_bkops_start - Issue start for mmc background ops
+ *	@card: the MMC card associated with bkops
+ *	@is_synchronous: is the backops synchronous
+ *
+ *	Issued background ops without the busy wait.
+ */
+int mmc_bkops_start(struct mmc_card *card, bool is_synchronous)
+{
+	int err;
+	unsigned long flags;
+
+	BUG_ON(!card);
+
+	if (!card->ext_csd.bk_ops_en || mmc_card_doing_bkops(card))
+		return 1;
+
+	mmc_claim_host(card->host);
+	err = mmc_send_bk_ops_cmd(card, is_synchronous);
+	if (err)
+		pr_err("%s: abort bk ops (%d error)\n",
+			mmc_hostname(card->host), err);
+
+	/*
+	 * Incase of asynchronous backops, set card state
+	 * to doing bk ops to ensure that HPI is issued before
+	 * handling any new request in the queue.
+	 */
+		spin_lock_irqsave(&card->host->lock, flags);
+		mmc_card_clr_need_bkops(card);
+		if (!is_synchronous)
+			mmc_card_set_doing_bkops(card);
+		spin_unlock_irqrestore(&card->host->lock, flags);
+
+	mmc_release_host(card->host);
+
+	return err;
+}
+EXPORT_SYMBOL(mmc_bkops_start);
+
+/**
+ *	mmc_interrupt_hpi - Issue for High priority Interrupt
+ *	@card: the MMC card associated with the HPI transfer
+ *
+ *	Issued High Priority Interrupt, and check for card status
+ *	util out-of prg-state.
+ */
+int mmc_interrupt_hpi(struct mmc_card *card)
+{
+	int err;
+	u32 status;
+	unsigned long flags;
+
+	BUG_ON(!card);
+
+	if (!mmc_card_mmc(card))
+		return 1;
+
+	if (!card->ext_csd.hpi_en) {
+		pr_info("%s: HPI enable bit unset\n", mmc_hostname(card->host));
+		return 1;
+	}
+
+	mmc_claim_host(card->host);
+	err = mmc_send_status(card, &status);
+	if (err) {
+		pr_err("%s: Get card status fail\n", mmc_hostname(card->host));
+		goto out;
+	}
+
+	/*
+	 * If the card status is in PRG-state, we can send the HPI command.
+	 */
+	if (R1_CURRENT_STATE(status) == R1_STATE_PRG) {
+		do {
+			/*
+			 * We don't know when the HPI command will finish
+			 * processing, so we need to resend HPI until out
+			 * of prg-state, and keep checking the card status
+			 * with SEND_STATUS.  If a timeout error occurs when
+			 * sending the HPI command, we are already out of
+			 * prg-state.
+			 */
+			err = mmc_send_hpi_cmd(card, &status);
+			if (err)
+				pr_debug("%s: abort HPI (%d error)\n",
+					 mmc_hostname(card->host), err);
+
+			err = mmc_send_status(card, &status);
+			if (err)
+				break;
+		} while (R1_CURRENT_STATE(status) == R1_STATE_PRG);
+	} else
+		pr_debug("%s: Left prg-state\n", mmc_hostname(card->host));
+
+out:
+	spin_lock_irqsave(&card->host->lock, flags);
+	mmc_card_clr_doing_bkops(card);
+	spin_unlock_irqrestore(&card->host->lock, flags);
+	mmc_release_host(card->host);
+	return err;
+}
+EXPORT_SYMBOL(mmc_interrupt_hpi);
 
 /**
  *	mmc_wait_for_cmd - start a command and wait for completion
@@ -558,9 +670,12 @@ void mmc_host_deeper_disable(struct work_struct *work)
 
 	/* If the host is claimed then we do not want to disable it anymore */
 	if (!mmc_try_claim_host(host))
-		return;
+		goto out;
 	mmc_host_do_disable(host, 1);
 	mmc_do_release_host(host);
+
+out:
+	wake_unlock(&mmc_delayed_work_wake_lock);
 }
 
 /**
@@ -720,22 +835,12 @@ void mmc_set_bus_mode(struct mmc_host *host, unsigned int mode)
 }
 
 /*
- * Change data bus width and DDR mode of a host.
- */
-void mmc_set_bus_width_ddr(struct mmc_host *host, unsigned int width,
-			   unsigned int ddr)
-{
-	host->ios.bus_width = width;
-	host->ios.ddr = ddr;
-	mmc_set_ios(host);
-}
-
-/*
  * Change data bus width of a host.
  */
 void mmc_set_bus_width(struct mmc_host *host, unsigned int width)
 {
-	mmc_set_bus_width_ddr(host, width, MMC_SDR_MODE);
+	host->ios.bus_width = width;
+	mmc_set_ios(host);
 }
 
 /**
@@ -944,12 +1049,53 @@ u32 mmc_select_voltage(struct mmc_host *host, u32 ocr)
 	return ocr;
 }
 
+int mmc_set_signal_voltage(struct mmc_host *host, int signal_voltage)
+{
+	struct mmc_command cmd = {0};
+	int err = 0;
+
+	BUG_ON(!host);
+
+	/*
+	 * Send CMD11 only if the request is to switch the card to
+	 * 1.8V signalling.
+	 */
+	if (signal_voltage == MMC_SIGNAL_VOLTAGE_180) {
+		cmd.opcode = SD_SWITCH_VOLTAGE;
+		cmd.arg = 0;
+		cmd.flags = MMC_RSP_R1 | MMC_CMD_AC;
+
+		err = mmc_wait_for_cmd(host, &cmd, 0);
+		if (err)
+			return err;
+
+		if (!mmc_host_is_spi(host) && (cmd.resp[0] & R1_ERROR))
+			return -EIO;
+	}
+
+	host->ios.signal_voltage = signal_voltage;
+
+	if (host->ops->start_signal_voltage_switch)
+		err = host->ops->start_signal_voltage_switch(host, &host->ios);
+
+	return err;
+}
+
 /*
  * Select timing parameters for host.
  */
 void mmc_set_timing(struct mmc_host *host, unsigned int timing)
 {
 	host->ios.timing = timing;
+	mmc_set_ios(host);
+}
+
+/*
+ * Select appropriate driver type for host.
+ */
+void mmc_set_driver_type(struct mmc_host *host, unsigned int drv_type)
+{
+	host->ios.drv_type = drv_type;
 	mmc_set_ios(host);
 }
 
@@ -1064,6 +1210,36 @@ static inline void mmc_bus_put(struct mmc_host *host)
 		__mmc_release_bus(host);
 	spin_unlock_irqrestore(&host->lock, flags);
 }
+
+int mmc_resume_bus(struct mmc_host *host)
+{
+	unsigned long flags;
+
+	if (!mmc_bus_needs_resume(host))
+		return -EINVAL;
+
+	printk("%s: Starting deferred resume\n", mmc_hostname(host));
+	spin_lock_irqsave(&host->lock, flags);
+	host->bus_resume_flags &= ~MMC_BUSRESUME_NEEDS_RESUME;
+	host->rescan_disable = 0;
+	spin_unlock_irqrestore(&host->lock, flags);
+
+	mmc_bus_get(host);
+	if (host->bus_ops && !host->bus_dead) {
+		mmc_power_up(host);
+		BUG_ON(!host->bus_ops->resume);
+		host->bus_ops->resume(host);
+	}
+
+	if (host->bus_ops->detect && !host->bus_dead)
+		host->bus_ops->detect(host);
+
+	mmc_bus_put(host);
+	printk("%s: Deferred resume completed\n", mmc_hostname(host));
+	return 0;
+}
+
+EXPORT_SYMBOL(mmc_resume_bus);
 
 /*
  * Assign a mmc bus handler to a host. Only one bus handler may control a
@@ -1538,6 +1714,7 @@ void mmc_rescan(struct work_struct *work)
 	struct mmc_host *host =
 		container_of(work, struct mmc_host, detect.work);
 	int i;
+	bool extend_wakelock = false;
 
 	if (host->rescan_disable)
 		return;
@@ -1551,6 +1728,12 @@ void mmc_rescan(struct work_struct *work)
 	if (host->bus_ops && host->bus_ops->detect && !host->bus_dead
 	    && !(host->caps & MMC_CAP_NONREMOVABLE))
 		host->bus_ops->detect(host);
+
+	/* If the card was removed the bus will be marked
+	 * as dead - extend the wakelock so userspace
+	 * can respond */
+	if (host->bus_dead)
+		extend_wakelock = 1;
 
 	/*
 	 * Let mmc_bus_put() free the bus/bus_ops if we've found that
@@ -1576,14 +1759,20 @@ void mmc_rescan(struct work_struct *work)
 
 	mmc_claim_host(host);
 	for (i = 0; i < ARRAY_SIZE(freqs); i++) {
-		if (!mmc_rescan_try_freq(host, max(freqs[i], host->f_min)))
+		if (!mmc_rescan_try_freq(host, max(freqs[i], host->f_min))) {
+			extend_wakelock = true;
 			break;
+		}
 		if (freqs[i] < host->f_min)
 			break;
 	}
 	mmc_release_host(host);
 
  out:
+	if (extend_wakelock)
+		wake_lock_timeout(&mmc_delayed_work_wake_lock, HZ / 2);
+	else
+		wake_unlock(&mmc_delayed_work_wake_lock);
 	if (host->caps & MMC_CAP_NEEDS_POLL)
 		mmc_schedule_delayed_work(&host->detect, HZ);
 }
@@ -1721,6 +1910,13 @@ int mmc_suspend_host(struct mmc_host *host)
 {
 	int err = 0;
 
+	if (mmc_bus_needs_resume(host))
+		return 0;
+
+	if (mmc_card_mmc(host->card) && mmc_card_doing_bkops(host->card))
+		mmc_interrupt_hpi(host->card);
+	mmc_card_clr_need_bkops(host->card);
+
 	if (host->caps & MMC_CAP_DISABLE)
 		cancel_delayed_work(&host->disable);
 	cancel_delayed_work(&host->detect);
@@ -1763,6 +1959,12 @@ int mmc_resume_host(struct mmc_host *host)
 	int err = 0;
 
 	mmc_bus_get(host);
+	if (mmc_bus_manual_resume(host)) {
+		host->bus_resume_flags |= MMC_BUSRESUME_NEEDS_RESUME;
+		mmc_bus_put(host);
+		return 0;
+	}
+
 	if (host->bus_ops && !host->bus_dead) {
 		if (!(host->pm_flags & MMC_PM_KEEP_POWER)) {
 			mmc_power_up(host);
@@ -1812,6 +2014,10 @@ int mmc_pm_notify(struct notifier_block *notify_block,
 	case PM_SUSPEND_PREPARE:
 
 		spin_lock_irqsave(&host->lock, flags);
+		if (mmc_bus_needs_resume(host)) {
+			spin_unlock_irqrestore(&host->lock, flags);
+			break;
+		}
 		host->rescan_disable = 1;
 		spin_unlock_irqrestore(&host->lock, flags);
 		cancel_delayed_work_sync(&host->detect);
@@ -1834,6 +2040,10 @@ int mmc_pm_notify(struct notifier_block *notify_block,
 	case PM_POST_RESTORE:
 
 		spin_lock_irqsave(&host->lock, flags);
+		if (mmc_bus_manual_resume(host)) {
+			spin_unlock_irqrestore(&host->lock, flags);
+			break;
+		}
 		host->rescan_disable = 0;
 		spin_unlock_irqrestore(&host->lock, flags);
 		mmc_detect_change(host, 0);
@@ -1844,6 +2054,22 @@ int mmc_pm_notify(struct notifier_block *notify_block,
 }
 #endif
 
+#ifdef CONFIG_MMC_EMBEDDED_SDIO
+void mmc_set_embedded_sdio_data(struct mmc_host *host,
+				struct sdio_cis *cis,
+				struct sdio_cccr *cccr,
+				struct sdio_embedded_func *funcs,
+				int num_funcs)
+{
+	host->embedded_sdio_data.cis = cis;
+	host->embedded_sdio_data.cccr = cccr;
+	host->embedded_sdio_data.funcs = funcs;
+	host->embedded_sdio_data.num_funcs = num_funcs;
+}
+
+EXPORT_SYMBOL(mmc_set_embedded_sdio_data);
+#endif
+
 static int __init mmc_init(void)
 {
 	int ret;
@@ -1851,6 +2077,9 @@ static int __init mmc_init(void)
 	workqueue = alloc_ordered_workqueue("kmmcd", 0);
 	if (!workqueue)
 		return -ENOMEM;
+
+	wake_lock_init(&mmc_delayed_work_wake_lock, WAKE_LOCK_SUSPEND,
+		       "mmc_delayed_work");
 
 	ret = mmc_register_bus();
 	if (ret)
@@ -1872,6 +2101,7 @@ unregister_bus:
 	mmc_unregister_bus();
 destroy_workqueue:
 	destroy_workqueue(workqueue);
+	wake_lock_destroy(&mmc_delayed_work_wake_lock);
 
 	return ret;
 }
@@ -1882,6 +2112,7 @@ static void __exit mmc_exit(void)
 	mmc_unregister_host_class();
 	mmc_unregister_bus();
 	destroy_workqueue(workqueue);
+	wake_lock_destroy(&mmc_delayed_work_wake_lock);
 }
 
 subsys_initcall(mmc_init);

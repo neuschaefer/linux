@@ -121,6 +121,15 @@ static int fat_get_block(struct inode *inode, sector_t iblock,
 
 static int fat_writepage(struct page *page, struct writeback_control *wbc)
 {
+#ifdef CONFIG_SNSC_FS_VFAT_CHECK_DISK
+	struct inode *inode = page->mapping->host;
+	if (fat_check_disk(inode->i_sb, 0)) {
+		SetPageError(page);
+		ClearPageUptodate(page);
+		unlock_page(page);
+		return -EIO;
+	}
+#endif
 	return block_write_full_page(page, fat_get_block, wbc);
 }
 
@@ -132,6 +141,15 @@ static int fat_writepages(struct address_space *mapping,
 
 static int fat_readpage(struct file *file, struct page *page)
 {
+#ifdef CONFIG_SNSC_FS_VFAT_CHECK_DISK
+	struct inode *inode = page->mapping->host;
+	if (fat_check_disk(inode->i_sb, 0)) {
+		SetPageError(page);
+		ClearPageUptodate(page);
+		unlock_page(page);
+		return -EIO;
+	}
+#endif
 	return mpage_readpage(page, fat_get_block);
 }
 
@@ -156,7 +174,11 @@ static int fat_write_begin(struct file *file, struct address_space *mapping,
 			struct page **pagep, void **fsdata)
 {
 	int err;
-
+#ifdef CONFIG_SNSC_FS_VFAT_CHECK_DISK
+	struct inode *inode = mapping->host;
+	if (fat_check_disk(inode->i_sb, 0))
+		return -EIO;
+#endif
 	*pagep = NULL;
 	err = cont_write_begin(file, mapping, pos, len, flags,
 				pagep, fsdata, fat_get_block,
@@ -362,6 +384,11 @@ static int fat_fill_inode(struct inode *inode, struct msdos_dir_entry *de)
 	inode->i_gid = sbi->options.fs_gid;
 	inode->i_version++;
 	inode->i_generation = get_seconds();
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC
+	MSDOS_I(inode)->i_last_dclus = 0;
+	MSDOS_I(inode)->i_new = 0;
+	MSDOS_I(inode)->i_new_dclus = 0;
+#endif
 
 	if ((de->attr & ATTR_DIR) && !IS_FREE(de->name)) {
 		inode->i_generation &= ~1;
@@ -392,6 +419,12 @@ static int fat_fill_inode(struct inode *inode, struct msdos_dir_entry *de)
 		MSDOS_I(inode)->i_logstart = MSDOS_I(inode)->i_start;
 		inode->i_size = le32_to_cpu(de->size);
 		inode->i_op = &fat_file_inode_operations;
+#ifdef CONFIG_SNSC_FS_VFAT_POSIX_ATTR
+		if (sbi->options.posix_attr
+			&& sbi->posix_ops.is_symlink(inode, de)){
+				inode->i_op = &fat_symlink_inode_operations;
+		}
+#endif
 		inode->i_fop = &fat_file_operations;
 		inode->i_mapping->a_ops = &fat_aops;
 		MSDOS_I(inode)->mmu_private = inode->i_size;
@@ -407,6 +440,11 @@ static int fat_fill_inode(struct inode *inode, struct msdos_dir_entry *de)
 
 	fat_time_fat2unix(sbi, &inode->i_mtime, de->time, de->date, 0);
 	if (sbi->options.isvfat) {
+#ifdef CONFIG_SNSC_FS_VFAT_IGNORE_CRTIME
+		if (sbi->options.ignore_crtime)
+			inode->i_ctime = inode->i_mtime;
+		else
+#endif
 		fat_time_fat2unix(sbi, &inode->i_ctime, de->ctime,
 				  de->cdate, de->ctime_cs);
 		fat_time_fat2unix(sbi, &inode->i_atime, 0, de->adate, 0);
@@ -446,6 +484,10 @@ out:
 
 EXPORT_SYMBOL_GPL(fat_build_inode);
 
+#ifdef CONFIG_SNSC_FS_FAT_LOOKUP_HINT
+extern void fat_lkup_hint_inval(struct inode*);
+#endif
+
 static void fat_evict_inode(struct inode *inode)
 {
 	truncate_inode_pages(&inode->i_data, 0);
@@ -456,6 +498,9 @@ static void fat_evict_inode(struct inode *inode)
 	invalidate_inode_buffers(inode);
 	end_writeback(inode);
 	fat_cache_inval_inode(inode);
+#ifdef CONFIG_SNSC_FS_FAT_LOOKUP_HINT
+	fat_lkup_hint_inval(inode);
+#endif
 	fat_detach(inode);
 }
 
@@ -464,8 +509,15 @@ static void fat_write_super(struct super_block *sb)
 	lock_super(sb);
 	sb->s_dirt = 0;
 
+#ifdef CONFIG_SNSC_FS_VFAT_CHECK_DISK
+	if (!fat_check_disk(sb, 0)) {
+		if (!(sb->s_flags & MS_RDONLY))
+			fat_clusters_flush(sb);
+	}
+#else
 	if (!(sb->s_flags & MS_RDONLY))
 		fat_clusters_flush(sb);
+#endif
 	unlock_super(sb);
 }
 
@@ -487,6 +539,36 @@ static void fat_put_super(struct super_block *sb)
 {
 	struct msdos_sb_info *sbi = MSDOS_SB(sb);
 
+#ifdef CONFIG_SNSC_FS_VFAT_CLEAN_SHUTDOWN_BIT
+	if (sbi->options.clnshutbit && (sbi->clnshutbit & 1)) {
+		unsigned int cn;
+		struct fat_entry fatent;
+
+#ifdef CONFIG_SNSC_FS_VFAT_CHECK_DISK
+		if (fat_check_disk(sb, 0))
+			goto set_clnshutbit_failed;
+#endif
+		fatent_init(&fatent);
+		cn = fat_ent_raw_read(sb, &fatent, 1);
+		if (cn == 0)
+			goto set_clnshutbit_failed;
+		if (sbi->fat_bits == 32) {
+			if (!(cn & 0x08000000) &&
+			    fat_ent_raw_write(sb, &fatent, cn | 0x08000000) != 0)
+				goto set_clnshutbit_failed;
+		}
+		else if (sbi->fat_bits == 16) {
+			if (!(cn & 0x8000) &&
+			    fat_ent_raw_write(sb, &fatent, cn | 0x8000) != 0)
+				goto set_clnshutbit_failed;
+		}
+		if (0) {
+set_clnshutbit_failed:
+			printk("FAT: failed to set ClnShutBit\n");
+		}
+	}
+#endif
+ 
 	if (sb->s_dirt)
 		fat_write_super(sb);
 
@@ -497,6 +579,14 @@ static void fat_put_super(struct super_block *sb)
 
 	if (sbi->options.iocharset != fat_default_iocharset)
 		kfree(sbi->options.iocharset);
+
+#ifdef CONFIG_SNSC_FS_FAT_GC
+	fat_stop_gc(sb);
+#endif
+#ifdef CONFIG_SNSC_FS_VFAT_CHECK_DISK
+	if (sbi->options.check_disk)
+		k3d_put_disk(sb->s_bdev->bd_disk);
+#endif
 
 	sb->s_fs_info = NULL;
 	kfree(sbi);
@@ -600,6 +690,61 @@ static inline loff_t fat_i_pos_read(struct msdos_sb_info *sbi,
 	return i_pos;
 }
 
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC
+
+#define FAT_START(sb)	(MSDOS_SB(sb)->fat_start << (sb)->s_blocksize_bits)
+#define DIR_START(sb)	(MSDOS_SB(sb)->dir_start << (sb)->s_blocksize_bits)
+#define FAT_END(sb)	(DIR_START(sb) - 1)
+#define DIR_END(sb)	LLONG_MAX
+
+static int fat_sync_meta(struct inode *inode)
+{
+	struct super_block *sb = inode->i_sb;
+	struct address_space *mapping = sb->s_bdev->bd_inode->i_mapping;
+	int err = 0;
+
+	/* the FAT BHS update have to be ATOMIC*/
+	err = filemap_write_and_wait_range(mapping, FAT_START(sb), FAT_END(sb));
+	if (err)
+		goto error;
+
+	/* wait BODY DATA to be finished*/
+	err = filemap_write_and_wait(inode->i_mapping);
+	if (err)
+		goto error;
+
+	if (!MSDOS_I(inode)->i_new
+	    && MSDOS_I(inode)->i_last_dclus) {
+		struct fat_entry fatent;
+		int last = MSDOS_I(inode)->i_last_dclus;
+		int new = MSDOS_I(inode)->i_new_dclus;
+
+		pr_debug("%s - add chain now: %d %d\n",
+			 __func__, last, new);
+
+		fatent_init(&fatent);
+		err = fat_ent_read(inode, &fatent, last);
+		if (err < 0)
+			goto out;
+
+		err = fat_ent_write(inode, &fatent, new, 1);
+		if (err < 0)
+			goto out;
+
+	out:
+		fatent_brelse(&fatent);
+		if (err < 0)
+			goto error;
+	}
+
+	MSDOS_I(inode)->i_new = 0;
+	MSDOS_I(inode)->i_last_dclus = 0;
+
+error:
+	return err;
+}
+#endif
+
 static int __fat_write_inode(struct inode *inode, int wait)
 {
 	struct super_block *sb = inode->i_sb;
@@ -608,7 +753,17 @@ static int __fat_write_inode(struct inode *inode, int wait)
 	struct msdos_dir_entry *raw_entry;
 	loff_t i_pos;
 	int err;
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC
+	struct address_space *mapping = sb->s_bdev->bd_inode->i_mapping;
 
+	if (sbi->options.batch_sync) {
+		err = fat_sync_meta(inode);
+		if (err) {
+			printk(KERN_ERR "fat_sync_meta error: %d!\n", err);
+			return err;
+		}
+	}
+#endif
 	if (inode->i_ino == MSDOS_ROOT_INO)
 		return 0;
 
@@ -623,9 +778,17 @@ retry:
 		       "for updating (i_pos %lld)\n", i_pos);
 		return -EIO;
 	}
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC
+	if (sbi->options.batch_sync)
+		lock_buffer(bh);
+#endif
 	spin_lock(&sbi->inode_hash_lock);
 	if (i_pos != MSDOS_I(inode)->i_pos) {
 		spin_unlock(&sbi->inode_hash_lock);
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC
+		if (sbi->options.batch_sync)
+			unlock_buffer(bh);
+#endif
 		brelse(bh);
 		goto retry;
 	}
@@ -643,23 +806,85 @@ retry:
 			  &raw_entry->date, NULL);
 	if (sbi->options.isvfat) {
 		__le16 atime;
+#ifdef CONFIG_SNSC_FS_VFAT_IGNORE_CRTIME
+		if (!sbi->options.ignore_crtime) {
+#endif
+#ifdef CONFIG_SNSC_FS_VFAT_POSIX_ATTR
+		fat_time_unix2fat(sbi, &inode->i_ctime, &raw_entry->ctime,
+				  &raw_entry->cdate, NULL);
+ 		if (sbi->posix_ops.set_attr(raw_entry, inode) == -1) {
+ 			raw_entry->ctime_cs
+ 				= (inode->i_ctime.tv_sec & 1) * 100 +
+ 					inode->i_ctime.tv_nsec / 10000000;
+ 		}
+#else
 		fat_time_unix2fat(sbi, &inode->i_ctime, &raw_entry->ctime,
 				  &raw_entry->cdate, &raw_entry->ctime_cs);
+#endif
+#ifdef CONFIG_SNSC_FS_VFAT_IGNORE_CRTIME
+		}
+#endif
 		fat_time_unix2fat(sbi, &inode->i_atime, &atime,
 				  &raw_entry->adate, NULL);
 	}
 	spin_unlock(&sbi->inode_hash_lock);
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC
+	if (sbi->options.batch_sync)
+		unlock_buffer(bh);
+#endif
 	mark_buffer_dirty(bh);
 	err = 0;
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC
+	/* sync dirty direntries */
+	if (sbi->options.batch_sync)
+		err = filemap_write_and_wait_range(mapping, DIR_START(sb),
+						   DIR_END(sb));
+	else
+#endif
 	if (wait)
+#ifdef CONFIG_SNSC_FS_FAT_RELAX_SYNC
+		err = sbi->options.relax_sync ?
+			flush_dirty_buffer(bh) : sync_dirty_buffer(bh);
+#else
 		err = sync_dirty_buffer(bh);
+#endif
 	brelse(bh);
 	return err;
 }
 
 static int fat_write_inode(struct inode *inode, struct writeback_control *wbc)
 {
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC
+	struct msdos_sb_info *sbi = MSDOS_SB(inode->i_sb);
+	int ret = 0;
+
+	if (sbi->options.batch_sync) {
+		if (!mutex_trylock(&inode->i_mutex)) {
+			/*
+			 * if we failed to acquire the lock now
+			 * then mark it dirty again.
+			 * it never fail during umount, so it will
+			 * be committed finally.
+			 */
+			pr_debug("Fail to acquire lock, mark it dirty again!\n");
+			mark_inode_dirty(inode);
+			goto out;
+		}
+
+		pr_debug("Acquire lock sucessfully!\n");
+
+		ret = __fat_write_inode(inode, 1);
+
+		mutex_unlock(&inode->i_mutex);
+	} else {
+		ret = __fat_write_inode(inode, wbc->sync_mode == WB_SYNC_ALL);
+	}
+
+out:
+	return ret;
+#else
 	return __fat_write_inode(inode, wbc->sync_mode == WB_SYNC_ALL);
+#endif
 }
 
 int fat_sync_inode(struct inode *inode)
@@ -856,6 +1081,26 @@ static int fat_show_options(struct seq_file *m, struct vfsmount *mnt)
 		seq_puts(m, ",showexec");
 	if (opts->sys_immutable)
 		seq_puts(m, ",sys_immutable");
+#ifdef CONFIG_SNSC_FS_FAT_GC
+	if (opts->gc)
+		seq_puts(m, ",gc");
+#endif
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC
+	if (opts->batch_sync)
+		seq_puts(m, ",batch_sync");
+#endif
+#ifdef CONFIG_SNSC_FS_FAT_RELAX_SYNC
+	if (opts->relax_sync)
+		seq_puts(m, ",relax_sync");
+#endif
+#ifdef CONFIG_SNSC_FS_FAT12_NO_SECTOR_BOUNDARY
+	if (opts->no_sect_bndry)
+		seq_puts(m, ",no_sect_bndry");
+#endif
+#ifdef CONFIG_SNSC_FS_FAT_STRICT_CHECK_ON_BOOT_SECTOR
+	if (opts->strict)
+		seq_puts(m, ",strict");
+#endif
 	if (!isvfat) {
 		if (opts->dotsOK)
 			seq_puts(m, ",dotsOK=yes");
@@ -870,6 +1115,30 @@ static int fat_show_options(struct seq_file *m, struct vfsmount *mnt)
 			seq_puts(m, ",nonumtail");
 		if (opts->rodir)
 			seq_puts(m, ",rodir");
+#ifdef CONFIG_SNSC_FS_VFAT_POSIX_ATTR
+		if (opts->posix_attr)
+			seq_puts(m, ",posix_attr");
+#endif
+#ifdef CONFIG_SNSC_FS_VFAT_COMPARE_UNICODE
+		if (opts->compare_unicode)
+			seq_puts(m, ",comp_uni");
+#endif
+#ifdef CONFIG_SNSC_FS_VFAT_CLEAN_SHUTDOWN_BIT
+		if (opts->clnshutbit)
+			seq_puts(m, ",clnshutbit");
+#endif
+#ifdef CONFIG_SNSC_FS_VFAT_IGNORE_CRTIME
+		if (opts->ignore_crtime)
+			seq_puts(m, ",ignore_crtime");
+#endif
+#ifdef CONFIG_SNSC_FS_VFAT_CHECK_DISK
+		if (opts->check_disk)
+			seq_puts(m, ",check_disk");
+#endif
+#ifdef CONFIG_SNSC_FS_VFAT_AVOID_DOUBLE_LINK
+		if (opts->avoid_dlink)
+			seq_puts(m, ",avoid_dlink");
+#endif
 	}
 	if (opts->flush)
 		seq_puts(m, ",flush");
@@ -888,18 +1157,67 @@ static int fat_show_options(struct seq_file *m, struct vfsmount *mnt)
 }
 
 enum {
+#ifdef CONFIG_SNSC_FS_FAT_GC
+	Opt_gc,
+#endif
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC
+	Opt_batch_dirsync, Opt_batch_sync,
+#endif
+#ifdef CONFIG_SNSC_FS_FAT_RELAX_SYNC
+	Opt_relax_sync,
+#endif
 	Opt_check_n, Opt_check_r, Opt_check_s, Opt_uid, Opt_gid,
 	Opt_umask, Opt_dmask, Opt_fmask, Opt_allow_utime, Opt_codepage,
 	Opt_usefree, Opt_nocase, Opt_quiet, Opt_showexec, Opt_debug,
 	Opt_immutable, Opt_dots, Opt_nodots,
+#ifdef CONFIG_SNSC_FS_FAT12_NO_SECTOR_BOUNDARY
+	Opt_no_sect_bndry,
+#endif
 	Opt_charset, Opt_shortname_lower, Opt_shortname_win95,
 	Opt_shortname_winnt, Opt_shortname_mixed, Opt_utf8_no, Opt_utf8_yes,
 	Opt_uni_xl_no, Opt_uni_xl_yes, Opt_nonumtail_no, Opt_nonumtail_yes,
+#ifdef CONFIG_SNSC_FS_VFAT_POSIX_ATTR
+	Opt_posix_attr_no, Opt_posix_attr_yes,
+#endif
+#ifdef CONFIG_SNSC_FS_VFAT_COMPARE_UNICODE
+	Opt_comp_uni_no, Opt_comp_uni_yes,
+#endif
+#ifdef CONFIG_SNSC_FS_FAT_TIMEZONE
+	Opt_timezone,
+#endif
+#ifdef CONFIG_SNSC_FS_VFAT_CLEAN_SHUTDOWN_BIT
+	Opt_clnshutbit_no, Opt_clnshutbit_yes,
+#endif
+#ifdef CONFIG_SNSC_FS_VFAT_IGNORE_CRTIME
+	Opt_ignore_crtime_no, Opt_ignore_crtime_yes,
+#endif
+#ifdef CONFIG_SNSC_FS_FAT_STRICT_CHECK_ON_BOOT_SECTOR
+	Opt_strict,
+#endif
+#ifdef CONFIG_SNSC_FS_VFAT_CHECK_DISK
+	Opt_check_disk_no, Opt_check_disk_yes,
+#endif
+#ifdef CONFIG_SNSC_FS_VFAT_AVOID_DOUBLE_LINK
+	Opt_avoid_dlink_no, Opt_avoid_dlink_yes,
+#endif
 	Opt_obsolate, Opt_flush, Opt_tz_utc, Opt_rodir, Opt_err_cont,
 	Opt_err_panic, Opt_err_ro, Opt_discard, Opt_err,
 };
 
 static const match_table_t fat_tokens = {
+#ifdef CONFIG_SNSC_FS_FAT_GC
+	{Opt_gc, "gc"},
+#endif
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC
+	{Opt_batch_dirsync, "batch_dirsync"},
+	{Opt_batch_sync, "batch_sync"},
+#endif
+#ifdef CONFIG_SNSC_FS_FAT_RELAX_SYNC
+	{Opt_relax_sync, "relax_sync"},
+#endif
+#ifdef CONFIG_SNSC_FS_FAT_STRICT_CHECK_ON_BOOT_SECTOR
+	{Opt_strict, "strict"},
+#endif
 	{Opt_check_r, "check=relaxed"},
 	{Opt_check_s, "check=strict"},
 	{Opt_check_n, "check=normal"},
@@ -925,6 +1243,9 @@ static const match_table_t fat_tokens = {
 	{Opt_err_panic, "errors=panic"},
 	{Opt_err_ro, "errors=remount-ro"},
 	{Opt_discard, "discard"},
+#ifdef CONFIG_SNSC_FS_FAT12_NO_SECTOR_BOUNDARY
+	{Opt_no_sect_bndry, "no_sect_bndry"},
+#endif
 	{Opt_obsolate, "conv=binary"},
 	{Opt_obsolate, "conv=text"},
 	{Opt_obsolate, "conv=auto"},
@@ -973,6 +1294,63 @@ static const match_table_t vfat_tokens = {
 	{Opt_nonumtail_yes, "nonumtail=true"},
 	{Opt_nonumtail_yes, "nonumtail"},
 	{Opt_rodir, "rodir"},
+#ifdef CONFIG_SNSC_FS_VFAT_POSIX_ATTR
+	{Opt_posix_attr_no, "posix_attr=0"},	/* 0 or no or false */
+	{Opt_posix_attr_no, "posix_attr=no"},
+	{Opt_posix_attr_no, "posix_attr=false"},
+	{Opt_posix_attr_yes, "posix_attr=1"},	/* empty or 1 or yes or true */
+	{Opt_posix_attr_yes, "posix_attr=yes"},
+	{Opt_posix_attr_yes, "posix_attr=true"},
+	{Opt_posix_attr_yes, "posix_attr"},
+#endif
+#ifdef CONFIG_SNSC_FS_VFAT_COMPARE_UNICODE
+	{Opt_comp_uni_no, "comp_uni=0"},	/* 0 or no or false */
+	{Opt_comp_uni_no, "comp_uni=no"},
+	{Opt_comp_uni_no, "comp_uni=false"},
+	{Opt_comp_uni_yes, "comp_uni=1"},	/* empty or 1 or yes or true */
+	{Opt_comp_uni_yes, "comp_uni=yes"},
+	{Opt_comp_uni_yes, "comp_uni=true"},
+	{Opt_comp_uni_yes, "comp_uni"},
+#endif
+#ifdef CONFIG_SNSC_FS_FAT_TIMEZONE
+	{Opt_timezone, "timezone=%s"},
+#endif
+#ifdef CONFIG_SNSC_FS_VFAT_CLEAN_SHUTDOWN_BIT
+	{Opt_clnshutbit_no, "clnshutbit=0"},	/* 0 or no or false */
+	{Opt_clnshutbit_no, "clnshutbit=no"},
+	{Opt_clnshutbit_no, "clnshutbit=false"},
+	{Opt_clnshutbit_yes, "clnshutbit=1"},	/* empty or 1 or yes or true */
+	{Opt_clnshutbit_yes, "clnshutbit=yes"},
+	{Opt_clnshutbit_yes, "clnshutbit=true"},
+	{Opt_clnshutbit_yes, "clnshutbit"},
+#endif
+#ifdef CONFIG_SNSC_FS_VFAT_IGNORE_CRTIME
+	{Opt_ignore_crtime_no, "ignore_crtime=0"},	/* 0 or no or false */
+	{Opt_ignore_crtime_no, "ignore_crtime=no"},
+	{Opt_ignore_crtime_no, "ignore_crtime=false"},
+	{Opt_ignore_crtime_yes, "ignore_crtime=1"},	/* empty or 1 or yes or true */
+	{Opt_ignore_crtime_yes, "ignore_crtime=yes"},
+	{Opt_ignore_crtime_yes, "ignore_crtime=true"},
+	{Opt_ignore_crtime_yes, "ignore_crtime"},
+#endif
+#ifdef CONFIG_SNSC_FS_VFAT_CHECK_DISK
+	{Opt_check_disk_no, "check_disk=0"},	/* 0 or no or false */
+	{Opt_check_disk_no, "check_disk=no"},
+	{Opt_check_disk_no, "check_disk=false"},
+	{Opt_check_disk_yes, "check_disk=1"},	/* empty or 1 or yes or true */
+	{Opt_check_disk_yes, "check_disk=yes"},
+	{Opt_check_disk_yes, "check_disk=true"},
+	{Opt_check_disk_yes, "check_disk"},
+#endif
+#ifdef CONFIG_SNSC_FS_VFAT_AVOID_DOUBLE_LINK
+	{Opt_avoid_dlink_no, "avoid_dlink=0"},	/* 0 or no or false */
+	{Opt_avoid_dlink_no, "avoid_dlink=no"},
+	{Opt_avoid_dlink_no, "avoid_dlink=false"},
+	{Opt_avoid_dlink_yes, "avoid_dlink=1"},	/* empty or 1 or yes or true */
+	{Opt_avoid_dlink_yes, "avoid_dlink=yes"},
+	{Opt_avoid_dlink_yes, "avoid_dlink=true"},
+	{Opt_avoid_dlink_yes, "avoid_dlink"},
+#endif
 	{Opt_err, NULL}
 };
 
@@ -983,6 +1361,9 @@ static int parse_options(char *options, int is_vfat, int silent, int *debug,
 	substring_t args[MAX_OPT_ARGS];
 	int option;
 	char *iocharset;
+#ifdef CONFIG_SNSC_FS_FAT_TIMEZONE
+	char *tz;
+#endif
 
 	opts->isvfat = is_vfat;
 
@@ -999,6 +1380,15 @@ static int parse_options(char *options, int is_vfat, int silent, int *debug,
 		opts->shortname = 0;
 		opts->rodir = 1;
 	}
+#ifdef CONFIG_SNSC_FS_FAT_GC
+	opts->gc = 0;
+#endif
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC
+	opts->batch_sync = 0;
+#endif
+#ifdef CONFIG_SNSC_FS_FAT_RELAX_SYNC
+	opts->relax_sync = 0;
+#endif
 	opts->name_check = 'n';
 	opts->quiet = opts->showexec = opts->sys_immutable = opts->dotsOK =  0;
 	opts->utf8 = opts->unicode_xlate = 0;
@@ -1006,6 +1396,40 @@ static int parse_options(char *options, int is_vfat, int silent, int *debug,
 	opts->usefree = opts->nocase = 0;
 	opts->tz_utc = 0;
 	opts->errors = FAT_ERRORS_RO;
+#ifdef CONFIG_SNSC_FS_VFAT_POSIX_ATTR
+#ifdef CONFIG_SNSC_FS_ROOT_VFAT
+	opts->posix_attr = 1;
+	opts->quiet = 1;
+#else
+	opts->posix_attr = 0;
+#endif
+#endif
+#ifdef CONFIG_SNSC_FS_FAT12_NO
+	opts->no_sect_bndry = 0;
+#endif
+#ifdef CONFIG_SNSC_FS_VFAT_COMPARE_UNICODE
+	opts->compare_unicode = 1;
+#endif
+#ifdef CONFIG_SNSC_FS_FAT_TIMEZONE
+	fat_tz_set(&opts->timezone, NULL);
+#endif
+#ifdef CONFIG_SNSC_FS_VFAT_CLEAN_SHUTDOWN_BIT
+	opts->clnshutbit = 0;
+#endif
+#ifdef CONFIG_SNSC_FS_VFAT_IGNORE_CRTIME
+	opts->ignore_crtime = 0;
+#endif
+#ifdef CONFIG_SNSC_FS_FAT_STRICT_CHECK_ON_BOOT_SECTOR
+	opts->strict = 0;
+#endif
+#ifdef CONFIG_SNSC_FS_VFAT_CHECK_DISK
+	opts->check_disk = 0;
+#endif
+#ifdef CONFIG_SNSC_FS_VFAT_AVOID_DOUBLE_LINK
+	opts->avoid_dlink = CONFIG_SNSC_FS_VFAT_AVOID_DOUBLE_LINK_DEFAULT;
+	if (opts->avoid_dlink != 0)
+		opts->avoid_dlink = 1;
+#endif
 	*debug = 0;
 
 	if (!options)
@@ -1024,6 +1448,23 @@ static int parse_options(char *options, int is_vfat, int silent, int *debug,
 				token = match_token(p, msdos_tokens, args);
 		}
 		switch (token) {
+#ifdef CONFIG_SNSC_FS_FAT_GC
+		case Opt_gc:
+			opts->gc = 1;
+			break;
+#endif
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC
+		case Opt_batch_dirsync:
+			opts->dirsync = 1;
+		case Opt_batch_sync:
+			opts->batch_sync = 1;
+			break;
+#endif
+#ifdef CONFIG_SNSC_FS_FAT_RELAX_SYNC
+		case Opt_relax_sync:
+			opts->relax_sync = 1;
+			break;
+#endif
 		case Opt_check_s:
 			opts->name_check = 's';
 			break;
@@ -1115,6 +1556,16 @@ static int parse_options(char *options, int is_vfat, int silent, int *debug,
 		case Opt_nodots:
 			opts->dotsOK = 0;
 			break;
+#ifdef CONFIG_SNSC_FS_FAT12_NO_SECTOR_BOUNDARY
+		case Opt_no_sect_bndry:
+			opts->no_sect_bndry = 1;
+			break;
+#endif
+#ifdef CONFIG_SNSC_FS_FAT_STRICT_CHECK_ON_BOOT_SECTOR
+		case Opt_strict:
+			opts->strict = 1;
+			break;
+#endif
 
 		/* vfat specific */
 		case Opt_charset:
@@ -1165,6 +1616,67 @@ static int parse_options(char *options, int is_vfat, int silent, int *debug,
 		case Opt_discard:
 			opts->discard = 1;
 			break;
+#ifdef CONFIG_SNSC_FS_VFAT_POSIX_ATTR
+		case Opt_posix_attr_no:		/* 0 or no or false */
+			opts->posix_attr = 0;
+			break;
+		case Opt_posix_attr_yes:	/* empty or 1 or yes or true */
+			opts->posix_attr = 1;
+			break;
+#endif
+#ifdef CONFIG_SNSC_FS_VFAT_COMPARE_UNICODE
+		case Opt_comp_uni_no:		/* 0 or no or false */
+			opts->compare_unicode = 0;
+			break;
+		case Opt_comp_uni_yes:		/* empty or 1 or yes or true */
+			opts->compare_unicode = 1;
+			break;
+#endif
+#ifdef CONFIG_SNSC_FS_FAT_TIMEZONE
+		case Opt_timezone:
+			tz = match_strdup(&args[0]);
+			if (!tz)
+				return -ENOMEM;
+			if (fat_tz_set(&opts->timezone, tz) < 0) {
+				printk("VFAT: failed to parse mount option timezone=%s\n", tz);
+				printk("VFAT: using default timezone\n");
+				fat_tz_set(&opts->timezone, NULL);
+			}
+			kfree(tz);
+			break;
+#endif
+#ifdef CONFIG_SNSC_FS_VFAT_CLEAN_SHUTDOWN_BIT
+		case Opt_clnshutbit_no:		/* 0 or no or false */
+			opts->clnshutbit = 0;
+			break;
+		case Opt_clnshutbit_yes:	/* empty or 1 or yes or true */
+			opts->clnshutbit = 1;
+			break;
+#endif
+#ifdef CONFIG_SNSC_FS_VFAT_IGNORE_CRTIME
+		case Opt_ignore_crtime_no:	/* 0 or no or false */
+			opts->ignore_crtime = 0;
+			break;
+		case Opt_ignore_crtime_yes:	/* empty or 1 or yes or true */
+			opts->ignore_crtime = 1;
+			break;
+#endif
+#ifdef CONFIG_SNSC_FS_VFAT_CHECK_DISK
+		case Opt_check_disk_no:		/* 0 or no or false */
+			opts->check_disk = 0;
+			break;
+		case Opt_check_disk_yes:	/* empty or 1 or yes or true */
+			opts->check_disk = 1;
+			break;
+#endif
+#ifdef CONFIG_SNSC_FS_VFAT_AVOID_DOUBLE_LINK
+		case Opt_avoid_dlink_no:	/* 0 or no or false */
+			opts->avoid_dlink = 0;
+			break;
+		case Opt_avoid_dlink_yes:	/* empty or 1 or yes or true */
+			opts->avoid_dlink = 1;
+			break;
+#endif
 
 		/* obsolete mount options */
 		case Opt_obsolate:
@@ -1206,6 +1718,11 @@ static int fat_read_root(struct inode *inode)
 	int error;
 
 	MSDOS_I(inode)->i_pos = 0;
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC
+	MSDOS_I(inode)->i_last_dclus = 0;
+	MSDOS_I(inode)->i_new = 0;
+	MSDOS_I(inode)->i_new_dclus = 0;
+#endif
 	inode->i_uid = sbi->options.fs_uid;
 	inode->i_gid = sbi->options.fs_gid;
 	inode->i_version++;
@@ -1235,6 +1752,33 @@ static int fat_read_root(struct inode *inode)
 	return 0;
 }
 
+#ifdef CONFIG_SNSC_FS_VFAT_POSIX_ATTR
+static int noop_is_symlink(struct inode *inode, struct msdos_dir_entry *dentry)
+{
+	return 0;
+}
+
+static int noop_set_attr(struct msdos_dir_entry *dentry, struct inode *inode)
+{
+	return -1;
+}
+
+static int noop_get_attr(struct inode *inode, struct msdos_dir_entry *dentry)
+{
+	return -1;
+}
+
+static struct fat_posix_ops posix_noops = {
+        .is_symlink = noop_is_symlink,
+        .set_attr = noop_set_attr,
+	.get_attr = noop_get_attr,
+};
+#endif
+
+#ifdef CONFIG_SNSC_FS_FAT_LOOKUP_HINT
+extern void fat_lkup_hint_init_sb(struct super_block *sb);
+#endif
+
 /*
  * Read the super block of an MS-DOS FS.
  */
@@ -1245,6 +1789,7 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 	struct inode *root_inode = NULL, *fat_inode = NULL;
 	struct buffer_head *bh;
 	struct fat_boot_sector *b;
+	struct fat_boot_bsx *bsx;
 	struct msdos_sb_info *sbi;
 	u16 logical_sector_size;
 	u32 total_sectors, total_clusters, fat_clusters, rootdir_sectors;
@@ -1271,12 +1816,27 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 	sbi->dir_ops = fs_dir_inode_ops;
 	ratelimit_state_init(&sbi->ratelimit, DEFAULT_RATELIMIT_INTERVAL,
 			     DEFAULT_RATELIMIT_BURST);
+#ifdef CONFIG_SNSC_FS_FAT_LOOKUP_HINT
+	fat_lkup_hint_init_sb(sb);
+#endif
 
 	error = parse_options(data, isvfat, silent, &debug, &sbi->options);
 	if (error)
 		goto out_fail;
 
 	setup(sb); /* flavour-specific stuff that needs options */
+#ifdef CONFIG_SNSC_FS_FAT_RELAX_SYNC
+	if (sbi->options.relax_sync)
+		sb->s_flags |= MS_SYNCHRONOUS;
+#endif
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC
+	if (sbi->options.dirsync)
+		sb->s_flags |= MS_DIRSYNC;
+	if (sbi->options.batch_sync) {
+		sbi->options.relax_sync = 0;
+		sb->s_flags &= ~MS_SYNCHRONOUS;
+	}
+#endif
 
 	error = -EIO;
 	sb_min_blocksize(sb, 512);
@@ -1305,6 +1865,26 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 	 * but it turns out valid FAT filesystems can have zero there.
 	 */
 
+#ifdef CONFIG_SNSC_FS_FAT_STRICT_CHECK_ON_BOOT_SECTOR
+	if (sbi->options.strict) {
+		if (b->ignored[0] != 0xe9 && b->ignored[0] != 0xeb) {
+			if (!silent)
+				printk(KERN_ERR "FAT: invalid boot code"
+				       " (0x%02x)\n", b->ignored[0]);
+			brelse(bh);
+			goto out_invalid;
+		}
+		if ((unsigned char)bh->b_data[0x1fe] != 0x55 ||
+		    (unsigned char)bh->b_data[0x1ff] != 0xaa) {
+			if (!silent)
+				printk(KERN_ERR "FAT: invalid signature"
+				       " (0x%02x%02x)\n", bh->b_data[0x1fe],
+				       bh->b_data[0x1ff]);
+			brelse(bh);
+			goto out_invalid;
+		}
+	}
+#endif
 	media = b->media;
 	if (!fat_valid_media(media)) {
 		if (!silent)
@@ -1366,8 +1946,17 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 	sbi->free_clusters = -1;	/* Don't know yet */
 	sbi->free_clus_valid = 0;
 	sbi->prev_free = FAT_START_ENT;
+#ifdef CONFIG_SNSC_FS_FAT_STRICT_CHECK_ON_BOOT_SECTOR
+	sbi->dir_entries =
+		le16_to_cpu(get_unaligned((__le16 *)&b->dir_entries));
+#endif
 
+#ifdef CONFIG_SNSC_FS_FAT_STRICT_CHECK_ON_BOOT_SECTOR
+	if ((sbi->options.strict && sbi->dir_entries == 0) ||
+	    (!sbi->options.strict && !sbi->fat_length && b->fat32_length)) {
+#else
 	if (!sbi->fat_length && b->fat32_length) {
+#endif
 		struct fat_boot_fsinfo *fsinfo;
 		struct buffer_head *fsinfo_bh;
 
@@ -1391,6 +1980,8 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 			goto out_fail;
 		}
 
+		bsx = (struct fat_boot_bsx *)(bh->b_data + FAT32_BSX_OFFSET);
+
 		fsinfo = (struct fat_boot_fsinfo *)fsinfo_bh->b_data;
 		if (!IS_FSINFO(fsinfo)) {
 			printk(KERN_WARNING "FAT: Invalid FSINFO signature: "
@@ -1406,13 +1997,21 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 		}
 
 		brelse(fsinfo_bh);
+	} else {
+		bsx = (struct fat_boot_bsx *)(bh->b_data + FAT16_BSX_OFFSET);
 	}
+
+	/* interpret volume ID as a little endian 32 bit integer */
+	sbi->vol_id = (((u32)bsx->vol_id[0]) | ((u32)bsx->vol_id[1] << 8) |
+		((u32)bsx->vol_id[2] << 16) | ((u32)bsx->vol_id[3] << 24));
 
 	sbi->dir_per_block = sb->s_blocksize / sizeof(struct msdos_dir_entry);
 	sbi->dir_per_block_bits = ffs(sbi->dir_per_block) - 1;
 
 	sbi->dir_start = sbi->fat_start + sbi->fats * sbi->fat_length;
+#ifndef CONFIG_SNSC_FS_FAT_STRICT_CHECK_ON_BOOT_SECTOR
 	sbi->dir_entries = get_unaligned_le16(&b->dir_entries);
+#endif
 	if (sbi->dir_entries & (sbi->dir_per_block - 1)) {
 		if (!silent)
 			printk(KERN_ERR "FAT: bogus directroy-entries per block"
@@ -1506,6 +2105,74 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 		printk(KERN_ERR "FAT: get root inode failed\n");
 		goto out_fail;
 	}
+
+#ifdef CONFIG_SNSC_FS_VFAT_CLEAN_SHUTDOWN_BIT
+	if (sbi->options.clnshutbit) {
+		int cn;
+		int clnshutbit;
+		struct fat_entry fatent;
+		int count = 1;
+
+		clnshutbit = 1;
+		fatent_init(&fatent);
+		fatent.fat_inode = sbi->fat_inode;
+		cn = fat_ent_raw_read(sb, &fatent, 1);
+		if (cn == -1) {
+			printk("FAT: fail to read FAT\n");
+			goto out_invalid;
+		}
+retry:
+		switch (sbi->fat_bits) {
+		case 32:
+			if (((cn | 0x0c000000) & 0x0fffffff) < 0x0ffffff8) {
+				printk("FAT: broken FAT (FAT[1]=%x)\n", cn);
+				goto out_invalid;
+			}
+			clnshutbit = (cn & 0x08000000) ? 1 : 0;
+			if (!(sb->s_flags & MS_RDONLY) && clnshutbit) {
+				if (fat_ent_raw_write(sb, &fatent, cn & ~0x08000000) != 0) {
+					if (count-- > 0)
+						goto retry;
+					printk("FAT: fail to clear ClnShutBit\n");
+					goto out_invalid;
+				}
+			}
+			break;
+		case 16:
+			if ((cn | 0xc000) < 0x0000fff8) {
+				printk("FAT: broken FAT (FAT[1]=%x)\n", cn);
+				goto out_invalid;
+			}
+			clnshutbit = (cn & 0x8000) ? 1 : 0;
+			if (!(sb->s_flags & MS_RDONLY) && clnshutbit) {
+				if (fat_ent_raw_write(sb, &fatent,
+						       (cn & ~0x8000) & 0xffff) != 0) {
+					if (count-- > 0)
+						goto retry;
+					printk("FAT: fail to clear ClnShutBit\n") ;
+					goto out_invalid;
+				}
+			}
+			break;
+		case 12:
+			if (cn < 0x00000ff8) {
+				printk("FAT: broken FAT (FAT[1]=%x)\n", cn);
+				goto out_invalid;
+			}
+			break;
+		}
+		if (!clnshutbit)
+			printk("FAT: %s-fs: not clean shutdown\n",
+			       sbi->fat_bits == 32 ? "FAT32" : "FAT16");
+		sbi->clnshutbit = clnshutbit;
+	}
+#endif
+#ifdef CONFIG_SNSC_FS_VFAT_POSIX_ATTR
+	MSDOS_SB(sb)->posix_ops = posix_noops;
+#endif
+#ifdef CONFIG_SNSC_FS_FAT_GC
+	fat_start_gc(sb);
+#endif
 
 	return 0;
 

@@ -57,6 +57,10 @@ int do_truncate(struct dentry *dentry, loff_t length, unsigned int time_attrs,
 
 	mutex_lock(&dentry->d_inode->i_mutex);
 	ret = notify_change(dentry, &newattrs);
+#ifdef CONFIG_SNSC_FS_OSYNC_ATTR
+	if (!ret && IS_SYNC(dentry->d_inode))
+		generic_osync_inode_only(dentry->d_inode);
+#endif
 	mutex_unlock(&dentry->d_inode->i_mutex);
 	return ret;
 }
@@ -475,6 +479,10 @@ SYSCALL_DEFINE2(fchmod, unsigned int, fd, mode_t, mode)
 	newattrs.ia_mode = (mode & S_IALLUGO) | (inode->i_mode & ~S_IALLUGO);
 	newattrs.ia_valid = ATTR_MODE | ATTR_CTIME;
 	err = notify_change(dentry, &newattrs);
+#ifdef CONFIG_SNSC_FS_OSYNC_ATTR
+	if (!err && IS_SYNC(inode))
+		generic_osync_inode_only(inode);
+#endif
 out_unlock:
 	mutex_unlock(&inode->i_mutex);
 	mnt_drop_write(file->f_path.mnt);
@@ -508,6 +516,10 @@ SYSCALL_DEFINE3(fchmodat, int, dfd, const char __user *, filename, mode_t, mode)
 	newattrs.ia_mode = (mode & S_IALLUGO) | (inode->i_mode & ~S_IALLUGO);
 	newattrs.ia_valid = ATTR_MODE | ATTR_CTIME;
 	error = notify_change(path.dentry, &newattrs);
+#ifdef CONFIG_SNSC_FS_OSYNC_ATTR
+	if (!error && IS_SYNC(inode))
+		generic_osync_inode_only(inode);
+#endif
 out_unlock:
 	mutex_unlock(&inode->i_mutex);
 	mnt_drop_write(path.mnt);
@@ -544,6 +556,10 @@ static int chown_common(struct path *path, uid_t user, gid_t group)
 	error = security_path_chown(path, user, group);
 	if (!error)
 		error = notify_change(path->dentry, &newattrs);
+#ifdef CONFIG_SNSC_FS_OSYNC_ATTR
+	if (!error && IS_SYNC(inode))
+		generic_osync_inode_only(inode);
+#endif
 	mutex_unlock(&inode->i_mutex);
 
 	return error;

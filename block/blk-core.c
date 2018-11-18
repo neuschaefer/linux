@@ -28,6 +28,7 @@
 #include <linux/task_io_accounting_ops.h>
 #include <linux/fault-inject.h>
 #include <linux/list_sort.h>
+#include <linux/ratelimit.h>
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/block.h>
@@ -348,9 +349,10 @@ void blk_put_queue(struct request_queue *q)
 EXPORT_SYMBOL(blk_put_queue);
 
 /*
- * Note: If a driver supplied the queue lock, it should not zap that lock
- * unexpectedly as some queue cleanup components like elevator_exit() and
- * blk_throtl_exit() need queue lock.
+ * Note: If a driver supplied the queue lock, it is disconnected
+ * by this function. The actual state of the lock doesn't matter
+ * here as the request_queue isn't accessible after this point
+ * (QUEUE_FLAG_DEAD is set) and no other requests will be queued.
  */
 void blk_cleanup_queue(struct request_queue *q)
 {
@@ -367,10 +369,8 @@ void blk_cleanup_queue(struct request_queue *q)
 	queue_flag_set_unlocked(QUEUE_FLAG_DEAD, q);
 	mutex_unlock(&q->sysfs_lock);
 
-	if (q->elevator)
-		elevator_exit(q->elevator);
-
-	blk_throtl_exit(q);
+	if (q->queue_lock != &q->__queue_lock)
+		q->queue_lock = &q->__queue_lock;
 
 	blk_put_queue(q);
 }
@@ -2067,7 +2067,7 @@ bool blk_update_request(struct request *req, int error, unsigned int nr_bytes)
 			error_type = "I/O";
 			break;
 		}
-		printk(KERN_ERR "end_request: %s error, dev %s, sector %llu\n",
+		printk_ratelimited(KERN_ERR "end_request: %s error, dev %s, sector %llu\n",
 		       error_type, req->rq_disk ? req->rq_disk->disk_name : "?",
 		       (unsigned long long)blk_rq_pos(req));
 	}

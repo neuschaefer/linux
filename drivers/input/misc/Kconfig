@@ -1,3 +1,4 @@
+# 2012-04-12: File changed by Sony Corporation
 #
 # Input misc drivers configuration
 #
@@ -193,6 +194,17 @@ config INPUT_ATI_REMOTE2
 	  To compile this driver as a module, choose M here: the module will be
 	  called ati_remote2.
 
+config INPUT_KEYCHORD
+	tristate "Key chord input driver support"
+	help
+	  Say Y here if you want to enable the key chord driver
+	  accessible at /dev/keychord.  This driver can be used
+	  for receiving notifications when client specified key
+	  combinations are pressed.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called keychord.
+
 config INPUT_KEYSPAN_REMOTE
 	tristate "Keyspan DMR USB remote control (EXPERIMENTAL)"
 	depends on EXPERIMENTAL
@@ -293,6 +305,11 @@ config INPUT_SGI_BTNS
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called sgi_btns.
+
+config INPUT_GPIO
+	tristate "GPIO driver support"
+	help
+	  Say Y here if you want to support gpio based keys, wheels etc...
 
 config HP_SDC_RTC
 	tristate "HP SDC Real Time Clock"
@@ -466,5 +483,59 @@ config INPUT_XEN_KBDDEV_FRONTEND
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called xen-kbdfront.
+
+config INPUT_ALPS_GPIO_SCROLLWHEEL
+	tristate "Alps GPIO Scrollwheel"
+	depends on GENERIC_GPIO
+	help
+	  This driver implements support for Alps SRBE
+          ScrollWheel connected to GPIO pins of various
+          CPUs (and some other chips).
+
+	  Say Y here if your device has ScrollWheel connected
+	  directly to such GPIO pins.  Your board-specific
+	  setup logic must also provide a platform device,
+	  with configuration data saying which GPIOs are used.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called alps_gpio_scrollwheel.
+
+config INPUT_LIS331DLH
+	tristate "STMicroeletronics LIS331DH 3-axes digital accelerometer for NBX"
+	depends on ARCH_TEGRA
+	help
+	  If you say yes here you get support for accelerometer from
+	  STMicroelectoronics LIS331DLH.
+	  This driver will provide the measurements of acceleration in 3 axes.
+
+config INPUT_AMI304
+	tristate "AICHI STEEL AMI304 3-axes magnetometer for NBX"
+	depends on ARCH_TEGRA
+	help
+	  If you say yes here you get support for magnetometer from
+	  AICHI STEEL AMI304.
+	  This driver will provide the measurements of
+	  ambient mangetic field in 3 axes.
+
+config INPUT_L3G4200DH
+	tristate "STMicroeletronics L3G4200DH 3-axes digital gyroscope for NBX"
+	depends on ARCH_TEGRA
+	help
+	  If you say yes here you get support for accelerometer from
+	  STMicroelectoronics gyroscope.
+	  This driver will provide the measurements of acceleration in 3 axes.
+
+config INPUT_BH1690
+	tristate "Ambient light sensor for NBX"
+	depends on ARCH_TEGRA
+	help
+	  If you say yes here you get support for ambinet light sensor from
+	  microcontroller.
+
+config INPUT_NBX_EC_LID_SWITCH
+	tristate "Support for NBX EC lid switch"
+	depends on NBX_EC_IPC_LID_SWITCH
+	help
+	  This option enables support for NBX EC lid switch
 
 endif

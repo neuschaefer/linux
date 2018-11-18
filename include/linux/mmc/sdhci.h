@@ -85,6 +85,8 @@ struct sdhci_host {
 #define SDHCI_QUIRK_NO_HISPD_BIT			(1<<29)
 /* Controller treats ADMA descriptors with length 0000h incorrectly */
 #define SDHCI_QUIRK_BROKEN_ADMA_ZEROLEN_DESC		(1<<30)
+/* Controller cannot report the line status in present state register */
+#define SDHCI_QUIRK_NON_STD_VOLTAGE_SWITCHING		(1<<31)
 
 	int irq;		/* Device IRQ */
 	void __iomem *ioaddr;	/* Mapped address */
@@ -109,6 +111,7 @@ struct sdhci_host {
 #define SDHCI_USE_ADMA		(1<<1)	/* Host is ADMA capable */
 #define SDHCI_REQ_USE_DMA	(1<<2)	/* Use DMA for this req. */
 #define SDHCI_DEVICE_DEAD	(1<<3)	/* Device unresponsive */
+#define SDHCI_SDR50_NEEDS_TUNING (1<<4)	/* SDR50 needs tuning */
 
 	unsigned int version;	/* SDHCI spec. version */
 
@@ -138,12 +141,16 @@ struct sdhci_host {
 	struct tasklet_struct finish_tasklet;
 
 	struct timer_list timer;	/* Timer for timeouts */
+	unsigned int card_int_set;	/* card int status */
 
 	unsigned int caps;	/* Alternative capabilities */
 
 	unsigned int            ocr_avail_sdio;	/* OCR bit masks */
 	unsigned int            ocr_avail_sd;
 	unsigned int            ocr_avail_mmc;
+
+	wait_queue_head_t	buf_ready_int;	/* Waitqueue for Buffer Read Ready interrupt */
+	unsigned int		tuning_done;	/* Condition flag set when CMD19 succeeds */
 
 	unsigned long private[0] ____cacheline_aligned;
 };

@@ -278,6 +278,10 @@ static int uni2char(wchar_t uni, unsigned char *out, int boundlen)
 	uni2charset = page_uni2charset[ch];
 	if (uni2charset && uni2charset[cl])
 		out[0] = uni2charset[cl];
+#if defined(CONFIG_SNSC_FIX_NLS_CODEPAGE_850)
+	else if (uni == 0x0000)
+		out[0] = 0x00;
+#endif
 	else
 		return -EINVAL;
 	return 1;
@@ -286,8 +290,10 @@ static int uni2char(wchar_t uni, unsigned char *out, int boundlen)
 static int char2uni(const unsigned char *rawstring, int boundlen, wchar_t *uni)
 {
 	*uni = charset2uni[*rawstring];
+#if !defined(CONFIG_SNSC_FIX_NLS_CODEPAGE_850)
 	if (*uni == 0x0000)
 		return -EINVAL;
+#endif
 	return 1;
 }
 

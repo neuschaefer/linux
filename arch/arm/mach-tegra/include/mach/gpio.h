@@ -24,8 +24,18 @@
 #include <mach/irqs.h>
 
 #define TEGRA_NR_GPIOS		INT_GPIO_NR
+#define ARCH_NR_GPIOS		(TEGRA_NR_GPIOS + 128)
 
 #include <asm-generic/gpio.h>
+#include "pinmux.h"
+
+struct gpio_init_pin_info {
+	char name[16];
+	int gpio_nr;
+	bool is_gpio;
+	bool is_input;
+	int value; /* Value if it is output*/
+};
 
 #define gpio_get_value		__gpio_get_value
 #define gpio_set_value		__gpio_set_value
@@ -36,16 +46,23 @@
 
 static inline int gpio_to_irq(unsigned int gpio)
 {
+	/* SOC gpio */
 	if (gpio < TEGRA_NR_GPIOS)
 		return INT_GPIO_BASE + gpio;
-	return -EINVAL;
+
+	/* For non soc gpio, the external peripheral driver need to
+	 * provide the implementation */
+	return __gpio_to_irq(gpio);
 }
 
 static inline int irq_to_gpio(unsigned int irq)
 {
+	/* SOC gpio */
 	if ((irq >= INT_GPIO_BASE) && (irq < INT_GPIO_BASE + INT_GPIO_NR))
 		return irq - INT_GPIO_BASE;
-	return -EINVAL;
+
+	/* we don't supply reverse mappings for non-SOC gpios */
+	return -EIO;
 }
 
 struct tegra_gpio_table {
@@ -56,5 +73,9 @@ struct tegra_gpio_table {
 void tegra_gpio_config(struct tegra_gpio_table *table, int num);
 void tegra_gpio_enable(int gpio);
 void tegra_gpio_disable(int gpio);
-
+int tegra_gpio_resume_init(void);
+void tegra_gpio_init_configure(unsigned gpio, bool is_input, int value);
+void tegra_gpio_set_tristate(int gpio, enum tegra_tristate ts);
+int tegra_gpio_get_bank_int_nr(int gpio);
+int tegra_gpio_to_int_pin(int gpio);
 #endif

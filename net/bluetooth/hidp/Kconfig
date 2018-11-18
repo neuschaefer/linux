@@ -10,3 +10,9 @@ config BT_HIDP
 	  Say Y here to compile HIDP support into the kernel or say M to
 	  compile it as module (hidp).
 
+config BT_HID_SONY_CTRL
+	tristate "BT Sony WirelessController support"
+	depends on BT
+	---help---
+	Support for Sony WirelessController.
+

@@ -108,6 +108,18 @@ int fat_chain_add(struct inode *inode, int new_dclus, int nr_cluster)
 
 	/* add new one to the last of the cluster chain */
 	if (last) {
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC
+		/*the FAT will be updated until right before write_inode*/
+		if (sbi->options.batch_sync &&
+		    !MSDOS_I(inode)->i_new &&
+		    !MSDOS_I(inode)->i_last_dclus) {
+			MSDOS_I(inode)->i_last_dclus = last;
+			MSDOS_I(inode)->i_new_dclus = new_dclus;
+
+			pr_debug("%s: %d %d\n", __func__, last, new_dclus);
+		}
+		else {
+#endif
 		struct fat_entry fatent;
 
 		fatent_init(&fatent);
@@ -119,10 +131,16 @@ int fat_chain_add(struct inode *inode, int new_dclus, int nr_cluster)
 		}
 		if (ret < 0)
 			return ret;
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC
+		}
+#endif
 //		fat_cache_add(inode, new_fclus, new_dclus);
 	} else {
 		MSDOS_I(inode)->i_start = new_dclus;
 		MSDOS_I(inode)->i_logstart = new_dclus;
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC
+		MSDOS_I(inode)->i_new = 1;
+#endif
 		/*
 		 * Since generic_write_sync() synchronizes regular files later,
 		 * we sync here only directories.
@@ -166,19 +184,28 @@ extern struct timezone sys_tz;
 #define YEAR_2100	120
 #define IS_LEAP_YEAR(y)	(!((y) & 3) && (y) != YEAR_2100)
 
+#ifndef CONFIG_SNSC_FS_FAT_TIMEZONE
 /* Linear day numbers of the respective 1sts in non-leap years. */
 static time_t days_in_year[] = {
 	/* Jan  Feb  Mar  Apr  May  Jun  Jul  Aug  Sep  Oct  Nov  Dec */
 	0,   0,  31,  59,  90, 120, 151, 181, 212, 243, 273, 304, 334, 0, 0, 0,
 };
+#endif
 
 /* Convert a FAT time/date pair to a UNIX date (seconds since 1 1 70). */
 void fat_time_fat2unix(struct msdos_sb_info *sbi, struct timespec *ts,
 		       __le16 __time, __le16 __date, u8 time_cs)
 {
 	u16 time = le16_to_cpu(__time), date = le16_to_cpu(__date);
+#ifdef CONFIG_SNSC_FS_FAT_TIMEZONE
+	time_t second;
+#else
 	time_t second, day, leap_day, month, year;
+#endif
 
+#ifdef CONFIG_SNSC_FS_FAT_TIMEZONE
+	fat_tz_fat2unix(&sbi->options.timezone, time, date, &second);
+#else
 	year  = date >> 9;
 	month = max(1, (date >> 5) & 0xf);
 	day   = max(1, date & 0x1f) - 1;
@@ -198,6 +225,11 @@ void fat_time_fat2unix(struct msdos_sb_info *sbi, struct timespec *ts,
 
 	if (!sbi->options.tz_utc)
 		second += sys_tz.tz_minuteswest * SECS_PER_MIN;
+#ifdef CONFIG_SNSC_FS_FAT_UNIX_DATE
+	if (second < 0)
+		second = LONG_MAX;
+#endif
+#endif
 
 	if (time_cs) {
 		ts->tv_sec = second + (time_cs / 100);
@@ -212,7 +244,15 @@ void fat_time_fat2unix(struct msdos_sb_info *sbi, struct timespec *ts,
 void fat_time_unix2fat(struct msdos_sb_info *sbi, struct timespec *ts,
 		       __le16 *time, __le16 *date, u8 *time_cs)
 {
+#ifdef CONFIG_SNSC_FS_FAT_TIMEZONE
+	time_t second = ts->tv_sec;
+#else
 	struct tm tm;
+#endif
+
+#ifdef CONFIG_SNSC_FS_FAT_TIMEZONE
+	fat_tz_unix2fat(&sbi->options.timezone, second, time, date);
+#else
 	time_to_tm(ts->tv_sec, sbi->options.tz_utc ? 0 :
 		   -sys_tz.tz_minuteswest * 60, &tm);
 
@@ -241,6 +281,7 @@ void fat_time_unix2fat(struct msdos_sb_info *sbi, struct timespec *ts,
 
 	*time = cpu_to_le16(tm.tm_hour << 11 | tm.tm_min << 5 | tm.tm_sec);
 	*date = cpu_to_le16(tm.tm_year << 9 | tm.tm_mon << 5 | tm.tm_mday);
+#endif
 	if (time_cs)
 		*time_cs = (ts->tv_sec & 1) * 100 + ts->tv_nsec / 10000000;
 }
@@ -260,3 +301,26 @@ int fat_sync_bhs(struct buffer_head **bhs, int nr_bhs)
 	}
 	return err;
 }
+
+#ifdef CONFIG_SNSC_FS_FAT_RELAX_SYNC
+int fat_flush_bhs(struct buffer_head **bhs, int nr_bhs)
+{
+	int i, e, err = 0;
+
+	for (i = 0; i < nr_bhs; i++) {
+		lock_buffer(bhs[i]);
+		if (test_clear_buffer_dirty(bhs[i])) {
+			get_bh(bhs[i]);
+			bhs[i]->b_end_io = end_buffer_write_sync;
+			e = submit_bh(WRITE, bhs[i]);
+			if (!err && e)
+				err = e;
+		} else
+			unlock_buffer(bhs[i]);
+
+	}
+	return err;
+}
+
+EXPORT_SYMBOL_GPL(fat_flush_bhs);
+#endif

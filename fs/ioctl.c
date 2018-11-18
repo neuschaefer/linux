@@ -577,6 +577,19 @@ int do_vfs_ioctl(struct file *filp, unsigned int fd, unsigned int cmd,
 			error = -ENOTTY;
 		break;
 
+#ifdef CONFIG_SNSC_FS_IOCTL_SYNC
+	case FIOFLSBUF:
+	{
+		struct super_block *sb;
+
+		sb = filp->f_path.dentry->d_inode->i_sb;
+		down_write(&sb->s_umount);
+		error = sync_filesystem(sb);
+		up_write(&sb->s_umount);
+		break;
+	}
+#endif
+
 	case FIFREEZE:
 		error = ioctl_fsfreeze(filp);
 		break;

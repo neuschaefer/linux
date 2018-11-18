@@ -1099,3 +1099,9 @@ ecuv5			MACH_ECUV5		ECUV5			3421
 hsgx6d			MACH_HSGX6D		HSGX6D			3422
 dawad7			MACH_DAWAD7		DAWAD7			3423
 sam9repeater		MACH_SAM9REPEATER	SAM9REPEATER		3424
+aruba			MACH_ARUBA		ARUBA			3437
+cardhu			MACH_CARDHU		CARDHU			3436
+tegra_enterprise	MACH_TEGRA_ENTERPRISE	TEGRA_ENTERPRISE	3512
+p852			MACH_P852		P852			3667
+nbx02                   MACH_NBX02              NBX02                   3331
+nbx03                   MACH_NBX03              NBX03                   3330

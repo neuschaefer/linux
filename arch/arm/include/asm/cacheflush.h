@@ -16,6 +16,7 @@
 #include <asm/shmparam.h>
 #include <asm/cachetype.h>
 #include <asm/outercache.h>
+#include <asm/rodata.h>
 
 #define CACHE_COLOUR(vaddr)	((vaddr & (SHMLBA - 1)) >> PAGE_SHIFT)
 
@@ -249,7 +250,7 @@ extern void flush_cache_page(struct vm_area_struct *vma, unsigned long user_addr
  * Harvard caches are synchronised for the user space address range.
  * This is used for the ARM private sys_cacheflush system call.
  */
-#define flush_cache_user_range(vma,start,end) \
+#define flush_cache_user_range(start,end) \
 	__cpuc_coherent_user_range((start) & PAGE_MASK, PAGE_ALIGN(end))
 
 /*
@@ -343,5 +344,54 @@ static inline void flush_cache_vunmap(unsigned long start, unsigned long end)
 	if (!cache_is_vipt_nonaliasing())
 		flush_cache_all();
 }
+
+/*
+ * The set_memory_* API can be used to change various attributes of a virtual
+ * address range. The attributes include:
+ * Cachability   : UnCached, WriteCombining, WriteBack
+ * Executability : eXeutable, NoteXecutable
+ * Read/Write    : ReadOnly, ReadWrite
+ * Presence      : NotPresent
+ *
+ * Within a catagory, the attributes are mutually exclusive.
+ *
+ * The implementation of this API will take care of various aspects that
+ * are associated with changing such attributes, such as:
+ * - Flushing TLBs
+ * - Flushing CPU caches
+ * - Making sure aliases of the memory behind the mapping don't violate
+ *   coherency rules as defined by the CPU in the system.
+ *
+ * What this API does not do:
+ * - Provide exclusion between various callers - including callers that
+ *   operation on other mappings of the same physical page
+ * - Restore default attributes when a page is freed
+ * - Guarantee that mappings other than the requested one are
+ *   in any state, other than that these do not violate rules for
+ *   the CPU you have. Do not depend on any effects on other mappings,
+ *   CPUs other than the one you have may have more relaxed rules.
+ * The caller is required to take care of these.
+ */
+
+int set_memory_uc(unsigned long addr, int numpages);
+int set_memory_wc(unsigned long addr, int numpages);
+int set_memory_wb(unsigned long addr, int numpages);
+int set_memory_iwb(unsigned long addr, int numpages);
+int set_memory_x(unsigned long addr, int numpages);
+int set_memory_nx(unsigned long addr, int numpages);
+int set_memory_ro(unsigned long addr, int numpages);
+int set_memory_rw(unsigned long addr, int numpages);
+int set_memory_np(unsigned long addr, int numpages);
+int set_memory_4k(unsigned long addr, int numpages);
+
+int set_memory_array_uc(unsigned long *addr, int addrinarray);
+int set_memory_array_wc(unsigned long *addr, int addrinarray);
+int set_memory_array_wb(unsigned long *addr, int addrinarray);
+int set_memory_array_iwb(unsigned long *addr, int addrinarray);
+
+int set_pages_array_uc(struct page **pages, int addrinarray);
+int set_pages_array_wc(struct page **pages, int addrinarray);
+int set_pages_array_wb(struct page **pages, int addrinarray);
+int set_pages_array_iwb(struct page **pages, int addrinarray);
 
 #endif

@@ -1,3 +1,4 @@
+# 2012-04-12: File changed by Sony Corporation
 #
 # USB OTG infrastructure may be needed for peripheral-only, host-only,
 # or OTG-capable configurations when OTG transceivers or controllers
@@ -113,6 +114,14 @@ config USB_MSM_OTG
 	  This driver is not supported on boards like trout which
 	  has an external PHY.
 
+config USB_TEGRA_OTG
+	boolean "Tegra OTG Driver"
+	depends on USB && ARCH_TEGRA
+	select USB_OTG_UTILS
+	help
+	  Enable this driver on boards which use the internal VBUS and ID
+	  sensing of the Tegra USB PHY.
+
 config AB8500_USB
         tristate "AB8500 USB Transceiver Driver"
         depends on AB8500_CORE
@@ -121,5 +130,11 @@ config AB8500_USB
           Enable this to support the USB OTG transceiver in AB8500 chip.
           This transceiver supports high and full speed devices plus,
           in host mode, low speed.
+
+config USB_OTG_HOLD_WAKELOCK_WHILE_VBUS_DETECTED
+	tristate "Hold wakelock while VBUS detected"
+	depends on USB && ARCH_TEGRA
+	help
+	  Wakelock is hold while detecting VBUS.
 
 endif # USB || OTG

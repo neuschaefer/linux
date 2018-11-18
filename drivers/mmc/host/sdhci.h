@@ -68,8 +68,10 @@
 #define  SDHCI_DATA_AVAILABLE	0x00000800
 #define  SDHCI_CARD_PRESENT	0x00010000
 #define  SDHCI_WRITE_PROTECT	0x00080000
+#define  SDHCI_DATA_LVL_MASK	0x00F00000
+#define   SDHCI_DATA_LVL_SHIFT	20
 
-#define SDHCI_HOST_CONTROL 	0x28
+#define SDHCI_HOST_CONTROL	0x28
 #define  SDHCI_CTRL_LED		0x01
 #define  SDHCI_CTRL_4BITBUS	0x02
 #define  SDHCI_CTRL_HISPD	0x04
@@ -146,7 +148,22 @@
 
 #define SDHCI_ACMD12_ERR	0x3C
 
-/* 3E-3F reserved */
+#define SDHCI_HOST_CONTROL2		0x3E
+#define  SDHCI_CTRL_UHS_MASK		0x0007
+#define   SDHCI_CTRL_UHS_SDR12		0x0000
+#define   SDHCI_CTRL_UHS_SDR25		0x0001
+#define   SDHCI_CTRL_UHS_SDR50		0x0002
+#define   SDHCI_CTRL_UHS_SDR104		0x0003
+#define   SDHCI_CTRL_UHS_DDR50		0x0004
+#define  SDHCI_CTRL_VDD_180		0x0008
+#define  SDHCI_CTRL_DRV_TYPE_MASK	0x0030
+#define   SDHCI_CTRL_DRV_TYPE_B		0x0000
+#define   SDHCI_CTRL_DRV_TYPE_A		0x0010
+#define   SDHCI_CTRL_DRV_TYPE_C		0x0020
+#define   SDHCI_CTRL_DRV_TYPE_D		0x0030
+#define  SDHCI_CTRL_EXEC_TUNING		0x0040
+#define  SDHCI_CTRL_TUNED_CLK		0x0080
+#define  SDHCI_CTRL_PRESET_VAL_ENABLE	0x8000
 
 #define SDHCI_CAPABILITIES	0x40
 #define  SDHCI_TIMEOUT_CLK_MASK	0x0000003F
@@ -169,7 +186,22 @@
 
 #define SDHCI_CAPABILITIES_1	0x44
 
-#define SDHCI_MAX_CURRENT	0x48
+#define  SDHCI_SUPPORT_SDR50	0x00000001
+#define  SDHCI_SUPPORT_SDR104	0x00000002
+#define  SDHCI_SUPPORT_DDR50	0x00000004
+#define  SDHCI_DRIVER_TYPE_A	0x00000010
+#define  SDHCI_DRIVER_TYPE_C	0x00000020
+#define  SDHCI_DRIVER_TYPE_D	0x00000040
+#define  SDHCI_USE_SDR50_TUNING	0x00002000
+
+#define SDHCI_MAX_CURRENT		0x48
+#define  SDHCI_MAX_CURRENT_330_MASK	0x0000FF
+#define  SDHCI_MAX_CURRENT_330_SHIFT	0
+#define  SDHCI_MAX_CURRENT_300_MASK	0x00FF00
+#define  SDHCI_MAX_CURRENT_300_SHIFT	8
+#define  SDHCI_MAX_CURRENT_180_MASK	0xFF0000
+#define  SDHCI_MAX_CURRENT_180_SHIFT	16
+#define   SDHCI_MAX_CURRENT_MULTIPLIER	4
 
 /* 4C-4F reserved for more max current */
 
@@ -223,6 +255,15 @@ struct sdhci_ops {
 	void (*platform_send_init_74_clocks)(struct sdhci_host *host,
 					     u8 power_mode);
 	unsigned int    (*get_ro)(struct sdhci_host *host);
+
+	int		(*suspend)(struct sdhci_host *host, pm_message_t state);
+	int		(*resume)(struct sdhci_host *host);
+
+	void	(*platform_reset_enter)(struct sdhci_host *host, u8 mask);
+	void	(*platform_reset_exit)(struct sdhci_host *host, u8 mask);
+	int	(*set_uhs_signaling)(struct sdhci_host *host, unsigned int uhs);
+	int	(*switch_signal_voltage)(struct sdhci_host *host,
+				unsigned int signal_voltage);
 };
 
 #ifdef CONFIG_MMC_SDHCI_IO_ACCESSORS

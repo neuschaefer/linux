@@ -180,6 +180,9 @@ void __lock_buffer(struct buffer_head *bh);
 void ll_rw_block(int, int, struct buffer_head * bh[]);
 int sync_dirty_buffer(struct buffer_head *bh);
 int __sync_dirty_buffer(struct buffer_head *bh, int rw);
+#ifdef CONFIG_SNSC_FS_FAT_RELAX_SYNC
+int flush_dirty_buffer(struct buffer_head *bh);
+#endif
 void write_dirty_buffer(struct buffer_head *bh, int rw);
 int submit_bh(int, struct buffer_head *);
 void write_boundary_block(struct block_device *bdev,

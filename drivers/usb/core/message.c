@@ -46,6 +46,7 @@ static int usb_start_wait_urb(struct urb *urb, int timeout, int *actual_length)
 	struct api_context ctx;
 	unsigned long expire;
 	int retval;
+	void __iomem *regs;
 
 	init_completion(&ctx.done);
 	urb->context = &ctx;
@@ -56,6 +57,15 @@ static int usb_start_wait_urb(struct urb *urb, int timeout, int *actual_length)
 
 	expire = timeout ? msecs_to_jiffies(timeout) : MAX_SCHEDULE_TIMEOUT;
 	if (!wait_for_completion_timeout(&ctx.done, expire)) {
+		regs = bus_to_hcd(urb->dev->bus)->regs;
+		/* Dump USB registers */
+		dev_err(&urb->dev->dev, "URB timeout, dumping ehci registers:\n");
+		print_hex_dump(KERN_ERR, "", DUMP_PREFIX_ADDRESS, 16, 4, regs + 0x140, 0xc0, false);
+		printk("\n");
+		print_hex_dump(KERN_ERR, "", DUMP_PREFIX_ADDRESS, 16, 4, regs + 0x400, 0x80, false);
+		printk("\n");
+		print_hex_dump(KERN_ERR, "", DUMP_PREFIX_ADDRESS, 16, 4, regs + 0x800, 0x40, false);
+
 		usb_kill_urb(urb);
 		retval = (ctx.status == -ENOENT ? -ETIMEDOUT : ctx.status);
 

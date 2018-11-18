@@ -213,6 +213,22 @@ static ssize_t hidraw_get_report(struct file *file, char __user *buffer, size_t 
 		goto out_free;
 	}
 
+#ifdef CONFIG_HID_SONY_CTRL
+	if (report_type == HID_FEATURE_REPORT_WITH_DATASIZE) {
+		if (count < 3) {
+			printk(KERN_WARNING "hidraw: pid %d passed too short report\n",
+					task_pid_nr(current));
+			ret = -EINVAL;
+			goto out;
+		}
+		
+		if (copy_from_user(buf, buffer,3)) {
+			ret = -EFAULT;
+			goto out_free;
+		}
+	}
+#endif //CONFIG_HID_SONY_CTRL
+
 	ret = dev->hid_get_raw_report(dev, report_number, buf, count, report_type);
 
 	if (ret < 0)
@@ -388,6 +404,41 @@ static long hidraw_ioctl(struct file *file, unsigned int cmd,
 					break;
 				}
 
+#ifdef CONFIG_HID_SONY_CTRL
+				if (_IOC_NR(cmd) == _IOC_NR(HIDIOCSFEATURE_SKIPREPORTID(0))) {
+					if ( dev->hid->bus != BUS_USB ) {
+						ret = -EINVAL;
+						break;
+					}
+					
+					int len = _IOC_SIZE(cmd);
+					ret = hidraw_send_report(file, user_arg, len, HID_FEATURE_REPORT_SKIP_REPORTID);
+					break;
+				}
+
+				if (_IOC_NR(cmd) == _IOC_NR(HIDIOCSOUTPUT_SKIPREPORTID(0))) {
+					if ( dev->hid->bus != BUS_USB ) {
+						ret = -EINVAL;
+						break;
+					}
+					
+					int len = _IOC_SIZE(cmd);
+					ret = hidraw_send_report(file, user_arg, len, HID_OUTPUT_REPORT_SKIP_REPORTID);
+					break;
+				}
+				
+				if (_IOC_NR(cmd) == _IOC_NR(HIDIOCGFEATURE_WITHDATASIZE(0))) {
+					if ( dev->hid->bus != BUS_BLUETOOTH ) {
+						ret = -EINVAL;
+						break;
+					}
+
+					int len = _IOC_SIZE(cmd);
+					ret = hidraw_get_report(file, user_arg, len, HID_FEATURE_REPORT_WITH_DATASIZE);
+					break;
+				}
+#endif //CONFIG_HID_SONY_CTRL
+
 				/* Begin Read-only ioctls. */
 				if (_IOC_DIR(cmd) != _IOC_READ) {
 					ret = -EINVAL;
@@ -450,6 +501,11 @@ void hidraw_report_event(struct hid_device *hid, u8 *data, int len)
 	struct hidraw_list *list;
 
 	list_for_each_entry(list, &dev->list, node) {
+#ifdef CONFIG_HID_SONY_CTRL
+		if(list < PAGE_OFFSET || !(list->node.next)) {
+			break;
+		}
+#endif //CONFIG_HID_SONY_CTRL
 		list->buffer[list->head].value = kmemdup(data, len, GFP_ATOMIC);
 		list->buffer[list->head].len = len;
 		list->head = (list->head + 1) & (HIDRAW_BUFFER_SIZE - 1);

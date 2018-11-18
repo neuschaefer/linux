@@ -1,0 +1,82 @@
+comment "SNSC related options"
+	depends on SNSC
+
+config SNSC_FIX_NLS_CODEPAGE_437
+	bool "Fix codepage 437 (United States, Canada)"
+	depends on SNSC && NLS_CODEPAGE_437
+	default y
+
+config SNSC_FIX_NLS_CODEPAGE_850
+	bool "Fix Codepage 850 (Europe)"
+	depends on SNSC && NLS_CODEPAGE_850
+	default y
+
+config SNSC_FIX_NLS_CODEPAGE_932
+	bool "Fix japanese charsets (Shift-JIS, EUC-JP)"
+	depends on SNSC && NLS_CODEPAGE_932
+	default y
+
+config SNSC_FIX_NLS_CODEPAGE_874
+	bool "Fix Thai charset (CP874, TIS-620)"
+	depends on SNSC && NLS_CODEPAGE_874
+	default y
+
+config SNSC_FIX_NLS_CODEPAGE_1251
+        bool "Fix Windows CP1251 (Bulgarian, Belarusian)"
+        depends on SNSC && NLS_CODEPAGE_1251
+        default y
+
+config SNSC_FIX_NLS_ISO8859_1
+	bool "Fix NLS ISO 8859-1  (Latin 1; Western European Languages)"
+	depends on SNSC && NLS_ISO8859_1
+	default y
+
+config SNSC_FIX_NLS_ISO8859_2
+	bool "Fix NLS ISO 8859-2  (Latin 2; Slavic/Central European Languages)"
+	depends on SNSC && NLS_ISO8859_2
+	default y
+
+config SNSC_NLS_CODEPAGE_1252
+	tristate "Windows CP1252 (Western European languages)"
+	help
+	  The Microsoft FAT file system family can deal with filenames in
+	  native language character sets. These character sets are stored in
+	  so-called DOS codepages. You need to include the appropriate
+	  codepage if you want to be able to read/write these filenames on
+	  DOS/Windows partitions correctly. This does apply to the filenames
+	  only, not to the file contents. You can include several codepages;
+	  say Y here if you want to include the DOS codepage for Western
+	  European languages.
+
+config SNSC_NLS_CODEPAGE_1253
+	tristate "Windows CP1253 (Greek)"
+	help
+	  The Microsoft FAT file system family can deal with filenames in
+	  native language character sets. These character sets are stored in
+	  so-called DOS codepages. You need to include the appropriate
+	  codepage if you want to be able to read/write these filenames on
+	  DOS/Windows partitions correctly. This does apply to the filenames
+	  only, not to the file contents. You can include several codepages;
+	  say Y here if you want to include the DOS codepage for Greek.
+
+config SNSC_NLS_CODEPAGE_1254
+	tristate "Windows CP1254 (Turkish)"
+	help
+	  The Microsoft FAT file system family can deal with filenames in
+	  native language character sets. These character sets are stored in
+	  so-called DOS codepages. You need to include the appropriate
+	  codepage if you want to be able to read/write these filenames on
+	  DOS/Windows partitions correctly. This does apply to the filenames
+	  only, not to the file contents. You can include several codepages;
+	  say Y here if you want to include the DOS codepage for Turkish.
+
+config SNSC_NLS_CODEPAGE_1256
+	tristate "Windows CP1256 (Arabic)"
+	help
+	  The Microsoft FAT file system family can deal with filenames in
+	  native language character sets. These character sets are stored in
+	  so-called DOS codepages. You need to include the appropriate
+	  codepage if you want to be able to read/write these filenames on
+	  DOS/Windows partitions correctly. This does apply to the filenames
+	  only, not to the file contents. You can include several codepages;
+	  say Y here if you want to include the DOS codepage for Arabic.

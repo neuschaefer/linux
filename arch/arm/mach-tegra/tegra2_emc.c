@@ -25,6 +25,11 @@
 
 #include "tegra2_emc.h"
 
+#define TEGRA_MRR_DIVLD        (1<<20)
+#define TEGRA_EMC_STATUS       0x02b4
+#define TEGRA_EMC_MRR          0x00ec
+static DEFINE_MUTEX(tegra_emc_mrr_lock);
+
 #ifdef CONFIG_TEGRA_EMC_SCALING_ENABLE
 static bool emc_enable = true;
 #else
@@ -36,6 +41,9 @@ static void __iomem *emc = IO_ADDRESS(TEGRA_EMC_BASE);
 static const struct tegra_emc_table *tegra_emc_table;
 static int tegra_emc_table_size;
 
+static unsigned long tegra_emc_max_bus_rate;  /* 2 * 1000 * maximum emc_clock rate */
+static unsigned long tegra_emc_min_bus_rate;  /* 2 * 1000 * minimum emc_clock rate */
+
 static inline void emc_writel(u32 val, unsigned long addr)
 {
 	writel(val, emc + addr);
@@ -44,6 +52,35 @@ static inline void emc_writel(u32 val, unsigned long addr)
 static inline u32 emc_readl(unsigned long addr)
 {
 	return readl(emc + addr);
+}
+
+/* read LPDDR2 memory modes */
+static int tegra_emc_read_mrr(unsigned long addr)
+{
+	u32 value;
+	int count = 100;
+
+	mutex_lock(&tegra_emc_mrr_lock);
+	do {
+		emc_readl(TEGRA_EMC_MRR);
+	} while (--count && (emc_readl(TEGRA_EMC_STATUS) & TEGRA_MRR_DIVLD));
+	if (count == 0) {
+		pr_err("%s: Failed to read memory type\n", __func__);
+		BUG();
+	}
+	value = (1 << 30) | (addr << 16);
+	emc_writel(value, TEGRA_EMC_MRR);
+
+	count = 100;
+	while (--count && !(emc_readl(TEGRA_EMC_STATUS) & TEGRA_MRR_DIVLD));
+	if (count == 0) {
+		pr_err("%s: Failed to read memory type\n", __func__);
+		BUG();
+	}
+	value = emc_readl(TEGRA_EMC_MRR) & 0xFFFF;
+	mutex_unlock(&tegra_emc_mrr_lock);
+
+	return value;
 }
 
 static const unsigned long emc_reg_addr[TEGRA_EMC_NUM_REGS] = {
@@ -108,6 +145,14 @@ long tegra_emc_round_rate(unsigned long rate)
 	if (!emc_enable)
 		return -EINVAL;
 
+	if (rate >= tegra_emc_max_bus_rate) {
+		best = tegra_emc_table_size - 1;
+		goto round_out;
+	} else if (rate <= tegra_emc_min_bus_rate) {
+		best = 0;
+		goto round_out;
+	}
+
 	pr_debug("%s: %lu\n", __func__, rate);
 
 	/*
@@ -126,7 +171,7 @@ long tegra_emc_round_rate(unsigned long rate)
 
 	if (best < 0)
 		return -EINVAL;
-
+round_out:
 	pr_debug("%s: using %lu\n", __func__, tegra_emc_table[best].rate);
 
 	return tegra_emc_table[best].rate * 2 * 1000;
@@ -154,11 +199,11 @@ int tegra_emc_set_rate(unsigned long rate)
 	 */
 	rate = rate / 2 / 1000;
 
-	for (i = 0; i < tegra_emc_table_size; i++)
+	for (i = tegra_emc_table_size - 1; i >= 0; i--)
 		if (tegra_emc_table[i].rate == rate)
 			break;
 
-	if (i >= tegra_emc_table_size)
+	if (i < 0)
 		return -EINVAL;
 
 	pr_debug("%s: setting to %lu\n", __func__, rate);
@@ -171,8 +216,57 @@ int tegra_emc_set_rate(unsigned long rate)
 	return 0;
 }
 
-void tegra_init_emc(const struct tegra_emc_table *table, int table_size)
+void tegra_init_emc(const struct tegra_emc_chip *chips, int chips_size)
 {
-	tegra_emc_table = table;
-	tegra_emc_table_size = table_size;
+	int i;
+	int vid;
+	int rev_id1;
+	int rev_id2;
+	int pid;
+	int chip_matched = -1;
+
+	vid = tegra_emc_read_mrr(5);
+	rev_id1 = tegra_emc_read_mrr(6);
+	rev_id2 = tegra_emc_read_mrr(7);
+	pid = tegra_emc_read_mrr(8);
+
+	for (i = 0; i < chips_size; i++) {
+		if (chips[i].mem_manufacturer_id >= 0) {
+			if (chips[i].mem_manufacturer_id != vid)
+				continue;
+		}
+		if (chips[i].mem_revision_id1 >= 0) {
+			if (chips[i].mem_revision_id1 != rev_id1)
+				continue;
+		}
+		if (chips[i].mem_revision_id2 >= 0) {
+			if (chips[i].mem_revision_id2 != rev_id2)
+				continue;
+		}
+		if (chips[i].mem_pid >= 0) {
+			if (chips[i].mem_pid != pid)
+				continue;
+		}
+
+		chip_matched = i;
+		break;
+	}
+
+	if (chip_matched >= 0) {
+		pr_info("%s: %s memory found\n", __func__,
+			chips[chip_matched].description);
+		tegra_emc_table = chips[chip_matched].table;
+		tegra_emc_table_size = chips[chip_matched].table_size;
+
+		tegra_emc_min_bus_rate = tegra_emc_table[0].rate * 2 * 1000;
+		tegra_emc_max_bus_rate = tegra_emc_table[tegra_emc_table_size - 1].rate * 2 * 1000;
+
+	} else {
+		pr_err("%s: Memory not recognized, memory scaling disabled\n",
+			__func__);
+		pr_info("%s: Memory vid     = 0x%04x", __func__, vid);
+		pr_info("%s: Memory rev_id1 = 0x%04x", __func__, rev_id1);
+		pr_info("%s: Memory rev_id2 = 0x%04x", __func__, rev_id2);
+		pr_info("%s: Memory pid     = 0x%04x", __func__, pid);
+	}
 }

@@ -50,12 +50,30 @@ struct mmc_ios {
 #define MMC_TIMING_LEGACY	0
 #define MMC_TIMING_MMC_HS	1
 #define MMC_TIMING_SD_HS	2
+#define MMC_TIMING_UHS_SDR12	MMC_TIMING_LEGACY
+#define MMC_TIMING_UHS_SDR25	MMC_TIMING_SD_HS
+#define MMC_TIMING_UHS_SDR50	3
+#define MMC_TIMING_UHS_SDR104	4
+#define MMC_TIMING_UHS_DDR50	5
 
 	unsigned char	ddr;			/* dual data rate used */
 
 #define MMC_SDR_MODE		0
 #define MMC_1_2V_DDR_MODE	1
 #define MMC_1_8V_DDR_MODE	2
+
+	unsigned char	signal_voltage;		/* signalling voltage (1.8V or 3.3V) */
+
+#define MMC_SIGNAL_VOLTAGE_330	0
+#define MMC_SIGNAL_VOLTAGE_180	1
+#define MMC_SIGNAL_VOLTAGE_120	2
+
+	unsigned char	drv_type;		/* driver type (A, B, C, D) */
+
+#define MMC_SET_DRIVER_TYPE_B	0
+#define MMC_SET_DRIVER_TYPE_A	1
+#define MMC_SET_DRIVER_TYPE_C	2
+#define MMC_SET_DRIVER_TYPE_D	3
 };
 
 struct mmc_host_ops {
@@ -117,6 +135,11 @@ struct mmc_host_ops {
 
 	/* optional callback for HC quirks */
 	void	(*init_card)(struct mmc_host *host, struct mmc_card *card);
+
+	int	(*start_signal_voltage_switch)(struct mmc_host *host, struct mmc_ios *ios);
+	int	(*execute_tuning)(struct mmc_host *host);
+	int	(*select_drive_strength)(unsigned int max_dtr,
+		int host_drv, int card_drv);
 };
 
 struct mmc_card;
@@ -173,6 +196,18 @@ struct mmc_host {
 						/* DDR mode at 1.2V */
 #define MMC_CAP_POWER_OFF_CARD	(1 << 13)	/* Can power off after boot */
 #define MMC_CAP_BUS_WIDTH_TEST	(1 << 14)	/* CMD14/CMD19 bus width ok */
+#define MMC_CAP_UHS_SDR12	(1 << 15)	/* Host supports UHS SDR12 mode */
+#define MMC_CAP_UHS_SDR25	(1 << 16)	/* Host supports UHS SDR25 mode */
+#define MMC_CAP_UHS_SDR50	(1 << 17)	/* Host supports UHS SDR50 mode */
+#define MMC_CAP_UHS_SDR104	(1 << 18)	/* Host supports UHS SDR104 mode */
+#define MMC_CAP_UHS_DDR50	(1 << 19)	/* Host supports UHS DDR50 mode */
+#define MMC_CAP_SET_XPC_330	(1 << 20)	/* Host supports >150mA current at 3.3V */
+#define MMC_CAP_SET_XPC_300	(1 << 21)	/* Host supports >150mA current at 3.0V */
+#define MMC_CAP_SET_XPC_180	(1 << 22)	/* Host supports >150mA current at 1.8V */
+#define MMC_CAP_DRIVER_TYPE_A	(1 << 23)	/* Host supports Driver Type A */
+#define MMC_CAP_DRIVER_TYPE_C	(1 << 24)	/* Host supports Driver Type C */
+#define MMC_CAP_DRIVER_TYPE_D	(1 << 25)	/* Host supports Driver Type D */
+#define MMC_CAP_BKOPS		(1 << 26)	/* Host supports BKOPS */
 
 	mmc_pm_flag_t		pm_caps;	/* supported pm features */
 
@@ -227,6 +262,10 @@ struct mmc_host {
 	const struct mmc_bus_ops *bus_ops;	/* current bus driver */
 	unsigned int		bus_refs;	/* reference counter */
 
+	unsigned int		bus_resume_flags;
+#define MMC_BUSRESUME_MANUAL_RESUME	(1 << 0)
+#define MMC_BUSRESUME_NEEDS_RESUME	(1 << 1)
+
 	unsigned int		sdio_irqs;
 	struct task_struct	*sdio_irq_thread;
 	atomic_t		sdio_irq_thread_abort;
@@ -243,6 +282,15 @@ struct mmc_host {
 
 	struct dentry		*debugfs_root;
 
+#ifdef CONFIG_MMC_EMBEDDED_SDIO
+	struct {
+		struct sdio_cis			*cis;
+		struct sdio_cccr		*cccr;
+		struct sdio_embedded_func	*funcs;
+		int				num_funcs;
+	} embedded_sdio_data;
+#endif
+
 	unsigned long		private[0] ____cacheline_aligned;
 };
 
@@ -250,6 +298,14 @@ extern struct mmc_host *mmc_alloc_host(int extra, struct device *);
 extern int mmc_add_host(struct mmc_host *);
 extern void mmc_remove_host(struct mmc_host *);
 extern void mmc_free_host(struct mmc_host *);
+
+#ifdef CONFIG_MMC_EMBEDDED_SDIO
+extern void mmc_set_embedded_sdio_data(struct mmc_host *host,
+				       struct sdio_cis *cis,
+				       struct sdio_cccr *cccr,
+				       struct sdio_embedded_func *funcs,
+				       int num_funcs);
+#endif
 
 static inline void *mmc_priv(struct mmc_host *host)
 {
@@ -261,6 +317,18 @@ static inline void *mmc_priv(struct mmc_host *host)
 #define mmc_dev(x)	((x)->parent)
 #define mmc_classdev(x)	(&(x)->class_dev)
 #define mmc_hostname(x)	(dev_name(&(x)->class_dev))
+#define mmc_bus_needs_resume(host) ((host)->bus_resume_flags & MMC_BUSRESUME_NEEDS_RESUME)
+#define mmc_bus_manual_resume(host) ((host)->bus_resume_flags & MMC_BUSRESUME_MANUAL_RESUME)
+
+static inline void mmc_set_bus_resume_policy(struct mmc_host *host, int manual)
+{
+	if (manual)
+		host->bus_resume_flags |= MMC_BUSRESUME_MANUAL_RESUME;
+	else
+		host->bus_resume_flags &= ~MMC_BUSRESUME_MANUAL_RESUME;
+}
+
+extern int mmc_resume_bus(struct mmc_host *host);
 
 extern int mmc_suspend_host(struct mmc_host *);
 extern int mmc_resume_host(struct mmc_host *);

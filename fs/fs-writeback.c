@@ -1041,7 +1041,7 @@ void __mark_inode_dirty(struct inode *inode, int flags)
 	if ((inode->i_state & flags) == flags)
 		return;
 
-	if (unlikely(block_dump))
+	if (unlikely(block_dump > 1))
 		block_dump___mark_inode_dirty(inode);
 
 	spin_lock(&inode->i_lock);
@@ -1107,6 +1107,61 @@ out_unlock_inode:
 
 }
 EXPORT_SYMBOL(__mark_inode_dirty);
+
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC
+/*
+ * earse DIRTY bit of inode
+ * and move it from dirty list to inode_inuse
+ */
+void mark_inode_clean(struct inode *inode)
+{
+	if (!(inode->i_state & I_DIRTY))
+		return;
+
+	if (unlikely(block_dump)) {
+		struct dentry *dentry = NULL;
+		const char *name = "?";
+
+		if (!list_empty(&inode->i_dentry)) {
+			dentry = list_entry(inode->i_dentry.next,
+					    struct dentry, d_alias);
+			if (dentry && dentry->d_name.name)
+				name = (const char *) dentry->d_name.name;
+		}
+
+		if (inode->i_ino || strcmp(inode->i_sb->s_id, "bdev"))
+			printk(KERN_DEBUG
+			       "%s(%d): clean inode %lu (%s) on %s\n",
+			       current->comm, current->pid, inode->i_ino,
+			       name, inode->i_sb->s_id);
+	}
+
+	spin_lock(&inode_wb_list_lock);
+	spin_lock(&inode->i_lock);
+
+	if (inode->i_state & I_DIRTY) {
+		inode->i_state &= ~I_DIRTY;
+
+		/*
+		 * If the inode is locked, just update its dirty state.
+		 * The unlocker will place the inode on the appropriate
+		 * superblock list, based upon its state.
+		 */
+		if (inode->i_state & I_NEW)
+			goto out;
+
+		if (inode->i_state & (I_FREEING|I_CLEAR))
+			goto out;
+
+		list_del_init(&inode->i_wb_list);
+	}
+ out:
+	spin_unlock(&inode->i_lock);
+	spin_unlock(&inode_wb_list_lock);
+}
+
+EXPORT_SYMBOL(mark_inode_clean);
+#endif
 
 /*
  * Write out a superblock's list of dirty inodes.  A wait will be performed
@@ -1362,3 +1417,47 @@ int sync_inode_metadata(struct inode *inode, int wait)
 	return sync_inode(inode, &wbc);
 }
 EXPORT_SYMBOL(sync_inode_metadata);
+
+
+#ifdef CONFIG_SNSC_FS_OSYNC_INODE_ONLY
+/**
+ * generic_osync_inode_only - flush a inode to disk
+ * @inode: inode to write
+ *
+ * This can be called by file_write functions for files which have the
+ * O_SYNC flag set, to flush dirty writes to disk.
+ *
+ */
+
+int generic_osync_inode_only(struct inode *inode)
+{
+	int err = 0;
+	int need_write_inode_now = 0;
+	int err2;
+
+	spin_lock(&inode->i_lock);
+	if ((inode->i_state & I_DIRTY) && (inode->i_state & I_DIRTY_DATASYNC)) {
+		need_write_inode_now = 1;
+	}
+	spin_unlock(&inode->i_lock);
+
+	if (need_write_inode_now &&
+	    mapping_cap_writeback_dirty(inode->i_mapping)) {
+		struct writeback_control wbc = {
+			.sync_mode = WB_SYNC_ALL,
+			.nr_to_write = 0,
+		};
+
+		might_sleep();
+		err2 = sync_inode(inode, &wbc);
+		wait_on_inode(inode);
+		if (!err)
+			err = err2;
+	}
+	else
+		inode_sync_wait(inode);
+
+	return err;
+}
+EXPORT_SYMBOL(generic_osync_inode_only);
+#endif

@@ -24,20 +24,41 @@
 #include <linux/types.h>
 #include <linux/input/matrix_keypad.h>
 
-#ifdef CONFIG_ARCH_TEGRA_2x_SOC
 #define KBC_MAX_GPIO	24
 #define KBC_MAX_KPENT	8
-#else
-#define KBC_MAX_GPIO	20
-#define KBC_MAX_KPENT	7
-#endif
 
 #define KBC_MAX_ROW	16
 #define KBC_MAX_COL	8
 #define KBC_MAX_KEY	(KBC_MAX_ROW * KBC_MAX_COL)
 
+#define KBC_PIN_GPIO_0		0
+#define KBC_PIN_GPIO_1		1
+#define KBC_PIN_GPIO_2		2
+#define KBC_PIN_GPIO_3		3
+#define KBC_PIN_GPIO_4		4
+#define KBC_PIN_GPIO_5		5
+#define KBC_PIN_GPIO_6		6
+#define KBC_PIN_GPIO_7		7
+#define KBC_PIN_GPIO_8		8
+#define KBC_PIN_GPIO_9		9
+#define KBC_PIN_GPIO_10		10
+#define KBC_PIN_GPIO_11		11
+#define KBC_PIN_GPIO_12		12
+#define KBC_PIN_GPIO_13		13
+#define KBC_PIN_GPIO_14		14
+#define KBC_PIN_GPIO_15		15
+#define KBC_PIN_GPIO_16		16
+#define KBC_PIN_GPIO_17		17
+#define KBC_PIN_GPIO_18		18
+#define KBC_PIN_GPIO_19		19
+#define KBC_PIN_GPIO_20		20
+#define KBC_PIN_GPIO_21		21
+#define KBC_PIN_GPIO_22		22
+#define KBC_PIN_GPIO_23		23
+
 struct tegra_kbc_pin_cfg {
 	bool is_row;
+	bool en;
 	unsigned char num;
 };
 
@@ -49,6 +70,7 @@ struct tegra_kbc_wake_key {
 struct tegra_kbc_platform_data {
 	unsigned int debounce_cnt;
 	unsigned int repeat_cnt;
+	unsigned int scan_count;
 
 	unsigned int wake_cnt; /* 0:wake on any key >1:wake on wake_cfg */
 	const struct tegra_kbc_wake_key *wake_cfg;

@@ -64,7 +64,7 @@
 #define L2X0_AUX_CTRL_MASK			0xc0000fff
 #define L2X0_AUX_CTRL_ASSOCIATIVITY_SHIFT	16
 #define L2X0_AUX_CTRL_WAY_SIZE_SHIFT		17
-#define L2X0_AUX_CTRL_WAY_SIZE_MASK		(0x3 << 17)
+#define L2X0_AUX_CTRL_WAY_SIZE_MASK		(0x7 << 17)
 #define L2X0_AUX_CTRL_SHARE_OVERRIDE_SHIFT	22
 #define L2X0_AUX_CTRL_NS_LOCKDOWN_SHIFT		26
 #define L2X0_AUX_CTRL_NS_INT_CTRL_SHIFT		27
@@ -73,7 +73,8 @@
 #define L2X0_AUX_CTRL_EARLY_BRESP_SHIFT		30
 
 #ifndef __ASSEMBLY__
-extern void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask);
+extern void l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask);
+extern void l2x0_enable(void);
 #endif
 
 #endif

@@ -1,6 +1,7 @@
 #
 # Makefile for kernel SPI drivers.
 #
+GCOV_PROFILE := y
 
 ccflags-$(CONFIG_SPI_DEBUG) := -DDEBUG
 
@@ -45,6 +46,7 @@ obj-$(CONFIG_SPI_S3C24XX_GPIO)		+= spi_s3c24xx_gpio.o
 obj-$(CONFIG_SPI_S3C24XX)		+= spi_s3c24xx_hw.o
 obj-$(CONFIG_SPI_S3C64XX)		+= spi_s3c64xx.o
 obj-$(CONFIG_SPI_TEGRA)			+= spi_tegra.o
+obj-$(CONFIG_SPI_SLAVE_TEGRA)		+= spi_slave_tegra.o
 obj-$(CONFIG_SPI_TI_SSP)		+= ti-ssp-spi.o
 obj-$(CONFIG_SPI_TOPCLIFF_PCH)		+= spi_topcliff_pch.o
 obj-$(CONFIG_SPI_TXX9)			+= spi_txx9.o

@@ -465,7 +465,6 @@ static int __rfcomm_dlc_close(struct rfcomm_dlc *d, int err)
 
 	switch (d->state) {
 	case BT_CONNECT:
-	case BT_CONFIG:
 		if (test_and_clear_bit(RFCOMM_DEFER_SETUP, &d->flags)) {
 			set_bit(RFCOMM_AUTH_REJECT, &d->flags);
 			rfcomm_schedule();
@@ -668,6 +667,9 @@ static void rfcomm_session_close(struct rfcomm_session *s, int err)
 
 	BT_DBG("session %p state %ld err %d", s, s->state, err);
 
+	if (s->state == BT_CLOSED)
+		return;
+
 	rfcomm_session_hold(s);
 
 	s->state = BT_CLOSED;
@@ -680,6 +682,12 @@ static void rfcomm_session_close(struct rfcomm_session *s, int err)
 	}
 
 	rfcomm_session_clear_timer(s);
+
+	/* Drop reference for incoming sessions */
+	if (!s->initiator)
+		if (list_empty(&s->dlcs))
+			rfcomm_session_put(s);
+
 	rfcomm_session_put(s);
 }
 
@@ -1160,12 +1168,7 @@ static int rfcomm_recv_ua(struct rfcomm_session *s, u8 dlci)
 			break;
 
 		case BT_DISCONN:
-			/* When socket is closed and we are not RFCOMM
-			 * initiator rfcomm_process_rx already calls
-			 * rfcomm_session_put() */
-			if (s->sock->sk->sk_state != BT_CLOSED)
-				if (list_empty(&s->dlcs))
-					rfcomm_session_put(s);
+			rfcomm_session_close(s, 0);
 			break;
 		}
 	}
@@ -1196,7 +1199,6 @@ static int rfcomm_recv_dm(struct rfcomm_session *s, u8 dlci)
 		else
 			err = ECONNRESET;
 
-		s->state = BT_CLOSED;
 		rfcomm_session_close(s, err);
 	}
 	return 0;
@@ -1231,7 +1233,6 @@ static int rfcomm_recv_disc(struct rfcomm_session *s, u8 dlci)
 		else
 			err = ECONNRESET;
 
-		s->state = BT_CLOSED;
 		rfcomm_session_close(s, err);
 	}
 
@@ -1856,12 +1857,8 @@ static inline void rfcomm_process_rx(struct rfcomm_session *s)
 		rfcomm_recv_frame(s, skb);
 	}
 
-	if (sk->sk_state == BT_CLOSED) {
-		if (!s->initiator)
-			rfcomm_session_put(s);
-
+	if (sk->sk_state == BT_CLOSED)
 		rfcomm_session_close(s, sk->sk_err);
-	}
 }
 
 static inline void rfcomm_accept_connection(struct rfcomm_session *s)
@@ -1915,7 +1912,6 @@ static inline void rfcomm_check_connection(struct rfcomm_session *s)
 		break;
 
 	case BT_CLOSED:
-		s->state = BT_CLOSED;
 		rfcomm_session_close(s, sk->sk_err);
 		break;
 	}

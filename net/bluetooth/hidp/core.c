@@ -327,10 +327,20 @@ static int hidp_get_raw_report(struct hid_device *hid,
 	size_t len;
 	int numbered_reports = hid->report_enum[report_type].numbered;
 
+#ifdef CONFIG_BT_HID_SONY_CTRL
+	int data_size = 1;
+#endif //CONFIG_BT_HID_SONY_CTRL
+
 	switch (report_type) {
 	case HID_FEATURE_REPORT:
 		report_type = HIDP_TRANS_GET_REPORT | HIDP_DATA_RTYPE_FEATURE;
 		break;
+#ifdef CONFIG_BT_HID_SONY_CTRL
+	case HID_FEATURE_REPORT_WITH_DATASIZE:
+			report_type = HIDP_TRANS_GET_REPORT | HIDP_DATA_RTYPE_FEATURE | HIDP_DATA_SIZE_TRUE;
+			data_size = 3;
+		break;
+#endif //CONFIG_BT_HID_SONY_CTRL
 	case HID_INPUT_REPORT:
 		report_type = HIDP_TRANS_GET_REPORT | HIDP_DATA_RTYPE_INPUT;
 		break;
@@ -349,7 +359,11 @@ static int hidp_get_raw_report(struct hid_device *hid,
 	session->waiting_report_number = numbered_reports ? report_number : -1;
 	set_bit(HIDP_WAITING_FOR_RETURN, &session->flags);
 	data[0] = report_number;
+#ifdef CONFIG_BT_HID_SONY_CTRL
+	if (hidp_send_ctrl_message(hid->driver_data, report_type, data, data_size))
+#else
 	if (hidp_send_ctrl_message(hid->driver_data, report_type, data, 1))
+#endif //CONFIG_BT_HID_SONY_CTRL
 		goto err_eio;
 
 	/* Wait for the return of the report. The returned report

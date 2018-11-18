@@ -338,6 +338,8 @@ void l2cap_send_cmd(struct l2cap_conn *conn, u8 ident, u8 code, u16 len, void *d
 	else
 		flags = ACL_START;
 
+	bt_cb(skb)->force_active = BT_POWER_FORCE_ACTIVE_ON;
+
 	hci_send_acl(conn->hcon, skb, flags);
 }
 
@@ -390,6 +392,7 @@ static inline void l2cap_send_sframe(struct l2cap_pinfo *pi, u16 control)
 	else
 		flags = ACL_START;
 
+	bt_cb(skb)->force_active = pi->force_active;
 	hci_send_acl(pi->conn->hcon, skb, flags);
 }
 
@@ -548,7 +551,8 @@ static void l2cap_conn_start(struct l2cap_conn *conn)
 					struct sock *parent = bt_sk(sk)->parent;
 					rsp.result = cpu_to_le16(L2CAP_CR_PEND);
 					rsp.status = cpu_to_le16(L2CAP_CS_AUTHOR_PEND);
-					parent->sk_data_ready(parent, 0);
+					if (parent)
+						parent->sk_data_ready(parent, 0);
 
 				} else {
 					sk->sk_state = BT_CONFIG;
@@ -855,10 +859,10 @@ int l2cap_do_connect(struct sock *sk)
 	auth_type = l2cap_get_auth_type(sk);
 
 	if (l2cap_pi(sk)->dcid == L2CAP_CID_LE_DATA)
-		hcon = hci_connect(hdev, LE_LINK, dst,
+		hcon = hci_connect(hdev, LE_LINK, 0, dst,
 					l2cap_pi(sk)->sec_level, auth_type);
 	else
-		hcon = hci_connect(hdev, ACL_LINK, dst,
+		hcon = hci_connect(hdev, ACL_LINK, 0, dst,
 					l2cap_pi(sk)->sec_level, auth_type);
 
 	if (IS_ERR(hcon)) {
@@ -998,6 +1002,7 @@ void l2cap_do_send(struct sock *sk, struct sk_buff *skb)
 	else
 		flags = ACL_START;
 
+	bt_cb(skb)->force_active = pi->force_active;
 	hci_send_acl(hcon, skb, flags);
 }
 

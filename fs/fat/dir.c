@@ -18,8 +18,10 @@
 #include <linux/time.h>
 #include <linux/buffer_head.h>
 #include <linux/compat.h>
+#include <linux/sched.h>
 #include <asm/uaccess.h>
 #include <linux/kernel.h>
+#include <linux/ratelimit.h>
 #include "fat.h"
 
 /*
@@ -35,6 +37,188 @@
 #define FAT_MAX_UNI_CHARS	((MSDOS_SLOTS - 1) * 13 + 1)
 #define FAT_MAX_UNI_SIZE	(FAT_MAX_UNI_CHARS * sizeof(wchar_t))
 
+#ifdef CONFIG_SNSC_FS_FAT_LOOKUP_HINT
+void fat_lkup_hint_init_sb(struct super_block *sb)
+{
+	struct msdos_sb_info *sbi = MSDOS_SB(sb);
+
+	spin_lock_init(&sbi->lkup_hint_lock);
+	INIT_LIST_HEAD(&sbi->lkup_hint_head);
+	sbi->lkup_hint_freemap = 0;
+	sbi->lkup_hint_freemap = ~sbi->lkup_hint_freemap;
+}
+
+void fat_lkup_hint_inval(struct inode *dir)
+{
+	struct super_block *sb = dir->i_sb;
+	struct msdos_sb_info *sbi = MSDOS_SB(sb);
+	struct fat_lookup_hint *hint, *n;
+	int i;
+
+	spin_lock(&sbi->lkup_hint_lock);
+	list_for_each_entry_safe(hint, n, &sbi->lkup_hint_head, lru_list) {
+		if (hint->dir == dir) {
+			list_del_init(&hint->lru_list);
+			i = hint - &(sbi->lkup_hint[0]);
+			sbi->lkup_hint_freemap |= (1 << i);
+		}
+	}
+	spin_unlock(&sbi->lkup_hint_lock);
+}
+
+/*
+ * AVG_MSDOS_SLOTS is selected so that it can store 48 chars file name length.
+ *
+ * According raugh observation, most files in Linux installed system have
+ * less than or equal to 48 chars file name length.
+ *
+ * Following is one of statistic information;
+ *
+ *	total # of files(*1) 			9193
+ *	max length of file name			52 chars
+ *
+ *	# of files over 48 chars name length	36
+ *	  % covered by 48 chars name length	 99.6%
+ *
+ *	# of files over 32 chars name length	517
+ *	  % covered by 32 chars name length	 94.3%
+ *
+ *	*1) # of file, dir and symlink which has over 2 chars
+ *	file name length.
+ *
+ */
+#define AVG_MSDOS_SLOTS	(8+1)
+#define WIN_LFN_TOP	(3 * AVG_MSDOS_SLOTS * sizeof(struct msdos_dir_entry))
+#define WIN_LFN_BOTTOM	(5 * AVG_MSDOS_SLOTS * sizeof(struct msdos_dir_entry))
+
+#define WIN_TOP		(3 * sizeof(struct msdos_dir_entry))
+#define WIN_BOTTOM	(5 * sizeof(struct msdos_dir_entry))
+
+static inline
+loff_t get_syswide_hint(loff_t pos, struct fat_lookup_hint *hint)
+{
+	/*
+	 * NOTE: If you don't expect locality beyond process,
+	 * make this return 0 always, instead of following.
+	 */
+	return  (pos == 0) ? hint->last_pos : pos;
+}
+
+static loff_t fat_lkup_hint_get(struct inode *dir, int is_lfn)
+{
+	struct super_block *sb = dir->i_sb;
+	struct fat_lookup_hint *hint;
+	struct msdos_sb_info *sbi = MSDOS_SB(sb);
+	loff_t win_top;
+	unsigned int rnd_flg;
+	loff_t pos = 0;
+
+	if (is_lfn) {
+		rnd_flg = FAT_LKUP_ST_LFN_RANDOM;
+		win_top = WIN_LFN_TOP;
+	} else {
+		rnd_flg = FAT_LKUP_ST_RANDOM;
+		win_top = WIN_TOP;
+	}
+
+	spin_lock(&sbi->lkup_hint_lock);
+	list_for_each_entry(hint, &sbi->lkup_hint_head, lru_list) {
+		if (hint->dir == dir) {
+			if (!(hint->state & rnd_flg)) {
+				if (hint->pid == current->pid)  {
+					pos = hint->last_pos;
+					break;
+				}
+				/* expect locality beyond process */
+				pos = get_syswide_hint(pos, hint);
+			}
+		}
+	}
+	spin_unlock(&sbi->lkup_hint_lock);
+	return max(0LL, pos - win_top);
+}
+
+/*
+ * NOTE: If you don't want multiple entries for
+ * same pid, set this to 1.
+ */
+#define LKUP_MULTIENT_MAX	(FAT_LKUP_HINT_MAX/4-1)
+
+
+/* caller must hold dir->i_sem */
+static void fat_lkup_hint_add(struct inode *dir, loff_t pos)
+{
+	struct super_block *sb = dir->i_sb;
+	struct fat_lookup_hint *p, *hint = NULL;
+	loff_t win_start, win_end;
+	struct msdos_sb_info *sbi = MSDOS_SB(sb);
+	int nr_pid_match = 0;
+	unsigned int state;
+
+	spin_lock(&sbi->lkup_hint_lock);
+	/* find out same pid entry */
+	list_for_each_entry(p, &sbi->lkup_hint_head, lru_list) {
+		if (p->pid == current->pid) {
+			nr_pid_match ++;
+			if (p->dir == dir) {
+				hint = p;
+				goto match;
+			}
+			if (!hint)
+				hint = p;
+		}
+	}
+
+	if (nr_pid_match < LKUP_MULTIENT_MAX)
+		hint = NULL;
+
+	if (hint == NULL) {
+		int free_hint;
+		free_hint = ffs(sbi->lkup_hint_freemap);
+		if (free_hint) {
+			/* add the new entry */
+			free_hint --;
+			sbi->lkup_hint_freemap &= ~ (1<<(free_hint));
+			hint = &sbi->lkup_hint[free_hint];
+			INIT_LIST_HEAD(&hint->lru_list);
+			/* don't need to recheck hint */
+		} else {
+			/* replace the last entry */
+			struct list_head *p = sbi->lkup_hint_head.prev;
+			hint = list_entry(p, struct fat_lookup_hint, lru_list);
+		}
+		hint->pid = current->pid;
+		hint->dir = dir;
+		hint->last_pos = 0;
+	}
+
+match:
+	state = (FAT_LKUP_ST_RANDOM | FAT_LKUP_ST_LFN_RANDOM);
+	hint->last_pos = pos;
+	if (hint->dir != dir) {
+		hint->dir = dir;
+	} else {
+		win_start = hint->last_pos - WIN_TOP;
+		win_end = hint->last_pos + WIN_BOTTOM;
+		if (win_start <= pos && pos <= win_end) {
+			state &= ~FAT_LKUP_ST_RANDOM;
+		}
+		win_start = hint->last_pos - WIN_LFN_TOP;
+		win_end = hint->last_pos + WIN_LFN_BOTTOM;
+		if (win_start <= pos && pos <= win_end) {
+			state &= ~FAT_LKUP_ST_LFN_RANDOM;
+		}
+	}
+	hint->state = state;
+
+	/* update LRU list */
+	list_del(&hint->lru_list);
+	list_add(&hint->lru_list, &sbi->lkup_hint_head);	/* put hint to head */
+	spin_unlock(&sbi->lkup_hint_lock);
+}
+#endif
+
+#ifndef CONFIG_SNSC_FS_FAT_GC
 static inline loff_t fat_make_i_pos(struct super_block *sb,
 				    struct buffer_head *bh,
 				    struct msdos_dir_entry *de)
@@ -42,6 +226,7 @@ static inline loff_t fat_make_i_pos(struct super_block *sb,
 	return ((loff_t)bh->b_blocknr << MSDOS_SB(sb)->dir_per_block_bits)
 		| (de - (struct msdos_dir_entry *)bh->b_data);
 }
+#endif
 
 static inline void fat_dir_readahead(struct inode *dir, sector_t iblock,
 				     sector_t phys)
@@ -98,7 +283,7 @@ next:
 
 	*bh = sb_bread(sb, phys);
 	if (*bh == NULL) {
-		printk(KERN_ERR "FAT: Directory bread(block %llu) failed\n",
+		printk_ratelimited(KERN_ERR "FAT: Directory bread(block %llu) failed\n",
 		       (llu)phys);
 		/* skip this block */
 		*pos = (iblock + 1) << sb->s_blocksize_bits;
@@ -258,6 +443,21 @@ static inline int fat_name_match(struct msdos_sb_info *sbi,
 		return !memcmp(a, b, a_len);
 }
 
+#ifdef CONFIG_SNSC_FS_VFAT_COMPARE_UNICODE
+static inline int fat_uname_match(struct msdos_sb_info *sbi,
+				  const wchar_t *a, int a_len,
+				  const wchar_t *b, int b_len)
+{
+	if (a_len != b_len)
+		return 0;
+
+	if (sbi->options.name_check != 's')
+		return !vfat_uni_strnicmp(a, b, a_len);
+	else
+		return !memcmp(a, b, a_len * sizeof(wchar_t));
+}
+#endif
+
 enum { PARSE_INVALID = 1, PARSE_NOT_LONGNAME, PARSE_EOF, };
 
 /**
@@ -349,14 +549,59 @@ int fat_search_long(struct inode *inode, const unsigned char *name,
 	wchar_t *unicode = NULL;
 	unsigned char work[MSDOS_NAME];
 	unsigned char bufname[FAT_MAX_SHORT_SIZE];
+#ifdef CONFIG_SNSC_FS_VFAT_COMPARE_UNICODE
+	int comp_uni = sbi->options.compare_unicode;
+	wchar_t *name_unicode = NULL;
+	int name_ulen;
+#endif
 	unsigned short opt_shortname = sbi->options.shortname;
 	loff_t cpos = 0;
 	int chl, i, j, last_u, err, len;
+#ifdef CONFIG_SNSC_FS_FAT_LOOKUP_HINT
+	loff_t start_off;
+	int reach_bottom = 0;
+#endif
 
+#ifdef CONFIG_SNSC_FS_VFAT_COMPARE_UNICODE
+	if (comp_uni) {
+		int len;
+		name_unicode = __getname();
+		if (!name_unicode)
+			return -ENOMEM;
+		len = name_len;
+		while (len && name[len - 1] == '.')
+			len--;
+		if (vfat_xlate_to_uni(name, len, (char *)name_unicode,
+				       &name_ulen,
+				       &len, sbi->options.unicode_xlate,
+				       sbi->options.utf8, sbi->nls_io) < 0) {
+			__putname(name_unicode);
+			return -EINVAL;
+		}
+	}
+#endif
+#ifdef CONFIG_SNSC_FS_FAT_LOOKUP_HINT
+	start_off = cpos = fat_lkup_hint_get(inode, 1);
+#endif
 	err = -ENOENT;
 	while (1) {
+#ifdef CONFIG_SNSC_FS_FAT_LOOKUP_HINT
+top:
+		if (reach_bottom && cpos >= start_off) {
+			brelse(bh);
+			goto end_of_dir;
+		}
+		if (fat_get_entry(inode, &cpos, &bh, &de) == -1) {
+			if (!start_off || reach_bottom)
+				goto end_of_dir;
+			reach_bottom++;
+			cpos = 0;
+			continue;
+		}
+#else
 		if (fat_get_entry(inode, &cpos, &bh, &de) == -1)
 			goto end_of_dir;
+#endif
 parse_record:
 		nr_slots = 0;
 		if (de->name[0] == DELETED_FLAG)
@@ -375,8 +620,17 @@ parse_record:
 				continue;
 			else if (status == PARSE_NOT_LONGNAME)
 				goto parse_record;
-			else if (status == PARSE_EOF)
+			else if (status == PARSE_EOF) {
+#ifdef CONFIG_SNSC_FS_FAT_LOOKUP_HINT
+				if (!start_off || reach_bottom)
+					goto end_of_dir;
+				reach_bottom++;
+				cpos = 0;
+				goto top;
+#else
 				goto end_of_dir;
+#endif
+			}
 		}
 
 		memcpy(work, de->name, sizeof(de->name));
@@ -419,6 +673,21 @@ parse_record:
 
 		/* Compare shortname */
 		bufuname[last_u] = 0x0000;
+#ifdef CONFIG_SNSC_FS_VFAT_COMPARE_UNICODE
+		if (comp_uni) {
+			if (fat_uname_match(sbi, name_unicode, name_ulen,
+					    bufuname, last_u))
+				goto found;
+			if (nr_slots) {
+				int ulen = 0;
+				while (unicode[ulen] != 0)
+					ulen++;
+				if (fat_uname_match(sbi, name_unicode,
+						    name_ulen, unicode, ulen))
+					goto found;
+			}
+		} else {
+#endif
 		len = fat_uni_to_x8(sbi, bufuname, bufname, sizeof(bufname));
 		if (fat_name_match(sbi, name, name_len, bufname, len))
 			goto found;
@@ -432,6 +701,9 @@ parse_record:
 			if (fat_name_match(sbi, name, name_len, longname, len))
 				goto found;
 		}
+#ifdef CONFIG_SNSC_FS_VFAT_COMPARE_UNICODE
+		}
+#endif
 	}
 
 found:
@@ -441,10 +713,17 @@ found:
 	sinfo->de = de;
 	sinfo->bh = bh;
 	sinfo->i_pos = fat_make_i_pos(sb, sinfo->bh, sinfo->de);
+#ifdef CONFIG_SNSC_FS_FAT_LOOKUP_HINT
+	fat_lkup_hint_add(inode, sinfo->slot_off);
+#endif
 	err = 0;
 end_of_dir:
 	if (unicode)
 		__putname(unicode);
+#ifdef CONFIG_SNSC_FS_VFAT_COMPARE_UNICODE
+	if (name_unicode)
+		__putname(name_unicode);
+#endif
 
 	return err;
 }
@@ -547,6 +826,10 @@ parse_record:
 			int size = PATH_MAX - FAT_MAX_UNI_SIZE;
 			int len = fat_uni_to_x8(sbi, unicode, longname, size);
 
+#ifdef CONFIG_SNSC_FS_FAT_FIX_UTF8
+			if (len > NAME_MAX)
+				goto record_end;
+#endif
 			fill_name = longname;
 			fill_len = len;
 			/* !both && !short_only, so we don't need shortname. */
@@ -676,6 +959,10 @@ out:
 static int fat_readdir(struct file *filp, void *dirent, filldir_t filldir)
 {
 	struct inode *inode = filp->f_path.dentry->d_inode;
+#ifdef CONFIG_SNSC_FS_VFAT_CHECK_DISK
+	if (fat_check_disk(inode->i_sb, 1))
+		return -EIO;
+#endif
 	return __fat_readdir(inode, filp, dirent, filldir, 0, 0);
 }
 
@@ -753,6 +1040,13 @@ static int fat_ioctl_readdir(struct inode *inode, struct file *filp,
 	return ret;
 }
 
+static int fat_ioctl_volume_id(struct inode *dir)
+{
+	struct super_block *sb = dir->i_sb;
+	struct msdos_sb_info *sbi = MSDOS_SB(sb);
+	return sbi->vol_id;
+}
+
 static long fat_dir_ioctl(struct file *filp, unsigned int cmd,
 			  unsigned long arg)
 {
@@ -769,6 +1063,8 @@ static long fat_dir_ioctl(struct file *filp, unsigned int cmd,
 		short_only = 0;
 		both = 1;
 		break;
+	case VFAT_IOCTL_GET_VOLUME_ID:
+		return fat_ioctl_volume_id(inode);
 	default:
 		return fat_generic_ioctl(filp, cmd, arg);
 	}
@@ -839,9 +1135,12 @@ const struct file_operations fat_dir_operations = {
 	.fsync		= fat_file_fsync,
 };
 
-static int fat_get_short_entry(struct inode *dir, loff_t *pos,
-			       struct buffer_head **bh,
-			       struct msdos_dir_entry **de)
+#ifndef CONFIG_SNSC_FS_FAT_GC
+static
+#endif
+int fat_get_short_entry(struct inode *dir, loff_t *pos,
+			struct buffer_head **bh,
+			struct msdos_dir_entry **de)
 {
 	while (fat_get_entry(dir, pos, bh, de) >= 0) {
 		/* free entry or long name entry or volume label */
@@ -925,9 +1224,41 @@ int fat_scan(struct inode *dir, const unsigned char *name,
 	     struct fat_slot_info *sinfo)
 {
 	struct super_block *sb = dir->i_sb;
+#ifdef CONFIG_SNSC_FS_FAT_LOOKUP_HINT
+	int reach_bottom = 0;
+	loff_t start_off;
+#endif
 
+#ifdef CONFIG_SNSC_FS_FAT_LOOKUP_HINT
+	start_off = sinfo->slot_off = fat_lkup_hint_get(dir, 0);
+#else
 	sinfo->slot_off = 0;
+#endif
 	sinfo->bh = NULL;
+#ifdef CONFIG_SNSC_FS_FAT_LOOKUP_HINT
+	while (1) {
+		if  (fat_get_short_entry(dir, &sinfo->slot_off, &sinfo->bh,
+				         &sinfo->de) >= 0) {
+			if (!strncmp(sinfo->de->name, name, MSDOS_NAME)) {
+				sinfo->slot_off -= sizeof(*sinfo->de);
+				sinfo->nr_slots = 1;
+				sinfo->i_pos = fat_make_i_pos(sb, sinfo->bh,
+							      sinfo->de);
+				fat_lkup_hint_add(dir, sinfo->slot_off);
+				return 0;
+			}
+			if (reach_bottom && (start_off <= sinfo->slot_off)) {
+				brelse(sinfo->bh);
+				break;
+			}
+		} else {
+			if (!start_off || reach_bottom)
+				break;
+			reach_bottom ++;
+			sinfo->slot_off = 0;
+		}
+	}
+#else
 	while (fat_get_short_entry(dir, &sinfo->slot_off, &sinfo->bh,
 				   &sinfo->de) >= 0) {
 		if (!strncmp(sinfo->de->name, name, MSDOS_NAME)) {
@@ -937,6 +1268,7 @@ int fat_scan(struct inode *dir, const unsigned char *name,
 			return 0;
 		}
 	}
+#endif
 	return -ENOENT;
 }
 
@@ -948,6 +1280,10 @@ static int __fat_remove_entries(struct inode *dir, loff_t pos, int nr_slots)
 	struct buffer_head *bh;
 	struct msdos_dir_entry *de, *endp;
 	int err = 0, orig_slots;
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC
+	struct buffer_head *bhs[3]; /* 32*slots (672bytes) */
+	int i, nr_bhs = 0;
+#endif
 
 	while (nr_slots) {
 		bh = NULL;
@@ -964,15 +1300,31 @@ static int __fat_remove_entries(struct inode *dir, loff_t pos, int nr_slots)
 			nr_slots--;
 		}
 		mark_buffer_dirty_inode(bh, dir);
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC
+		if (MSDOS_SB(sb)->options.batch_sync) {
+			bhs[nr_bhs++] = bh;
+		} else {
+#endif
 		if (IS_DIRSYNC(dir))
 			err = sync_dirty_buffer(bh);
 		brelse(bh);
 		if (err)
 			break;
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC
+		}
+#endif
 
 		/* pos is *next* de's position, so this does `- sizeof(de)' */
 		pos += ((orig_slots - nr_slots) * sizeof(*de)) - sizeof(*de);
 	}
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC
+	if (nr_bhs > 0) {
+		if (!err)
+			err = fat_sync_bhs(bhs, nr_bhs);
+		for (i = 0; i < nr_bhs; i++)
+			brelse(bhs[i]);
+	}
+#endif
 
 	return err;
 }
@@ -992,6 +1344,15 @@ int fat_remove_entries(struct inode *dir, struct fat_slot_info *sinfo)
 	sinfo->de = NULL;
 	bh = sinfo->bh;
 	sinfo->bh = NULL;
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC
+	if (MSDOS_SB(dir->i_sb)->options.batch_sync) {
+		err = __fat_remove_entries(dir, sinfo->slot_off, nr_slots);
+		brelse(bh);
+		if (err)
+			return err;
+		dir->i_version++;
+	} else {
+#endif
 	while (nr_slots && de >= (struct msdos_dir_entry *)bh->b_data) {
 		de->name[0] = DELETED_FLAG;
 		de--;
@@ -1017,6 +1378,9 @@ int fat_remove_entries(struct inode *dir, struct fat_slot_info *sinfo)
 			       "FAT: Couldn't remove the long name slots\n");
 		}
 	}
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC
+	}
+#endif
 
 	dir->i_mtime = dir->i_atime = CURRENT_TIME_SEC;
 	if (IS_DIRSYNC(dir))
@@ -1329,6 +1693,10 @@ found:
 			fat_free_clusters(dir, cluster);
 			goto error_remove;
 		}
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC
+		if (!IS_DIRSYNC(dir) && sbi->options.batch_sync)
+			fat_sync_inode(dir);
+#endif
 		if (dir->i_size & (sbi->cluster_size - 1)) {
 			fat_fs_error(sb, "Odd directory size");
 			dir->i_size = (dir->i_size + sbi->cluster_size - 1)

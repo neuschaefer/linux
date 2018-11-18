@@ -41,6 +41,7 @@
 #include <linux/bitops.h>
 #include <linux/mpage.h>
 #include <linux/bit_spinlock.h>
+#include <linux/ratelimit.h>
 
 static int fsync_buffers_list(spinlock_t *lock, struct list_head *list);
 
@@ -106,7 +107,7 @@ static int quiet_error(struct buffer_head *bh)
 static void buffer_io_error(struct buffer_head *bh)
 {
 	char b[BDEVNAME_SIZE];
-	printk(KERN_ERR "Buffer I/O error on device %s, logical block %Lu\n",
+	printk_ratelimited(KERN_ERR "Buffer I/O error on device %s, logical block %Lu\n",
 			bdevname(bh->b_bdev, b),
 			(unsigned long long)bh->b_blocknr);
 }
@@ -3021,6 +3022,27 @@ int sync_dirty_buffer(struct buffer_head *bh)
 	return __sync_dirty_buffer(bh, WRITE_SYNC);
 }
 EXPORT_SYMBOL(sync_dirty_buffer);
+
+#ifdef CONFIG_SNSC_FS_FAT_RELAX_SYNC
+int flush_dirty_buffer(struct buffer_head *bh)
+{
+	int ret = 0;
+	int wr;
+
+	WARN_ON(atomic_read(&bh->b_count) < 1);
+	lock_buffer(bh);
+	if (test_clear_buffer_dirty(bh)) {
+		get_bh(bh);
+		bh->b_end_io = end_buffer_write_sync;
+		wr = bdev_support_ordered(bh->b_bdev) ?  WRITE_FLUSH_FUA : WRITE;
+		ret = submit_bh(wr, bh);
+	} else {
+		unlock_buffer(bh);
+	}
+	return ret;
+}
+EXPORT_SYMBOL_GPL(flush_dirty_buffer);
+#endif
 
 /*
  * try_to_free_buffers() checks if all the buffers on this particular page

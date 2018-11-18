@@ -842,7 +842,13 @@ static int usbhid_output_raw_report(struct hid_device *hid, __u8 *buf, size_t co
 	struct usb_host_interface *interface = intf->cur_altsetting;
 	int ret;
 
+#ifdef CONFIG_USB_HID_SONY_CTRL
+	if (usbhid->urbout && report_type != HID_FEATURE_REPORT &&
+			report_type != HID_FEATURE_REPORT_SKIP_REPORTID &&
+			report_type != HID_OUTPUT_REPORT_SKIP_REPORTID) {
+#else
 	if (usbhid->urbout && report_type != HID_FEATURE_REPORT) {
+#endif //CONFIG_USB_HID_SONY_CTRL
 		int actual_length;
 		int skipped_report_id = 0;
 
@@ -871,6 +877,25 @@ static int usbhid_output_raw_report(struct hid_device *hid, __u8 *buf, size_t co
 			count--;
 			skipped_report_id = 1;
 		}
+#ifdef CONFIG_USB_HID_SONY_CTRL
+		if(report_type == HID_FEATURE_REPORT_SKIP_REPORTID ||
+			report_type == HID_OUTPUT_REPORT_SKIP_REPORTID) {
+				
+			buf++;
+			count--;
+			skipped_report_id = 1;
+			
+			switch(report_type){
+				case HID_FEATURE_REPORT_SKIP_REPORTID:
+					report_type = HID_FEATURE_REPORT;
+					break;
+				case HID_OUTPUT_REPORT_SKIP_REPORTID:
+					report_type = HID_OUTPUT_REPORT;
+				default:
+					break;
+			}
+		}
+#endif //CONFIG_USB_HID_SONY_CTRL
 		ret = usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
 			HID_REQ_SET_REPORT,
 			USB_DIR_OUT | USB_TYPE_CLASS | USB_RECIP_INTERFACE,

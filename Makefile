@@ -612,6 +612,10 @@ KBUILD_CFLAGS	+= $(call cc-option,-fno-strict-overflow)
 # conserve stack if available
 KBUILD_CFLAGS   += $(call cc-option,-fconserve-stack)
 
+ifdef SF_BUILD_WIRELESS_HWCONFIG
+KBUILD_CFLAGS += -DSF_BUILD_WIRELESS_HWCONFIG=$(SF_BUILD_WIRELESS_HWCONFIG)
+endif
+
 # check for 'asm goto'
 ifeq ($(shell $(CONFIG_SHELL) $(srctree)/scripts/gcc-goto.sh $(CC)), y)
 	KBUILD_CFLAGS += -DCC_HAVE_ASM_GOTO

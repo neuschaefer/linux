@@ -23,6 +23,189 @@
 #include <linux/namei.h>
 #include "fat.h"
 
+#ifdef CONFIG_SNSC_FS_VFAT_POSIX_ATTR
+#include <linux/fs.h>
+#endif
+
+#ifdef CONFIG_SNSC_FS_VFAT_COMPARE_UNICODE
+DEFINE_SPINLOCK(vfat_cmpu_lock);
+static wchar_t uname_buf1[260], uname_buf2[260];
+#endif
+
+#ifdef CONFIG_SNSC_FS_VFAT_COMPARE_UNICODE
+static int xlate_to_uni(const unsigned char *name, int len,
+			unsigned char *outname, int *longlen, int *outlen,
+			int escape, int utf8, struct nls_table *nls);
+#endif
+
+#ifdef CONFIG_SNSC_FS_VFAT_POSIX_ATTR
+#define	GET_INODE_FILE_TYPE(x)	(((x)->i_mode & S_IFMT) >> 12)
+#define	GET_INODE_USER_ID(x)	((x)->i_uid ? 1 : 0)
+#define	GET_INODE_DRV_MAJOR(x)	((x)->i_rdev >> MINORBITS)
+#define	GET_INODE_DRV_MINOR(x)	((x)->i_rdev & MINORMASK)
+
+static unsigned short  filetype_table[] = {
+	DT_REG, /* place folder for backward compat */
+	DT_LNK,
+	DT_BLK,
+	DT_CHR,
+	DT_FIFO,
+	DT_SOCK,
+	0
+};
+
+/**
+ * is_vfat_posix_symlink - check if posix file type from VFAT dir is symlink
+ *
+ * Returns
+ *	        0 ... is not symlink or don't have posix attributes
+ *	otherwise ... is symlink
+ */
+static int is_vfat_posix_symlink(struct inode *inode, struct msdos_dir_entry *dentry)
+{
+	if ((dentry->attr & ATTR_SYS) && get_pxattr_specf(dentry)) {
+		int size = le16_to_cpu(dentry->size);
+		if ((size <= PATH_MAX) && (size <= PAGE_SIZE))
+			return filetype_table[get_pxattr_ftype(dentry)] == DT_LNK;
+	}
+	return 0;
+}
+
+/*
+ * get_vfat_posix_attr - Retrieve posix attributes from VFAT dir entry
+ *
+ * Returns
+ *	 0 ... posix_attr are get
+ *	-1 ... posix_attr are not get
+ */
+static
+int get_vfat_posix_attr(struct inode *inode, struct msdos_dir_entry *dentry)
+{
+	int px_uid, px_gid;
+	struct msdos_sb_info *sbi;
+	int ftype;
+	int umode, gmode, omode;
+
+	if (!(inode && dentry) || IS_ERR(inode)) goto not_get;
+	sbi = MSDOS_SB(inode->i_sb);
+	if ((!sbi->options.posix_attr) || (dentry->attr == ATTR_EXT) ||
+	    (dentry->attr & ATTR_VOLUME)) goto not_get;
+
+	/* File type : 0xF000 : 12 */
+	ftype = -1;
+	if (!(dentry->attr & ATTR_SYS) || (dentry->attr & ATTR_DIR)) {
+		if (get_pxattr_regf(dentry))
+			ftype = (dentry->attr & ATTR_DIR) ? DT_DIR : DT_REG;
+	} else if (get_pxattr_specf(dentry)) {
+		int size = le16_to_cpu(dentry->size);
+		ftype = filetype_table[get_pxattr_ftype(dentry)];
+		if (ftype == DT_LNK) {
+			if ((size > PATH_MAX) || (size > PAGE_SIZE)) ftype = -1;
+		} else {
+			if (size) ftype = -1;
+		}
+	}
+	if (ftype == -1)
+		goto not_get;
+	inode->i_mode = ftype << 12;
+	inode->i_ctime = inode->i_mtime;
+
+	/* User  : 0x01C0) : 6 */
+	/* Group : 0x0038) : 3 */
+	/* Other : 0x0007 */
+	umode = (get_pxattr_ur(dentry) ? S_IRUSR : 0) |
+		(get_pxattr_uw(dentry) ? S_IWUSR : 0) |
+		(get_pxattr_ux(dentry) ? S_IXUSR : 0);
+	gmode = (get_pxattr_gr(dentry) ? S_IRGRP : 0) |
+		(get_pxattr_gw(dentry) ? S_IWGRP : 0) |
+		(get_pxattr_gx(dentry) ? S_IXGRP : 0);
+	omode = gmode >> 3;
+	inode->i_mode |= (umode | gmode | omode);
+
+	/* User & Group ID */
+	px_uid = sbi->options.fs_uid ? sbi->options.fs_uid : (u16)-1;
+	px_gid = sbi->options.fs_gid ? sbi->options.fs_gid : (u16)-1;
+	inode->i_uid = get_pxattr_uid(dentry) ?  px_uid : 0;
+	inode->i_gid = get_pxattr_uid(dentry) ?  px_gid : 0;
+
+	/* Special file */
+	if ((ftype==DT_BLK) || (ftype==DT_CHR)) {
+		inode->i_rdev = ((get_pxattr_major(dentry) << MINORBITS) |
+				  get_pxattr_minor(dentry));
+		inode->i_mode &= ~S_IFMT;
+		inode->i_mode |= (ftype == DT_BLK) ? S_IFBLK : S_IFCHR;
+		init_special_inode(inode, inode->i_mode, inode->i_rdev);
+	} else if ((ftype==DT_FIFO) || (ftype==DT_SOCK)) {
+		inode->i_mode &= ~S_IFMT;
+		inode->i_mode |= (ftype == DT_FIFO) ? S_IFIFO : S_IFSOCK;
+		init_special_inode(inode, inode->i_mode, inode->i_rdev);
+	}
+	return 0;
+not_get:
+	return -1;
+
+}
+
+/**
+ * set_vfat_posix_attr - set posix attributes to VFAT dir entry
+ *
+ * Returns
+ *	 0 ... posix_attr are set
+ *	-1 ... posix_attr are not set
+ */
+static int set_vfat_posix_attr(struct msdos_dir_entry *dentry, struct inode *inode)
+{
+	int     ftype;
+	int     iftype;
+	int	mode;
+
+	if (!(inode && dentry) || IS_ERR(inode)) goto not_set;
+	if (!MSDOS_SB(inode->i_sb)->options.posix_attr) goto not_set;
+
+	/* File type */
+	iftype = GET_INODE_FILE_TYPE(inode);
+	switch (iftype) {
+	case DT_DIR:
+		dentry->attr |= ATTR_DIR;
+		/* fall through */
+	case DT_REG:
+		set_pxattr_regf(dentry, 1);
+		break;
+	default:
+		for(ftype=0; filetype_table[ftype]; ftype++){
+			if (filetype_table[ftype] == iftype)
+				break;
+		}
+		if (!filetype_table[ftype]) goto not_set;
+		/* mark posix attr for special file */
+		dentry->attr |= ATTR_SYS;
+		set_pxattr_specf(dentry, 1);
+		set_pxattr_ftype(dentry, ftype);
+		break;
+	}
+	/* Permissions for Owner */
+	mode = inode->i_mode;
+	set_pxattr_ur(dentry, mode & S_IRUSR);
+	set_pxattr_uw(dentry, mode & S_IWUSR);
+	set_pxattr_ux(dentry, mode & S_IXUSR);
+	/* Permissions for Group/Others */
+	set_pxattr_gr(dentry, mode & S_IRGRP);
+	set_pxattr_gw(dentry, mode & S_IWGRP);
+	set_pxattr_gx(dentry, mode & S_IXGRP);
+	/* User ID */
+	set_pxattr_uid(dentry, GET_INODE_USER_ID(inode));
+
+	/* Deivce number */
+	if ((iftype==DT_BLK) || (iftype==DT_CHR)) {
+		set_pxattr_major(dentry, GET_INODE_DRV_MAJOR(inode));
+		set_pxattr_minor(dentry, GET_INODE_DRV_MINOR(inode));
+	}
+	return 0;
+not_set:
+	return -1;
+}
+#endif
+
 /*
  * If new entry was created in the parent, it could create the 8.3
  * alias (the shortname of logname).  So, the parent may have the
@@ -103,6 +286,23 @@ static unsigned int vfat_striptail_len(const struct qstr *qstr)
 	return __vfat_striptail_len(qstr->len, qstr->name);
 }
 
+#ifdef CONFIG_SNSC_FS_VFAT_COMPARE_UNICODE
+static wchar_t vfat_uni_tolower(wchar_t u)
+{
+	if (u >= 0x100)
+		return u;
+	return (wchar_t)tolower((unsigned char)u);
+}
+
+int vfat_uni_strnicmp(const wchar_t *u1, const wchar_t *u2, int len)
+{
+	while(len--)
+		if (vfat_uni_tolower(*u1++) != vfat_uni_tolower(*u2++))
+			return 1;
+	return 0;
+}
+#endif
+
 /*
  * Compute the hash for the vfat name corresponding to the dentry.
  * Note: if the name is invalid, we leave the hash code unchanged so
@@ -161,6 +361,46 @@ static int vfat_cmpi(const struct dentry *parent, const struct inode *pinode,
 	return 1;
 }
 
+#ifdef CONFIG_SNSC_FS_VFAT_COMPARE_UNICODE
+static int vfat_cmpiu(const struct dentry *parent, const struct inode *pinode,
+		const struct dentry *dentry, const struct inode *inode,
+		unsigned int len, const char *str, const struct qstr *name)
+{
+	struct nls_table *t = MSDOS_SB(parent->d_inode->i_sb)->nls_io;
+	int alen, blen, aulen, aunilen, bulen, bunilen;
+	int utf8 = MSDOS_SB(parent->d_inode->i_sb)->options.utf8;
+	int uni_xlate = MSDOS_SB(parent->d_inode->i_sb)->options.unicode_xlate;
+	int matched = -1;
+
+	/* A filename cannot end in '.' or we treat it like it has none */
+	alen = name->len;
+	blen = len;
+	while (alen && name->name[alen-1] == '.')
+		alen--;
+	while (blen && str[blen-1] == '.')
+		blen--;
+
+	spin_lock(&vfat_cmpu_lock);
+	if (xlate_to_uni(name->name, alen, (char *)uname_buf1, &aulen, &aunilen,
+			 uni_xlate, utf8, t) < 0)
+		goto end;
+	if (xlate_to_uni(str, blen, (char *)uname_buf2, &bulen, &bunilen,
+			 uni_xlate, utf8, t) < 0)
+		goto end;
+
+	if (aulen == bulen) {
+		if (vfat_uni_strnicmp(uname_buf1, uname_buf2, aulen) == 0){
+			matched = 0;
+			goto end;
+		}
+	}
+	matched = 1;
+end:
+	spin_unlock(&vfat_cmpu_lock);
+	return matched;
+}
+#endif
+
 /*
  * Case sensitive compare of two vfat names.
  */
@@ -180,6 +420,47 @@ static int vfat_cmp(const struct dentry *parent, const struct inode *pinode,
 	return 1;
 }
 
+#ifdef CONFIG_SNSC_FS_VFAT_COMPARE_UNICODE
+static int vfat_cmpu(const struct dentry *parent, const struct inode *pinode,
+		const struct dentry *dentry, const struct inode *inode,
+		unsigned int len, const char *str, const struct qstr *name)
+{
+	struct nls_table *t = MSDOS_SB(parent->d_inode->i_sb)->nls_io;
+	int alen, blen, aulen, aunilen, bulen, bunilen;
+	int utf8 = MSDOS_SB(parent->d_inode->i_sb)->options.utf8;
+	int uni_xlate = MSDOS_SB(parent->d_inode->i_sb)->options.unicode_xlate;
+	int matched = -1;
+
+	/* A filename cannot end in '.' or we treat it like it has none */
+	alen = name->len;
+	blen = len;
+	while (alen && name->name[alen-1] == '.')
+		alen--;
+	while (blen && str[blen-1] == '.')
+		blen--;
+
+	spin_lock(&vfat_cmpu_lock);
+	if (xlate_to_uni(name->name, alen, (char *)uname_buf1, &aulen, &aunilen,
+			 uni_xlate, utf8, t) < 0)
+		goto end;
+	if (xlate_to_uni(str, blen, (char *)uname_buf2, &bulen, &bunilen,
+			 uni_xlate, utf8, t) < 0)
+		goto end;
+
+	if (aulen == bulen) {
+		if (strncmp((char *)uname_buf1, (char *)uname_buf2,
+			    aulen * sizeof(wchar_t)) == 0){
+			matched = 0;
+			goto end;
+		}
+	}
+	matched = 1;
+end:
+	spin_unlock(&vfat_cmpu_lock);
+	return matched;
+}
+#endif
+
 static const struct dentry_operations vfat_ci_dentry_ops = {
 	.d_revalidate	= vfat_revalidate_ci,
 	.d_hash		= vfat_hashi,
@@ -191,6 +472,20 @@ static const struct dentry_operations vfat_dentry_ops = {
 	.d_hash		= vfat_hash,
 	.d_compare	= vfat_cmp,
 };
+
+#ifdef CONFIG_SNSC_FS_VFAT_COMPARE_UNICODE
+static struct dentry_operations vfat_ciu_dentry_ops = {
+	.d_revalidate	= vfat_revalidate_ci,
+	.d_hash		= vfat_hashi,
+	.d_compare	= vfat_cmpiu,
+};
+
+static struct dentry_operations vfat_cu_dentry_ops = {
+	.d_revalidate	= vfat_revalidate,
+	.d_hash		= vfat_hash,
+	.d_compare	= vfat_cmpu,
+};
+#endif
 
 /* Characters that are undesirable in an MS-DOS file name */
 
@@ -500,6 +795,47 @@ static int vfat_create_shortname(struct inode *dir, struct nls_table *nls,
 	return 0;
 }
 
+#ifdef CONFIG_SNSC_FS_VFAT_COMPARE_UNICODE
+#define PLANE_SIZE	0x00010000
+
+#define SURROGATE_PAIR	0x0000d800
+#define SURROGATE_LOW	0x00000400
+#define SURROGATE_BITS	0x000003ff
+
+static int utf8s_to_utf16s_len(const u8 *s, int len, wchar_t *pwcs, int max)
+{
+	u16 *op;
+	int size;
+	unicode_t u;
+
+	op = pwcs;
+	while (*s && len > 0 && (op - pwcs) < max) {
+		if (*s & 0x80) {
+			size = utf8_to_utf32(s, len, &u);
+			if (size < 0)
+				return -EINVAL;
+
+			if (u >= PLANE_SIZE) {
+				u -= PLANE_SIZE;
+				*op++ = (wchar_t) (SURROGATE_PAIR |
+						((u >> 10) & SURROGATE_BITS));
+				*op++ = (wchar_t) (SURROGATE_PAIR |
+						SURROGATE_LOW |
+						(u & SURROGATE_BITS));
+			} else {
+				*op++ = (wchar_t) u;
+			}
+			s += size;
+			len -= size;
+		} else {
+			*op++ = *s++;
+			len--;
+		}
+	}
+	return op - pwcs;
+}
+#endif
+
 /* Translate a string, including coded sequences into Unicode */
 static int
 xlate_to_uni(const unsigned char *name, int len, unsigned char *outname,
@@ -514,7 +850,11 @@ xlate_to_uni(const unsigned char *name, int len, unsigned char *outname,
 	int charlen;
 
 	if (utf8) {
+#ifdef CONFIG_SNSC_FS_VFAT_COMPARE_UNICODE
+		*outlen = utf8s_to_utf16s_len(name, len, (wchar_t *)outname, 260);
+#else
 		*outlen = utf8s_to_utf16s(name, len, (wchar_t *)outname);
+#endif
 		if (*outlen < 0)
 			return *outlen;
 		else if (*outlen > FAT_LFN_LEN)
@@ -548,8 +888,8 @@ xlate_to_uni(const unsigned char *name, int len, unsigned char *outname,
 						}
 						return -EINVAL;
 					}
-					*op++ = ec & 0xFF;
-					*op++ = ec >> 8;
+					*(wchar_t *)op = ec & 0xFFFF;
+					op += 2;
 					ip += 5;
 					i += 5;
 				} else {
@@ -592,6 +932,16 @@ xlate_to_uni(const unsigned char *name, int len, unsigned char *outname,
 
 	return 0;
 }
+
+#ifdef CONFIG_SNSC_FS_VFAT_COMPARE_UNICODE
+int
+vfat_xlate_to_uni(const char *name, int len, char *outname, int *longlen,
+		   int *outlen, int escape, int utf8, struct nls_table *nls)
+{
+	return xlate_to_uni(name, len, outname, longlen, outlen, escape,
+			    utf8, nls);
+}
+#endif
 
 static int vfat_build_slots(struct inode *dir, const unsigned char *name,
 			    int len, int is_dir, int cluster,
@@ -734,6 +1084,11 @@ static struct dentry *vfat_lookup(struct inode *dir, struct dentry *dentry,
 	struct dentry *alias;
 	int err;
 
+#ifdef CONFIG_SNSC_FS_VFAT_CHECK_DISK
+	if (fat_check_disk(sb, 1))
+		return ERR_PTR(-EIO);
+#endif
+
 	lock_super(sb);
 
 	err = vfat_find(dir, &dentry->d_name, &sinfo);
@@ -746,6 +1101,9 @@ static struct dentry *vfat_lookup(struct inode *dir, struct dentry *dentry,
 	}
 
 	inode = fat_build_inode(sb, sinfo.de, sinfo.i_pos);
+#ifdef CONFIG_SNSC_FS_VFAT_POSIX_ATTR
+	(void) MSDOS_SB(sb)->posix_ops.get_attr(inode, sinfo.de);
+#endif
 	brelse(sinfo.bh);
 	if (IS_ERR(inode)) {
 		err = PTR_ERR(inode);
@@ -792,6 +1150,11 @@ static int vfat_create(struct inode *dir, struct dentry *dentry, int mode,
 	struct timespec ts;
 	int err;
 
+#ifdef CONFIG_SNSC_FS_VFAT_CHECK_DISK
+	if (fat_check_disk(sb, 1))
+		return -EIO;
+#endif
+
 	lock_super(sb);
 
 	ts = CURRENT_TIME_SEC;
@@ -808,6 +1171,16 @@ static int vfat_create(struct inode *dir, struct dentry *dentry, int mode,
 	}
 	inode->i_version++;
 	inode->i_mtime = inode->i_atime = inode->i_ctime = ts;
+#ifdef CONFIG_SNSC_FS_VFAT_POSIX_ATTR
+	if (MSDOS_SB(sb)->options.posix_attr)  {
+		inode->i_mode =	mode & VFAT_POSIX_ATTR_VALID_MODE;
+		mark_inode_dirty(inode);
+	}
+#endif
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC
+	if (!IS_DIRSYNC(dir) &&  MSDOS_SB(sb)->options.batch_sync)
+		mark_inode_dirty(inode);
+#endif
 	/* timestamp is already written, so mark_inode_dirty() is unneeded. */
 
 	dentry->d_time = dentry->d_parent->d_inode->i_version;
@@ -824,6 +1197,11 @@ static int vfat_rmdir(struct inode *dir, struct dentry *dentry)
 	struct fat_slot_info sinfo;
 	int err;
 
+#ifdef CONFIG_SNSC_FS_VFAT_CHECK_DISK
+	if (fat_check_disk(sb, 1))
+		return -EIO;
+#endif
+
 	lock_super(sb);
 
 	err = fat_dir_empty(inode);
@@ -833,9 +1211,25 @@ static int vfat_rmdir(struct inode *dir, struct dentry *dentry)
 	if (err)
 		goto out;
 
+#ifdef CONFIG_SNSC_FS_FAT_GC
+	/*
+	 * mark all cluster of this entry valid
+	 * before erase it from the dir
+	 */
+        fat_gc_mark_valid_entries(inode);
+#endif
+
 	err = fat_remove_entries(dir, &sinfo);	/* and releases bh */
 	if (err)
 		goto out;
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC
+	/* remove dentry from disk */
+	if (MSDOS_SB(inode->i_sb)->options.batch_sync) {
+		err = fat_syncdir(dir);
+		if (err)
+			goto out;
+	}
+#endif
 	drop_nlink(dir);
 
 	clear_nlink(inode);
@@ -853,6 +1247,11 @@ static int vfat_unlink(struct inode *dir, struct dentry *dentry)
 	struct super_block *sb = dir->i_sb;
 	struct fat_slot_info sinfo;
 	int err;
+
+#ifdef CONFIG_SNSC_FS_VFAT_CHECK_DISK
+	if (fat_check_disk(sb, 1))
+		return -EIO;
+#endif
 
 	lock_super(sb);
 
@@ -880,6 +1279,11 @@ static int vfat_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 	struct timespec ts;
 	int err, cluster;
 
+#ifdef CONFIG_SNSC_FS_VFAT_CHECK_DISK
+	if (fat_check_disk(sb, 1))
+		return -EIO;
+#endif
+
 	lock_super(sb);
 
 	ts = CURRENT_TIME_SEC;
@@ -888,12 +1292,27 @@ static int vfat_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 		err = cluster;
 		goto out;
 	}
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC
+	/* flush cluster chain & first cluster of the subdir*/
+	if (MSDOS_SB(sb)->options.batch_sync) {
+		err = fat_syncdir(dir);
+		if (err)
+			goto out_free;
+	}
+#endif
 	err = vfat_add_entry(dir, &dentry->d_name, 1, cluster, &ts, &sinfo);
 	if (err)
 		goto out_free;
 	dir->i_version++;
 	inc_nlink(dir);
 
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC
+	/* flush dentry*/
+	if (MSDOS_SB(sb)->options.batch_sync) {
+		if (fat_syncdir(dir))
+			goto out_free;
+	}
+#endif
 	inode = fat_build_inode(sb, sinfo.de, sinfo.i_pos);
 	brelse(sinfo.bh);
 	if (IS_ERR(inode)) {
@@ -904,6 +1323,12 @@ static int vfat_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 	inode->i_version++;
 	inode->i_nlink = 2;
 	inode->i_mtime = inode->i_atime = inode->i_ctime = ts;
+#ifdef CONFIG_SNSC_FS_VFAT_POSIX_ATTR
+	if (MSDOS_SB(sb)->options.posix_attr) {
+		inode->i_mode = (S_IFDIR | (mode & VFAT_POSIX_ATTR_VALID_MODE));
+		mark_inode_dirty(inode);
+	}
+#endif
 	/* timestamp is already written, so mark_inode_dirty() is unneeded. */
 
 	dentry->d_time = dentry->d_parent->d_inode->i_version;
@@ -922,6 +1347,9 @@ out:
 static int vfat_rename(struct inode *old_dir, struct dentry *old_dentry,
 		       struct inode *new_dir, struct dentry *new_dentry)
 {
+#if defined(CONFIG_SNSC_FS_FAT_BATCH_SYNC) || defined(CONFIG_SNSC_FS_VFAT_AVOID_DOUBLE_LINK)
+	struct msdos_sb_info *sbi = MSDOS_SB(old_dir->i_sb);
+#endif
 	struct buffer_head *dotdot_bh;
 	struct msdos_dir_entry *dotdot_de;
 	struct inode *old_inode, *new_inode;
@@ -930,6 +1358,11 @@ static int vfat_rename(struct inode *old_dir, struct dentry *old_dentry,
 	loff_t dotdot_i_pos, new_i_pos;
 	int err, is_dir, update_dotdot, corrupt = 0;
 	struct super_block *sb = old_dir->i_sb;
+
+#ifdef CONFIG_SNSC_FS_VFAT_CHECK_DISK
+	if (fat_check_disk(sb, 1))
+		return -EIO;
+#endif
 
 	old_sinfo.bh = sinfo.bh = dotdot_bh = NULL;
 	old_inode = old_dentry->d_inode;
@@ -968,29 +1401,77 @@ static int vfat_rename(struct inode *old_dir, struct dentry *old_dentry,
 	new_dir->i_version++;
 
 	fat_detach(old_inode);
+#ifdef CONFIG_SNSC_FS_VFAT_AVOID_DOUBLE_LINK
+	if (sbi->options.avoid_dlink) {
+		err = fat_remove_entries(old_dir, &old_sinfo);  /* and releases bh */
+		old_sinfo.bh = NULL;
+		if (err)
+			goto error_inode;
+		old_dir->i_version++;
+		old_dir->i_ctime = old_dir->i_mtime = ts;
+		if (IS_DIRSYNC(old_dir))
+			(void)fat_sync_inode(old_dir);
+		else
+			mark_inode_dirty(old_dir);
+	}
+#endif
 	fat_attach(old_inode, new_i_pos);
+#ifdef CONFIG_SNSC_FS_VFAT_AVOID_DOUBLE_LINK
+	if (!sbi->options.avoid_dlink) {
+#endif
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC
+	if (IS_DIRSYNC(new_dir) || sbi->options.batch_sync) {
+#else
 	if (IS_DIRSYNC(new_dir)) {
+#endif
 		err = fat_sync_inode(old_inode);
 		if (err)
 			goto error_inode;
 	} else
 		mark_inode_dirty(old_inode);
+#ifdef CONFIG_SNSC_FS_VFAT_AVOID_DOUBLE_LINK
+	}
+#endif
 
 	if (update_dotdot) {
 		int start = MSDOS_I(new_dir)->i_logstart;
 		dotdot_de->start = cpu_to_le16(start);
 		dotdot_de->starthi = cpu_to_le16(start >> 16);
 		mark_buffer_dirty_inode(dotdot_bh, old_inode);
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC
+		if (IS_DIRSYNC(new_dir) || sbi->options.batch_sync) {
+#else
 		if (IS_DIRSYNC(new_dir)) {
+#endif
 			err = sync_dirty_buffer(dotdot_bh);
-			if (err)
+			if (err) {
+#ifdef CONFIG_SNSC_FS_VFAT_AVOID_DOUBLE_LINK
+				if (sbi->options.avoid_dlink)
+					goto error_inode;
+				else
+#endif
 				goto error_dotdot;
+			}
 		}
 		drop_nlink(old_dir);
 		if (!new_inode)
  			inc_nlink(new_dir);
 	}
 
+#ifdef CONFIG_SNSC_FS_VFAT_AVOID_DOUBLE_LINK
+	if (sbi->options.avoid_dlink) {
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC
+		if (IS_DIRSYNC(new_dir) || sbi->options.batch_sync) {
+#else
+		if (IS_DIRSYNC(new_dir)) {
+#endif
+			err = fat_sync_inode(old_inode);
+			if (err)
+				goto error_dotdot;
+		} else
+			mark_inode_dirty(old_inode);
+	} else {
+#endif
 	err = fat_remove_entries(old_dir, &old_sinfo);	/* and releases bh */
 	old_sinfo.bh = NULL;
 	if (err)
@@ -1001,6 +1482,9 @@ static int vfat_rename(struct inode *old_dir, struct dentry *old_dentry,
 		(void)fat_sync_inode(old_dir);
 	else
 		mark_inode_dirty(old_dir);
+#ifdef CONFIG_SNSC_FS_VFAT_AVOID_DOUBLE_LINK
+	}
+#endif
 
 	if (new_inode) {
 		drop_nlink(new_inode);
@@ -1017,7 +1501,11 @@ out:
 	return err;
 
 error_dotdot:
+#ifdef CONFIG_SNSC_FS_VFAT_AVOID_DOUBLE_LINK
+	/*Revert the change*/
+#else
 	/* data cluster is shared, serious corruption */
+#endif
 	corrupt = 1;
 
 	if (update_dotdot) {
@@ -1026,24 +1514,46 @@ error_dotdot:
 		dotdot_de->starthi = cpu_to_le16(start >> 16);
 		mark_buffer_dirty_inode(dotdot_bh, old_inode);
 		corrupt |= sync_dirty_buffer(dotdot_bh);
+#ifdef CONFIG_SNSC_FS_VFAT_AVOID_DOUBLE_LINK
+		if (sbi->options.avoid_dlink) {
+			if (corrupt < 0){
+				goto error_inode;
+			}
+			old_dir->i_nlink++;
+			if (!new_inode)
+				new_dir->i_nlink--;
+		}
+#endif
 	}
 error_inode:
+#ifdef CONFIG_SNSC_FS_VFAT_AVOID_DOUBLE_LINK
+	if (!sbi->options.avoid_dlink)
+#endif
 	fat_detach(old_inode);
 	fat_attach(old_inode, old_sinfo.i_pos);
 	if (new_inode) {
 		fat_attach(new_inode, new_i_pos);
+#ifdef CONFIG_SNSC_FS_VFAT_AVOID_DOUBLE_LINK
+		if (corrupt || sbi->options.avoid_dlink)
+#else
 		if (corrupt)
+#endif
 			corrupt |= fat_sync_inode(new_inode);
 	} else {
+#ifndef CONFIG_SNSC_FS_VFAT_AVOID_DOUBLE_LINK
 		/*
 		 * If new entry was not sharing the data cluster, it
 		 * shouldn't be serious corruption.
 		 */
+#endif
 		int err2 = fat_remove_entries(new_dir, &sinfo);
 		if (corrupt)
 			corrupt |= err2;
 		sinfo.bh = NULL;
 	}
+#ifdef CONFIG_SNSC_FS_VFAT_AVOID_DOUBLE_LINK
+	/* There are not so fatal state in FAT FS. */
+#endif
 	if (corrupt < 0) {
 		fat_fs_error(new_dir->i_sb,
 			     "%s: Filesystem corrupted (i_pos %lld)",
@@ -1051,6 +1561,118 @@ error_inode:
 	}
 	goto out;
 }
+
+#ifdef CONFIG_SNSC_FS_VFAT_POSIX_ATTR
+static
+int vfat_symlink(struct inode *dir, struct dentry *dentry, const char *symname)
+{
+	/* base : vfat_create() */
+	struct super_block *sb = dir->i_sb;
+	struct inode *inode = NULL;
+	struct fat_slot_info sinfo;
+	struct timespec ts;
+	int err;
+	int len;
+
+	if (!MSDOS_SB(sb)->options.posix_attr)
+		return -EOPNOTSUPP;
+
+#ifdef CONFIG_SNSC_FS_VFAT_CHECK_DISK
+	if (fat_check_disk(sb, 1))
+		return -EIO;
+#endif
+
+	len = strlen (symname) + 1;
+	if ((len > PATH_MAX) || (len > PAGE_SIZE)) {
+		return -ENAMETOOLONG;
+	}
+
+	lock_super(sb);
+
+	ts = CURRENT_TIME_SEC;
+	err = vfat_add_entry(dir, &dentry->d_name, 0, 0, &ts, &sinfo);
+	if (err)
+		goto out;
+	dir->i_version++;
+
+	inode = fat_build_inode(sb, sinfo.de, sinfo.i_pos);
+	brelse(sinfo.bh);
+	if (IS_ERR(inode)){
+		err = PTR_ERR(inode);
+		goto out;
+	}
+	inode->i_version++;
+	inode->i_mode = (S_IFLNK | 0777);
+	inode->i_mtime = inode->i_atime = inode->i_ctime = ts;
+	inode->i_op = &fat_symlink_inode_operations;
+	mark_inode_dirty(inode);
+
+	dentry->d_time = dentry->d_parent->d_inode->i_version;
+	d_instantiate(dentry,inode);
+
+	err = page_symlink(dentry->d_inode, symname, len);
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC
+	if (MSDOS_SB(sb)->options.batch_sync) {
+		(void)fat_sync_inode(inode);
+		mark_inode_clean(inode);
+	}
+#endif
+out:
+	unlock_super(sb);
+	return err;
+}
+
+static
+int vfat_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t rdev)
+{
+	/* base : vfat_create() */
+	struct super_block *sb = dir->i_sb;
+	struct inode *inode = NULL;
+	struct fat_slot_info sinfo;
+	struct timespec ts;
+	int err;
+
+	if (!MSDOS_SB(sb)->options.posix_attr)
+		return -EOPNOTSUPP;
+
+#ifdef CONFIG_SNSC_FS_VFAT_CHECK_DISK
+	if (fat_check_disk(sb, 1))
+		return -EIO;
+#endif
+
+	lock_super(sb);
+
+	ts = CURRENT_TIME_SEC;
+	err = vfat_add_entry(dir, &dentry->d_name, 0, 0, &ts, &sinfo);
+	if (err)
+		goto out;
+	dir->i_version++;
+
+	inode = fat_build_inode(sb, sinfo.de, sinfo.i_pos);
+	brelse(sinfo.bh);
+	if (IS_ERR(inode)){
+		err = PTR_ERR(inode);
+		goto out;
+	}
+	inode->i_version++;
+
+	inode->i_mode =	mode & VFAT_POSIX_ATTR_VALID_MODE;
+	inode->i_rdev = rdev;
+
+	inode->i_mtime = inode->i_atime = inode->i_ctime = ts;
+	init_special_inode(inode, mode, rdev);
+	mark_inode_dirty(inode);
+
+	dentry->d_time = dentry->d_parent->d_inode->i_version;
+	d_instantiate(dentry, inode);
+
+	err = 0;
+
+out:
+	unlock_super(sb);
+	return err;
+}
+#endif
 
 static const struct inode_operations vfat_dir_inode_operations = {
 	.create		= vfat_create,
@@ -1061,7 +1683,19 @@ static const struct inode_operations vfat_dir_inode_operations = {
 	.rename		= vfat_rename,
 	.setattr	= fat_setattr,
 	.getattr	= fat_getattr,
+#ifdef CONFIG_SNSC_FS_VFAT_POSIX_ATTR
+	.symlink	= vfat_symlink,
+	.mknod		= vfat_mknod,
+#endif
 };
+
+#ifdef CONFIG_SNSC_FS_VFAT_POSIX_ATTR
+static struct fat_posix_ops vfat_posix_ops = {
+	.is_symlink = is_vfat_posix_symlink,
+	.set_attr = set_vfat_posix_attr,
+	.get_attr = get_vfat_posix_attr,
+};
+#endif
 
 static void setup(struct super_block *sb)
 {
@@ -1073,8 +1707,37 @@ static void setup(struct super_block *sb)
 
 static int vfat_fill_super(struct super_block *sb, void *data, int silent)
 {
-	return fat_fill_super(sb, data, silent, &vfat_dir_inode_operations,
+	int res;
+	res = fat_fill_super(sb, data, silent, &vfat_dir_inode_operations,
 			     1, setup);
+	if (res)
+		return res;
+
+#ifdef CONFIG_SNSC_FS_VFAT_COMPARE_UNICODE
+	if (MSDOS_SB(sb)->options.compare_unicode) {
+		if (MSDOS_SB(sb)->options.name_check != 's')
+			sb->s_d_op = &vfat_ciu_dentry_ops;
+		else
+			sb->s_d_op = &vfat_cu_dentry_ops;
+	}
+#endif
+
+#ifdef CONFIG_SNSC_FS_VFAT_POSIX_ATTR
+	MSDOS_SB(sb)->posix_ops = vfat_posix_ops;
+#endif
+
+#ifdef CONFIG_SNSC_FS_VFAT_CHECK_DISK
+	if (MSDOS_SB(sb)->options.check_disk &&
+	    k3d_get_disk(sb->s_bdev->bd_disk) != 0) {
+		printk("VFAT: disabled check_disk option\n");
+		MSDOS_SB(sb)->options.check_disk = 0;
+	}
+#else
+	if (MSDOS_SB(sb)->options.check_disk)
+		MSDOS_SB(sb)->options.check_disk = 0;
+#endif
+
+	return 0;
 }
 
 static struct dentry *vfat_mount(struct file_system_type *fs_type,

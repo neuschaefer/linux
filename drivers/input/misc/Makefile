@@ -1,3 +1,4 @@
+# 2012-04-12: File changed by Sony Corporation
 #
 # Makefile for the input misc drivers.
 #
@@ -12,6 +13,7 @@ obj-$(CONFIG_INPUT_AD714X_SPI)		+= ad714x-spi.o
 obj-$(CONFIG_INPUT_ADXL34X)		+= adxl34x.o
 obj-$(CONFIG_INPUT_ADXL34X_I2C)		+= adxl34x-i2c.o
 obj-$(CONFIG_INPUT_ADXL34X_SPI)		+= adxl34x-spi.o
+obj-$(CONFIG_INPUT_ALPS_GPIO_SCROLLWHEEL) += alps_gpio_scrollwheel.o
 obj-$(CONFIG_INPUT_APANEL)		+= apanel.o
 obj-$(CONFIG_INPUT_ATI_REMOTE)		+= ati_remote.o
 obj-$(CONFIG_INPUT_ATI_REMOTE2)		+= ati_remote2.o
@@ -22,8 +24,10 @@ obj-$(CONFIG_INPUT_CMA3000)		+= cma3000_d0x.o
 obj-$(CONFIG_INPUT_CMA3000_I2C)		+= cma3000_d0x_i2c.o
 obj-$(CONFIG_INPUT_COBALT_BTNS)		+= cobalt_btns.o
 obj-$(CONFIG_INPUT_DM355EVM)		+= dm355evm_keys.o
+obj-$(CONFIG_INPUT_GPIO)		+= gpio_event.o gpio_matrix.o gpio_input.o gpio_output.o gpio_axis.o
 obj-$(CONFIG_HP_SDC_RTC)		+= hp_sdc_rtc.o
 obj-$(CONFIG_INPUT_IXP4XX_BEEPER)	+= ixp4xx-beeper.o
+obj-$(CONFIG_INPUT_KEYCHORD)		+= keychord.o
 obj-$(CONFIG_INPUT_KEYSPAN_REMOTE)	+= keyspan_remote.o
 obj-$(CONFIG_INPUT_M68K_BEEP)		+= m68kspkr.o
 obj-$(CONFIG_INPUT_MAX8925_ONKEY)	+= max8925_onkey.o
@@ -44,4 +48,8 @@ obj-$(CONFIG_INPUT_WISTRON_BTNS)	+= wistron_btns.o
 obj-$(CONFIG_INPUT_WM831X_ON)		+= wm831x-on.o
 obj-$(CONFIG_INPUT_XEN_KBDDEV_FRONTEND)	+= xen-kbdfront.o
 obj-$(CONFIG_INPUT_YEALINK)		+= yealink.o
-
+obj-$(CONFIG_INPUT_LIS331DLH)	+= lis331dlh.o
+obj-$(CONFIG_INPUT_AMI304)	+= ami304.o
+obj-$(CONFIG_INPUT_L3G4200DH)	+= l3g4200dh.o
+obj-$(CONFIG_INPUT_BH1690)	+= bh1690.o
+obj-$(CONFIG_INPUT_NBX_EC_LID_SWITCH)	+= nbx_lidsw_ec.o

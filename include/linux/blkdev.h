@@ -1190,6 +1190,13 @@ static inline int blk_throtl_init(struct request_queue *q) { return 0; }
 static inline int blk_throtl_exit(struct request_queue *q) { return 0; }
 #endif /* CONFIG_BLK_DEV_THROTTLING */
 
+#ifdef CONFIG_SNSC_FS_FAT_RELAX_SYNC
+static inline int bdev_support_ordered(struct block_device *bdev)
+{
+	return 0;
+}
+#endif
+
 #define MODULE_ALIAS_BLOCKDEV(major,minor) \
 	MODULE_ALIAS("block-major-" __stringify(major) "-" __stringify(minor))
 #define MODULE_ALIAS_BLOCKDEV_MAJOR(major) \
