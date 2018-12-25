@@ -1,5 +1,5 @@
 
-//#¼ÓÁËµã×¢ÊÍ
+//#åŠ äº†ç‚¹æ³¨é‡Š
 
 //#Rockie Cheng
 
@@ -46,7 +46,7 @@ struct size{
 	int height;
 };
 
-static char *           dev_name        = "/dev/video0";//ÉãÏñÍ·Éè±¸Ãû
+static char *           dev_name        = "/dev/video0";//æ‘„åƒå¤´è®¾å¤‡å
 static int              fd              = -1;
 struct buffer *         buffers         = NULL;
 static unsigned int     n_buffers       = 0;
@@ -361,7 +361,7 @@ enum v4l2_ctrl_type qc_ctrl[]=
 };
 
 //////////////////////////////////////////////////////
-//»ñÈ¡Ò»Ö¡Êı¾İ
+//è·å–ä¸€å¸§æ•°æ®
 //////////////////////////////////////////////////////
 static int read_frame (void)
 {
@@ -373,7 +373,7 @@ static int read_frame (void)
 	buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 	buf.memory = V4L2_MEMORY_MMAP;
 
-	ioctl (fd, VIDIOC_DQBUF, &buf); //³öÁĞ²É¼¯µÄÖ¡»º³å
+	ioctl (fd, VIDIOC_DQBUF, &buf); //å‡ºåˆ—é‡‡é›†çš„å¸§ç¼“å†²
 	
 
 	if((fps_test==1)||(lost_frame_test==1))
@@ -388,7 +388,7 @@ static int read_frame (void)
  
 	//printf ("press ENTER to continue!\n");
 	//getchar();
-	//fwrite(buffers[buf.index].start, buffers[buf.index].length, 1, file_fd); //½«ÆäĞ´ÈëÎÄ¼şÖĞ
+	//fwrite(buffers[buf.index].start, buffers[buf.index].length, 1, file_fd); //å°†å…¶å†™å…¥æ–‡ä»¶ä¸­
 	  
 
 	
@@ -405,7 +405,7 @@ static int read_frame (void)
 		}
 	}
 	
-	ioctl (fd, VIDIOC_QBUF, &buf); //ÔÙ½«ÆäÈëÁĞ
+	ioctl (fd, VIDIOC_QBUF, &buf); //å†å°†å…¶å…¥åˆ—
 
 	return 1;
 }
@@ -600,10 +600,10 @@ int main_test (void)
 	struct v4l2_input inp;
 	struct v4l2_streamparm parms;
 	
-	//fd = open (dev_name, O_RDWR /* required */ | O_NONBLOCK, 0);//´ò¿ªÉè±¸
-	//fd = open (dev_name, O_RDWR /* required */ | O_NONBLOCK, 0);//´ò¿ªÉè±¸
+	//fd = open (dev_name, O_RDWR /* required */ | O_NONBLOCK, 0);//æ‰“å¼€è®¾å¤‡
+	//fd = open (dev_name, O_RDWR /* required */ | O_NONBLOCK, 0);//æ‰“å¼€è®¾å¤‡
 	//close (fd);
-	fd = open (dev_name, O_RDWR /* required */ | O_NONBLOCK, 0);//´ò¿ªÉè±¸
+	fd = open (dev_name, O_RDWR /* required */ | O_NONBLOCK, 0);//æ‰“å¼€è®¾å¤‡
 	
 	if(invalid_ops)
 	{
@@ -616,13 +616,13 @@ int main_test (void)
 	if (inp.type == V4L2_INPUT_TYPE_CAMERA)
 		printf("enuminput type is V4L2_INPUT_TYPE_CAMERA!\n");
 	
-	if (-1 == ioctl (fd, VIDIOC_S_INPUT, &inp))	//ÉèÖÃÊäÈëindex
+	if (-1 == ioctl (fd, VIDIOC_S_INPUT, &inp))	//è®¾ç½®è¾“å…¥index
 		printf("VIDIOC_S_INPUT error!\n");
 	
 	if(ioctl_test==1)
 	{
 			//Test VIDIOC_QUERYCAP
-			if (-1 == ioctl (fd, VIDIOC_QUERYCAP, &cap))//»ñÈ¡ÉãÏñÍ·²ÎÊı
+			if (-1 == ioctl (fd, VIDIOC_QUERYCAP, &cap))//è·å–æ‘„åƒå¤´å‚æ•°
 				printf("VIDIOC_QUERYCAP error!\n");
 			
 			printf("cap.driver=%s\n",cap.driver);
@@ -637,15 +637,15 @@ int main_test (void)
 			for(i=0;i<2;i++)
 			{
 				inp.index = i;
-				if (-1 == ioctl (fd, VIDIOC_ENUMINPUT, &inp))//»ñÈ¡ÊäÈë²ÎÊı
+				if (-1 == ioctl (fd, VIDIOC_ENUMINPUT, &inp))//è·å–è¾“å…¥å‚æ•°
 					printf("VIDIOC_ENUMINPUT error!\n");
 				if (inp.type == V4L2_INPUT_TYPE_CAMERA)
 					printf("enuminput type is V4L2_INPUT_TYPE_CAMERA!\n");
 				
-				if (-1 == ioctl (fd, VIDIOC_S_INPUT, &inp))	//ÉèÖÃÊäÈëindex
+				if (-1 == ioctl (fd, VIDIOC_S_INPUT, &inp))	//è®¾ç½®è¾“å…¥index
 					printf("VIDIOC_S_INPUT error!\n");
 				
-				if (-1 == ioctl (fd, VIDIOC_G_INPUT, &inp))	//»ñÈ¡ÊäÈëindex
+				if (-1 == ioctl (fd, VIDIOC_G_INPUT, &inp))	//è·å–è¾“å…¥index
 					printf("VIDIOC_G_INPUT error!\n");
 				printf("input index is %d\n",inp.index);
 			}	
@@ -656,7 +656,7 @@ int main_test (void)
 			for(i=0;i<12;i++)
 			{
 				fmtdesc.index = i;
-				if (-1 == ioctl (fd, VIDIOC_ENUM_FMT, &fmtdesc))//»ñÈ¡¸ñÊ½²ÎÊı
+				if (-1 == ioctl (fd, VIDIOC_ENUM_FMT, &fmtdesc))//è·å–æ ¼å¼å‚æ•°
 					{
 						printf("VIDIOC_ENUM_FMT error!\n");
 						continue;
@@ -681,14 +681,14 @@ int main_test (void)
 			{
 				printf("Try V4L2_PIX_FMT_YUV410\n");
 				fmt.fmt.pix.pixelformat=V4L2_PIX_FMT_YUV410;
-				if (-1 == ioctl (fd, VIDIOC_S_FMT, &fmt)) //ÉèÖÃ´íÎóÍ¼Ïñ¸ñÊ½
+				if (-1 == ioctl (fd, VIDIOC_S_FMT, &fmt)) //è®¾ç½®é”™è¯¯å›¾åƒæ ¼å¼
 				{
 					printf("VIDIOC_S_FMT error!\n");
 				}
 				
 				printf("Try V4L2_PIX_FMT_YVU420\n");
 				fmt.fmt.pix.pixelformat=V4L2_PIX_FMT_YVU420;
-				if (-1 == ioctl (fd, VIDIOC_S_FMT, &fmt)) //ÉèÖÃ´íÎóÍ¼Ïñ¸ñÊ½
+				if (-1 == ioctl (fd, VIDIOC_S_FMT, &fmt)) //è®¾ç½®é”™è¯¯å›¾åƒæ ¼å¼
 				{
 					printf("VIDIOC_S_FMT error!\n");
 				}
@@ -701,7 +701,7 @@ int main_test (void)
 			
 			
 			
-			if (-1 == ioctl (fd, VIDIOC_S_FMT, &fmt)) //ÉèÖÃÍ¼Ïñ¸ñÊ½
+			if (-1 == ioctl (fd, VIDIOC_S_FMT, &fmt)) //è®¾ç½®å›¾åƒæ ¼å¼
 			{
 					printf("VIDIOC_S_FMT error!\n");
 					ret = -1;
@@ -726,7 +726,7 @@ int main_test (void)
 		
 		
 			
-		if (-1 == ioctl (fd, VIDIOC_G_FMT, &fmt)) //»ñÈ¡Í¼Ïñ¸ñÊ½
+		if (-1 == ioctl (fd, VIDIOC_G_FMT, &fmt)) //è·å–å›¾åƒæ ¼å¼
 		{
 				printf("VIDIOC_G_FMT error!\n");
 		}
@@ -755,7 +755,7 @@ int main_test (void)
 	parms.parm.capture.timeperframe.denominator = 1;
 	parms.parm.capture.timeperframe.denominator = fps;
 	
-	if (-1 == ioctl (fd, VIDIOC_S_PARM, &parms)) //»ñÈ¡Ö¡ÂÊ
+	if (-1 == ioctl (fd, VIDIOC_S_PARM, &parms)) //è·å–å¸§ç‡
 			printf ("VIDIOC_S_PARM error\n");
 					
 	if(fps_test==1)
@@ -764,7 +764,7 @@ int main_test (void)
 			struct v4l2_streamparm parms;
 			parms.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 			
-			if (-1 == ioctl (fd, VIDIOC_G_PARM, &parms)) //»ñÈ¡Ö¡ÂÊ
+			if (-1 == ioctl (fd, VIDIOC_G_PARM, &parms)) //è·å–å¸§ç‡
 					printf ("VIDIOC_G_PARM error\n");
 					
 			printf("numerator = %d\n",parms.parm.capture.timeperframe.numerator);
@@ -774,11 +774,11 @@ int main_test (void)
 //		//Test VIDIOC_S_PARM		
 //			parms.parm.capture.timeperframe.denominator = fps;//
 //			
-//			if (-1 == ioctl (fd, VIDIOC_S_PARM, &parms)) //»ñÈ¡Ö¡ÂÊ
+//			if (-1 == ioctl (fd, VIDIOC_S_PARM, &parms)) //è·å–å¸§ç‡
 //					printf ("VIDIOC_G_PARM error\n");
 //		
 //		//Test VIDIOC_G_PARM
-//			if (-1 == ioctl (fd, VIDIOC_G_PARM, &parms)) //»ñÈ¡Ö¡ÂÊ
+//			if (-1 == ioctl (fd, VIDIOC_G_PARM, &parms)) //è·å–å¸§ç‡
 //					printf ("VIDIOC_G_PARM error\n");
 //					
 //			printf("numerator = %d\n",parms.parm.capture.timeperframe.numerator);
@@ -794,23 +794,23 @@ int main_test (void)
 	req.memory              = V4L2_MEMORY_MMAP;
 	
 	
-	ioctl (fd, VIDIOC_REQBUFS, &req); //ÉêÇë»º³å£¬countÊÇÉêÇëµÄÊıÁ¿
+	ioctl (fd, VIDIOC_REQBUFS, &req); //ç”³è¯·ç¼“å†²ï¼Œcountæ˜¯ç”³è¯·çš„æ•°é‡
 
-	buffers = calloc (req.count, sizeof (*buffers));//ÄÚ´æÖĞ½¨Á¢¶ÔÓ¦¿Õ¼ä
+	buffers = calloc (req.count, sizeof (*buffers));//å†…å­˜ä¸­å»ºç«‹å¯¹åº”ç©ºé—´
 
 	for (n_buffers = 0; n_buffers < req.count; ++n_buffers) 
 	{
-	   struct v4l2_buffer buf;   //Çı¶¯ÖĞµÄÒ»Ö¡
+	   struct v4l2_buffer buf;   //é©±åŠ¨ä¸­çš„ä¸€å¸§
 	   CLEAR (buf);
 	   buf.type        = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 	   buf.memory      = V4L2_MEMORY_MMAP;
 	   buf.index       = n_buffers;
 
-	   if (-1 == ioctl (fd, VIDIOC_QUERYBUF, &buf)) //Ó³ÉäÓÃ»§¿Õ¼ä
+	   if (-1 == ioctl (fd, VIDIOC_QUERYBUF, &buf)) //æ˜ å°„ç”¨æˆ·ç©ºé—´
 			printf ("VIDIOC_QUERYBUF error\n");
 
 	   buffers[n_buffers].length = buf.length;
-	   buffers[n_buffers].start  = mmap (NULL /* start anywhere */,    //Í¨¹ımmap½¨Á¢Ó³Éä¹ØÏµ
+	   buffers[n_buffers].start  = mmap (NULL /* start anywhere */,    //é€šè¿‡mmapå»ºç«‹æ˜ å°„å…³ç³»
 								         buf.length,
 								         PROT_READ | PROT_WRITE /* required */,
 								         MAP_SHARED /* recommended */,
@@ -829,7 +829,7 @@ int main_test (void)
 	   buf.memory      = V4L2_MEMORY_MMAP;
 	   buf.index       = i;
 
-	   if (-1 == ioctl (fd, VIDIOC_QBUF, &buf))//ÉêÇëµ½µÄ»º³å½øÈëÁĞ¶Ó
+	   if (-1 == ioctl (fd, VIDIOC_QBUF, &buf))//ç”³è¯·åˆ°çš„ç¼“å†²è¿›å…¥åˆ—é˜Ÿ
 		printf ("VIDIOC_QBUF failed\n");
 	}
 					
@@ -840,12 +840,12 @@ int main_test (void)
 	
 	type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 	
-	if (-1 == ioctl (fd, VIDIOC_STREAMON, &type)) //¿ªÊ¼²¶×½Í¼ÏñÊı¾İ
+	if (-1 == ioctl (fd, VIDIOC_STREAMON, &type)) //å¼€å§‹æ•æ‰å›¾åƒæ•°æ®
 		printf ("VIDIOC_STREAMON failed\n");
 	else 
 		printf ("VIDIOC_STREAMON ok\n");
 		
-	if (-1 == ioctl (fd, VIDIOC_STREAMON, &type)) //¿ªÊ¼²¶×½Í¼ÏñÊı¾İ
+	if (-1 == ioctl (fd, VIDIOC_STREAMON, &type)) //å¼€å§‹æ•æ‰å›¾åƒæ•°æ®
 		printf ("VIDIOC_STREAMON failed\n");
 	else 
 		printf ("VIDIOC_STREAMON ok\n");
@@ -859,20 +859,20 @@ int main_test (void)
 	        			
 	  
 	    
-		for (;;) //ÕâÒ»¶ÎÉæ¼°µ½Òì²½IO
+		for (;;) //è¿™ä¸€æ®µæ¶‰åŠåˆ°å¼‚æ­¥IO
 		{
 		   fd_set fds;
 		   struct timeval tv;
 		   int r;
 		
-		   FD_ZERO (&fds);//½«Ö¸¶¨µÄÎÄ¼şÃèÊö·û¼¯Çå¿Õ
-		   FD_SET (fd, &fds);//ÔÚÎÄ¼şÃèÊö·û¼¯ºÏÖĞÔö¼ÓÒ»¸öĞÂµÄÎÄ¼şÃèÊö·û
+		   FD_ZERO (&fds);//å°†æŒ‡å®šçš„æ–‡ä»¶æè¿°ç¬¦é›†æ¸…ç©º
+		   FD_SET (fd, &fds);//åœ¨æ–‡ä»¶æè¿°ç¬¦é›†åˆä¸­å¢åŠ ä¸€ä¸ªæ–°çš„æ–‡ä»¶æè¿°ç¬¦
 		
 		   /* Timeout. */
 		   tv.tv_sec = 2;
 		   tv.tv_usec = 0;
 		
-		   r = select (fd + 1, &fds, NULL, NULL, &tv);//ÅĞ¶ÏÊÇ·ñ¿É¶Á£¨¼´ÉãÏñÍ·ÊÇ·ñ×¼±¸ºÃ£©£¬tvÊÇ¶¨Ê±
+		   r = select (fd + 1, &fds, NULL, NULL, &tv);//åˆ¤æ–­æ˜¯å¦å¯è¯»ï¼ˆå³æ‘„åƒå¤´æ˜¯å¦å‡†å¤‡å¥½ï¼‰ï¼Œtvæ˜¯å®šæ—¶
 		
 		   if (-1 == r) {
 			if (EINTR == errno)
@@ -888,7 +888,7 @@ int main_test (void)
       if(count==read_num-1)
       	disp_on();                  
 #endif		
-		   if (read_frame ())//Èç¹û¿É¶Á£¬Ö´ĞĞread_frame ()º¯Êı£¬²¢Ìø³öÑ­»·
+		   if (read_frame ())//å¦‚æœå¯è¯»ï¼Œæ‰§è¡Œread_frame ()å‡½æ•°ï¼Œå¹¶è·³å‡ºå¾ªç¯
 		   break;
 		} 
 	}
@@ -971,12 +971,12 @@ int main_test (void)
 	}
 
 close:	
-	if (-1 == ioctl (fd, VIDIOC_STREAMOFF, &type)) //Í£Ö¹²¶×½Í¼ÏñÊı¾İ
+	if (-1 == ioctl (fd, VIDIOC_STREAMOFF, &type)) //åœæ­¢æ•æ‰å›¾åƒæ•°æ®
 		printf ("VIDIOC_STREAMOFF failed\n");
 	else
 		printf ("VIDIOC_STREAMOFF ok\n");
 
-	if (-1 == ioctl (fd, VIDIOC_STREAMOFF, &type)) //Í£Ö¹²¶×½Í¼ÏñÊı¾İ
+	if (-1 == ioctl (fd, VIDIOC_STREAMOFF, &type)) //åœæ­¢æ•æ‰å›¾åƒæ•°æ®
 		printf ("VIDIOC_STREAMOFF failed\n");
 	else
 		printf ("VIDIOC_STREAMOFF ok\n");

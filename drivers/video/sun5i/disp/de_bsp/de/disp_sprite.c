@@ -51,7 +51,7 @@ static __s32 Sprite_Hid_To_Id(__u32 sel, __s32 hid)
 	}
 }
 
-//--hgl--ÓÃÕâ¸öµÄÇ°Ìá£ºprev,next±ØĞëÊÇ´æÔÚµÄ£¬·ñÔò±ÀÀ£¡£
+//--hgl--ç”¨è¿™ä¸ªçš„å‰æï¼šprev,nextå¿…é¡»æ˜¯å­˜åœ¨çš„ï¼Œå¦åˆ™å´©æºƒã€‚
 static __inline void ___list_add(list_head_t *node,list_head_t *prev,list_head_t *next)
 {
 	node->next = next;
@@ -60,7 +60,7 @@ static __inline void ___list_add(list_head_t *node,list_head_t *prev,list_head_t
 	next->prev = node;
 }
 
-//½«nodeÌí¼Óµ½listµÄ×îºóÃæ£¬Ò²¼ÈÆäÇ°Ãæ
+//å°†nodeæ·»åŠ åˆ°listçš„æœ€åé¢ï¼Œä¹Ÿæ—¢å…¶å‰é¢
 static  __inline void list_add_node_tail(list_head_t *node, list_head_t **head)
 {	
 	if(*head == NULL)
@@ -73,7 +73,7 @@ static  __inline void list_add_node_tail(list_head_t *node, list_head_t **head)
 	}
 }
 
-//´ÓlistÖĞÉ¾³ıentry
+//ä»listä¸­åˆ é™¤entry
 static __inline void list_del_node(list_head_t *entry)
 {
 	entry->prev->next = entry->next;
@@ -82,7 +82,7 @@ static __inline void list_del_node(list_head_t *entry)
 	entry->prev = entry;
 }
 
-//ÄÚ²¿º¯Êı,ÊÍ·Å¸Ã½ÚµãµÄ¿Õ¼ä
+//å†…éƒ¨å‡½æ•°,é‡Šæ”¾è¯¥èŠ‚ç‚¹çš„ç©ºé—´
 static __inline void list_free_node(list_head_t * node)
 {
 	if(node != NULL)
@@ -93,7 +93,7 @@ static __inline void list_free_node(list_head_t * node)
 	}
 }
 
-//ÉêÇëÒ»¸öĞÂµÄ½áµã,²¢³õÊ¼»¯
+//ç”³è¯·ä¸€ä¸ªæ–°çš„ç»“ç‚¹,å¹¶åˆå§‹åŒ–
 static list_head_t * List_New_Sprite_Block(__u32 sel, __disp_sprite_block_para_t * para)
 {
 	list_head_t * node = NULL;
@@ -128,7 +128,7 @@ static list_head_t * List_New_Sprite_Block(__u32 sel, __disp_sprite_block_para_t
 	}
 }
 
-//ÔÚÁ´±íµÄÎ²²¿Ôö¼ÓĞÂ½áµã
+//åœ¨é“¾è¡¨çš„å°¾éƒ¨å¢åŠ æ–°ç»“ç‚¹
 static void* List_Add_Sprite_Block(__u32 sel, __disp_sprite_block_para_t * para)
 {
 	list_head_t * node = NULL;
@@ -143,7 +143,7 @@ static void* List_Add_Sprite_Block(__u32 sel, __disp_sprite_block_para_t * para)
 	return NULL;
 }
 
-//ÔÚÁ´±íÖĞÑ°ÕÒblock id,²¢·µ»Ø¸Ã½áµãµÄÖ¸Õë
+//åœ¨é“¾è¡¨ä¸­å¯»æ‰¾block id,å¹¶è¿”å›è¯¥ç»“ç‚¹çš„æŒ‡é’ˆ
 static list_head_t *  List_Find_Sprite_Block(__u32 sel, __s32 id)
 {
 	list_head_t * guard = NULL;
@@ -167,7 +167,7 @@ static list_head_t *  List_Find_Sprite_Block(__u32 sel, __s32 id)
 	
 }
 
-//´ÓÁ´±íÖĞÉ¾³ıblock id,²¢·µ»Ø¸ÃblockµÄÖ¸Õë
+//ä»é“¾è¡¨ä¸­åˆ é™¤block id,å¹¶è¿”å›è¯¥blockçš„æŒ‡é’ˆ
 static list_head_t * List_Delete_Sprite_Block(__u32 sel, list_head_t * node)
 {
 	__s32 id = 0;
@@ -210,7 +210,7 @@ static list_head_t * List_Delete_Sprite_Block(__u32 sel, list_head_t * node)
 	}
 }
 
-//´ÓÁ´±íÖĞÉ¾³ıblock id,²¢ÊÍ·ÅÆä¿Õ¼ä,·µ»Ø¸ÃblockµÄid(¸Ãid¿ÉÄÜ²»ÊÇÆäÔ­À´µÄid)
+//ä»é“¾è¡¨ä¸­åˆ é™¤block id,å¹¶é‡Šæ”¾å…¶ç©ºé—´,è¿”å›è¯¥blockçš„id(è¯¥idå¯èƒ½ä¸æ˜¯å…¶åŸæ¥çš„id)
 static __s32 List_Delete_Free_Sprite_Block(__u32 sel, list_head_t * node)
 {
     __s32 ret = -1;

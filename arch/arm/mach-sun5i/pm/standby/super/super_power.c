@@ -210,7 +210,7 @@ __s32 mem_power_init(__u32 wakeup_src)
 			}
 	}	
 
-	/*°Ñ44H¼Ä´æÆ÷µÄbit6(°´¼üÉÏÉıÑØ´¥·¢)ÖÃ1*/
+	/*æŠŠ44Hå¯„å­˜å™¨çš„bit6(æŒ‰é”®ä¸Šå‡æ²¿è§¦å‘)ç½®1*/
 	if(wakeup_src & AXP_WAKEUP_ASCEND){
 			if(twi_byte_rw(TWI_OP_RD, AXP_ADDR,AXP20_IRQEN5, &reg_val)){
 				return -1;
@@ -221,7 +221,7 @@ __s32 mem_power_init(__u32 wakeup_src)
 			}
 	}
 	
-	/*°Ñ44H¼Ä´æÆ÷µÄbit5(ÏÂ½µÑØ´¥·¢)ÖÃ1*/
+	/*æŠŠ44Hå¯„å­˜å™¨çš„bit5(ä¸‹é™æ²¿è§¦å‘)ç½®1*/
 	if(wakeup_src & AXP_WAKEUP_DESCEND){
 			if(twi_byte_rw(TWI_OP_RD, AXP_ADDR,AXP20_IRQEN5, &reg_val)){
 				return -1;
@@ -540,7 +540,7 @@ __s32 mem_power_exit(__u32 wakeup_src)
 			}
 	}	
 
-	/*°Ñ44H¼Ä´æÆ÷µÄbit6(°´¼üÉÏÉıÑØ´¥·¢)ÖÃ1*/
+	/*æŠŠ44Hå¯„å­˜å™¨çš„bit6(æŒ‰é”®ä¸Šå‡æ²¿è§¦å‘)ç½®1*/
 	if(wakeup_src & AXP_WAKEUP_ASCEND){
 			if(twi_byte_rw(TWI_OP_RD, AXP_ADDR,AXP20_IRQEN5, &reg_val)){
 				return -1;
@@ -551,7 +551,7 @@ __s32 mem_power_exit(__u32 wakeup_src)
 			}
 	}
 	
-	/*°Ñ44H¼Ä´æÆ÷µÄbit5(ÏÂ½µÑØ´¥·¢)ÖÃ1*/
+	/*æŠŠ44Hå¯„å­˜å™¨çš„bit5(ä¸‹é™æ²¿è§¦å‘)ç½®1*/
 	if(wakeup_src & AXP_WAKEUP_DESCEND){
 			if(twi_byte_rw(TWI_OP_RD, AXP_ADDR,AXP20_IRQEN5, &reg_val)){
 				return -1;
@@ -631,7 +631,7 @@ __s32 mem_power_off(void)
 {
 	__u8 reg_val = 0;
 	/*config wakeup signal*/
-	/*°Ñ31H¼Ä´æÆ÷µÄbit3(°´¼ü¡¢gpio»½ĞÑÎ»)ÖÃ1: low battery to power off*/
+	/*æŠŠ31Hå¯„å­˜å™¨çš„bit3(æŒ‰é”®ã€gpioå”¤é†’ä½)ç½®1: low battery to power off*/
 	if(twi_byte_rw(TWI_OP_RD, AXP_ADDR,0x31, &reg_val)){
 		return -1;
 	}
@@ -642,7 +642,7 @@ __s32 mem_power_off(void)
 
 #if 1
 	/*power off*/
-	/*°Ñ12H¼Ä´æÆ÷µÄbit0¡¢1¡¢3¡¢4¡¢6ÖÃ0*/
+	/*æŠŠ12Hå¯„å­˜å™¨çš„bit0ã€1ã€3ã€4ã€6ç½®0*/
 	if(twi_byte_rw(TWI_OP_RD, AXP_ADDR,0x12, &reg_val)){
 		return -1;
 	}
@@ -654,7 +654,7 @@ __s32 mem_power_off(void)
 
 #if 0
 	/*power off*/
-	/*°Ñ12H¼Ä´æÆ÷µÄbit1¡¢3¡¢4¡¢6ÖÃ0*/
+	/*æŠŠ12Hå¯„å­˜å™¨çš„bit1ã€3ã€4ã€6ç½®0*/
 	if(twi_byte_rw(TWI_OP_RD, AXP_ADDR,0x12, &reg_val)){
 		return -1;
 	}
@@ -693,7 +693,7 @@ __s32 mem_power_off_nommu(void)
 {
 	__u8 reg_val = 0;
 	/*config wakeup signal*/
-	/*°Ñ31H¼Ä´æÆ÷µÄbit3(°´¼ü¡¢gpio»½ĞÑÎ»)ÖÃ1*/
+	/*æŠŠ31Hå¯„å­˜å™¨çš„bit3(æŒ‰é”®ã€gpioå”¤é†’ä½)ç½®1*/
 	if(0 != twi_byte_rw_nommu(TWI_OP_RD, AXP_ADDR,0x31, &reg_val)){
 		return -1;
 	}
@@ -704,7 +704,7 @@ __s32 mem_power_off_nommu(void)
 
 #if 1
 	/*power off*/
-	/*°Ñ12H¼Ä´æÆ÷µÄbit0¡¢1¡¢3¡¢4¡¢6ÖÃ0*/
+	/*æŠŠ12Hå¯„å­˜å™¨çš„bit0ã€1ã€3ã€4ã€6ç½®0*/
 	if(twi_byte_rw_nommu(TWI_OP_RD, AXP_ADDR,0x12, &reg_val)){
 		return -1;
 	}
@@ -716,7 +716,7 @@ __s32 mem_power_off_nommu(void)
 
 #if 0
 	/*power off*/
-	/*°Ñ12H¼Ä´æÆ÷µÄbit1¡¢3¡¢4¡¢6ÖÃ0*/
+	/*æŠŠ12Hå¯„å­˜å™¨çš„bit1ã€3ã€4ã€6ç½®0*/
 	if(twi_byte_rw(TWI_OP_RD, AXP_ADDR,0x12, &reg_val)){
 		return -1;
 	}

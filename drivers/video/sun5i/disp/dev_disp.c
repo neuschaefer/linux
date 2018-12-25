@@ -1987,12 +1987,12 @@ __s32 Drv_disp_set_fb_yoffset(__u32 sel, __u32 fb_id, __u32 yoffset)
 
 __s32 Drv_disp_layer_request(__u32 sel, __disp_layer_work_mode_t mode)
 {    
-    return BSP_disp_layer_request(sel, mode);   //ÉêÇëÓ²¼şÍ¼²ã
+    return BSP_disp_layer_request(sel, mode);   //ç”³è¯·ç¡¬ä»¶å›¾å±‚
 }
 
 __s32 Drv_disp_layer_release(__u32 sel, __hdle hlyr)
 {    
-    return BSP_disp_layer_release(sel, hlyr);   //ÊÍ·ÅÓ²¼şÍ¼²ã
+    return BSP_disp_layer_release(sel, hlyr);   //é‡Šæ”¾ç¡¬ä»¶å›¾å±‚
 }
 
 __s32 Drv_disp_layer_set_para(int sel, __hdle hlyr, __disp_layer_info_t* p_layer_info)

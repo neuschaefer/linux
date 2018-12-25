@@ -72,7 +72,7 @@ struct cedarv_engine_task {
 	unsigned int is_first_task;
 };
 
-/*利用优先级task_prio查询当前运行task的frametime，和比优先级task_prio高的task可能运行的总时间total_time*/
+/*鍒╃敤浼樺厛绾ask_prio鏌ヨ褰撳墠杩愯task鐨刦rametime锛屽拰姣斾紭鍏堢骇task_prio楂樼殑task鍙兘杩愯鐨勬�绘椂闂磘otal_time*/
 struct cedarv_engine_task_info {
 	int task_prio;
 	unsigned int frametime;

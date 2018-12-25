@@ -6,19 +6,19 @@
 
 typedef struct __EINK_INIT_WF_S
 {
-    __u16 total_frame;                  //Ö¡Êı
+    __u16 total_frame;                  //å¸§æ•°
     __u8 wf_data[COL_MAX];
-}eink_init_wf_t;                        //³õÊ¼»¯²¨ĞÎÊı¾İÎÄ¼ş
+}eink_init_wf_t;                        //åˆå§‹åŒ–æ³¢å½¢æ•°æ®æ–‡ä»¶
 
 typedef struct __EINK_DU_WF_S
 {
-    __u16 total_frame;                  //Ö¡Êı
+    __u16 total_frame;                  //å¸§æ•°
     __u8 wf_data[DU_ROW_MAX][COL_MAX];
-}eink_du_wf_t;                          //DU Ä£Ê½ÏÂ²¨ĞÎÊı¾İÎÄ¼ş
+}eink_du_wf_t;                          //DU æ¨¡å¼ä¸‹æ³¢å½¢æ•°æ®æ–‡ä»¶
 
 typedef struct __EINK_WF_DATA_S
 {
-    __u16 total_frame;            //Ö¡Êı
+    __u16 total_frame;            //å¸§æ•°
     __u8 wf_data[ROW_MAX][COL_MAX];    
 }eink_wf_data_t;
 

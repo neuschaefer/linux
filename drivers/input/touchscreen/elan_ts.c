@@ -951,7 +951,7 @@ static struct i2c_driver elan_ts_driver = {
 
 //extern void eink_disp_display_logo()
 
-//Çý¶¯¼ÓÔØº¯Êý
+//é©±åŠ¨åŠ è½½å‡½æ•°
 static int __devinit elan_ts_init(void)
 {
 	int ret = -1;
@@ -989,7 +989,7 @@ static int __devinit elan_ts_init(void)
 	return ret;
 }
 
-//Çý¶¯Ð¶ÔØº¯Êý
+//é©±åŠ¨å¸è½½å‡½æ•°
 static void __exit elan_ts_exit(void)
 {
 	printk_i("here");
@@ -1007,8 +1007,8 @@ MODULE_DESCRIPTION("Elan Touchscreen Driver");
 MODULE_LICENSE("GPL v2");
 
 
-//i2c_driver  ÖÐÃû³ÆÒªÓë sys_config1.fex ctp_name = "gt813_ts_d" Ò»ÖÂ
-//ts->input_dev->name Ãû³ÆÒªÓë gt813_ts_i.idc Ò»ÖÂ£¬ ²Å²»ÊÇÊó±ê Ä£Ê½
+//i2c_driver  ä¸­åç§°è¦ä¸Ž sys_config1.fex ctp_name = "gt813_ts_d" ä¸€è‡´
+//ts->input_dev->name åç§°è¦ä¸Ž gt813_ts_i.idc ä¸€è‡´ï¼Œ æ‰ä¸æ˜¯é¼ æ ‡ æ¨¡å¼
 
 //	sprintf(ts->phys, "input/gt813_ts_i");
 //	ts->input_dev->name = ELAN_INPUT_DEVICE_NAME; //elan_ts_name;

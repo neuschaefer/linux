@@ -39,7 +39,7 @@ s32 sunximmc_init_controller(struct sunxi_mmc_host* smc_host)
 }
 
 /* static s32 sunximmc_set_src_clk(struct sunxi_mmc_host* smc_host)
- * ÉèÖÃSD¿¨¿ØÖÆÆ÷Ô´Ê±ÖÓÆµÂÊ, Ä¿±êÎª100MHz£¬clockÔ´ÓĞsmc_hostµÄclk_source¾ö¶¨
+ * è®¾ç½®SDå¡æ§åˆ¶å™¨æºæ—¶é’Ÿé¢‘ç‡, ç›®æ ‡ä¸º100MHzï¼Œclockæºæœ‰smc_hostçš„clk_sourceå†³å®š
  * clk_source: 0-video PLL, 2-dram PLL, 3-core pll
  */
 static int sunximmc_set_src_clk(struct sunxi_mmc_host* smc_host)

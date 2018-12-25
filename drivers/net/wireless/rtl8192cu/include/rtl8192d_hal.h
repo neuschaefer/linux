@@ -659,7 +659,7 @@ struct hal_data_8192de
 #if 1
 	IQK_MATRIX_REGS_SETTING IQKMatrixRegSetting[IQK_Matrix_Settings_NUM];
 #else
-	//regc80¡¢regc94¡¢regc4c¡¢regc88¡¢regc9c¡¢regc14¡¢regca0¡¢regc1c¡¢regc78
+	//regc80ã€regc94ã€regc4cã€regc88ã€regc9cã€regc14ã€regca0ã€regc1cã€regc78
 	u4Byte				IQKMatrixReg[IQK_Matrix_REG_NUM];
 	IQK_MATRIX_REGS_SETTING			   IQKMatrixRegSetting[IQK_Matrix_Settings_NUM];	// 1->2G,24->5G 20M channel,21->5G 40M channel.													
 #endif
@@ -858,7 +858,7 @@ struct hal_data_8192du
 #if 1
 	IQK_MATRIX_REGS_SETTING IQKMatrixRegSetting[IQK_Matrix_Settings_NUM];
 #else
-	//regc80¡¢regc94¡¢regc4c¡¢regc88¡¢regc9c¡¢regc14¡¢regca0¡¢regc1c¡¢regc78
+	//regc80ã€regc94ã€regc4cã€regc88ã€regc9cã€regc14ã€regca0ã€regc1cã€regc78
 	u4Byte				IQKMatrixReg[IQK_Matrix_REG_NUM];
 	IQK_MATRIX_REGS_SETTING			   IQKMatrixRegSetting[IQK_Matrix_Settings_NUM];	// 1->2G,24->5G 20M channel,21->5G 40M channel.													
 #endif

@@ -25,7 +25,7 @@ static __u32* eink_load_waveform(char * path)
     __s32 file_len = 0, read_len = 0;    
     mm_segment_t fs;
     loff_t pos;
-    __u32 wf_data_len = 0;           //waveformÊı¾İ×Ü³¤¶È
+    __u32 wf_data_len = 0;           //waveformæ•°æ®æ€»é•¿åº¦
     
     fp = filp_open(path, O_RDONLY, 0);
 	if(IS_ERR(fp))
@@ -184,9 +184,9 @@ static __s32 eink_gc16_update_waveindex(void)
 {
     register int col = 0, row = 0, width = 0, height = 0;
     register __u8 index = 0;
-    register __u8* p_new_data;			//ĞÂÏÔÊ¾Êı¾İ
-    register __u8* p_old_data = disp_eink.wav_last_frame; 					//Ç°Ò»´ÎÏÔÊ¾µÄÊı¾İ
-    register __u8* p_wf_index = disp_eink.wav_form_index;					//²¨ĞÎÎÄ¼şË÷ÒıºÅ    
+    register __u8* p_new_data;			//æ–°æ˜¾ç¤ºæ•°æ®
+    register __u8* p_old_data = disp_eink.wav_last_frame; 					//å‰ä¸€æ¬¡æ˜¾ç¤ºçš„æ•°æ®
+    register __u8* p_wf_index = disp_eink.wav_form_index;					//æ³¢å½¢æ–‡ä»¶ç´¢å¼•å·    
     register __u8 new = 0,old = 0;    
 
 	p_new_data = disp_eink.bufQueue.slots[disp_eink.bufQueue.curBufIndex].buffer;
@@ -227,9 +227,9 @@ __s32 eink_du_update_local_waveindex(void)
 {
     int col = 0, row = 0, width = 0, height = 0;
     __u8 index = 0;
-    __u8* p_new_data;			//ĞÂÏÔÊ¾Êı¾İ
-    __u8* p_old_data = disp_eink.wav_last_frame; 					//Ç°Ò»´ÎÏÔÊ¾µÄÊı¾İ
-    __u8* p_wf_index = disp_eink.wav_form_index;					//²¨ĞÎÎÄ¼şË÷ÒıºÅ    
+    __u8* p_new_data;			//æ–°æ˜¾ç¤ºæ•°æ®
+    __u8* p_old_data = disp_eink.wav_last_frame; 					//å‰ä¸€æ¬¡æ˜¾ç¤ºçš„æ•°æ®
+    __u8* p_wf_index = disp_eink.wav_form_index;					//æ³¢å½¢æ–‡ä»¶ç´¢å¼•å·    
     __u8 new = 0,old = 0;   
     __u8 eink_type = OPM060A1;
 
@@ -264,7 +264,7 @@ __s32 eink_du_update_local_waveindex(void)
             
             if (eink_type == OPM060A1) 
             {
-                if(new == old)                      //¾Ö²¿Ä£Ê½,ÈôÏàµÈ£¬Ôòindex = 0,waveform²¨ĞÎËÍ0µçÆ½
+                if(new == old)                      //å±€éƒ¨æ¨¡å¼,è‹¥ç›¸ç­‰ï¼Œåˆ™index = 0,waveformæ³¢å½¢é€0ç”µå¹³
                 {
                     index = 0;
                 }
@@ -284,7 +284,7 @@ __s32 eink_du_update_local_waveindex(void)
             }
             else if ((eink_type == ED060SC7)||(eink_type == ED060SC4)) 
             {
-                if(new == old)                      //¾Ö²¿Ä£Ê½,ÈôÏàµÈ£¬Ôòindex = 0,waveform²¨ĞÎËÍ0µçÆ½
+                if(new == old)                      //å±€éƒ¨æ¨¡å¼,è‹¥ç›¸ç­‰ï¼Œåˆ™index = 0,waveformæ³¢å½¢é€0ç”µå¹³
                 {
                     index = 0;
                 }
@@ -305,9 +305,9 @@ __s32 eink_du_update_waveindex(void)
 {
     int col = 0, row = 0, width = 0, height = 0;
     register __u8 index = 0;
-    register __u8* p_new_data;			//ĞÂÏÔÊ¾Êı¾İ
-    register __u8* p_old_data = disp_eink.wav_last_frame; 					//Ç°Ò»´ÎÏÔÊ¾µÄÊı¾İ
-    register __u8* p_wf_index = disp_eink.wav_form_index;					//²¨ĞÎÎÄ¼şË÷ÒıºÅ    
+    register __u8* p_new_data;			//æ–°æ˜¾ç¤ºæ•°æ®
+    register __u8* p_old_data = disp_eink.wav_last_frame; 					//å‰ä¸€æ¬¡æ˜¾ç¤ºçš„æ•°æ®
+    register __u8* p_wf_index = disp_eink.wav_form_index;					//æ³¢å½¢æ–‡ä»¶ç´¢å¼•å·    
     register __u8 new = 0,old = 0;   
     __u8 eink_type = OPM060A1;
     
@@ -329,7 +329,7 @@ __s32 eink_du_update_waveindex(void)
         eink_type = ED060SC7;
     }
     
-    width  = disp_eink.frame_width; //PIXEL_MONO_8BPP,Í¼²ãÖĞÃ¿¸öbyte´æ·ÅÒ»¸öpixel
+    width  = disp_eink.frame_width; //PIXEL_MONO_8BPP,å›¾å±‚ä¸­æ¯ä¸ªbyteå­˜æ”¾ä¸€ä¸ªpixel
     height = disp_eink.frame_height;
     __EINK_INF("width = %d, height = %d\n", width, height);
     

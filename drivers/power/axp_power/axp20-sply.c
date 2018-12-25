@@ -2119,7 +2119,7 @@ axp_set_startup_sequence(charger);
     register_early_suspend(&axp_early_suspend);
 #endif
 
-	/* µ÷ÊÔ½Ó¿Ú×¢²á */
+	/* è°ƒè¯•æ¥å£æ³¨å†Œ */
 	class_register(&axppower_class);
 
   return ret;

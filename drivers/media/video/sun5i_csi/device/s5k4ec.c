@@ -186,7 +186,7 @@ static struct regval_list sensor_default_regs[] = {
 //20110728 : ESD Check Register Address Changed
 //20110829 : TnP Changed by S.Y.Lee
 //20120104 : init Parm Update sequence changed
-//20120201 : Flash½Ã ÁÖº¯ºÎ Green Noise °³¼± setting 
+//20120201 : FlashçŸ« æž—å‡½ä½• Green Noise ä¿ºæ€¥ setting 
 //20120228 : Add Brightness Block
 //==================================================================================
   
@@ -2065,7 +2065,7 @@ static struct regval_list sensor_default_regs[] = {
 {{0x0F,0x12},{0x00,0x00}},	//senHal_SamplingMode 0 : 2 PLA / 1 : 4PLA              
 {{0x0F,0x12},{0x00,0x03}},	//senHal_PLAOption	[0] VPLA enable  [1] HPLA enable
 
-{{0x00,0x2A},{0x1B,0x00}},  //Green Noise °³¼±
+{{0x00,0x2A},{0x1B,0x00}},  //Green Noise ä¿ºæ€¥
 {{0x0F,0x12},{0xF4,0x28}},
 {{0x0F,0x12},{0xFF,0xFF}},
 {{0x0F,0x12},{0x00,0x00}},
@@ -3685,7 +3685,7 @@ static struct regval_list sensor_default_regs[] = {
 //20110728 : ESD Check Register Address Change
 //20110829 : TnP Changed by S.Y.Lee
 //20120104 : init Parm Update sequence changed(by J.M.Ahn)
-//20120201 : Flash½Ã ÁÖº¯ºÎ Green Noise °³¼± setting (by J.M.Ahn)
+//20120201 : FlashçŸ« æž—å‡½ä½• Green Noise ä¿ºæ€¥ setting (by J.M.Ahn)
 //20120228 : Add Brightness Block
 
 };                         	                         

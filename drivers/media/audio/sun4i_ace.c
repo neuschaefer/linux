@@ -102,7 +102,7 @@ __s32 ACE_Init(void)
     //create semphore to sync clock adjust.    
  	sema_init(&pSemAceClkAdjust, 1);
 		
-	/*ae,ceµÄÏà¹Ø¼Ä´æÆ÷¶¼ĞèÒªÍ¨¹ıÕâ¸öµØÖ·ÖµÓ³ÉäÆ«ÒÆÕÒµ½*/
+	/*ae,ceçš„ç›¸å…³å¯„å­˜å™¨éƒ½éœ€è¦é€šè¿‡è¿™ä¸ªåœ°å€å€¼æ˜ å°„åç§»æ‰¾åˆ°*/
 	ace_hsram = ioremap(ACE_REGS_pBASE, 4096);
     if (!ace_hsram) {
         printk("cannot map region for sram");

@@ -113,7 +113,7 @@ static int randseed;
 static EcFpPoint pTable1[POINTTABLELEN];
 static EllipticCurve TheCurve;
 
-/* 64Œª≥À∑®”≈ªØ*/
+/* 64‰Ωç‰πòÊ≥ï‰ºòÂåñ*/
 #ifdef IWN_ECC_GCCINT64
 #define DWordMult(product_64, v1, v2)		\
 	do									\
@@ -151,7 +151,7 @@ static  void DWordMult (DWord a[2],const DWord b,const DWord c)
 #endif
 
 
-/* 64Œª≥˝∑®”≈ªØ*/
+/* 64‰ΩçÈô§Ê≥ï‰ºòÂåñ*/
 #ifdef IWN_ECC_CPU_DIVISION64
 #define CMP_WordDiv(val_p, dividend_64_p, divisor)		\
    *(val_p) = (unsigned int)(((((unsigned long long)(dividend_64_p)[1])<<32) |(dividend_64_p)[0]) / (unsigned long long)(divisor))
@@ -2126,7 +2126,7 @@ int ecc192_genkey_pc(unsigned char *priv_key, unsigned char *pub_key)
 	Point oPubPoint;
 	MInt key;
 	EcFpPoint point0;
-	/*≤˙…˙¡Ÿ ±ÀΩ‘ø*/
+	/*‰∫ßÁîü‰∏¥Êó∂ÁßÅÈí•*/
 	oPubPoint.x = pubkey_x;
 	oPubPoint.y = pubkey_y;
 	
@@ -2164,7 +2164,7 @@ int ecc192_genkey(unsigned char *priv_key, unsigned char *pub_key)
 	Point oPubPoint;
 	MInt key;
 	EcFpPoint point0;
-	/*≤˙…˙¡Ÿ ±ÀΩ‘ø*/
+	/*‰∫ßÁîü‰∏¥Êó∂ÁßÅÈí•*/
 	oPubPoint.x = pubkey_x;
 	oPubPoint.y = pubkey_y;
 	
@@ -2253,7 +2253,7 @@ int ecc192_generate_pubKey(unsigned char *priv_key, unsigned char *pub_key)
 	Point oPubPoint;
 	MInt key;
 	EcFpPoint point0;
-	/*≤˙…˙¡Ÿ ±ÀΩ‘ø*/
+	/*‰∫ßÁîü‰∏¥Êó∂ÁßÅÈí•*/
 	oPubPoint.x = pubkey_x;
 	oPubPoint.y = pubkey_y;
 #if 0	
@@ -2382,10 +2382,10 @@ int ecc192_ecdh(const unsigned char * priv_key, const unsigned char *pub_key, un
 	OctetStringToPriKey(priv_key, 24, PrivateKey, &LenOfPrivKey);
 
 	ret = KTimesPoint(PrivateKey,//y
-                &private_len_int,     // int∏ˆ ˝
+                &private_len_int,     // int‰∏™Êï∞
                 &oPubPoint,//x*P
                 192,  // 192
-                &poutPublicKey,    // ‰≥ˆµƒx*y*P
+                &poutPublicKey,    //ËæìÂá∫ÁöÑx*y*P
                 192   //192
                 );
 	if(ret != 0)

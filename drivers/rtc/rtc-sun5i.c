@@ -209,12 +209,12 @@ int rtc_detect(struct i2c_client *client, struct i2c_board_info *info)
 }
 
 /*
-*Ğ´Ê±ÖÓ²½Öè£º
-*	step1:½«Ê±¼ä×°Èë·¢ËÍ»º³åÇø(Ê×µØÖ·Îª50H)ÖĞ
-*	step2:È¡Æ÷¼şµØÖ·
-*	step3:È¡Ğ´Èë¼Ä´æÆ÷µÄÊ×µØÖ·(´Ó00H¿ªÊ¼Ğ´)
-*	step4:Ğ´7¸öÊ±¼äĞÅÏ¢ºÍ2¸ö¿ØÖÆÃüÁî
-*	step5:Ğ´Ê±¼ä
+*å†™æ—¶é’Ÿæ­¥éª¤ï¼š
+*	step1:å°†æ—¶é—´è£…å…¥å‘é€ç¼“å†²åŒº(é¦–åœ°å€ä¸º50H)ä¸­
+*	step2:å–å™¨ä»¶åœ°å€
+*	step3:å–å†™å…¥å¯„å­˜å™¨çš„é¦–åœ°å€(ä»00Hå¼€å§‹å†™)
+*	step4:å†™7ä¸ªæ—¶é—´ä¿¡æ¯å’Œ2ä¸ªæ§åˆ¶å‘½ä»¤
+*	step5:å†™æ—¶é—´
 */
 static int pcf8563_set_datetime(struct i2c_client *client, struct rtc_time *tm)
 {
@@ -231,7 +231,7 @@ static int pcf8563_set_datetime(struct i2c_client *client, struct rtc_time *tm)
 	leap_year = tm->tm_year + 1900;
 	if(leap_year > 2069 || leap_year < 1970) {
 		mutex_unlock(&pcf8563->mutex);
-		dev_err(&client->dev, "rtc only supports 100ï¿½ï¿½1970ï¿½ï¿½2069ï¿½ï¿½ years\n");
+		dev_err(&client->dev, "rtc only supports 100é”Ÿæ–¤æ‹·1970é”Ÿæ–¤æ‹·2069é”Ÿæ–¤æ‹· years\n");
 		return -EINVAL;
 	}
 
@@ -353,11 +353,11 @@ static int pcf8563_set_datetime(struct i2c_client *client, struct rtc_time *tm)
 /*
  * In the routines that deal directly with the pcf8563 hardware, we use
  * rtc_time -- month 0-11, hour 0-23, yr = calendar year-epoch.
- * ¶ÁÊ±ÖÓ²½Öè£º
- *		step1:È¡Æ÷¼şµØÖ·
- *		step2:¶ÁÈ¡Ê±¼äµÄÊ××Ö½ÚµØÖ·(´ÓÃë¿ªÊ¼¶Á)
- *		step3:¶ÁÆß¸öÊ±¼äĞÅÏ¢
- *		step4:¶ÁÈ¡Ê±¼ä²¢·ÅÈë½ÓÊÕ»º³åÇøÖĞ
+ * è¯»æ—¶é’Ÿæ­¥éª¤ï¼š
+ *		step1:å–å™¨ä»¶åœ°å€
+ *		step2:è¯»å–æ—¶é—´çš„é¦–å­—èŠ‚åœ°å€(ä»ç§’å¼€å§‹è¯»)
+ *		step3:è¯»ä¸ƒä¸ªæ—¶é—´ä¿¡æ¯
+ *		step4:è¯»å–æ—¶é—´å¹¶æ”¾å…¥æ¥æ”¶ç¼“å†²åŒºä¸­
  */
 static int pcf8563_get_datetime(struct i2c_client *client, struct rtc_time *tm)
 {

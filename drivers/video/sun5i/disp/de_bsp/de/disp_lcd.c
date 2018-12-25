@@ -184,7 +184,7 @@ void Lcd_Panel_Parameter_Check(__u32 sel)
 		OSAL_PRINTF("*** lcd_vspw:   %d\n",info->lcd_hv_vspw);		
 		OSAL_PRINTF("*** lcd_frame_frq:  %dHz\n",lcd_fclk_frq);	
 		
-		//´òÓ¡´íÎóÌáÊ¾
+		//æ‰“å°é”™è¯¯æç¤º
 		OSAL_PRINTF("*** \n");	
 		if(Lcd_Panel_Err_Flag & BIT0)
 			{OSAL_PRINTF("*** Err01: Violate \"lcd_hbp > lcd_hspw\"\n");}

@@ -23,7 +23,7 @@
 #define FT5X02_MAX_TOUCH_VALUE			1200
 #define FT5X02_DRAW_LINE_TH			250
 #define FT5X02_PWMODE_CTRL			1
-#define FT5X02_PERIOD_ACTIVE			16//±¨µãÂÊ ÖµÔ½´ó ±¨µã¸ß ÖµĞ¡±¨µãµÍ
+#define FT5X02_PERIOD_ACTIVE			16//æŠ¥ç‚¹ç‡ å€¼è¶Šå¤§ æŠ¥ç‚¹é«˜ å€¼å°æŠ¥ç‚¹ä½
 #define FT5X02_TIME_ENTER_MONITOR			10
 #define FT5X02_PERIOD_MONITOR			40
 #define FT5X02_FILTER_FRAME_NOISE			2
@@ -60,7 +60,7 @@ unsigned char g_ft5x02_tx_num = 15;
 unsigned char g_ft5x02_rx_num = 10;
 unsigned char g_ft5x02_gain = 10;
 unsigned char g_ft5x02_voltage = 3;
-unsigned char g_ft5x02_scanselect = 4;//3~15//½â¾öÆÁ¸úTPÖ®¼äµÄ¸ÉÈÅµÄ²ÎÊı
+unsigned char g_ft5x02_scanselect = 4;//3~15//è§£å†³å±è·ŸTPä¹‹é—´çš„å¹²æ‰°çš„å‚æ•°
 unsigned char g_ft5x02_tx_order[] = {14,13,12,11,10,9,8,7,6,5,4,3,2,1,0};
 unsigned char g_ft5x02_tx_offset = 1;
 unsigned char g_ft5x02_tx_cap[] = {23,23,24,25,25,25,25,25,25,25,25,25,25,26,31};

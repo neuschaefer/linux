@@ -566,7 +566,7 @@ static void  sdxc_init_idma_des(struct sunxi_mmc_host* smc_host, struct mmc_data
 	u32 remain;
 	u32 i, j;
 
-	/* ³õÊ¼»¯IDMA Descriptor */
+	/* åˆå§‹åŒ–IDMA Descriptor */
 	for (i=0; i<data->sg_len; i++)
 	{
 		buff_frag_num = data->sg[i].length >> SDXC_DES_NUM_SHIFT;

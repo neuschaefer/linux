@@ -14,7 +14,7 @@
 #define TEMP_DATA              (0x20)
 #define TP_DATA                (0x24)
 
-#define T_MAX                   50  //ÎÂ¶È-×èÖµÓ³Éä±í·¶Î§:0-49
+#define T_MAX                   50  //æ¸©åº¦-é˜»å€¼æ˜ å°„è¡¨èŒƒå›´:0-49
 
 extern __u32 tp_reg_base;
 
@@ -32,15 +32,15 @@ typedef struct {
     
     struct task_struct *read_ADC_value_task;    
     spinlock_t          lock[1];                
-    __u32               ADC_value;              //ADC¶ÁÊı
-    __s32               R_div;                  //ÓëÈÈÃôµç×è´®ÁªµÄ·ÖÑ¹µç×è×èÖµ,µ¥Î»:Å·Ä·
-    __s32               vcc_vol;                //VCCµçÑ¹£¬µ¥Î»:ºÁ·ü
-    __s32               adc_compensate_vol;     //ADC²¹³¥µçÑ¹£¬ĞèÒª¸ù¾İ²âÊÔÊı¾İ½øĞĞµ÷ÊÔ
+    __u32               ADC_value;              //ADCè¯»æ•°
+    __s32               R_div;                  //ä¸çƒ­æ•ç”µé˜»ä¸²è”çš„åˆ†å‹ç”µé˜»é˜»å€¼,å•ä½:æ¬§å§†
+    __s32               vcc_vol;                //VCCç”µå‹ï¼Œå•ä½:æ¯«ä¼
+    __s32               adc_compensate_vol;     //ADCè¡¥å¿ç”µå‹ï¼Œéœ€è¦æ ¹æ®æµ‹è¯•æ•°æ®è¿›è¡Œè°ƒè¯•
     
-    __u32               TR_map_table[T_MAX];    //ÈÈÃôµç×èµÄÎÂ¶È-×èÖµÓ³Éä±í
-    __s32               T_ref;                  //ÈÈÃôµç×è²Î¿¼ÎÂ¶È,µ¥Î»:¡æ
-    __s32               R_ref;                  //ÈÈÃôµç×èÔÚ²Î¿¼ÎÂ¶ÈÏÂµÄ×èÖµ,µ¥Î»:Å·Ä·
-    __s32               B_constant;             //ÈÈÃôµç×èBÖµ
+    __u32               TR_map_table[T_MAX];    //çƒ­æ•ç”µé˜»çš„æ¸©åº¦-é˜»å€¼æ˜ å°„è¡¨
+    __s32               T_ref;                  //çƒ­æ•ç”µé˜»å‚è€ƒæ¸©åº¦,å•ä½:â„ƒ
+    __s32               R_ref;                  //çƒ­æ•ç”µé˜»åœ¨å‚è€ƒæ¸©åº¦ä¸‹çš„é˜»å€¼,å•ä½:æ¬§å§†
+    __s32               B_constant;             //çƒ­æ•ç”µé˜»Bå€¼
 }adc_para_t;
 
 __s32 ADC_Set_Reg_Base(__u32 address);

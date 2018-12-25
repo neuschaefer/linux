@@ -1084,7 +1084,7 @@ E_UPGRADE_ERR_TYPE  fts_ctpm_fw_upgrade(u8* pbt_buf, u16 dw_lenth)
 
     /*********Step 6: read out checksum***********************/
     /*send the opration head*/
-    //cmd_write(0xcc,0x00,0x00,0x00,1);//°Ñ0xccµ±×÷¼Ä´æÆ÷µØÖ·£¬È¥¶Á³öÒ»¸ö×Ö½Ú
+    //cmd_write(0xcc,0x00,0x00,0x00,1);//æŠŠ0xccå½“ä½œå¯„å­˜å™¨åœ°å€ï¼Œå»è¯»å‡ºä¸€ä¸ªå­—èŠ‚
    // byte_read(reg_val,1);//change by zhengdixu
 
 	fts_register_read(0xcc, reg_val,1);
@@ -1754,7 +1754,7 @@ static void ft5x_ts_resume(struct early_suspend *handler)
 		//ctp_ops.ts_wakeup();
 		
 		msleep(250);
-		//Í¨¹ıIO¿ÚÅĞ¶ÏÊ¹ÓÃÄÄ¸ö¼ÓÔØº¯Êı
+		//é€šè¿‡IOå£åˆ¤æ–­ä½¿ç”¨å“ªä¸ªåŠ è½½å‡½æ•°
 		#if 0
 		ft5x02_Init_IC_Param_qtw(this_client);
 		#else

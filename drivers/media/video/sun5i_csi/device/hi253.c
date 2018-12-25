@@ -1126,7 +1126,7 @@ static struct regval_list sensor_default_regs[] = {
 	{{0x7d}, {0x23}},
 	
 	
-	//0x83--0x9fÊÇ¸ù¾İ27MÊ±ÖÓËùÅäÖÃµÄÆØ¹âÖµ£¬Ïû³ıFlickers
+	//0x83--0x9fæ˜¯æ ¹æ®27Mæ—¶é’Ÿæ‰€é…ç½®çš„æ›å…‰å€¼ï¼Œæ¶ˆé™¤Flickers
 	
 	{{0x83}, {0x01}}, //EXP Normal 33.33 fps 
 	{{0x84}, {0x89}}, 
@@ -1284,7 +1284,7 @@ static struct regval_list sensor_default_regs[] = {
 	{{0x03}, {0x00}},
 	
 	{{0x03}, {0x00}}, // Page 0
-	{{0x01}, {0x50}}, // Sleep Off ĞŞ¸ÄÇı¶¯ÄÜÁ¦½â¾öºìÂÌÏßÌõÎÊÌâ
+	{{0x01}, {0x50}}, // Sleep Off ä¿®æ”¹é©±åŠ¨èƒ½åŠ›è§£å†³çº¢ç»¿çº¿æ¡é—®é¢˜
 	
 	{{0xff}, {0xff}},
 	{{0xff}, {0xff}},
@@ -2454,7 +2454,7 @@ static int sensor_s_fmt(struct v4l2_subdev *sd,
 	info->fmt = sensor_fmt;
 	info->width = wsize->width;
 	info->height = wsize->height;
-	msleep(500);//Ôö¼ÓÑÓ³Ù½â¾öÅÄÕÕ·ÖÆÁÎÊÌâ
+	msleep(500);//å¢åŠ å»¶è¿Ÿè§£å†³æ‹ç…§åˆ†å±é—®é¢˜
 	return 0;
 }
 

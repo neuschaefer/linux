@@ -35,17 +35,17 @@ typedef enum
 
 typedef enum
 {
-    DISP_MOD_INTERLEAVED        =0x1,   //interleaved,1¸öµØÖ·
-    DISP_MOD_NON_MB_PLANAR      =0x0,   //ÎŞºê¿éÆ½ÃæÄ£Ê½,3¸öµØÖ·,RGB/YUVÃ¿¸öchannel·Ö±ğ´æ·Å
-    DISP_MOD_NON_MB_UV_COMBINED =0x2,   //ÎŞºê¿éUV´ò°üÄ£Ê½,2¸öµØÖ·,YºÍUV·Ö±ğ´æ·Å
-    DISP_MOD_MB_PLANAR          =0x4,   //ºê¿éÆ½ÃæÄ£Ê½,3¸öµØÖ·,RGB/YUVÃ¿¸öchannel·Ö±ğ´æ·Å
-    DISP_MOD_MB_UV_COMBINED     =0x6,   //ºê¿éUV´ò°üÄ£Ê½ ,2¸öµØÖ·,YºÍUV·Ö±ğ´æ·Å
+    DISP_MOD_INTERLEAVED        =0x1,   //interleaved,1ä¸ªåœ°å€
+    DISP_MOD_NON_MB_PLANAR      =0x0,   //æ— å®å—å¹³é¢æ¨¡å¼,3ä¸ªåœ°å€,RGB/YUVæ¯ä¸ªchannelåˆ†åˆ«å­˜æ”¾
+    DISP_MOD_NON_MB_UV_COMBINED =0x2,   //æ— å®å—UVæ‰“åŒ…æ¨¡å¼,2ä¸ªåœ°å€,Yå’ŒUVåˆ†åˆ«å­˜æ”¾
+    DISP_MOD_MB_PLANAR          =0x4,   //å®å—å¹³é¢æ¨¡å¼,3ä¸ªåœ°å€,RGB/YUVæ¯ä¸ªchannelåˆ†åˆ«å­˜æ”¾
+    DISP_MOD_MB_UV_COMBINED     =0x6,   //å®å—UVæ‰“åŒ…æ¨¡å¼ ,2ä¸ªåœ°å€,Yå’ŒUVåˆ†åˆ«å­˜æ”¾
 }__disp_pixel_mod_t;
 
 typedef enum
 {
 //for interleave argb8888
-    DISP_SEQ_ARGB   =0x0,//AÔÚ¸ßÎ»
+    DISP_SEQ_ARGB   =0x0,//Aåœ¨é«˜ä½
     DISP_SEQ_BGRA   =0x2,
     
 //for nterleaved yuv422
@@ -63,12 +63,12 @@ typedef enum
     DISP_SEQ_VUVU   =0xa,
     
 //for 16bpp rgb
-    DISP_SEQ_P10    = 0xd,//p1ÔÚ¸ßÎ»
-    DISP_SEQ_P01    = 0xe,//p0ÔÚ¸ßÎ»
+    DISP_SEQ_P10    = 0xd,//p1åœ¨é«˜ä½
+    DISP_SEQ_P01    = 0xe,//p0åœ¨é«˜ä½
     
 //for planar format or 8bpp rgb
-    DISP_SEQ_P3210  = 0xf,//p3ÔÚ¸ßÎ»
-    DISP_SEQ_P0123  = 0x10,//p0ÔÚ¸ßÎ»
+    DISP_SEQ_P3210  = 0xf,//p3åœ¨é«˜ä½
+    DISP_SEQ_P0123  = 0x10,//p0åœ¨é«˜ä½
     
 //for 4bpp rgb
     DISP_SEQ_P76543210  = 0x11,
@@ -283,8 +283,8 @@ typedef enum//only for debug!!!
 
 typedef struct
 {
-    __u32                   addr[3];    // frame bufferµÄÄÚÈİµØÖ·£¬¶ÔÓÚrgbÀàĞÍ£¬Ö»ÓĞaddr[0]ÓĞĞ§
-    __disp_rectsz_t         size;//µ¥Î»ÊÇpixel
+    __u32                   addr[3];    // frame bufferçš„å†…å®¹åœ°å€ï¼Œå¯¹äºrgbç±»å‹ï¼Œåªæœ‰addr[0]æœ‰æ•ˆ
+    __disp_rectsz_t         size;//å•ä½æ˜¯pixel
     __disp_pixel_fmt_t      format;
     __disp_pixel_seq_t      seq;
     __disp_pixel_mod_t      mode;
@@ -300,7 +300,7 @@ typedef struct
     __disp_layer_work_mode_t    mode;       //layer work mode
     __bool                      b_from_screen;
     __u8                        pipe;       //layer pipe,0/1,if in scaler mode, scaler0 must be pipe0, scaler1 must be pipe1
-    __u8                        prio;       //layer priority,can get layer prio,but never set layer prio,´Óµ×ÖÁ¶¥,ÓÅÏÈ¼¶ÓÉµÍÖÁ¸ß
+    __u8                        prio;       //layer priority,can get layer prio,but never set layer prio,ä»åº•è‡³é¡¶,ä¼˜å…ˆçº§ç”±ä½è‡³é«˜
     __bool                      alpha_en;   //layer global alpha enable
     __u16                       alpha_val;  //layer global alpha value 
     __bool                      ck_enable;  //layer color key enable
@@ -327,7 +327,7 @@ typedef struct
     __u32   addr_right[3];//used when in frame packing 3d mode
     __bool  interlace;
     __bool  top_field_first;
-    __u32   frame_rate; // *FRAME_RATE_BASE(ÏÖÔÚ¶¨Îª1000)
+    __u32   frame_rate; // *FRAME_RATE_BASE(ç°åœ¨å®šä¸º1000)
     __u32   flag_addr;//dit maf flag address
     __u32   flag_stride;//dit maf flag line stride
     __bool  maf_valid;
@@ -656,10 +656,10 @@ typedef enum tag_DISP_CMD
     DISP_CMD_LAYER_GET_PRIO = 0x58,
     DISP_CMD_LAYER_SET_SMOOTH = 0x59,
     DISP_CMD_LAYER_GET_SMOOTH = 0x5a,
-    DISP_CMD_LAYER_SET_BRIGHT = 0x5b,//ÁÁ¶È
-    DISP_CMD_LAYER_SET_CONTRAST = 0x5c,//¶Ô±È¶È
-    DISP_CMD_LAYER_SET_SATURATION = 0x5d,//±¥ºÍ¶È
-    DISP_CMD_LAYER_SET_HUE = 0x5e,//É«µ÷,É«¶È
+    DISP_CMD_LAYER_SET_BRIGHT = 0x5b,//äº®åº¦
+    DISP_CMD_LAYER_SET_CONTRAST = 0x5c,//å¯¹æ¯”åº¦
+    DISP_CMD_LAYER_SET_SATURATION = 0x5d,//é¥±å’Œåº¦
+    DISP_CMD_LAYER_SET_HUE = 0x5e,//è‰²è°ƒ,è‰²åº¦
     DISP_CMD_LAYER_GET_BRIGHT = 0x5f,
     DISP_CMD_LAYER_GET_CONTRAST = 0x60,
     DISP_CMD_LAYER_GET_SATURATION = 0x61,

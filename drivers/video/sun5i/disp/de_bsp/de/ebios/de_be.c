@@ -402,7 +402,7 @@ __s32 DE_BE_Sprite_Set_Palette_Table(__u32 sel, __u32 address, __u32 offset, __u
 //                 		brightness<0~100>  default 50
 //                 		contrast <0~100>  default 50
 //                 		saturation<0~100> , default 50      
-//				       hue <0~100>£¬ default 50
+//				       hue <0~100>ï¼Œ default 50
 // return           : 
 //               		success
 //*********************************************************************************************** 

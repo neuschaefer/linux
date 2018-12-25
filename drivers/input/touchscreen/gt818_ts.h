@@ -51,7 +51,7 @@
 #define 		TPD_DOWNLOADER_DEBUG  printk
 
 
-//#define SHUTDOWN_PORT 	S3C64XX_GPF(3)			//SHUTDOWN¹Ü½ÅºÅ
+//#define SHUTDOWN_PORT 	S3C64XX_GPF(3)			//SHUTDOWNç®¡è„šå·
 //#define INT_PORT  	S3C64XX_GPL(10)//S3C64XX_GPN(15)						//Int IO port
 //#ifdef INT_PORT
 //	#define TS_INT 		gpio_to_irq(INT_PORT)			//Interrupt Number,EINT18(119)
@@ -63,7 +63,7 @@
 
 
 
-// IC ÀàĞÍ
+// IC ç±»å‹
 #define TPD_CHIP_VERSION_C_FIRMWARE_BASE 0x5A
 #define TPD_CHIP_VERSION_D1_FIRMWARE_BASE 0x7A
 #define TPD_CHIP_VERSION_E_FIRMWARE_BASE 0x9A
@@ -79,7 +79,7 @@ enum
 
 #define FLAG_UP		0
 #define FLAG_DOWN		1
-//set GT801 PLUS trigger mode,Ö»ÄÜÉèÖÃ0»ò1 
+//set GT801 PLUS trigger mode,åªèƒ½è®¾ç½®0æˆ–1 
 #define INT_TRIGGER		1	   // 1=rising 0=falling
 #define POLL_TIME		10	//actual query spacing interval:POLL_TIME+6
 
@@ -161,7 +161,7 @@ struct goodix_i2c_platform_data {
 #define READ_COOR_ADDR_L 0x22
 #define READ_ID_ADDR_H 0x00
 #define READ_ID_ADDR_L 0xff
-//****************************Éı¼¶Ä£¿é²ÎÊı******************************************
+//****************************å‡çº§æ¨¡å—å‚æ•°******************************************
 
 //******************************************************************************
 struct goodix_ts_data {
@@ -197,7 +197,7 @@ struct goodix_ts_data {
 //*****************************End of Part II*********************************
 
 //*************************Firmware Update part*******************************
-#define AUTO_UPDATE_GT818             //Èç¹û¶¨ÒåÁËÔòÉÏµç»á×Ô¶¯ÅĞ¶ÏÊÇ·ñĞèÒªÉı¼¶
+#define AUTO_UPDATE_GT818             //å¦‚æœå®šä¹‰äº†åˆ™ä¸Šç”µä¼šè‡ªåŠ¨åˆ¤æ–­æ˜¯å¦éœ€è¦å‡çº§
 
 #define CONFIG_TOUCHSCREEN_GOODIX_IAP        
 #ifdef CONFIG_TOUCHSCREEN_GOODIX_IAP

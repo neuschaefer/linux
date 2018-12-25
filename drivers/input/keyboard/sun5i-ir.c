@@ -604,7 +604,7 @@ static void ir_timer_handle(unsigned long arg)
 	dprintk(2, "ir_timer_handle: timeout \n");	
 }
 
-//停用设备
+//鍋滅敤璁惧
 #ifdef CONFIG_HAS_EARLYSUSPEND
 static void sun4i_ir_suspend(struct early_suspend *h)
 {
@@ -626,7 +626,7 @@ static void sun4i_ir_suspend(struct early_suspend *h)
 	return ;
 }
 
-//重新唤醒
+//閲嶆柊鍞ら啋
 static void sun4i_ir_resume(struct early_suspend *h)
 {
     //unsigned long tmp = 0;

@@ -341,7 +341,7 @@ void tp_do_tasklet(unsigned long data);
 DECLARE_TASKLET(tp_tasklet,tp_do_tasklet,0);
 
 static int  tp_init(void);
-//停用设备
+//鍋滅敤璁惧
 #ifdef CONFIG_HAS_EARLYSUSPEND
 static void sun4i_ts_suspend(struct early_suspend *h)
 {
@@ -359,7 +359,7 @@ static void sun4i_ts_suspend(struct early_suspend *h)
 	return ;
 }
 
-//重新唤醒
+//閲嶆柊鍞ら啋
 static void sun4i_ts_resume(struct early_suspend *h)
 {
 	/*int ret;
@@ -378,7 +378,7 @@ static void sun4i_ts_resume(struct early_suspend *h)
 	return ;
 }
 #else
-//停用设备
+//鍋滅敤璁惧
 #ifdef CONFIG_PM
 static int sun4i_ts_suspend(struct platform_device *pdev, pm_message_t state)
 {

@@ -54,8 +54,8 @@ typedef struct tag_PARTITION{
 	__u32 lenlo;				//size low 32 bit
 	__u8  classname[12];		//major device name
 	__u8  name[12];				//minor device name
-	unsigned  int       user_type;          //±êÖ¾µ±Ç°ÅÌ·ûËùÊôÓÚµÄÓÃ»§
-	unsigned  int       ro;                 //±êÖ¾µ±Ç°ÅÌ·ûµÄ¶ÁĞ´ÊôĞÔ
+	unsigned  int       user_type;          //æ ‡å¿—å½“å‰ç›˜ç¬¦æ‰€å±äºçš„ç”¨æˆ·
+	unsigned  int       ro;                 //æ ‡å¿—å½“å‰ç›˜ç¬¦çš„è¯»å†™å±æ€§
 	__u8  res[16];				//reserved
 }PARTITION;
 

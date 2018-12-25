@@ -81,19 +81,19 @@ typedef enum {
 	G2D_SEQ_NORMAL = 0x0,
 	
 	/* for interleaved yuv422 */
-    G2D_SEQ_VYUY   = 0x1,				/* pixel 0‘⁄µÕ16Œª */
-    G2D_SEQ_YVYU   = 0x2,				/* pixel 1‘⁄µÕ16Œª */
+    G2D_SEQ_VYUY   = 0x1,				/* pixel 0Âú®‰Ωé16‰Ωç */
+    G2D_SEQ_YVYU   = 0x2,				/* pixel 1Âú®‰Ωé16‰Ωç */
     
 	/* for uv_combined yuv420 */
     G2D_SEQ_VUVU   = 0x3,  
     
 	/* for 16bpp rgb */
-    G2D_SEQ_P10    = 0x4,				/* pixel 0‘⁄µÕ16Œª */
-    G2D_SEQ_P01    = 0x5,				/* pixel 1‘⁄µÕ16Œª */
+    G2D_SEQ_P10    = 0x4,				/* pixel 0Âú®‰Ωé16‰Ωç */
+    G2D_SEQ_P01    = 0x5,				/* pixel 1Âú®‰Ωé16‰Ωç */
     
 	/* planar format or 8bpp rgb */
-    G2D_SEQ_P3210  = 0x6,				/* pixel 0‘⁄µÕ8Œª */
-    G2D_SEQ_P0123  = 0x7,				/* pixel 3‘⁄µÕ8Œª */
+    G2D_SEQ_P3210  = 0x6,				/* pixel 0Âú®‰Ωé8‰Ωç */
+    G2D_SEQ_P0123  = 0x7,				/* pixel 3Âú®‰Ωé8‰Ωç */
     
 	/* for 4bpp rgb */
     G2D_SEQ_P76543210  = 0x8,			/* 7,6,5,4,3,2,1,0 */
@@ -194,7 +194,7 @@ typedef struct {
 }g2d_stretchblt;
 
 typedef struct {
-	__u32		 flag;		/* π‚’§≤Ÿ◊˜¬Î */
+	__u32		 flag;		/* ÂÖâÊ†ÖÊìç‰ΩúÁ†Å */
 	g2d_image	 dst_image;
 	g2d_rect	 dst_rect;
 		

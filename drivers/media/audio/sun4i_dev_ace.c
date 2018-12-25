@@ -51,7 +51,7 @@ static int ref_count = 0;
 static DECLARE_WAIT_QUEUE_HEAD(wait_ae);
 __u32 ae_interrupt_sta = 0, ae_interrupt_value = 0;
 void *       ccmu_hsram;
-/*ae¡¢ace¡¢ce¹²ÏíÖĞ¶ÏºÅ*/
+/*aeã€aceã€ceå…±äº«ä¸­æ–­å·*/
 #define ACE_IRQ_NO (60)
 
 //#define ACE_DEBUG
@@ -177,17 +177,17 @@ static long ace_dev_ioctl(struct file *filp, unsigned int cmd, unsigned long arg
 			break;
 		case ACE_DEV_CLK_CLOSE:			
 			clk_disable(ace_moduleclk);
-			//ÊÍ·Åace_moduleclkÊ±ÖÓ¾ä±ú
+			//é‡Šæ”¾ace_moduleclkæ—¶é’Ÿå¥æŸ„
 			clk_put(ace_moduleclk);
-			//ÊÍ·Åace_pll5_pclkÊ±ÖÓ¾ä±ú
+			//é‡Šæ”¾ace_pll5_pclkæ—¶é’Ÿå¥æŸ„
 			clk_put(ace_pll5_pclk);
 		
 			clk_disable(dram_aceclk);
-			//ÊÍ·Ådram_aceclkÊ±ÖÓ¾ä±ú
+			//é‡Šæ”¾dram_aceclkæ—¶é’Ÿå¥æŸ„
 			clk_put(dram_aceclk);	
 		
 			clk_disable(ahb_aceclk);
-			//ÊÍ·Åahb_aceclkÊ±ÖÓ¾ä±ú
+			//é‡Šæ”¾ahb_aceclkæ—¶é’Ÿå¥æŸ„
 			clk_put(ahb_aceclk);
 			ref_count--;
 			break;
@@ -235,16 +235,16 @@ static int snd_sw_ace_suspend(struct platform_device *pdev,pm_message_t state)
 {		
 	suspend_acerate = clk_get_rate(ace_moduleclk);
 	clk_disable(dram_aceclk);
-	//ÊÍ·Ådram_aceclkÊ±ÖÓ¾ä±ú
+	//é‡Šæ”¾dram_aceclkæ—¶é’Ÿå¥æŸ„
 	clk_put(dram_aceclk);	
 	
 	clk_disable(ace_moduleclk);
-	//ÊÍ·Åace_moduleclkÊ±ÖÓ¾ä±ú
+	//é‡Šæ”¾ace_moduleclkæ—¶é’Ÿå¥æŸ„
 	clk_put(ace_moduleclk);
 	clk_disable(ahb_aceclk);
-	//ÊÍ·Åahb_aceclkÊ±ÖÓ¾ä±ú
+	//é‡Šæ”¾ahb_aceclkæ—¶é’Ÿå¥æŸ„
 	clk_put(ahb_aceclk);
-	//ÊÍ·Åace_pll5_pclkÊ±ÖÓ¾ä±ú
+	//é‡Šæ”¾ace_pll5_pclkæ—¶é’Ÿå¥æŸ„
 	clk_put(ace_pll5_pclk);
 
 	/*for clk test*/

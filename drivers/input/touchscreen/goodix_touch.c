@@ -519,7 +519,7 @@ static struct ctp_platform_ops ctp_ops = {
 };
 
 
-//Í£ÓÃÉè±¸
+//åœç”¨è®¾å¤‡
 #ifdef CONFIG_HAS_EARLYSUSPEND
 static void goodix_ts_suspend(struct early_suspend *h)
 {
@@ -541,7 +541,7 @@ static void goodix_ts_suspend(struct early_suspend *h)
 	return ;
 }
 
-//ÖØĞÂ»½ĞÑ
+//é‡æ–°å”¤é†’
 static void goodix_ts_resume(struct early_suspend *h)
 {
 	int ret;
@@ -563,7 +563,7 @@ static void goodix_ts_resume(struct early_suspend *h)
 }
 #else
 #ifdef CONFIG_PM
-//Í£ÓÃÉè±¸
+//åœç”¨è®¾å¤‡
 static int goodix_ts_suspend(struct i2c_client *client, pm_message_t mesg)
 {
 	int ret;
@@ -583,7 +583,7 @@ static int goodix_ts_suspend(struct i2c_client *client, pm_message_t mesg)
 	return 0;
 }
 
-//ÖØĞÂ»½ĞÑ
+//é‡æ–°å”¤é†’
 static int goodix_ts_resume(struct i2c_client *client)
 {
 	int ret;
@@ -611,12 +611,12 @@ static int goodix_ts_resume(struct i2c_client *client)
 struct i2c_client * i2c_connect_client = NULL;
 EXPORT_SYMBOL(i2c_connect_client);
 /**********************************************************************	
-±¾³ÌĞòÖĞI2CÍ¨ĞÅ·½Ê½Îª£º
-	7bit´Ó»úµØÖ·£ü¶ÁĞ´Î» + buf£¨Êı¾İµØÖ·+¶ÁĞ´Êı¾İ£©
+æœ¬ç¨‹åºä¸­I2Cé€šä¿¡æ–¹å¼ä¸ºï¼š
+	7bitä»æœºåœ°å€ï½œè¯»å†™ä½ + bufï¼ˆæ•°æ®åœ°å€+è¯»å†™æ•°æ®ï¼‰
 	 --------------------------------------------------------------------
-	£ü  ´Ó»úµØÖ·   £ü buf[0](Êı¾İµØÖ·) | buf[1]~buf[MAX-1](Ğ´Èë»ò¶ÁÈ¡µ½µÄÊı¾İ)  |
+	ï½œ  ä»æœºåœ°å€   ï½œ buf[0](æ•°æ®åœ°å€) | buf[1]~buf[MAX-1](å†™å…¥æˆ–è¯»å–åˆ°çš„æ•°æ®)  |
 	 --------------------------------------------------------------------
-	ÒÆÖ²Ç°Çë¸ù¾İ×ÔÉíÖ÷¿Ø¸ñÊ½ĞŞ¸Ä£¡£¡
+	ç§»æ¤å‰è¯·æ ¹æ®è‡ªèº«ä¸»æ§æ ¼å¼ä¿®æ”¹ï¼ï¼
 ***********************************************************************/
 
 //Function as i2c_master_receive, and return 2 if operation is successful.
@@ -624,13 +624,13 @@ static int i2c_read_bytes(struct i2c_client *client, uint8_t *buf, uint16_t len)
 {
 	struct i2c_msg msgs[2];
 	int ret=-1;
-	//·¢ËÍĞ´µØÖ·
+	//å‘é€å†™åœ°å€
 	msgs[0].flags = !I2C_M_RD;
 	msgs[0].addr = client->addr;
 	msgs[0].len = 1;		//data address
 	msgs[0].buf = buf;
-	//½ÓÊÕÊı¾İ
-	msgs[1].flags = I2C_M_RD;//¶ÁÏûÏ¢
+	//æ¥æ”¶æ•°æ®
+	msgs[1].flags = I2C_M_RD;//è¯»æ¶ˆæ¯
 	msgs[1].addr = client->addr;
 	msgs[1].len = len-1;
 	msgs[1].buf = buf+1;
@@ -645,7 +645,7 @@ static int i2c_write_bytes(struct i2c_client *client, uint8_t *data, uint16_t le
 	struct i2c_msg msg;
 	int ret=-1;
 	
-	msg.flags = !I2C_M_RD;//Ğ´ÏûÏ¢
+	msg.flags = !I2C_M_RD;//å†™æ¶ˆæ¯
 	msg.addr = client->addr;
 	msg.len = len;
 	msg.buf = data;		
@@ -655,12 +655,12 @@ static int i2c_write_bytes(struct i2c_client *client, uint8_t *data, uint16_t le
 }
 
 /*******************************************************
-¹¦ÄÜ£º
-	GT80X³õÊ¼»¯º¯Êı£¬ÓÃÓÚ·¢ËÍÅäÖÃĞÅÏ¢
-²ÎÊı£º
+åŠŸèƒ½ï¼š
+	GT80Xåˆå§‹åŒ–å‡½æ•°ï¼Œç”¨äºå‘é€é…ç½®ä¿¡æ¯
+å‚æ•°ï¼š
 	ts:	struct goodix_ts_data
-return£º
-	Ö´ĞĞ½á¹ûÂë£¬0±íÊ¾Õı³£Ö´ĞĞ
+returnï¼š
+	æ‰§è¡Œç»“æœç ï¼Œ0è¡¨ç¤ºæ­£å¸¸æ‰§è¡Œ
 *******************************************************/
 static bool goodix_init_panel(struct goodix_ts_data *ts)
 {
@@ -747,7 +747,7 @@ static bool goodix_init_panel(struct goodix_ts_data *ts)
 	return ret==1 ? true : false;
 }
 
-/*¶ÁÈ¡GT80XµÄ°æ±¾ºÅ²¢´òÓ¡*/
+/*è¯»å–GT80Xçš„ç‰ˆæœ¬å·å¹¶æ‰“å°*/
 static int  goodix_read_version(struct goodix_ts_data *ts)
 {
 #define GT80X_VERSION_LENGTH	40	
@@ -770,13 +770,13 @@ static int  goodix_read_version(struct goodix_ts_data *ts)
 
 
 /*******************************************************	
-¹¦ÄÜ£º
-	´¥ÃşÆÁ¹¤×÷º¯Êı
-	ÓÉÖĞ¶Ï´¥·¢£¬½ÓÊÜ1×é×ø±êÊı¾İ£¬Ğ£ÑéºóÔÙ·ÖÎöÊä³ö
-²ÎÊı£º
-	ts:	clientË½ÓĞÊı¾İ½á¹¹Ìå
-return£º
-	Ö´ĞĞ½á¹ûÂë£¬0±íÊ¾Õı³£Ö´ĞĞ
+åŠŸèƒ½ï¼š
+	è§¦æ‘¸å±å·¥ä½œå‡½æ•°
+	ç”±ä¸­æ–­è§¦å‘ï¼Œæ¥å—1ç»„åæ ‡æ•°æ®ï¼Œæ ¡éªŒåå†åˆ†æè¾“å‡º
+å‚æ•°ï¼š
+	ts:	clientç§æœ‰æ•°æ®ç»“æ„ä½“
+returnï¼š
+	æ‰§è¡Œç»“æœç ï¼Œ0è¡¨ç¤ºæ­£å¸¸æ‰§è¡Œ
 ********************************************************/
 static void goodix_ts_work_func(struct work_struct *work)
 {
@@ -905,7 +905,7 @@ BIT_NO_CHANGE:
 		}
 	#endif
 
-		// ½«´¥ÃşÆÁµÄ×ø±êÓ³Éäµ½LCD×ø±êÉÏ. ´¥ÃşÆÁ¶Ì±ßÎªXÖá£¬LCD×ø±êÒ»°ã³¤±ßÎªXÖá£¬¿ÉÄÜĞèÒªµ÷ÕûÔ­µãÎ»ÖÃ
+		// å°†è§¦æ‘¸å±çš„åæ ‡æ˜ å°„åˆ°LCDåæ ‡ä¸Š. è§¦æ‘¸å±çŸ­è¾¹ä¸ºXè½´ï¼ŒLCDåæ ‡ä¸€èˆ¬é•¿è¾¹ä¸ºXè½´ï¼Œå¯èƒ½éœ€è¦è°ƒæ•´åŸç‚¹ä½ç½®
 		x = (TOUCH_MAX_WIDTH - x)*SCREEN_MAX_WIDTH/TOUCH_MAX_WIDTH;//y
 		y =  y*SCREEN_MAX_HEIGHT/TOUCH_MAX_HEIGHT ;					//x
 		//print_point_info("RAW X = %d,Y = %d\n",800-y,x);
@@ -962,9 +962,9 @@ NO_ACTION:
 
 
 /*******************************************************	
-¹¦ÄÜ£º
-	ÖĞ¶ÏÏìÓ¦º¯Êı
-	ÓÉÖĞ¶Ï´¥·¢£¬µ÷¶È´¥ÃşÆÁ´¦Àíº¯ÊıÔËĞĞ
+åŠŸèƒ½ï¼š
+	ä¸­æ–­å“åº”å‡½æ•°
+	ç”±ä¸­æ–­è§¦å‘ï¼Œè°ƒåº¦è§¦æ‘¸å±å¤„ç†å‡½æ•°è¿è¡Œ
 ********************************************************/
 static irqreturn_t goodix_ts_irq_handler(int irq, void *dev_id)
 {
@@ -990,12 +990,12 @@ static irqreturn_t goodix_ts_irq_handler(int irq, void *dev_id)
 }
 
 /*******************************************************	
-¹¦ÄÜ£º
-	GT80XµÄµçÔ´¹ÜÀí
-²ÎÊı£º
-	on:ÉèÖÃGT80XÔËĞĞÄ£Ê½£¬0Îª½øÈëSleepÄ£Ê½
-return£º
-	ÊÇ·ñÉèÖÃ³É¹¦£¬Ğ¡ÓÚ0±íÊ¾ÉèÖÃÊ§°Ü
+åŠŸèƒ½ï¼š
+	GT80Xçš„ç”µæºç®¡ç†
+å‚æ•°ï¼š
+	on:è®¾ç½®GT80Xè¿è¡Œæ¨¡å¼ï¼Œ0ä¸ºè¿›å…¥Sleepæ¨¡å¼
+returnï¼š
+	æ˜¯å¦è®¾ç½®æˆåŠŸï¼Œå°äº0è¡¨ç¤ºè®¾ç½®å¤±è´¥
 ********************************************************/
 static int goodix_ts_power(struct goodix_ts_data * ts, int on)
 {
@@ -1034,15 +1034,15 @@ static bool goodix_i2c_test(struct i2c_client * client)
 }
 
 /*******************************************************	
-¹¦ÄÜ£º
-	´¥ÃşÆÁÌ½²âº¯Êı
-	ÔÚ×¢²áÇı¶¯Ê±µ÷ÓÃ£¨ÒªÇó´æÔÚ¶ÔÓ¦µÄclient£©£»
-	ÓÃÓÚIO,ÖĞ¶ÏµÈ×ÊÔ´ÉêÇë£»Éè±¸×¢²á£»´¥ÃşÆÁ³õÊ¼»¯µÈ¹¤×÷
-²ÎÊı£º
-	client£º´ıÇı¶¯µÄÉè±¸½á¹¹Ìå
-	id£ºÉè±¸ID
-return£º
-	Ö´ĞĞ½á¹ûÂë£¬0±íÊ¾Õı³£Ö´ĞĞ
+åŠŸèƒ½ï¼š
+	è§¦æ‘¸å±æ¢æµ‹å‡½æ•°
+	åœ¨æ³¨å†Œé©±åŠ¨æ—¶è°ƒç”¨ï¼ˆè¦æ±‚å­˜åœ¨å¯¹åº”çš„clientï¼‰ï¼›
+	ç”¨äºIO,ä¸­æ–­ç­‰èµ„æºç”³è¯·ï¼›è®¾å¤‡æ³¨å†Œï¼›è§¦æ‘¸å±åˆå§‹åŒ–ç­‰å·¥ä½œ
+å‚æ•°ï¼š
+	clientï¼šå¾…é©±åŠ¨çš„è®¾å¤‡ç»“æ„ä½“
+	idï¼šè®¾å¤‡ID
+returnï¼š
+	æ‰§è¡Œç»“æœç ï¼Œ0è¡¨ç¤ºæ­£å¸¸æ‰§è¡Œ
 ********************************************************/
 static int goodix_ts_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
@@ -1189,12 +1189,12 @@ err_check_functionality_failed:
 
 
 /*******************************************************	
-¹¦ÄÜ£º
-	Çı¶¯×ÊÔ´ÊÍ·Å
-²ÎÊı£º
-	client£ºÉè±¸½á¹¹Ìå
-return£º
-	Ö´ĞĞ½á¹ûÂë£¬0±íÊ¾Õı³£Ö´ĞĞ
+åŠŸèƒ½ï¼š
+	é©±åŠ¨èµ„æºé‡Šæ”¾
+å‚æ•°ï¼š
+	clientï¼šè®¾å¤‡ç»“æ„ä½“
+returnï¼š
+	æ‰§è¡Œç»“æœç ï¼Œ0è¡¨ç¤ºæ­£å¸¸æ‰§è¡Œ
 ********************************************************/
 static int goodix_ts_remove(struct i2c_client *client)
 {
@@ -1215,14 +1215,14 @@ static int goodix_ts_remove(struct i2c_client *client)
 	return 0;
 }
 
-//¿ÉÓÃÓÚ¸ÃÇı¶¯µÄ Éè±¸Ãû¡ªÉè±¸ID ÁĞ±í
+//å¯ç”¨äºè¯¥é©±åŠ¨çš„ è®¾å¤‡åâ€•è®¾å¤‡ID åˆ—è¡¨
 //only one client
 static const struct i2c_device_id goodix_ts_id[] = {
 	{ GOODIX_I2C_NAME, 0 },
 	{ }
 };
 
-//Éè±¸Çı¶¯½á¹¹Ìå
+//è®¾å¤‡é©±åŠ¨ç»“æ„ä½“
 static struct i2c_driver goodix_ts_driver = {
 	.class = I2C_CLASS_HWMON,
 	.probe		= goodix_ts_probe,
@@ -1243,7 +1243,7 @@ static struct i2c_driver goodix_ts_driver = {
 };
 
 
-//Çı¶¯¼ÓÔØº¯Êı
+//é©±åŠ¨åŠ è½½å‡½æ•°
 static int __devinit goodix_ts_init(void)
 {
 	int ret = -1;
@@ -1278,7 +1278,7 @@ static int __devinit goodix_ts_init(void)
 	return ret;
 }
 
-//Çı¶¯Ğ¶ÔØº¯Êı
+//é©±åŠ¨å¸è½½å‡½æ•°
 static void __exit goodix_ts_exit(void)
 {
 	i2c_del_driver(&goodix_ts_driver);

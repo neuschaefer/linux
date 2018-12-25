@@ -190,13 +190,13 @@
 
 
     
-/* ����config��bitλ */
-/*      **************�����linux��spi��������һ��***************
-*       ����ģʽ������4�֣�
-*         0: ����ģʽ0��POL=0,PAL=0;
-*         1: ����ģʽ1��POL=0,PAL=1;
-*         2: ����ģʽ2��POL=1,PAL=0;
-*         3: ����ģʽ3��POL=1,PAL=1;
+/* 设置config的bit位 */
+/*      **************必须跟linux的spi参数设置一致***************
+*       工作模式，包括4种：
+*         0: 工作模式0，POL=0,PAL=0;
+*         1: 工作模式1，POL=0,PAL=1;
+*         2: 工作模式2，POL=1,PAL=0;
+*         3: 工作模式3，POL=1,PAL=1;
 */
 #define SPI_PHA_ACTIVE_		    (0x01)
 #define SPI_POL_ACTIVE_		    (0x02)
@@ -204,13 +204,13 @@
 #define SPI_MODE_0_ACTIVE_		(0|0)
 #define SPI_MODE_1_ACTIVE_		(0|SPI_PHA_ACTIVE_)
 #define SPI_MODE_2_ACTIVE_		(SPI_POL_ACTIVE_|0)
-#define SPI_MODE_3_ACTIVE_		(SPI_POL_ACTIVE_|SPI_PHA_ACTIVE_) /*Ĭ��Ϊģʽ3*/
-/* ������������ */
-#define SPI_CS_HIGH_ACTIVE_		    (0x04)  /*Ĭ��ΪƬѡ�͵�ƽ��Ч�����͵�ƽѡ��Ƭѡ*/
-#define SPI_LSB_FIRST_ACTIVE_		(0x08)  /*Ĭ��Ϊ�ȷ���MSB�����ȷ������λ*/
+#define SPI_MODE_3_ACTIVE_		(SPI_POL_ACTIVE_|SPI_PHA_ACTIVE_) /*默认为模式3*/
+/* 下面属性少用 */
+#define SPI_CS_HIGH_ACTIVE_		    (0x04)  /*默认为片选低电平有效，即低电平选中片选*/
+#define SPI_LSB_FIRST_ACTIVE_		(0x08)  /*默认为先发送MSB，即先发送最低位*/
     
-#define SPI_DUMMY_ONE_ACTIVE_        (0x10)  /*Ĭ��Ϊ����ʱspi�������Զ����0����txFIFO */
-#define SPI_RECEIVE_ALL_ACTIVE_      (0x20)  /*Ĭ��Ϊ�������õ�burst�������͵�ʱ�����rxFIFO���յ����� */
+#define SPI_DUMMY_ONE_ACTIVE_        (0x10)  /*默认为接收时spi控制器自动填充0放在txFIFO */
+#define SPI_RECEIVE_ALL_ACTIVE_      (0x20)  /*默认为放弃无用的burst，即发送的时候放弃rxFIFO接收到数据 */
     
     
 /* can modify to adapt the application */

@@ -10,12 +10,12 @@
 *
 * Author 		: javen
 *
-* Description 	: ²Ù×÷ÏµÍ³ÊÊÅä²ã
+* Description 	: æ“ä½œç³»ç»Ÿé€‚é…å±‚
 *
 * History 		:
 *      <author>    		<time>       	<version >    		<desc>
 *       javen     	   	2010-09-07          1.0         create this word
-*		holi			2010-12-03			1.1			ÊµÏÖÁË¾ßÌåµÄ½Ó¿Ú
+*		holi			2010-12-03			1.1			å®ç°äº†å…·ä½“çš„æ¥å£
 *************************************************************************************
 */
 
@@ -203,7 +203,7 @@ __s32 OSAL_CCMU_MclkReset(__hdle hMclk, __s32 bReset);
 
 
 /*
-//µÚÒ»°æ
+//ç¬¬ä¸€ç‰ˆ
 __s32  esCLK_SetSrcFreq(__s32 nSclkNo, __u32 nFreq);
 __u32  esCLK_GetSrcFreq(__s32 nSclkNo);
 
@@ -220,7 +220,7 @@ __s32  esCLK_MclkOnOff(__s32 nMclkNo, __s32 bOnOff);
 
 //======================================================================================
 
-//µÚ¶ş°æ
+//ç¬¬äºŒç‰ˆ
 __s32 esCLK_reg_cb(__s32 nMclkNo, __pCB_ClkCtl_t pCb);	//__hdle esCLK_OpenMclk(__s32 nMclkNo, __pCB_ClkCtl_t pCb);
 __s32  esCLK_unreg_cb(__s32 nMclkNo);					//__s32  esCLK_CloseMclk(__hdle hMclk);
 

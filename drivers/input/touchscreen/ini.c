@@ -4,10 +4,10 @@
 #include "ini.h"
 
 
-char CFG_SSL = '[';  /* Ïî±êÖ¾·ûSection Symbol --¿É¸ù¾İÌØÊâĞèÒª½øĞĞ¶¨Òå¸ü¸Ä£¬Èç { }µÈ*/
-char CFG_SSR = ']';  /* Ïî±êÖ¾·ûSection Symbol --¿É¸ù¾İÌØÊâĞèÒª½øĞĞ¶¨Òå¸ü¸Ä£¬Èç { }µÈ*/
-char CFG_NIS = ':';  /* name Óë index Ö®¼äµÄ·Ö¸ô·û */
-char CFG_NTS = '#';  /* ×¢ÊÍ·û*/
+char CFG_SSL = '[';  /* é¡¹æ ‡å¿—ç¬¦Section Symbol --å¯æ ¹æ®ç‰¹æ®Šéœ€è¦è¿›è¡Œå®šä¹‰æ›´æ”¹ï¼Œå¦‚ { }ç­‰*/
+char CFG_SSR = ']';  /* é¡¹æ ‡å¿—ç¬¦Section Symbol --å¯æ ¹æ®ç‰¹æ®Šéœ€è¦è¿›è¡Œå®šä¹‰æ›´æ”¹ï¼Œå¦‚ { }ç­‰*/
+char CFG_NIS = ':';  /* name ä¸ index ä¹‹é—´çš„åˆ†éš”ç¬¦ */
+char CFG_NTS = '#';  /* æ³¨é‡Šç¬¦*/
 
 static char * ini_str_trim_r(char * buf);
 static char * ini_str_trim_l(char * buf);
@@ -17,16 +17,16 @@ static long atol(char *nptr);
 
 
 /*************************************************************
-Function: »ñµÃkeyµÄÖµ
-Input: char * filedata¡¡ÎÄ¼ş£»char * section¡¡ÏîÖµ£»char * key¡¡¼üÖµ
-Output: char * value¡¡keyµÄÖµ
+Function: è·å¾—keyçš„å€¼
+Input: char * filedataã€€æ–‡ä»¶ï¼›char * sectionã€€é¡¹å€¼ï¼›char * keyã€€é”®å€¼
+Output: char * valueã€€keyçš„å€¼
 Return: 0		SUCCESS
-		-1		Î´ÕÒµ½section
-		-2		Î´ÕÒµ½key
-		-10		ÎÄ¼ş´ò¿ªÊ§°Ü
-		-12		¶ÁÈ¡ÎÄ¼şÊ§°Ü
-		-14		ÎÄ¼ş¸ñÊ½´íÎó
-		-22		³¬³ö»º³åÇø´óĞ¡
+		-1		æœªæ‰¾åˆ°section
+		-2		æœªæ‰¾åˆ°key
+		-10		æ–‡ä»¶æ‰“å¼€å¤±è´¥
+		-12		è¯»å–æ–‡ä»¶å¤±è´¥
+		-14		æ–‡ä»¶æ ¼å¼é”™è¯¯
+		-22		è¶…å‡ºç¼“å†²åŒºå¤§å°
 Note: 
 *************************************************************/
 int ini_get_key(char *filedata, char * section, char * key, char * value)
@@ -38,7 +38,7 @@ int ini_get_key(char *filedata, char * section, char * key, char * value)
 	
 	*value='\0';
 	
-	while(1) { /* ËÑÕÒÏîsection */
+	while(1) { /* æœæ‰¾é¡¹section */
 		ret = CFG_ERR_READ_FILE;
 		n = ini_file_get_line(filedata+dataoff, buf1, MAX_CFG_BUF);
 		dataoff += n;
@@ -46,11 +46,11 @@ int ini_get_key(char *filedata, char * section, char * key, char * value)
 			goto r_cfg_end;
 		ret = CFG_SECTION_NOT_FOUND;
 		if(n < 0)
-			goto r_cfg_end; /* ÎÄ¼şÎ²£¬Î´·¢ÏÖ */ 
+			goto r_cfg_end; /* æ–‡ä»¶å°¾ï¼Œæœªå‘ç° */ 
 
 		n = strlen(ini_str_trim_l(ini_str_trim_r(buf1)));
 		if(n == 0 || buf1[0] == CFG_NTS)
-			continue;       /* ¿ÕĞĞ »ò ×¢ÊÍĞĞ */ 
+			continue;       /* ç©ºè¡Œ æˆ– æ³¨é‡Šè¡Œ */ 
 
 		ret = CFG_ERR_FILE_FORMAT;
 		if(n > 2 && ((buf1[0] == CFG_SSL && buf1[n-1] != CFG_SSR)))
@@ -58,11 +58,11 @@ int ini_get_key(char *filedata, char * section, char * key, char * value)
 		if(buf1[0] == CFG_SSL) {
 			buf1[n-1] = 0x00;
 			if(strcmp(buf1+1, section) == 0) 
-				break; /* ÕÒµ½Ïîsection */
+				break; /* æ‰¾åˆ°é¡¹section */
 		} 
 	} 
 
-	while(1){ /* ËÑÕÒkey */ 
+	while(1){ /* æœæ‰¾key */ 
 		ret = CFG_ERR_READ_FILE;
 		n = ini_file_get_line(filedata+dataoff, buf1, MAX_CFG_BUF);
 		dataoff += n;
@@ -70,15 +70,15 @@ int ini_get_key(char *filedata, char * section, char * key, char * value)
 			goto r_cfg_end;
 		ret = CFG_KEY_NOT_FOUND;
 		if(n < 0)
-			goto r_cfg_end;/* ÎÄ¼şÎ²£¬Î´·¢ÏÖkey */ 
+			goto r_cfg_end;/* æ–‡ä»¶å°¾ï¼Œæœªå‘ç°key */ 
 
 		n = strlen(ini_str_trim_l(ini_str_trim_r(buf1))); 
 		if(n == 0 || buf1[0] == CFG_NTS) 
-			continue;       /* ¿ÕĞĞ »ò ×¢ÊÍĞĞ */ 
+			continue;       /* ç©ºè¡Œ æˆ– æ³¨é‡Šè¡Œ */ 
 		ret = CFG_KEY_NOT_FOUND; 
 		if(buf1[0] == CFG_SSL) 
 			goto r_cfg_end; 
-		if(buf1[n-1] == '+') { /* Óö+ºÅ±íÊ¾ÏÂÒ»ĞĞ¼ÌĞø  */ 		
+		if(buf1[n-1] == '+') { /* é‡+å·è¡¨ç¤ºä¸‹ä¸€è¡Œç»§ç»­  */ 		
 			buf1[n-1] = 0x00; 
 			while(1) {			
 				ret = CFG_ERR_READ_FILE; 
@@ -87,11 +87,11 @@ int ini_get_key(char *filedata, char * section, char * key, char * value)
 				if(n < -1) 
 					goto r_cfg_end; 
 				if(n < 0) 
-					break;/* ÎÄ¼ş½áÊø */ 
+					break;/* æ–‡ä»¶ç»“æŸ */ 
 
 				n = strlen(ini_str_trim_r(buf2)); 
 				ret = CFG_ERR_EXCEED_BUF_SIZE; 
-				if(n > 0 && buf2[n-1] == '+'){/* Óö+ºÅ±íÊ¾ÏÂÒ»ĞĞ¼ÌĞø */ 
+				if(n > 0 && buf2[n-1] == '+'){/* é‡+å·è¡¨ç¤ºä¸‹ä¸€è¡Œç»§ç»­ */ 
 				 	buf2[n-1] = 0x00; 
 					if( (strlen(buf1) + strlen(buf2)) > MAX_CFG_BUF) 
 						goto r_cfg_end; 
@@ -109,7 +109,7 @@ int ini_get_key(char *filedata, char * section, char * key, char * value)
 			goto r_cfg_end; 
 		ini_str_trim_l(ini_str_trim_r(key_ptr)); 
 		if(strcmp(key_ptr, key) != 0) 
-			continue;                                  /* ºÍkeyÖµ²»Æ¥Åä */ 
+			continue;                                  /* å’Œkeyå€¼ä¸åŒ¹é… */ 
 		strcpy(value, val_ptr); 
 		break; 
 	} 
@@ -119,13 +119,13 @@ r_cfg_end:
 	return ret; 
 } 
 /*************************************************************
-Function: »ñµÃËùÓĞsection
-Input:  char *filename¡¡ÎÄ¼ş,int max ×î´ó¿É·µ»ØµÄsectionµÄ¸öÊı
-Output: char *sections[]¡¡´æ·ÅsectionÃû×Ö
-Return: ·µ»Øsection¸öÊı¡£Èô³ö´í£¬·µ»Ø¸ºÊı¡£
-		-10			ÎÄ¼ş´ò¿ª³ö´í
-		-12			ÎÄ¼ş¶ÁÈ¡´íÎó
-		-14			ÎÄ¼ş¸ñÊ½´íÎó
+Function: è·å¾—æ‰€æœ‰section
+Input:  char *filenameã€€æ–‡ä»¶,int max æœ€å¤§å¯è¿”å›çš„sectionçš„ä¸ªæ•°
+Output: char *sections[]ã€€å­˜æ”¾sectionåå­—
+Return: è¿”å›sectionä¸ªæ•°ã€‚è‹¥å‡ºé”™ï¼Œè¿”å›è´Ÿæ•°ã€‚
+		-10			æ–‡ä»¶æ‰“å¼€å‡ºé”™
+		-12			æ–‡ä»¶è¯»å–é”™è¯¯
+		-14			æ–‡ä»¶æ ¼å¼é”™è¯¯
 Note: 
 *************************************************************/
 int ini_get_sections(char *filedata, unsigned char * sections[], int max)
@@ -138,17 +138,17 @@ int ini_get_sections(char *filedata, unsigned char * sections[], int max)
 //	if((fp = fopen(filename, "rb")) == NULL) 
 //		return CFG_ERR_OPEN_FILE; 
 	
-	while(1) {/*ËÑÕÒÏîsection */
+	while(1) {/*æœæ‰¾é¡¹section */
 		ret = CFG_ERR_READ_FILE;
 		n = ini_file_get_line(filedata+dataoff, buf1, MAX_CFG_BUF);
 		dataoff += n;
 		if(n < -1) 
 			goto cfg_scts_end; 
 		if(n < 0)
-			break;/* ÎÄ¼şÎ² */ 
+			break;/* æ–‡ä»¶å°¾ */ 
 		n = strlen(ini_str_trim_l(ini_str_trim_r(buf1)));
 		if(n == 0 || buf1[0] == CFG_NTS) 
-			continue;       /* ¿ÕĞĞ »ò ×¢ÊÍĞĞ */ 
+			continue;       /* ç©ºè¡Œ æˆ– æ³¨é‡Šè¡Œ */ 
 		ret = CFG_ERR_FILE_FORMAT;
 		if(n > 2 && ((buf1[0] == CFG_SSL && buf1[n-1] != CFG_SSR)))
 			goto cfg_scts_end;
@@ -157,7 +157,7 @@ int ini_get_sections(char *filedata, unsigned char * sections[], int max)
 				buf1[n-1] = 0x00;
 				strcpy((char *)sections[n_sections], buf1+1);
 				if (n_sections>=max)
-					break;		/* ³¬¹ı¿É·µ»Ø×î´ó¸öÊı */
+					break;		/* è¶…è¿‡å¯è¿”å›æœ€å¤§ä¸ªæ•° */
 			}
 			n_sections++;
 		} 
@@ -172,10 +172,10 @@ cfg_scts_end:
 
 
 /*************************************************************
-Function: È¥³ı×Ö·û´®ÓÒ±ßµÄ¿Õ×Ö·û
-Input:  char * buf ×Ö·û´®Ö¸Õë
+Function: å»é™¤å­—ç¬¦ä¸²å³è¾¹çš„ç©ºå­—ç¬¦
+Input:  char * buf å­—ç¬¦ä¸²æŒ‡é’ˆ
 Output: 
-Return: ×Ö·û´®Ö¸Õë
+Return: å­—ç¬¦ä¸²æŒ‡é’ˆ
 Note: 
 *************************************************************/
 static char * ini_str_trim_r(char * buf)
@@ -201,10 +201,10 @@ static char * ini_str_trim_r(char * buf)
 }
 
 /*************************************************************
-Function: È¥³ı×Ö·û´®×ó±ßµÄ¿Õ×Ö·û
-Input:  char * buf ×Ö·û´®Ö¸Õë
+Function: å»é™¤å­—ç¬¦ä¸²å·¦è¾¹çš„ç©ºå­—ç¬¦
+Input:  char * buf å­—ç¬¦ä¸²æŒ‡é’ˆ
 Output: 
-Return: ×Ö·û´®Ö¸Õë
+Return: å­—ç¬¦ä¸²æŒ‡é’ˆ
 Note: 
 *************************************************************/
 static char * ini_str_trim_l(char * buf)
@@ -230,12 +230,12 @@ static char * ini_str_trim_l(char * buf)
 	return buf;
 }
 /*************************************************************
-Function: ´ÓÎÄ¼şÖĞ¶ÁÈ¡Ò»ĞĞ
-Input:  FILE *fp ÎÄ¼ş¾ä±ú£»int maxlen »º³åÇø×î´ó³¤¶È
-Output: char *buffer Ò»ĞĞ×Ö·û´®
-Return: >0		Êµ¼Ê¶ÁµÄ³¤¶È
-		-1		ÎÄ¼ş½áÊø
-		-2		¶ÁÎÄ¼ş³ö´í
+Function: ä»æ–‡ä»¶ä¸­è¯»å–ä¸€è¡Œ
+Input:  FILE *fp æ–‡ä»¶å¥æŸ„ï¼›int maxlen ç¼“å†²åŒºæœ€å¤§é•¿åº¦
+Output: char *buffer ä¸€è¡Œå­—ç¬¦ä¸²
+Return: >0		å®é™…è¯»çš„é•¿åº¦
+		-1		æ–‡ä»¶ç»“æŸ
+		-2		è¯»æ–‡ä»¶å‡ºé”™
 Note: 
 *************************************************************/
 static int ini_file_get_line(char *filedata, char *buffer, int maxlen)
@@ -246,18 +246,18 @@ static int ini_file_get_line(char *filedata, char *buffer, int maxlen)
 	for(i=0, j=0; i<maxlen; j++) { 
 		ch1 = filedata[j];
 		if(ch1 == '\n' || ch1 == 0x00) 
-			break; /* »»ĞĞ */ 
-		if(ch1 == '\f' || ch1 == 0x1A) {      /* '\f':»»Ò³·ûÒ²ËãÓĞĞ§×Ö·û */ 			
+			break; /* æ¢è¡Œ */ 
+		if(ch1 == '\f' || ch1 == 0x1A) {      /* '\f':æ¢é¡µç¬¦ä¹Ÿç®—æœ‰æ•ˆå­—ç¬¦ */ 			
 			buffer[i++] = ch1; 
 			break; 
 		}
-		if(ch1 != '\r') buffer[i++] = ch1;    /* ºöÂÔ»Ø³µ·û */ 
+		if(ch1 != '\r') buffer[i++] = ch1;    /* å¿½ç•¥å›è½¦ç¬¦ */ 
 	} 
 	buffer[i] = '\0'; 
 	return i+2; 
 } 
 /*************************************************************
-Function: ·ÖÀëkeyºÍvalue
+Function: åˆ†ç¦»keyå’Œvalue
 			key=val
 			jack   =   liaoyuewang 
 			|      |   | 
@@ -309,17 +309,17 @@ static int  ini_split_key_value(char *buf, char **key, char **val)
 int my_atoi(const char *str)
 {
 	int result = 0;
-	int signal = 1; /* Ä¬ÈÏÎªÕıÊı */
+	int signal = 1; /* é»˜è®¤ä¸ºæ­£æ•° */
 	if((*str>='0'&&*str<='9')||*str=='-'||*str=='+') {
 		if(*str=='-'||*str=='+') { 
 			if(*str=='-')
-				signal = -1; /*ÊäÈë¸ºÊı*/
+				signal = -1; /*è¾“å…¥è´Ÿæ•°*/
 			str++;
 		}
 	}
 	else 
 		return 0;
-	/*¿ªÊ¼×ª»»*/
+	/*å¼€å§‹è½¬æ¢*/
 	while(*str>='0' && *str<='9')
 	   result = result*10 + (*str++ - '0' );
 	

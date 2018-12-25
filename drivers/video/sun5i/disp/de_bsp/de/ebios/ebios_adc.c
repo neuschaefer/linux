@@ -428,7 +428,7 @@ __s32 ADC_construct_TR_table(__s32 T_ref, __s32 R_ref, __s32 B_constant)
         tmp3 = T_ref - T_input;
     	tmp4 = T_input * T_ref;
     	tmp2 = 1000*B_constant*tmp3/tmp4;
-        adc_para->TR_map_table[i] = R_ref*Exp(tmp2)>>13;   //除以8192
+        adc_para->TR_map_table[i] = R_ref*Exp(tmp2)>>13;   //闄や互8192
         __msg("T: %d, R: %d \n", i, adc_para->TR_map_table[i]);
     }
 }
@@ -702,7 +702,7 @@ __u32 ADC_Get_temperature(void)
         adc_var = adc_para->ADC_value;
         spin_unlock(adc_para->lock);
         
-        voltage = 3000*adc_var/4095;   //ADC参考电压为3000mV
+        voltage = 3000*adc_var/4095;   //ADC鍙傝�冪數鍘嬩负3000mV
         voltage += adc_para->adc_compensate_vol;
         resistance = voltage * adc_para->R_div / (adc_para->vcc_vol - voltage);
         

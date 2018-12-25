@@ -93,7 +93,7 @@ __s32 DE_BE_HWC_Set_Src(__u32 sel, de_hwc_src_t *hwc_pat)
 		 	break;
 	}    
 
-	if(hwc_pat->paddr & 0x3)//µØÖ··Ç32Î»¶ÔÆë
+	if(hwc_pat->paddr & 0x3)//åœ°å€éž32ä½å¯¹é½
 	{
 		for(i = 0; i < size; i+=4)
 		{

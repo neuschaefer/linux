@@ -102,14 +102,14 @@
 
 static unsigned char keypad_mapindex[64] =
 {
-    0,0,0,0,0,0,0,0,               //key 1, 8个， 0-7
-    1,1,1,1,1,1,1,                 //key 2, 7个， 8-14
-    2,2,2,2,2,2,2,                 //key 3, 7个， 15-21
-    3,3,3,3,3,3,                   //key 4, 6个， 22-27
-    4,4,4,4,4,4,                   //key 5, 6个， 28-33
-    5,5,5,5,5,5,                   //key 6, 6个， 34-39
-    6,6,6,6,6,6,6,6,6,6,           //key 7, 10个，40-49
-    7,7,7,7,7,7,7,7,7,7,7,7,7,7    //key 8, 17个，50-63
+    0,0,0,0,0,0,0,0,               //key 1, 8涓紝 0-7
+    1,1,1,1,1,1,1,                 //key 2, 7涓紝 8-14
+    2,2,2,2,2,2,2,                 //key 3, 7涓紝 15-21
+    3,3,3,3,3,3,                   //key 4, 6涓紝 22-27
+    4,4,4,4,4,4,                   //key 5, 6涓紝 28-33
+    5,5,5,5,5,5,                   //key 6, 6涓紝 34-39
+    6,6,6,6,6,6,6,6,6,6,           //key 7, 10涓紝40-49
+    7,7,7,7,7,7,7,7,7,7,7,7,7,7    //key 8, 17涓紝50-63
 };
 #endif
                         
@@ -170,7 +170,7 @@ static unsigned char transfer_code = INITIAL_VALUE;
 static struct sun4i_keyboard_data *keyboard_data;
 #endif
 
-//停用设备
+//鍋滅敤璁惧
 #ifdef CONFIG_HAS_EARLYSUSPEND
 static void sun4i_keyboard_suspend(struct early_suspend *h)
 {
@@ -192,7 +192,7 @@ static void sun4i_keyboard_suspend(struct early_suspend *h)
 	return ;
 }
 
-//重新唤醒
+//閲嶆柊鍞ら啋
 static void sun4i_keyboard_resume(struct early_suspend *h)
 {
 /*int ret;

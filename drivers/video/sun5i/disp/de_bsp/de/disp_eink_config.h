@@ -19,7 +19,7 @@
 #define         ED060SC7                0x02
 #define         OPM060A1                0x03
 
-#define         EINK_BLANK              0               //Ã¿ĞĞ5¸öclock ¿Õ°×ÇøÓò
+#define         EINK_BLANK              0               //æ¯è¡Œ5ä¸ªclock ç©ºç™½åŒºåŸŸ
 
 #define         EINK_LCD_W              (258)
 #define         EINK_LCD_H              (620)
@@ -50,8 +50,8 @@
 #define         COL_MAX           128
 #define         ROW_MAX           256                     //16*16 = 256
 
-#define         DU_ROW_MAX        32                      //DUÄ£Ê½ÏÂ£¬Ã¿¸öÎÂ¶ÈÓĞ32ĞĞ
+#define         DU_ROW_MAX        32                      //DUæ¨¡å¼ä¸‹ï¼Œæ¯ä¸ªæ¸©åº¦æœ‰32è¡Œ
 
-#define         T_MAX             50                      //×î´ó50¸öÎÂ¶ÈÖµ
+#define         T_MAX             50                      //æœ€å¤§50ä¸ªæ¸©åº¦å€¼
 
 #endif
