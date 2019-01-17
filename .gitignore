@@ -31,7 +31,13 @@ modules.builtin
 *.lzo
 *.patch
 *.gcno
-
+# gallen add rule [.
+svn-commit.*
+.svn
+*.cmd
+*.bak
+make.log
+# gallen add rule ].
 #
 # Top-level generic files
 #
@@ -50,12 +56,21 @@ modules.builtin
 !.gitignore
 !.mailmap
 
+# gallen add [.
+!.config
+!root_modules/lib/modules/2.6.35.3-850-gbc67621+/kernel/drivers/mmc/card/*.ko
+!root_modules/lib/modules/2.6.35.3-850-gbc67621+/kernel/drivers/usb/gadget/*.ko
+!root_modules/lib/modules/2.6.35.3-850-gbc67621+/kernel/drivers/usb/storage/*.ko
+# gallen add ].
+
 #
 # Generated include files
 #
 include/config
 include/linux/version.h
 include/generated
+
+!include/generated/compile.h
 
 # stgit generated dirs
 patches-*

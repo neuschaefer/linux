@@ -350,6 +350,8 @@ config ARCH_MXC
 	select GENERIC_CLOCKEVENTS
 	select ARCH_REQUIRE_GPIOLIB
 	select COMMON_CLKDEV
+	select ZONE_DMA
+	select ARCH_HAS_CPUFREQ
 	help
 	  Support for Freescale MXC/iMX-based family of processors
 
@@ -362,6 +364,17 @@ config ARCH_STMP3XXX
 	select USB_ARCH_HAS_EHCI
 	help
 	  Support for systems based on the Freescale 3xxx CPUs.
+
+config ARCH_MXS
+	bool "Freescale i.MXS family soc"
+	select HAVE_CLK
+	select ARCH_REQUIRE_GPIOLIB
+	select GENERIC_TIME
+	select GENERIC_CLOCKEVENTS
+	select GENERIC_GPIO
+	select COMMON_CLKDEV
+	help
+	  Support for Freescale i.MXS family of processors.
 
 config ARCH_NETX
 	bool "Hilscher NetX based"
@@ -851,6 +864,8 @@ source "arch/arm/mach-mv78xx0/Kconfig"
 
 source "arch/arm/plat-mxc/Kconfig"
 
+source "arch/arm/plat-mxs/Kconfig"
+
 source "arch/arm/mach-netx/Kconfig"
 
 source "arch/arm/mach-nomadik/Kconfig"
@@ -972,6 +987,19 @@ config ARM_ERRATA_411920
 	  fail. This erratum is present in 1136 (before r1p4), 1156 and 1176.
 	  It does not affect the MPCore. This option enables the ARM Ltd.
 	  recommended workaround.
+
+config ARM_ERRATA_364296
+	bool "Enable partial low interrupt latency mode for ARM1136"
+	depends on CPU_V6 && !SMP
+	default n
+	help
+	  This options enables the workaround for the 364296 ARM1136
+	  r0pX errata (possible cache data corruption with
+	  hit-under-miss enabled). It sets the undocumented bit 31 in
+	  the auxiliary control register and the FI bit in the control
+	  register, thus disabling hit-under-miss without putting the
+	  processor into full low interrupt latency mode. ARM11MPCore
+	  is not affected.
 
 config ARM_ERRATA_430973
 	bool "ARM errata: Stale prediction on replaced interworking branch"
@@ -1312,7 +1340,7 @@ config LEDS
 		   ARCH_OMAP || ARCH_P720T || ARCH_PXA_IDP || \
 		   ARCH_SA1100 || ARCH_SHARK || ARCH_VERSATILE || \
 		   ARCH_AT91 || ARCH_DAVINCI || \
-		   ARCH_KS8695 || MACH_RD88F5182 || ARCH_REALVIEW
+		   ARCH_KS8695 || MACH_RD88F5182 || ARCH_REALVIEW || ARCH_MXC
 	help
 	  If you say Y here, the LEDs on your machine will be used
 	  to provide useful information about your current system status.
@@ -1386,6 +1414,9 @@ config UACCESS_WITH_MEMCPY
 
 	  However, if the CPU data cache is using a write-allocate mode,
 	  this option is unlikely to provide any performance gain.
+
+config RUNTIME_PHYS_OFFSET
+	bool
 
 endmenu
 
@@ -1510,6 +1541,12 @@ config CPU_FREQ_SA1100
 
 config CPU_FREQ_SA1110
 	bool
+
+config CPU_FREQ_IMX
+         tristate "CPUfreq driver for i.MX CPUs"
+         depends on ARCH_MXC && CPU_FREQ && REGULATOR
+         help
+           This enables the CPUfreq driver for i.MX CPUs.
 
 config CPU_FREQ_INTEGRATOR
 	tristate "CPUfreq driver for ARM Integrator CPUs"

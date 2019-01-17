@@ -1306,6 +1306,7 @@ int usb_suspend(struct device *dev, pm_message_t msg)
 	choose_wakeup(udev, msg);
 	return usb_suspend_both(udev, msg);
 }
+EXPORT_SYMBOL(usb_suspend);
 
 /* The device lock is held by the PM core */
 int usb_resume(struct device *dev, pm_message_t msg)
@@ -1337,10 +1338,11 @@ int usb_resume(struct device *dev, pm_message_t msg)
 	/* Avoid PM error messages for devices disconnected while suspended
 	 * as we'll display regular disconnect messages just a bit later.
 	 */
-	if (status == -ENODEV)
+	if (status == -ENODEV || status == -ESHUTDOWN)
 		status = 0;
 	return status;
 }
+EXPORT_SYMBOL(usb_resume);
 
 #endif /* CONFIG_PM */
 

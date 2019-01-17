@@ -109,6 +109,10 @@ struct nand_flash_dev nand_flash_ids[] = {
 	{"NAND 2GiB 3,3V 8-bit",	0xD5, 0, 2048, 0, LP_OPTIONS},
 	{"NAND 2GiB 1,8V 16-bit",	0xB5, 0, 2048, 0, LP_OPTIONS16},
 	{"NAND 2GiB 3,3V 16-bit",	0xC5, 0, 2048, 0, LP_OPTIONS16},
+	{"NAND 2GiB 3,3V 8-bit",	0x48, 0, 2048, 0, LP_OPTIONS},
+
+	/* 32 Gigabit ,only use 2G due to the linux mtd limitation*/
+	{"NAND 4GiB 3,3V 8-bit",	0xD7, 0, 2048, 0, LP_OPTIONS},
 
 	/*
 	 * Renesas AND 1 Gigabit. Those chips do not support extended id and
@@ -125,6 +129,7 @@ struct nand_flash_dev nand_flash_ids[] = {
 	 BBT_AUTO_REFRESH
 	},
 
+	{"ONFI NAND 3,3V 8-bit", 0x88, 0, 2048, 0, 0 /*LP_OPTIONS*/ },
 	{NULL,}
 };
 
@@ -141,6 +146,8 @@ struct nand_manufacturers nand_manuf_ids[] = {
 	{NAND_MFR_HYNIX, "Hynix"},
 	{NAND_MFR_MICRON, "Micron"},
 	{NAND_MFR_AMD, "AMD"},
+	{NAND_MFR_SANDISK, "SanDisk"},
+	{NAND_MFR_INTEL, "Intel"},
 	{0x0, "Unknown"}
 };
 

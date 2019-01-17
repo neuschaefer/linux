@@ -56,6 +56,7 @@
 /* MX31, MX35, MX25, MXC91231, MX5 */
 #define V2_TCTL_WAITEN		(1 << 3) /* Wait enable mode */
 #define V2_TCTL_CLK_IPG		(1 << 6)
+#define V2_TCTL_CLK_PER		(2 << 6)
 #define V2_TCTL_FRR		(1 << 9)
 #define V2_IR			0x0c
 #define V2_TSTAT		0x08
@@ -123,6 +124,15 @@ static struct clocksource clocksource_mxc = {
 	.shift 		= 20,
 	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
 };
+
+unsigned long long sched_clock(void)
+{
+	if (!timer_base)
+		return 0;
+
+	return clocksource_cyc2ns(clocksource_mxc.read(&clocksource_mxc),
+			clocksource_mxc.mult, clocksource_mxc.shift);
+}
 
 static int __init mxc_clocksource_init(struct clk *timer_clk)
 {
@@ -308,7 +318,7 @@ void __init mxc_timer_init(struct clk *timer_clk, void __iomem *base, int irq)
 	__raw_writel(0, timer_base + MXC_TPRER); /* see datasheet note */
 
 	if (timer_is_v2())
-		tctl_val = V2_TCTL_CLK_IPG | V2_TCTL_FRR | V2_TCTL_WAITEN | MXC_TCTL_TEN;
+		tctl_val = V2_TCTL_CLK_PER | V2_TCTL_FRR | V2_TCTL_WAITEN | MXC_TCTL_TEN;
 	else
 		tctl_val = MX1_2_TCTL_FRR | MX1_2_TCTL_CLK_PCLK1 | MXC_TCTL_TEN;
 

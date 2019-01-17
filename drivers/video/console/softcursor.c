@@ -27,6 +27,7 @@ int soft_cursor(struct fb_info *info, struct fb_cursor *cursor)
 	unsigned int i, size, dsize, s_pitch, d_pitch;
 	struct fb_image *image;
 	u8 *src, *dst;
+	return 0;
 
 	if (info->state != FBINFO_STATE_RUNNING)
 		return 0;

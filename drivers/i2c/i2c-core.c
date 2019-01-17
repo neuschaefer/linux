@@ -189,9 +189,10 @@ static int i2c_device_pm_suspend(struct device *dev)
 {
 	const struct dev_pm_ops *pm = dev->driver ? dev->driver->pm : NULL;
 
+#if 0	// Joseph 20120103, skip pm_runtime to avoid devices in i2c bus not suspended in 1st suspend.
 	if (pm_runtime_suspended(dev))
 		return 0;
-
+#endif
 	if (pm)
 		return pm->suspend ? pm->suspend(dev) : 0;
 

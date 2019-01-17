@@ -29,6 +29,8 @@ obj-$(CONFIG_MFD_WM8350)	+= wm8350.o
 obj-$(CONFIG_MFD_WM8350_I2C)	+= wm8350-i2c.o
 obj-$(CONFIG_MFD_WM8994)	+= wm8994-core.o wm8994-irq.o
 
+obj-$(CONFIG_REGULATOR_LTC3589)	+= ltc3589-i2c.o
+
 obj-$(CONFIG_TPS65010)		+= tps65010.o
 obj-$(CONFIG_TPS6507X)		+= tps6507x.o
 obj-$(CONFIG_MENELAUS)		+= menelaus.o
@@ -71,3 +73,10 @@ obj-$(CONFIG_PMIC_ADP5520)	+= adp5520.o
 obj-$(CONFIG_LPC_SCH)		+= lpc_sch.o
 obj-$(CONFIG_MFD_RDC321X)	+= rdc321x-southbridge.o
 obj-$(CONFIG_MFD_JANZ_CMODIO)	+= janz-cmodio.o
+obj-$(CONFIG_MFD_MAX17135)  += max17135-core.o
+
+#ifeq ($(CONFIG_PMIC_DA9052),y)
+da9052-objs			:= da9052-spi.o da9052-i2c.o da9052-core.o
+obj-$(CONFIG_PMIC_DA9052)	+= da9052.o
+#endif
+

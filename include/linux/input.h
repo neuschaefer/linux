@@ -210,7 +210,8 @@ struct input_absinfo {
 #define KEY_F11			87
 #define KEY_F12			88
 #define KEY_RO			89
-#define KEY_KATAKANA		90
+//#define KEY_KATAKANA		90
+#define KEY_FL 			90
 #define KEY_HIRAGANA		91
 #define KEY_HENKAN		92
 #define KEY_KATAKANAHIRAGANA	93

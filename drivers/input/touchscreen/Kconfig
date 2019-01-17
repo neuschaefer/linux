@@ -268,6 +268,46 @@ config TOUCHSCREEN_HP7XX
 	  To compile this driver as a module, choose M here: the
 	  module will be called jornada720_ts.
 
+config TOUCHSCREEN_MXC
+	tristate "MXC touchscreen input driver"
+	depends on MXC_MC13783_ADC || MXC_MC13892_ADC
+	help
+	  Say Y here if you have an MXC based board with touchscreen
+	  attached to it.
+
+	  If unsure, say N.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called mxc_ts.
+
+config TOUCHSCREEN_IMX_ADC
+	tristate "Freescale i.MX ADC touchscreen input driver"
+	depends on IMX_ADC
+	help
+	  Say Y here if you have a Freescale i.MX based board with a
+	  touchscreen interfaced to the processor's integrated ADC.
+
+	  If unsure, say N.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called imx_adc_ts.
+
+config TOUCHSCREEN_STMP3XXX
+	tristate "STMP3XXX LRADC-based touchscreen"
+	depends on ARCH_STMP3XXX
+	select SERIO
+	help
+	  Say Y here if you want to enable TMP3XXX LRADC-based touchscreen.
+	  module will be called stmp3xxx_ts.
+
+config TOUCHSCREEN_MXS
+	tristate "MXS LRADC-based touchscreen"
+	depends on ARCH_MXS
+	select SERIO
+	help
+	  Say Y here if you want to enable MXS LRADC-based touchscreen.
+	  module will be called mxs-ts.
+
 config TOUCHSCREEN_HTCPEN
 	tristate "HTC Shift X9500 touchscreen"
 	depends on ISA
@@ -602,5 +642,70 @@ config TOUCHSCREEN_TPS6507X
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called tps6507x_ts.
+
+config TOUCHSCREEN_P1003
+	tristate "HannStar P1003 touchscreens"
+	depends on I2C
+	help
+	  Say Y here if you have a P1003 touchscreen
+	  controller.
+
+	  If unsure, say N.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called p1003-ts.
+
+config TOUCHSCREEN_DA9052
+        tristate "Dialog DA9052 TSI"
+        depends on PMIC_DA9052
+        help
+          Say y here to support the touchscreen found on
+          Dialog Semiconductor DA9052 PMIC
+
+config TOUCHSCREEN_MAX11801
+       tristate "MAXIM MAX11801 touchscreen"
+       depends on I2C
+       help
+        Say Y here if you have a MAX11801 touchscreen
+        controller
+
+        If unsure, say N.
+
+        To compile this driver as a module, choose M here: the
+	  module will be called max11801_ts
+
+config TOUCHSCREEN_ZFORCE
+       tristate "Neonode zForce IR touchscreen"
+       depends on I2C
+       help
+        Say Y here if you have a zForce touchscreen
+        controller
+
+        If unsure, say N.
+
+config TOUCHSCREEN_ELAN_TOUCH
+	tristate "Elan Capacitive touchpad on PVI EPD"
+	help
+	  If you say yes here you get support for Elan Capacitive touchpad on PVI EPD controller chip.
+	 
+	  This driver can also be built as a module.  If so, the module
+	  will be called elan_touch.
+
+config TOUCHSCREEN_IT7260_TOUCH
+	tristate "IT7260 Capacitive touchpad"
+	help
+	  If you say yes here you get support for IT7260 Capacitive touchpad controller chip.
+	 
+	  This driver can also be built as a module.  If so, the module
+	  will be called elan_touch.
+
+config TOUCHSCREEN_MSP430
+       tristate "NTX MSP430 touch"
+       depends on I2C
+       help
+        Say Y here if you have a NTX MSP430 back cover touch
+        controller
+
+        If unsure, say N.
 
 endif

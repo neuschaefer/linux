@@ -300,6 +300,16 @@ config SENSORS_ATXP1
 	  This driver can also be built as a module.  If so, the module
 	  will be called atxp1.
 
+config SENSORS_DA9052
+        tristate "Dialog DA9052 HWMon"
+        depends on PMIC_DA9052
+        help
+          Say y here to support the ADC found on
+          Dialog Semiconductor DA9052 PMIC.
+
+	  This driver can also be built as a module. If so, the module
+	  will be called da9052_hwmon.
+
 config SENSORS_DS1621
 	tristate "Dallas Semiconductor DS1621 and DS1625"
 	depends on I2C
@@ -651,6 +661,15 @@ config SENSORS_MAX1619
 
 	  This driver can also be built as a module.  If so, the module
 	  will be called max1619.
+
+config SENSORS_MAX17135
+	tristate "Maxim MAX17135"
+	depends on I2C
+	help
+	  If you say yes here you get support for MAX17135 PMIC sensor.
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called max17135_sensor.
 
 config SENSORS_MAX6650
 	tristate "Maxim MAX6650 sensor chip"
@@ -1165,5 +1184,25 @@ config SENSORS_LIS3LV02D
 	  the awesome power of lis3lv02d.
 
 endif # ACPI
+
+config MXC_MMA7450
+	tristate "MMA7450 device driver"
+	depends on MACH_MX31_3DS || MACH_MX23EVK
+	default n
+
+config SENSORS_ISL29003
+	tristate "ISL29003 Light Sensor"
+	depends on MACH_MX37_3DS || MACH_MX51_3DS
+	default y
+
+config MXC_MMA8450
+	tristate "MMA8450 device driver"
+	depends on I2C
+	default y
+
+config MXC_MMA8451
+	tristate "MMA8451 device driver"
+	depends on I2C
+	default y
 
 endif # HWMON

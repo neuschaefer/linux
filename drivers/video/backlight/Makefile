@@ -2,6 +2,7 @@
 
 obj-$(CONFIG_LCD_CLASS_DEVICE)     += lcd.o
 obj-$(CONFIG_LCD_CORGI)		   += corgi_lcd.o
+obj-$(CONFIG_BACKLIGHT_DA9052)	+= da9052_bl.o
 obj-$(CONFIG_LCD_HP700)		   += jornada720_lcd.o
 obj-$(CONFIG_LCD_L4F00242T03)	   += l4f00242t03.o
 obj-$(CONFIG_LCD_LMS283GF05)	   += lms283gf05.o
@@ -36,3 +37,9 @@ obj-$(CONFIG_BACKLIGHT_ADP8860)	+= adp8860_bl.o
 obj-$(CONFIG_BACKLIGHT_88PM860X) += 88pm860x_bl.o
 obj-$(CONFIG_BACKLIGHT_PCF50633)	+= pcf50633-backlight.o
 
+obj-$(CONFIG_BACKLIGHT_MXC_LCDC) += mxc_lcdc_bl.o
+obj-$(CONFIG_BACKLIGHT_MXC_IPU)	+= mxc_ipu_bl.o
+obj-$(CONFIG_BACKLIGHT_MXC_PMIC) += mxc_pmic_bl.o
+obj-$(CONFIG_BACKLIGHT_WM8350) += wm8350_bl.o
+obj-$(CONFIG_BACKLIGHT_MXC_MC13892) += mxc_mc13892_bl.o
+obj-$(CONFIG_BACKLIGHT_MXS) += mxs_bl.o
