@@ -184,19 +184,19 @@ int NtxHwCfg_Save(const char *szFileName,int iIsSeek);
 NTX_HWCONFIG *NtxHwCfg_Get(void);
 
 
-int NtxHwCfg_GetTotalFlds(void);//¨ú±o¦@¦³´X­ÓÄæ¦ì.
-int NtxHwCfg_GetFldVal(int iFldIdx,HwConfigField *O_ptHwCfgFld);//¨ú±o¤v©w¸qªºÄæ¦ì­È.
-unsigned char NtxHwCfg_FldStrVal2Val(int iFldIdx,char *szFldStrVal);//Äæ¦ìªº¦r¦ê­ÈÂà´«¬°Äæ¦ì.
-const char *NtxHwCfg_FldVal2StrVal(int iFldIdx,unsigned char bFldVal);//Äæ¦ìªº­ÈÂà´«¬°¦r¦ê­È.
+int NtxHwCfg_GetTotalFlds(void);//å–å¾—å…±æœ‰å¹¾å€‹æ¬„ä½.
+int NtxHwCfg_GetFldVal(int iFldIdx,HwConfigField *O_ptHwCfgFld);//å–å¾—å·±å®šç¾©çš„æ¬„ä½å€¼.
+unsigned char NtxHwCfg_FldStrVal2Val(int iFldIdx,char *szFldStrVal);//æ¬„ä½çš„å­—ä¸²å€¼è½‰æ›ç‚ºæ¬„ä½.
+const char *NtxHwCfg_FldVal2StrVal(int iFldIdx,unsigned char bFldVal);//æ¬„ä½çš„å€¼è½‰æ›ç‚ºå­—ä¸²å€¼.
 int NtxHwCfg_FldName2Idx(const char *szFldName);
 int NtxHwCfg_is_HW_Fld(int iFldIdx);
 int NtxHwCfg_is_SW_Fld(int iFldIdx);
 
 int NtxHwCfg_ChkCfgHeaderEx(NTX_HWCONFIG *pHdr,int iIsIgnoreVersion);
-int NtxHwCfg_ChkCfgHeader(NTX_HWCONFIG *pHdr);//ÀË¬d²ÕºAªíÀY,ª©¥».
-int NtxHwCfg_CfgUpgrade(NTX_HWCONFIG *pHdr);//®æ¦¡¤É¯Å¦Ü¤u¨ã¤@­Pªºª©¥».
+int NtxHwCfg_ChkCfgHeader(NTX_HWCONFIG *pHdr);//æª¢æŸ¥çµ„æ…‹è¡¨é ­,ç‰ˆæœ¬.
+int NtxHwCfg_CfgUpgrade(NTX_HWCONFIG *pHdr);//æ ¼å¼å‡ç´šè‡³å·¥å…·ä¸€è‡´çš„ç‰ˆæœ¬.
 
-int NtxHwCfg_GetCfgTotalFlds(NTX_HWCONFIG *pHdr);//¨ú±o²ÕºAÁ`¦@¦³´X­ÓÄæ¦ì.
+int NtxHwCfg_GetCfgTotalFlds(NTX_HWCONFIG *pHdr);//å–å¾—çµ„æ…‹ç¸½å…±æœ‰å¹¾å€‹æ¬„ä½.
 
 int NtxHwCfg_GetCfgFldVal(NTX_HWCONFIG *pHdr,int iFieldIdx);
 const char *NtxHwCfg_GetCfgFldStrVal(NTX_HWCONFIG *pHdr,int iFieldIdx);

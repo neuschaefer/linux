@@ -1145,7 +1145,7 @@ static int __init auo_epd_fb_probe(struct platform_device *pdev)
 		fb_data->default_bpp = PANEL_BPP; //16;
 
 	/* Set default (first defined mode) before searching for a match */
-	fb_data->cur_mode = &fb_data->pdata->epdc_mode[0];		// default ¥Îmode 0
+	fb_data->cur_mode = &fb_data->pdata->epdc_mode[0];		// default ç”¨mode 0
 	vmode = fb_data->cur_mode->vmode;
 
 
@@ -1757,7 +1757,7 @@ void auo_sys_var_init(void)
 		// for ddma
 		g_iAuoFlash = 0;
 		g_iAuoRefreshMode = 0;
-		g_iAuoRotation = 0;		// ¾î¿Ã¹õ
+		g_iAuoRotation = 0;		// æ©«è¢å¹•
 		
 		
 	}
@@ -1770,7 +1770,7 @@ void auo_sys_var_init(void)
 		// for ddma
 		g_iAuoFlash = 0;
 		g_iAuoRefreshMode = 0;
-		g_iAuoRotation = 1;		// ª½¿Ã¹õ
+		g_iAuoRotation = 1;		// ç›´è¢å¹•
 	}
 	
 	
@@ -2032,11 +2032,11 @@ void auo_epd_i80_LUT_write(int szLUTData)
 	printk("auo_epd_i80_LUT_write .. writenum=%d, x=%d, y=%d, rem=%d\n",writenum,writenum_x,writenum_y,writenum_rem);
 
 
-	mpu_write_16( MPU_DATA, pInputLUT, writenum_x, writenum_y );		//PS: mpu_write_16ªº x,y­È¤£¥i¶W¹L65535
+	mpu_write_16( MPU_DATA, pInputLUT, writenum_x, writenum_y );		//PS: mpu_write_16çš„ x,yå€¼ä¸å¯è¶…é65535
 	if (writenum_rem)
 	{
 		printk("auo_epd_i80_LUT_write .. write.. writenum_rem = %d\n",writenum_rem);
-		mpu_write_16( MPU_DATA, pInputLUT, writenum_rem, 1 );		//PS: mpu_write_16ªº x,y­È¤£¥i¶W¹L65535
+		mpu_write_16( MPU_DATA, pInputLUT, writenum_rem, 1 );		//PS: mpu_write_16çš„ x,yå€¼ä¸å¯è¶…é65535
 		
 	}
 	
@@ -4249,7 +4249,7 @@ static void epdc_powerdown(struct mxc_epdc_fb_data *fb_data)
 
 int mxc_epdc_fb_send_update(struct mxcfb_update_data *upd_data,struct fb_info *info)
 {
-#if 0 //&*&*&*J1_«İ¸É	
+#if 0 //&*&*&*J1_å¾…è£œ	
 	struct mxc_epdc_fb_data *fb_data = info ?
 		(struct mxc_epdc_fb_data *)info:g_fb_data;
 	struct update_data_list *upd_data_list = NULL;

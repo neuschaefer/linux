@@ -941,12 +941,12 @@ static int  ioctlDriver(struct inode *inode, struct file *filp, unsigned int com
 	        	// Turn on audio power
 //        		gpio_direction_output(GPIO_AUDIO_PWR, 0);
 				mxc_iomux_v3_setup_pad(MX50_PAD_PWM2__PWMO);
-//	        	gpio_activate_audio_ports(); // ∑|≥y¶®IO REQUEST ERROR !?
+//	        	gpio_activate_audio_ports(); // ÊúÉÈÄ†ÊàêIO REQUEST ERROR !?
 	        }
 	        else {	// turn off audio power
 				mxc_iomux_v3_setup_pad(MX50_PAD_PWM2__GPIO_6_25);
 //        		gpio_direction_input(GPIO_AUDIO_PWR);
-//	        	gpio_inactivate_audio_ports(); // ∑|≥y¶®IO REQUEST ERROR !?
+//	        	gpio_inactivate_audio_ports(); // ÊúÉÈÄ†ÊàêIO REQUEST ERROR !?
 	        }
 			break;
 		case CM_nLED:

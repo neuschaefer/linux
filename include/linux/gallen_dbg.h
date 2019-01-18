@@ -3,13 +3,13 @@
 
 
 /*****************************************************************
-1. include ¦¹ÀÉ«e½Ğ¥ı©w¸q GDEBUG .
-	¦p #define GDEBUG			1000
+1. include æ­¤æª”å‰è«‹å…ˆå®šç¾© GDEBUG .
+	å¦‚ #define GDEBUG			1000
 	
-2. ½Ğ¥ıinclude¬ÛÃöÀÉ .
-	¦p kernel.h , assert.h ....
+2. è«‹å…ˆincludeç›¸é—œæª” .
+	å¦‚ kernel.h , assert.h ....
 	
-3. ½Ğ©w¸q¤@­ÓGLOBALÅÜ¼Æ,§ïÅÜ¦¹ÅÜ¼Æªº­È§Y¥iÅÜ¤Æ°£¿ù°T®§ªº¿é¥X¦h©Î¤Ö.
+3. è«‹å®šç¾©ä¸€å€‹GLOBALè®Šæ•¸,æ”¹è®Šæ­¤è®Šæ•¸çš„å€¼å³å¯è®ŠåŒ–é™¤éŒ¯è¨Šæ¯çš„è¼¸å‡ºå¤šæˆ–å°‘.
 	int giDbgLvl;
 	
 ******************************************************************/
@@ -37,15 +37,15 @@
 #endif //] __KERNEL__
 
 #if 0
-	extern int giDbgLvl; // µ{¦¡¥²¶·´£¨Ñ³o­ÓÅÜ¼Æ.
+	extern int giDbgLvl; // ç¨‹å¼å¿…é ˆæä¾›é€™å€‹è®Šæ•¸.
 #else
 	#define giDbgLvl 	0
 #endif
 
 
-#define GALLEN_DBGLVL_MAX			100 // ¥NªíµL°T®§¿é¥X.
+#define GALLEN_DBGLVL_MAX			100 // ä»£è¡¨ç„¡è¨Šæ¯è¼¸å‡º.
 #define GALLEN_DBGLVL_HALF			50 // .
-#define GALLEN_DBGLVL_MIN			0 // ¥Nªí©Ò¦³°T®§³£·|¿é¥X.
+#define GALLEN_DBGLVL_MIN			0 // ä»£è¡¨æ‰€æœ‰è¨Šæ¯éƒ½æœƒè¼¸å‡º.
 
 
 //
