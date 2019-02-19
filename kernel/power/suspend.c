@@ -26,11 +26,15 @@
 #include "power.h"
 
 const char *const pm_states[PM_SUSPEND_MAX] = {
+#ifdef CONFIG_EARLYSUSPEND
+	[PM_SUSPEND_ON]		= "on",
+#endif
 	[PM_SUSPEND_STANDBY]	= "standby",
 	[PM_SUSPEND_MEM]	= "mem",
 };
 
 static struct platform_suspend_ops *suspend_ops;
+extern int g_InSuspendProcess;
 
 /**
  *	suspend_set_ops - Set the global suspend method table.
@@ -145,6 +149,7 @@ static int suspend_enter(suspend_state_t state)
 		goto Platfrom_finish;
 	}
 
+	g_InSuspendProcess = 0; // finish suspend
 	if (suspend_ops->prepare_late) {
 		error = suspend_ops->prepare_late();
 		if (error)
@@ -270,6 +275,8 @@ int enter_state(suspend_state_t state)
 
 	if (!mutex_trylock(&pm_mutex))
 		return -EBUSY;
+
+    g_InSuspendProcess = 1;// suspend start!!
 
 	printk(KERN_INFO "PM: Syncing filesystems ... ");
 	sys_sync();

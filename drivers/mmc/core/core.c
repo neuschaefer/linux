@@ -22,6 +22,7 @@
 #include <linux/scatterlist.h>
 #include <linux/log2.h>
 #include <linux/regulator/consumer.h>
+#include <linux/wakelock.h>
 
 #include <linux/mmc/card.h>
 #include <linux/mmc/host.h>
@@ -38,6 +39,7 @@
 #include "sdio_ops.h"
 
 static struct workqueue_struct *workqueue;
+static struct wake_lock mmc_delayed_work_wake_lock;
 
 /*
  * Enabling software CRCs on the data blocks can be a significant (30%)
@@ -69,6 +71,7 @@ MODULE_PARM_DESC(
 static int mmc_schedule_delayed_work(struct delayed_work *work,
 				     unsigned long delay)
 {
+	wake_lock(&mmc_delayed_work_wake_lock);
 	return queue_delayed_work(workqueue, work, delay);
 }
 
@@ -545,9 +548,12 @@ void mmc_host_deeper_disable(struct work_struct *work)
 
 	/* If the host is claimed then we do not want to disable it anymore */
 	if (!mmc_try_claim_host(host))
-		return;
+		goto out;
 	mmc_host_do_disable(host, 1);
 	mmc_do_release_host(host);
+
+out:
+	wake_unlock(&mmc_delayed_work_wake_lock);
 }
 
 /**
@@ -977,6 +983,37 @@ static inline void mmc_bus_put(struct mmc_host *host)
 	spin_unlock_irqrestore(&host->lock, flags);
 }
 
+#ifdef CONFIG_MMC_BLOCK_DEFERRED_RESUME
+int mmc_resume_bus(struct mmc_host *host)
+{
+	unsigned long flags;
+
+	if (!host->deferred_resume || !host->need_resume)
+		return -EINVAL;
+
+	printk("%s: Starting deferred resume\n", mmc_hostname(host));
+	spin_lock_irqsave(&host->lock, flags);
+	host->need_resume = 0;
+	spin_unlock_irqrestore(&host->lock, flags);
+
+	mmc_bus_get(host);
+	if (host->bus_ops && !host->bus_dead) {
+		mmc_power_up(host);
+		BUG_ON(!host->bus_ops->resume);
+		host->bus_ops->resume(host);
+	}
+
+	if (host->bus_ops->detect && !host->bus_dead)
+		host->bus_ops->detect(host);
+
+	mmc_bus_put(host);
+	printk("%s: Deferred resume completed\n", mmc_hostname(host));
+	return 0;
+}
+
+EXPORT_SYMBOL(mmc_resume_bus);
+#endif
+
 /*
  * Assign a mmc bus handler to a host. Only one bus handler may control a
  * host at any given time.
@@ -1057,12 +1094,19 @@ void mmc_rescan(struct work_struct *work)
 		container_of(work, struct mmc_host, detect.work);
 	u32 ocr;
 	int err;
+	int extend_wakelock = 0;
 
 	mmc_bus_get(host);
 
 	/* if there is a card registered, check whether it is still present */
 	if ((host->bus_ops != NULL) && host->bus_ops->detect && !host->bus_dead)
 		host->bus_ops->detect(host);
+
+	/* If the card was removed the bus will be marked
+	 * as dead - extend the wakelock so userspace
+	 * can respond */
+	if (host->bus_dead)
+		extend_wakelock = 1;
 
 	mmc_bus_put(host);
 
@@ -1101,6 +1145,7 @@ void mmc_rescan(struct work_struct *work)
 	if (!err) {
 		if (mmc_attach_sdio(host, ocr))
 			mmc_power_off(host);
+		extend_wakelock = 1;
 		goto out;
 	}
 
@@ -1111,6 +1156,7 @@ void mmc_rescan(struct work_struct *work)
 	if (!err) {
 		if (mmc_attach_sd(host, ocr))
 			mmc_power_off(host);
+		extend_wakelock = 1;
 		goto out;
 	}
 
@@ -1121,6 +1167,7 @@ void mmc_rescan(struct work_struct *work)
 	if (!err) {
 		if (mmc_attach_mmc(host, ocr))
 			mmc_power_off(host);
+		extend_wakelock = 1;
 		goto out;
 	}
 
@@ -1128,6 +1175,11 @@ void mmc_rescan(struct work_struct *work)
 	mmc_power_off(host);
 
 out:
+	if (extend_wakelock)
+		wake_lock_timeout(&mmc_delayed_work_wake_lock, HZ / 2);
+	else
+		wake_unlock(&mmc_delayed_work_wake_lock);
+
 	if (host->caps & MMC_CAP_NEEDS_POLL)
 		mmc_schedule_delayed_work(&host->detect, HZ);
 }
@@ -1257,6 +1309,11 @@ int mmc_suspend_host(struct mmc_host *host)
 {
 	int err = 0;
 
+#ifdef CONFIG_MMC_BLOCK_DEFERRED_RESUME
+	if (host->need_resume)
+		return 0;
+#endif
+
 	if (host->caps & MMC_CAP_DISABLE)
 		cancel_delayed_work(&host->disable);
 	cancel_delayed_work(&host->detect);
@@ -1299,6 +1356,15 @@ int mmc_resume_host(struct mmc_host *host)
 	int err = 0;
 
 	mmc_bus_get(host);
+
+#ifdef CONFIG_MMC_BLOCK_DEFERRED_RESUME
+	if (host->deferred_resume) {
+		host->need_resume = 1;
+		mmc_bus_put(host);
+		return 0;
+	}
+#endif
+
 	if (host->bus_ops && !host->bus_dead) {
 		if (!(host->pm_flags & MMC_PM_KEEP_POWER)) {
 			mmc_power_up(host);
@@ -1338,6 +1404,7 @@ static int __init mmc_init(void)
 {
 	int ret;
 
+	wake_lock_init(&mmc_delayed_work_wake_lock, WAKE_LOCK_SUSPEND, "mmc_delayed_work");
 	workqueue = create_singlethread_workqueue("kmmcd");
 	if (!workqueue)
 		return -ENOMEM;
@@ -1372,6 +1439,7 @@ static void __exit mmc_exit(void)
 	mmc_unregister_host_class();
 	mmc_unregister_bus();
 	destroy_workqueue(workqueue);
+	wake_lock_destroy(&mmc_delayed_work_wake_lock);
 }
 
 subsys_initcall(mmc_init);

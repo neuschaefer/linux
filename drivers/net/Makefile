@@ -120,6 +120,13 @@ obj-$(CONFIG_PCMCIA_PCNET) += 8390.o
 obj-$(CONFIG_HP100) += hp100.o
 obj-$(CONFIG_SMC9194) += smc9194.o
 obj-$(CONFIG_FEC) += fec.o
+ifeq ($(CONFIG_ARCH_MX53),y)
+	obj-$(CONFIG_FEC_1588) += imx_ptp.o
+endif
+ifeq ($(CONFIG_ARCH_MX28),y)
+	obj-$(CONFIG_FEC_1588) += fec_1588.o
+endif
+obj-$(CONFIG_FEC_L2SWITCH) += fec_switch.o
 obj-$(CONFIG_FEC_MPC52xx) += fec_mpc52xx.o
 ifeq ($(CONFIG_FEC_MPC52xx_MDIO),y)
 	obj-$(CONFIG_FEC_MPC52xx) += fec_mpc52xx_phy.o
@@ -162,6 +169,8 @@ obj-$(CONFIG_PPP_BSDCOMP) += bsd_comp.o
 obj-$(CONFIG_PPP_MPPE) += ppp_mppe.o
 obj-$(CONFIG_PPPOE) += pppox.o pppoe.o
 obj-$(CONFIG_PPPOL2TP) += pppox.o
+obj-$(CONFIG_PPPOLAC) += pppox.o pppolac.o
+obj-$(CONFIG_PPPOPNS) += pppox.o pppopns.o
 
 obj-$(CONFIG_SLIP) += slip.o
 obj-$(CONFIG_SLHC) += slhc.o

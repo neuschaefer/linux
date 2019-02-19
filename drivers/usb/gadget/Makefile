@@ -28,6 +28,7 @@ obj-$(CONFIG_USB_FSL_QE)	+= fsl_qe_udc.o
 obj-$(CONFIG_USB_CI13XXX)	+= ci13xxx_udc.o
 obj-$(CONFIG_USB_S3C_HSOTG)	+= s3c-hsotg.o
 obj-$(CONFIG_USB_LANGWELL)	+= langwell_udc.o
+obj-$(CONFIG_USB_ARC)		+= arcotg_udc.o
 
 #
 # USB gadget drivers
@@ -63,4 +64,7 @@ obj-$(CONFIG_USB_G_HID)		+= g_hid.o
 obj-$(CONFIG_USB_G_MULTI)	+= g_multi.o
 obj-$(CONFIG_USB_G_NOKIA)	+= g_nokia.o
 obj-$(CONFIG_USB_G_WEBCAM)	+= g_webcam.o
-
+obj-$(CONFIG_USB_ANDROID)	+= android.o
+obj-$(CONFIG_USB_ANDROID_ADB)	+= f_adb.o
+obj-$(CONFIG_USB_ANDROID_MASS_STORAGE)	+= f_mass_storage.o
+obj-$(CONFIG_USB_ANDROID_RNDIS)	+= f_rndis.o u_ether.o

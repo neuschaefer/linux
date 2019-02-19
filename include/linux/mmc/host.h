@@ -44,6 +44,7 @@ struct mmc_ios {
 #define MMC_BUS_WIDTH_1		0
 #define MMC_BUS_WIDTH_4		2
 #define MMC_BUS_WIDTH_8		3
+#define MMC_BUS_WIDTH_DDR	8
 
 	unsigned char	timing;			/* timing specification used */
 
@@ -155,6 +156,7 @@ struct mmc_host {
 #define MMC_CAP_DISABLE		(1 << 7)	/* Can the host be disabled */
 #define MMC_CAP_NONREMOVABLE	(1 << 8)	/* Nonremovable e.g. eMMC */
 #define MMC_CAP_WAIT_WHILE_BUSY	(1 << 9)	/* Waits while card is busy */
+#define MMC_CAP_DATA_DDR	(1 << 10)	/* Can the host do ddr transfers */
 
 	mmc_pm_flag_t		pm_caps;	/* supported pm features */
 
@@ -198,6 +200,10 @@ struct mmc_host {
 
 	const struct mmc_bus_ops *bus_ops;	/* current bus driver */
 	unsigned int		bus_refs;	/* reference counter */
+#ifdef CONFIG_MMC_BLOCK_DEFERRED_RESUME
+	unsigned int		need_resume:1;
+	unsigned int		deferred_resume:1;
+#endif
 
 	unsigned int		sdio_irqs;
 	struct task_struct	*sdio_irq_thread;
@@ -229,6 +235,10 @@ static inline void *mmc_priv(struct mmc_host *host)
 #define mmc_dev(x)	((x)->parent)
 #define mmc_classdev(x)	(&(x)->class_dev)
 #define mmc_hostname(x)	(dev_name(&(x)->class_dev))
+
+#ifdef CONFIG_MMC_BLOCK_DEFERRED_RESUME
+extern int mmc_resume_bus(struct mmc_host *host);
+#endif
 
 extern int mmc_suspend_host(struct mmc_host *);
 extern int mmc_resume_host(struct mmc_host *);

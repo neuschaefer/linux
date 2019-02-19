@@ -173,7 +173,11 @@ static ssize_t state_store(struct kobject *kobj, struct kobj_attribute *attr,
 			   const char *buf, size_t n)
 {
 #ifdef CONFIG_SUSPEND
+#ifdef CONFIG_EARLYSUSPEND
+	suspend_state_t state = PM_SUSPEND_ON;
+#else
 	suspend_state_t state = PM_SUSPEND_STANDBY;
+#endif
 	const char * const *s;
 #endif
 	char *p;
@@ -195,7 +199,14 @@ static ssize_t state_store(struct kobject *kobj, struct kobj_attribute *attr,
 			break;
 	}
 	if (state < PM_SUSPEND_MAX && *s)
+#ifdef CONFIG_EARLYSUSPEND
+		if (state == PM_SUSPEND_ON || valid_state(state)) {
+			error = 0;
+			request_suspend_state(state);
+		}
+#else
 		error = enter_state(state);
+#endif
 #endif
 
  Exit:
@@ -204,6 +215,37 @@ static ssize_t state_store(struct kobject *kobj, struct kobj_attribute *attr,
 
 power_attr(state);
 
+extern int gSleep_Mode_Suspend;
+static ssize_t state_extended_show(struct kobject *kobj, struct kobj_attribute *attr,
+			  char *buf)
+{
+	char *s = buf;
+	s += sprintf(s, "%d\n", gSleep_Mode_Suspend);
+	return (s - buf);
+}
+
+static ssize_t state_extended_store(struct kobject *kobj, struct kobj_attribute *attr,
+			   const char *buf, size_t n)
+{
+	if ('1' == *buf)
+		gSleep_Mode_Suspend = 1;
+	else 
+		gSleep_Mode_Suspend = 0;
+//	printk ("[%s-%d] %s() %d\n",__FILE__,__LINE__,__func__,gSleep_Mode_Suspend);
+
+	return n;
+}
+
+//power_attr(state_extended);
+static struct kobj_attribute state_extended_attr = {
+         .attr   = {
+                 .name = "state-extended",
+                 .mode = 0644,
+         },
+         .show   = state_extended_show,
+         .store  = state_extended_store,
+};
+ 
 #ifdef CONFIG_PM_TRACE
 int pm_trace_enabled;
 
@@ -229,17 +271,63 @@ pm_trace_store(struct kobject *kobj, struct kobj_attribute *attr,
 power_attr(pm_trace);
 #endif /* CONFIG_PM_TRACE */
 
+#ifdef CONFIG_SUSPEND_DEVICE_TIME_DEBUG
+/*
+ * threshold of device suspend time consumption in microsecond(0.5ms), the
+ * driver suspend/resume time longer than this threshold will be
+ * print to console, 0 to disable */
+int device_suspend_time_threshold;
+
+static ssize_t
+device_suspend_time_threshold_show(struct kobject *kobj,
+				   struct kobj_attribute *attr, char *buf)
+{
+	if (device_suspend_time_threshold == 0)
+		return sprintf(buf, "off\n");
+	else
+		return sprintf(buf, "%d usecs\n",
+			       device_suspend_time_threshold);
+}
+
+static ssize_t
+device_suspend_time_threshold_store(struct kobject *kobj,
+				    struct kobj_attribute *attr,
+				    const char *buf, size_t n)
+{
+	int val;
+	if (sscanf(buf, "%d", &val) > 0) {
+		device_suspend_time_threshold = val;
+		return n;
+	}
+	return -EINVAL;
+}
+power_attr(device_suspend_time_threshold);
+#endif
+
+#ifdef CONFIG_USER_WAKELOCK
+power_attr(wake_lock);
+power_attr(wake_unlock);
+#endif
+
 static struct attribute * g[] = {
 	&state_attr.attr,
 #ifdef CONFIG_PM_TRACE
 	&pm_trace_attr.attr,
+#endif
+#ifdef CONFIG_SUSPEND_DEVICE_TIME_DEBUG
+	&device_suspend_time_threshold_attr.attr,
 #endif
 #ifdef CONFIG_PM_SLEEP
 	&pm_async_attr.attr,
 #ifdef CONFIG_PM_DEBUG
 	&pm_test_attr.attr,
 #endif
+#ifdef CONFIG_USER_WAKELOCK
+	&wake_lock_attr.attr,
+	&wake_unlock_attr.attr,
 #endif
+#endif
+	&state_extended_attr.attr,
 	NULL,
 };
 

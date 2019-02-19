@@ -12,3 +12,6 @@ obj-$(CONFIG_MMC_TEST)		+= mmc_test.o
 
 obj-$(CONFIG_SDIO_UART)		+= sdio_uart.o
 
+obj-$(CONFIG_SDIO_UNIFI_FS)	+= unifi_fs/
+
+obj-$(CONFIG_SDIO_WIFI_PWR)	+= sdio_wifi_pwr.o

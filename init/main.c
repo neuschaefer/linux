@@ -6,7 +6,7 @@
  *  GK 2/5/95  -  Changed to support mounting root fs via NFS
  *  Added initrd & change_root: Werner Almesberger & Hans Lermen, Feb '96
  *  Moan early if gcc is old, avoiding bogus kernels - Paul Gortmaker, May '96
- *  Simplified starting of init:  Michael A. Griffith <grif@acm.org> 
+ *  Simplified starting of init:  Michael A. Griffith <grif@acm.org>
  */
 
 #include <linux/types.h>
@@ -78,6 +78,8 @@
 #include <asm/sections.h>
 #include <asm/cacheflush.h>
 
+#include <linux/reboot.h>	/* For kernel_power_off() :angela add*/
+
 #ifdef CONFIG_X86_LOCAL_APIC
 #include <asm/smp.h>
 #endif
@@ -98,6 +100,11 @@ static inline void mark_rodata_ro(void) { }
 #ifdef CONFIG_TC
 extern void tc_init(void);
 #endif
+
+//angela
+extern int ntx_get_battery_vol (void);
+extern int ntx_charge_status();
+extern int POWER_LOW_LIMIT;
 
 enum system_states system_state __read_mostly;
 EXPORT_SYMBOL(system_state);
@@ -122,6 +129,9 @@ static char *static_command_line;
 
 static char *execute_command;
 static char *ramdisk_execute_command;
+
+// Terry add 20130119 : add kernel finish booting process flag
+extern int gFinishKernelBoot;
 
 #ifdef CONFIG_SMP
 /* Setup configured maximum number of CPUs to activate */
@@ -536,6 +546,31 @@ static void __init mm_init(void)
 	vmalloc_init();
 }
 
+
+//angela add serial number
+void _cmdline_serialno(char *serialno_str)
+{
+	char proc_cmdline[COMMAND_LINE_SIZE];
+	memcpy(proc_cmdline, boot_command_line, COMMAND_LINE_SIZE);
+	proc_cmdline[COMMAND_LINE_SIZE-1] = '\0';
+
+	char *serialno = 0;
+	char *temp_ptr = 0;
+	serialno = strstr(proc_cmdline, "serialno");
+	if(serialno != NULL)
+	{
+		temp_ptr = strchr(serialno, " ");
+		if(temp_ptr != NULL)
+			*temp_ptr = '\0'; // change " " to '\0'
+		serialno = serialno+9; // ex:android.serialno=E60612A, point to "E"
+		printk(KERN_NOTICE "proc/cmdline : androidboot.serialno = %s\n", serialno);
+
+		strcpy(serialno_str, serialno);
+	}else{
+		strcpy(serialno_str, "no_serialno_cmd");
+	}
+}
+
 asmlinkage void __init start_kernel(void)
 {
 	char * command_line;
@@ -912,6 +947,8 @@ static int __init kernel_init(void * unused)
 	 * the work
 	 */
 
+	gFinishKernelBoot = 1; // Terry add 20130119 : kernel finish booting process
+
 	if (!ramdisk_execute_command)
 		ramdisk_execute_command = "/init";
 
@@ -925,6 +962,13 @@ static int __init kernel_init(void * unused)
 	 * we're essentially up and running. Get rid of the
 	 * initmem segments and start the user-mode stuff..
 	 */
+
+	//angela 20121221 : when battery value lower than POWER_LOW_LIMIT(5), kernel power off
+	//printk("***************** ntx_get_battery_vol = %d***********************\n", ntx_get_battery_vol());
+	if (ntx_get_battery_vol() <= POWER_LOW_LIMIT && ntx_charge_status() == 0){
+		kernel_power_off();
+	}
+
 
 	init_post();
 	return 0;

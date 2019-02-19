@@ -1424,7 +1424,7 @@ static uint8_t *nand_transfer_oob(struct nand_chip *chip, uint8_t *oob,
  *
  * Internal function. Called with chip held.
  */
-static int nand_do_read_ops(struct mtd_info *mtd, loff_t from,
+int nand_do_read_ops(struct mtd_info *mtd, loff_t from,
 			    struct mtd_oob_ops *ops)
 {
 	int chipnr, page, realpage, col, bytes, aligned;
@@ -1553,6 +1553,7 @@ static int nand_do_read_ops(struct mtd_info *mtd, loff_t from,
 
 	return  mtd->ecc_stats.corrected - stats.corrected ? -EUCLEAN : 0;
 }
+EXPORT_SYMBOL(nand_do_read_ops);
 
 /**
  * nand_read - [MTD Interface] MTD compability function for nand_do_read_ecc
@@ -2133,7 +2134,7 @@ static uint8_t *nand_fill_oob(struct nand_chip *chip, uint8_t *oob, size_t len,
  *
  * NAND write with ECC
  */
-static int nand_do_write_ops(struct mtd_info *mtd, loff_t to,
+int nand_do_write_ops(struct mtd_info *mtd, loff_t to,
 			     struct mtd_oob_ops *ops)
 {
 	int chipnr, realpage, page, blockmask, column;
@@ -2237,6 +2238,7 @@ static int nand_do_write_ops(struct mtd_info *mtd, loff_t to,
 		ops->oobretlen = ops->ooblen;
 	return ret;
 }
+EXPORT_SYMBOL(nand_do_write_ops);
 
 /**
  * panic_nand_write - [MTD Interface] NAND write with ECC
@@ -2584,6 +2586,12 @@ int nand_erase_nand(struct mtd_info *mtd, struct erase_info *instr,
 			instr->state = MTD_ERASE_FAILED;
 			instr->fail_addr =
 				((loff_t)page << chip->page_shift);
+
+			if (chip->bbt) {
+				int i = (page / pages_per_block) << 1;
+				chip->bbt[i >> 3] |= 0x03 << (i & 0x6);
+				mtd->ecc_stats.badblocks++;
+			}
 			goto erase_exit;
 		}
 
@@ -2649,6 +2657,7 @@ int nand_erase_nand(struct mtd_info *mtd, struct erase_info *instr,
 	/* Return more or less happy */
 	return ret;
 }
+EXPORT_SYMBOL_GPL(nand_erase_nand);
 
 /**
  * nand_sync - [MTD Interface] sync
@@ -2834,8 +2843,10 @@ static struct nand_flash_dev *nand_get_flash_type(struct mtd_info *mtd,
 
 	chip->chipsize = (uint64_t)type->chipsize << 20;
 
-	/* Newer devices have all the information in additional id bytes */
-	if (!type->pagesize) {
+	if (!type->pagesize && chip->init_size) {
+		/* set the pagesize, oobsize, erasesize by the driver*/
+		busw = chip->init_size(mtd, chip, id_data);
+	} else if (!type->pagesize) {
 		int extid;
 		/* The 3rd id byte holds MLC / multichip data */
 		chip->cellinfo = id_data[2];

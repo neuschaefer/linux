@@ -337,6 +337,14 @@ config TI_DAC7512
 	  This driver can also be built as a module. If so, the module
 	  will be calles ti_dac7512.
 
+config ANDROID_PMEM
+	bool "Android pmem allocator"
+	default n
+
+config UID_STAT
+	bool "UID based statistics tracking exported to /proc/uid_stat"
+	default n
+
 config VMWARE_BALLOON
 	tristate "VMware Balloon Driver"
 	depends on X86
@@ -352,6 +360,16 @@ config VMWARE_BALLOON
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called vmware_balloon.
+
+config MXS_PERSISTENT
+	tristate "MX23/MX28 persistent bit"
+	depends on ARCH_MXS
+	default y
+
+config MXS_PERFMON
+	tristate "i.MX Performance Monitor"
+	depends on ARCH_MX28 || ARCH_MX50
+	default y
 
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"

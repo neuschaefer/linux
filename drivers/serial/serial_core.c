@@ -2075,7 +2075,6 @@ int uart_resume_port(struct uart_driver *drv, struct uart_port *uport)
 	struct tty_port *port = &state->port;
 	struct device *tty_dev;
 	struct uart_match match = {uport, drv};
-	struct ktermios termios;
 
 	mutex_lock(&port->mutex);
 
@@ -2092,7 +2091,7 @@ int uart_resume_port(struct uart_driver *drv, struct uart_port *uport)
 	 */
 	if (uart_console(uport)) {
 		uart_change_pm(state, 0);
-		uport->ops->set_termios(uport, &termios, NULL);
+		uport->ops->set_termios(uport, port->tty->termios, NULL);
 		console_start(uport->cons);
 	}
 

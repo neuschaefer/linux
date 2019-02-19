@@ -55,6 +55,7 @@
 
 /** Defines ********************************************************************
 *******************************************************************************/
+// #define I2C_INT_READ
 
 /* This will be the driver name the kernel reports */
 #define DRIVER_NAME "imx-i2c"
@@ -161,14 +162,34 @@ static int i2c_imx_trx_complete(struct imx_i2c_struct *i2c_imx)
 {
 	int result;
 
+#ifdef I2C_INT_READ
+	if(in_interrupt()) 
+	{
+		int retry = 1000;
+//		printk("<%s> wait in int\n", __func__);
+		do {
+			udelay (100);
+		} while (retry-- && (unlikely(!(i2c_imx->i2csr & I2SR_IIF))));
+		result = 0;
+	}
+	else {
+		int retry = 10;
+		do {
+			result = wait_event_interruptible_timeout(i2c_imx->queue,
+				i2c_imx->i2csr & I2SR_IIF, HZ / 100);
+		} while (retry-- && (unlikely(!(i2c_imx->i2csr & I2SR_IIF))));
+	}
+#else
 	result = wait_event_interruptible_timeout(i2c_imx->queue,
 		i2c_imx->i2csr & I2SR_IIF, HZ / 10);
-
+#endif
 	if (unlikely(result < 0)) {
 		dev_dbg(&i2c_imx->adapter.dev, "<%s> result < 0\n", __func__);
+		printk("<%s> result < 0\n", __func__);
 		return result;
 	} else if (unlikely(!(i2c_imx->i2csr & I2SR_IIF))) {
 		dev_dbg(&i2c_imx->adapter.dev, "<%s> Timeout\n", __func__);
+		printk("<%s> Timeout\n", __func__);
 		return -ETIMEDOUT;
 	}
 	dev_dbg(&i2c_imx->adapter.dev, "<%s> TRX complete\n", __func__);
@@ -194,7 +215,9 @@ static int i2c_imx_start(struct imx_i2c_struct *i2c_imx)
 
 	dev_dbg(&i2c_imx->adapter.dev, "<%s>\n", __func__);
 
+#ifndef I2C_INT_READ
 	clk_enable(i2c_imx->clk);
+#endif
 	writeb(i2c_imx->ifdr, i2c_imx->base + IMX_I2C_IFDR);
 	/* Enable I2C controller */
 	writeb(0, i2c_imx->base + IMX_I2C_I2SR);
@@ -243,7 +266,9 @@ static void i2c_imx_stop(struct imx_i2c_struct *i2c_imx)
 
 	/* Disable I2C controller */
 	writeb(0, i2c_imx->base + IMX_I2C_I2CR);
+#ifndef I2C_INT_READ
 	clk_disable(i2c_imx->clk);
+#endif
 }
 
 static void __init i2c_imx_set_clk(struct imx_i2c_struct *i2c_imx,
@@ -282,6 +307,9 @@ static void __init i2c_imx_set_clk(struct imx_i2c_struct *i2c_imx,
 	printk(KERN_DEBUG "I2C: <%s> IFDR[IC]=0x%x, REAL DIV=%d\n",
 		__func__, i2c_clk_div[i][1], i2c_clk_div[i][0]);
 #endif
+#ifdef I2C_INT_READ
+	clk_enable(i2c_imx->clk);
+#endif
 }
 
 static irqreturn_t i2c_imx_isr(int irq, void *dev_id)
@@ -295,7 +323,10 @@ static irqreturn_t i2c_imx_isr(int irq, void *dev_id)
 		i2c_imx->i2csr = temp;
 		temp &= ~I2SR_IIF;
 		writeb(temp, i2c_imx->base + IMX_I2C_I2SR);
-		wake_up_interruptible(&i2c_imx->queue);
+#ifdef I2C_INT_READ
+		if (!in_interrupt())
+#endif
+			wake_up_interruptible(&i2c_imx->queue);
 		return IRQ_HANDLED;
 	}
 

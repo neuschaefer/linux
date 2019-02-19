@@ -53,8 +53,8 @@ extern int nand_unlock(struct mtd_info *mtd, loff_t ofs, uint64_t len);
  * is supported now. If you add a chip with bigger oobsize/page
  * adjust this accordingly.
  */
-#define NAND_MAX_OOBSIZE	256
-#define NAND_MAX_PAGESIZE	4096
+#define NAND_MAX_OOBSIZE	(256 * NAND_MAX_CHIPS)
+#define NAND_MAX_PAGESIZE	(4096 * NAND_MAX_CHIPS)
 
 /*
  * Constants for hardware specific CLE/ALE/NCE function
@@ -98,6 +98,14 @@ extern int nand_unlock(struct mtd_info *mtd, loff_t ofs, uint64_t len);
 #define NAND_CMD_READSTART	0x30
 #define NAND_CMD_RNDOUTSTART	0xE0
 #define NAND_CMD_CACHEDPROG	0x15
+
+/* Extended commands for ONFI nand */
+#define NAND_CMD_READ_PARAMETER_PAGE	0xec
+#define NAND_CMD_READ_UNIQUE_ID		0xed
+#define NAND_CMD_GET_FEATURE		0xee
+#define NAND_CMD_SET_FEATURE		0xef
+#define NAND_CMD_RESET_LUN		0xfa
+#define NAND_CMD_SYNC_RESET		0xfc
 
 /* Extended commands for AG-AND device */
 /*
@@ -334,6 +342,10 @@ struct nand_buffers {
  * @block_markbad:	[REPLACEABLE] mark the block bad
  * @cmd_ctrl:		[BOARDSPECIFIC] hardwarespecific funtion for controlling
  *			ALE/CLE/nCE. Also used to write command and address
+ * @init_size:		[BOARDSPECIFIC] hardwarespecific funtion for setting
+ *			mtd->oobsize, mtd->writesize and so on.
+ *			@id_data contains the 8 bytes values of NAND_CMD_READID.
+ *			Return with the bus width.
  * @dev_ready:		[BOARDSPECIFIC] hardwarespecific function for accesing device ready/busy line
  *			If set to NULL no access to ready/busy is available and the ready/busy information
  *			is read from the chip status register
@@ -388,6 +400,8 @@ struct nand_chip {
 	int		(*block_markbad)(struct mtd_info *mtd, loff_t ofs);
 	void		(*cmd_ctrl)(struct mtd_info *mtd, int dat,
 				    unsigned int ctrl);
+	int		(*init_size)(struct mtd_info *mtd,
+					struct nand_chip *this, u8 *id_data);
 	int		(*dev_ready)(struct mtd_info *mtd);
 	void		(*cmdfunc)(struct mtd_info *mtd, unsigned command, int column, int page_addr);
 	int		(*waitfunc)(struct mtd_info *mtd, struct nand_chip *this);
@@ -446,6 +460,8 @@ struct nand_chip {
 #define NAND_MFR_HYNIX		0xad
 #define NAND_MFR_MICRON		0x2c
 #define NAND_MFR_AMD		0x01
+#define NAND_MFR_SANDISK	0x45
+#define NAND_MFR_INTEL		0x89
 
 /**
  * struct nand_flash_dev - NAND Flash Device ID Structure
@@ -489,6 +505,10 @@ extern int nand_erase_nand(struct mtd_info *mtd, struct erase_info *instr,
 			   int allowbbt);
 extern int nand_do_read(struct mtd_info *mtd, loff_t from, size_t len,
 			size_t * retlen, uint8_t * buf);
+extern int nand_do_read_ops(struct mtd_info *mtd, loff_t from,
+			    struct mtd_oob_ops *ops);
+extern int nand_do_write_ops(struct mtd_info *mtd, loff_t to,
+			     struct mtd_oob_ops *ops);
 
 /**
  * struct platform_nand_chip - chip level device structure

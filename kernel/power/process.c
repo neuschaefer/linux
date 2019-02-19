@@ -1,5 +1,5 @@
 /*
- * drivers/power/process.c - Functions for starting/stopping processes on 
+ * drivers/power/process.c - Functions for starting/stopping processes on
  *                           suspend transitions.
  *
  * Originally from swsusp.
@@ -16,10 +16,11 @@
 #include <linux/freezer.h>
 #include <linux/delay.h>
 
-/* 
+/*
  * Timeout for stopping processes
  */
 #define TIMEOUT	(20 * HZ)
+extern int g_InSuspendProcess;
 
 static inline int freezeable(struct task_struct * p)
 {
@@ -161,5 +162,6 @@ void thaw_processes(void)
 	thaw_tasks(false);
 	schedule();
 	printk("done.\n");
+    g_InSuspendProcess = 0; //Terry add 20130617 : after resume, the flag need to be set to 0
 }
 

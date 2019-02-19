@@ -304,8 +304,13 @@ static void end_unlink_async(struct ehci_hcd *ehci);
 static void ehci_work(struct ehci_hcd *ehci);
 
 #include "ehci-hub.c"
+#ifdef CONFIG_USB_STATIC_IRAM
+#include "ehci-mem-iram.c"
+#include "ehci-q-iram.c"
+#else
 #include "ehci-mem.c"
 #include "ehci-q.c"
+#endif
 #include "ehci-sched.c"
 
 /*-------------------------------------------------------------------------*/
@@ -1121,6 +1126,11 @@ MODULE_LICENSE ("GPL");
 #ifdef CONFIG_ARCH_OMAP3
 #include "ehci-omap.c"
 #define        PLATFORM_DRIVER         ehci_hcd_omap_driver
+#endif
+
+#ifdef CONFIG_USB_EHCI_ARC
+#include "ehci-arc.c"
+#define	PLATFORM_DRIVER		ehci_fsl_driver
 #endif
 
 #ifdef CONFIG_PPC_PS3

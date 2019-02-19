@@ -33,6 +33,17 @@ config LEDS_ATMEL_PWM
 	  This option enables support for LEDs driven using outputs
 	  of the dedicated PWM controller found on newer Atmel SOCs.
 
+config LEDS_MXS
+	tristate "Support for PWM LEDs on MXS"
+	depends on LEDS_CLASS && ARCH_MXS
+	help
+	  This option enables support for the LEDs connected to PWM
+	  outputs on the Freescale MXS SOC.
+
+config LEDS_MC13892
+	tristate "LED Support for mc13892 pmic"
+	depends on LEDS_CLASS && MXC_MC13892_LIGHT
+
 config LEDS_LOCOMO
 	tristate "LED Support for Locomo device"
 	depends on SHARP_LOCOMO
@@ -234,6 +245,16 @@ config LEDS_DA903X
 	help
 	  This option enables support for on-chip LED drivers found
 	  on Dialog Semiconductor DA9030/DA9034 PMICs.
+
+config LEDS_DA9052
+	tristate "Dialog DA9052 LEDS"
+	depends on PMIC_DA9052
+	help
+	  This option enables support for on-chip LED drivers found
+	  on Dialog Semiconductor DA9052 PMICs.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called leds-da9052.
 
 config LEDS_DAC124S085
 	tristate "LED Support for DAC124S085 SPI DAC"

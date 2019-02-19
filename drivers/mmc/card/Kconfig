@@ -32,6 +32,15 @@ config MMC_BLOCK_BOUNCE
 
 	  If unsure, say Y here.
 
+config MMC_BLOCK_DEFERRED_RESUME
+	bool "Deferr MMC layer resume until I/O is requested"
+	depends on MMC_BLOCK
+	default n
+	help
+	  Say Y here to enable deferred MMC resume until I/O
+	  is requested. This will reduce overall resume latency and
+	  save power when theres an SD card inserted but not being used.
+
 config SDIO_UART
 	tristate "SDIO UART/GPS class support"
 	help
@@ -50,3 +59,24 @@ config MMC_TEST
 
 	  This driver is only of interest to those developing or
 	  testing a host driver. Most people should say N here.
+
+config SDIO_UNIFI_FS
+	tristate "UniFi SDIO glue for Freescale MMC/SDIO"
+	depends on (MMC_MXC || MMC_IMX_ESDHCI)
+	depends on (MACH_MX31_3DS || MACH_MX35_3DS || MACH_MX37_3DS || MACH_MX51_3DS)
+	help
+	  This provides an interface between the CSR UniFi WiFi
+	  driver and the Freescale MMC/SDIO interface.
+	  If you have a MXC platform with a UniFi WiFi chip,
+	  say M here.
+
+	  If unsure, say N.
+
+config SDIO_WIFI_PWR
+	tristate "Netronix wifi power control"
+	default m
+	help
+	  This provides an interface to control sdio wifi power,
+	  say M here.
+
+	  If unsure, say N.

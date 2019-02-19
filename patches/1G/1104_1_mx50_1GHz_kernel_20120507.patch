@@ -1,0 +1,900 @@
+diff --git a/arch/arm/mach-mx5/bus_freq.c b/arch/arm/mach-mx5/bus_freq.c
+index 5f166fd..b03bafc 100644
+--- a/arch/arm/mach-mx5/bus_freq.c
++++ b/arch/arm/mach-mx5/bus_freq.c
+@@ -239,7 +239,7 @@ void enter_lpapm_mode_mx50()
+ 	spin_unlock_irqrestore(&voltage_lock, flags);
+ 
+ 	if (clk_get_usecount(pll1_sw_clk) == 1) {
+-		/* Relock PLL1 to 160MHz. */
++		/* Relock PLL1 to 160MHz(166MHz). */
+ 		clk_set_parent(pll1_sw_clk, pll2);
+ 		/* Set the divider to ARM_PODF to 3. */
+ 		__raw_writel(0x02, MXC_CCM_CACRR);
+@@ -491,17 +491,17 @@ void exit_lpapm_mode_mx50(int high_bus_freq)
+ 	unsigned long flags;
+ 
+ 	if (clk_get_usecount(pll1_sw_clk) == 1) {
+-		/* Relock PLL1 to 800MHz. */
++		/* Relock PLL1 to 800MHz(1000MHz). */
+ 		clk_set_parent(pll1_sw_clk, pll2);
+ 		/* Set the divider to ARM_PODF to 3, cpu is at 160MHz. */
+ 		__raw_writel(0x02, MXC_CCM_CACRR);
+ 
+ 		clk_set_rate(pll1, cpu_wp_tbl[0].pll_rate);
+ 
+-		/* Set the divider to ARM_PODF to 5 before
++		/* Set the divider to ARM_PODF to cpu_wp_tbl[cpu_wp_nr-1].cpu_podf before
+ 		  * switching the parent.
+ 		  */
+-		__raw_writel(0x4, MXC_CCM_CACRR);
++		__raw_writel(cpu_wp_tbl[cpu_wp_nr - 1].cpu_podf, MXC_CCM_CACRR);
+ 		clk_set_parent(pll1_sw_clk, pll1);
+ 	}
+ 
+@@ -964,7 +964,12 @@ static int __devinit busfreq_probe(struct platform_device *pdev)
+ 			lp_med_rate = pll2_rate / 6;
+ 			ddr_low_rate = LP_APM_CLK;
+ 			if (mx50_ddr_type == MX50_LPDDR2)
+-				ddr_med_rate = pll2_rate / 3;
++			{
++				if( pll1_rate == 1000000000)
++					ddr_med_rate = pll1_rate / 8; // LPDDR2@125MHz
++				else
++					ddr_med_rate = pll1_rate / 6; // LPDDR2@133MHz
++			}
+ 			else
+ 				/* mDDR @ 133Mhz currently does not work */
+ 				ddr_med_rate = ddr_normal_rate;
+diff --git a/arch/arm/mach-mx5/clock_mx50.c b/arch/arm/mach-mx5/clock_mx50.c
+index 0a674be..4fe4b5f 100644
+--- a/arch/arm/mach-mx5/clock_mx50.c
++++ b/arch/arm/mach-mx5/clock_mx50.c
+@@ -97,6 +97,7 @@ void __iomem *databahn;
+ #define MAX_AXI_B_CLK_MX50 	200000000
+ #define MAX_AHB_CLK		133333333
+ #define MAX_EMI_SLOW_CLK	133000000
++#define LP_APM_CLK		24000000
+ 
+ extern int mxc_jtag_enabled;
+ extern int uart_at_24;
+@@ -512,14 +513,39 @@ static void do_pll_workaround(struct clk *clk, unsigned long rate)
+ 	u32 reg;
+ 
+ 	/*
+-	  * Need to apply the PLL1 workaround. Set the PLL initially to 864MHz
+-	  * and then relock it to 800MHz.
++	  * Need to apply the PLL1 workaround. Set the PLL initially to 864MHz(1056MHz)
++	  * and then relock it to 800MHz(1000MHz).
+ 	  */
+ 	/* Disable the auto-restart bit o f PLL1. */
+ 	reg = __raw_readl(pll1_base + MXC_PLL_DP_CONFIG);
+ 	reg &= ~MXC_PLL_DP_CONFIG_AREN;
+ 	__raw_writel(reg, pll1_base + MXC_PLL_DP_CONFIG);
+ 
++	if(rate >= 1000000000)
++	{
++	/* Configure the PLL1 to 1056MHz.
++	 * MFI = 10
++	 * MFN = 180
++	 * MFD = 179
++	 * PDF = 0
++	 */
++	/* MFI & PFD */
++	reg = 0xA0;
++	__raw_writel(reg, pll1_base + MXC_PLL_DP_OP);
++	__raw_writel(reg, pll1_base + MXC_PLL_DP_HFS_OP);
++
++	/* MFD */
++	reg = 179;
++	__raw_writel(reg, pll1_base + MXC_PLL_DP_MFD);
++	__raw_writel(reg, pll1_base + MXC_PLL_DP_HFS_MFD);
++
++	/* MFN */
++	reg = 180;
++	__raw_writel(reg, pll1_base + MXC_PLL_DP_MFN);
++	__raw_writel(reg, pll1_base + MXC_PLL_DP_HFS_MFN);
++	}
++	else
++	{
+ 	/* Configure the PLL1 to 864MHz.
+ 	  * MFI =8
+ 	  * MFN = 180
+@@ -540,6 +566,7 @@ static void do_pll_workaround(struct clk *clk, unsigned long rate)
+ 	reg = 180;
+ 	__raw_writel(reg, pll1_base + MXC_PLL_DP_MFN);
+ 	__raw_writel(reg, pll1_base + MXC_PLL_DP_HFS_MFN);
++	}
+ 
+ 	/* Restart PLL1. */
+ 	reg = (MXC_PLL_DP_CTL_DPDCK0_2_EN
+@@ -553,7 +580,10 @@ static void do_pll_workaround(struct clk *clk, unsigned long rate)
+ 				SPIN_DELAY))
+ 		panic("pll1_set_rate relock failed\n");
+ 
+-	/* Now update the MFN so that PLL1 is at 800MHz. */
++	/* Now update the MFN so that PLL1 is at 1000MHz/800MHz. */
++  if(rate >= 1000000000)
++	reg = 75;
++  else
+ 	reg = 60;
+ 	__raw_writel(reg, pll1_base + MXC_PLL_DP_MFN);
+ 	__raw_writel(reg, pll1_base + MXC_PLL_DP_HFS_MFN);
+@@ -632,10 +662,49 @@ static int _clk_pll_set_rate(struct clk *clk, unsigned long rate)
+ 	s64 temp64;
+ 	unsigned long quad_parent_rate;
+ 	unsigned long pll_hfsm, dp_ctl;
++	unsigned long dp_op, dp_mfd, dp_mfn;
+ 
+ 	pllbase = _get_pll_base(clk);
+ 
+ 	quad_parent_rate = 4 * clk_get_rate(clk->parent);
++
++	if(pllbase == pll1_base)
++	{
++		// For MX50, we only adjust pdf to change the PLL1 freq
++		dp_ctl = __raw_readl(pllbase + MXC_PLL_DP_CTL);
++		pll_hfsm = dp_ctl & MXC_PLL_DP_CTL_HFSM;
++
++		if (pll_hfsm == 0) {
++			dp_op = __raw_readl(pllbase + MXC_PLL_DP_OP);
++			dp_mfd = __raw_readl(pllbase + MXC_PLL_DP_MFD);
++			dp_mfn = __raw_readl(pllbase + MXC_PLL_DP_MFN);
++		} else {
++			dp_op = __raw_readl(pllbase + MXC_PLL_DP_HFS_OP);
++			dp_mfd = __raw_readl(pllbase + MXC_PLL_DP_HFS_MFD);
++			dp_mfn = __raw_readl(pllbase + MXC_PLL_DP_HFS_MFN);
++		}
++
++		mfi = (dp_op & MXC_PLL_DP_OP_MFI_MASK) >> MXC_PLL_DP_OP_MFI_OFFSET;
++		mfi = (mfi <= 5) ? 5 : mfi;
++		mfd = dp_mfd & MXC_PLL_DP_MFD_MASK;
++		mfn = dp_mfn & MXC_PLL_DP_MFN_MASK;
++	
++		for(pdf=0; pdf<16; pdf++)
++		{
++			temp64 = quad_parent_rate;
++			temp64 *= (mfi*(mfd+1) + mfn);
++			do_div(temp64, (mfd+1)*(pdf+1));
++			if((unsigned long)temp64 <= rate)
++				break;
++		}
++
++		if(pdf >= 16)
++			return -1;
++
++	}
++	else
++	{
++
+ 	pdf = mfi = -1;
+ 	while (++pdf < 16 && mfi < 5)
+ 		mfi = rate * (pdf+1) / quad_parent_rate;
+@@ -647,6 +716,8 @@ static int _clk_pll_set_rate(struct clk *clk, unsigned long rate)
+ 	do_div(temp64, quad_parent_rate/1000000);
+ 	mfn = (long)temp64;
+ 
++	}
++
+ 	dp_ctl = __raw_readl(pllbase + MXC_PLL_DP_CTL);
+ 	/* use dpdck0_2 */
+ 	__raw_writel(dp_ctl | 0x1000L, pllbase + MXC_PLL_DP_CTL);
+@@ -736,8 +807,8 @@ static int _clk_pll1_set_rate(struct clk *clk, unsigned long rate)
+ 
+ 		_clk_pll_set_rate(clk, rate);
+ 	} else {
+-		/* Above 700MHz, only 800MHz freq is supported. */
+-		if (rate != 800000000)
++		/* Above 700MHz, only 800MHz & 1000MHz freq is supported. */
++		if (rate != 800000000 && rate != 1000000000)
+ 			return -EINVAL;
+ 		do_pll_workaround(clk, rate);
+ 	}
+@@ -906,13 +977,16 @@ static unsigned long _clk_cpu_round_rate(struct clk *clk,
+ 	u32 i;
+ 	u32 wp;
+ 
++	rate = rate/1000000;
+ 	for (i = 0; i < cpu_wp_nr; i++) {
+-		if (rate == cpu_wp_tbl[i].cpu_rate)
++		if (rate == cpu_wp_tbl[i].cpu_rate/1000000)
+ 			break;
+ 	}
+ 
+-	if (i > cpu_wp_nr)
++	if (i >= cpu_wp_nr)
+ 		wp = 0;
++	else
++		wp = i;
+ 
+ 	return cpu_wp_tbl[wp].cpu_rate;
+ }
+@@ -2436,13 +2510,16 @@ static unsigned long _clk_ddr_get_rate(struct clk *clk)
+ {
+ 	u32 reg, div;
+ 
++	reg = (__raw_readl(databahn + DATABAHN_CTL_REG55)) &
++			DDR_SYNC_MODE;
++	if (reg != DDR_SYNC_MODE) {
+ 	reg = __raw_readl(MXC_CCM_CLK_DDR);
+ 	div = (reg & MXC_CCM_CLK_DDR_DDR_DIV_PLL_MASK) >>
+ 		MXC_CCM_CLK_DDR_DDR_DIV_PLL_OFFSET;
+ 	if (div)
+ 		return clk_get_rate(clk->parent) / div;
+-
+-	return 0;
++	}
++	return LP_APM_CLK;
+ }
+ 
+ static int _clk_ddr_enable(struct clk *clk)
+diff --git a/arch/arm/mach-mx5/mx50_arm2.c b/arch/arm/mach-mx5/mx50_arm2.c
+index 0d1032d..66a98b3 100644
+--- a/arch/arm/mach-mx5/mx50_arm2.c
++++ b/arch/arm/mach-mx5/mx50_arm2.c
+@@ -107,6 +107,7 @@
+ #define CSPI_CS2	(3*32 + 11) /*GPIO_4_11*/
+ #define USB_OTG_PWR	(5*32 + 25) /*GPIO_6_25*/
+ 
++extern void __iomem *apll_base;
+ extern int __init mx50_arm2_init_mc13892(void);
+ extern struct cpu_wp *(*get_cpu_wp)(int *wp);
+ extern void (*set_num_cpu_wp)(int num);
+@@ -398,8 +399,8 @@ static struct cpu_wp cpu_wp_auto[] = {
+ 	 .cpu_rate = 800000000,
+ 	 .pdf = 0,
+ 	 .mfi = 8,
+-	 .mfd = 2,
+-	 .mfn = 1,
++	 .mfd = 179,
++	 .mfn = 60,
+ 	 .cpu_podf = 0,
+ 	 .cpu_voltage = 1050000,},
+ 	{
+@@ -411,7 +412,30 @@ static struct cpu_wp cpu_wp_auto[] = {
+ 	 .pll_rate = 800000000,
+ 	 .cpu_rate = 160000000,
+ 	 .cpu_podf = 4,
+-	 .cpu_voltage = 850000,},
++	 .cpu_voltage = 900000,},
++};
++
++/* working point(wp): 0 - 1000MHz; 1 - 500MHz, 2 - 166MHz; */
++static struct cpu_wp fast_cpu_wp_auto[] = {
++	{
++	 .pll_rate = 1000000000,
++	 .cpu_rate = 1000000000,
++	 .pdf = 0,
++	 .mfi = 10,
++	 .mfd = 179,
++	 .mfn = 75,
++	 .cpu_podf = 0,
++	 .cpu_voltage = 1275000,},
++	{
++	 .pll_rate = 1000000000,
++	 .cpu_rate = 500000000,
++	 .cpu_podf = 1,
++	 .cpu_voltage = 1050000,},
++	{
++	 .pll_rate = 1000000000,
++	 .cpu_rate = 166666666,
++	 .cpu_podf = 5,
++	 .cpu_voltage = 900000,},
+ };
+ 
+ static struct dvfs_wp *mx50_arm2_get_dvfs_core_table(int *wp)
+@@ -426,6 +450,12 @@ static struct cpu_wp *mx50_arm2_get_cpu_wp(int *wp)
+ 	return cpu_wp_auto;
+ }
+ 
++static struct cpu_wp *mx50_arm2_get_fast_cpu_wp(int *wp)
++{
++    *wp = num_cpu_wp;
++    return fast_cpu_wp_auto;
++}
++
+ static void mx50_arm2_set_num_cpu_wp(int num)
+ {
+ 	num_cpu_wp = num;
+@@ -1185,6 +1215,15 @@ static void mx50_suspend_enter()
+ {
+ 	iomux_v3_cfg_t *p = suspend_enter_pads;
+ 	int i;
++
++    /* Clear the SELF_BIAS bit and power down
++     * the band-gap.
++     */
++    __raw_writel(MXC_ANADIG_REF_SELFBIAS_OFF,
++            apll_base + MXC_ANADIG_MISC_CLR);
++    __raw_writel(MXC_ANADIG_REF_PWD,
++            apll_base + MXC_ANADIG_MISC_SET);
++
+ 	/* Set PADCTRL to 0 for all IOMUX. */
+ 	for (i = 0; i < ARRAY_SIZE(suspend_enter_pads); i++) {
+ 		suspend_exit_pads[i] = *p;
+@@ -1199,6 +1238,13 @@ static void mx50_suspend_enter()
+ 
+ static void mx50_suspend_exit()
+ {
++    /* Power Up the band-gap and set the SELFBIAS bit. */
++    __raw_writel(MXC_ANADIG_REF_PWD,
++            apll_base + MXC_ANADIG_MISC_CLR);
++    udelay(100);
++    __raw_writel(MXC_ANADIG_REF_SELFBIAS_OFF,
++            apll_base + MXC_ANADIG_MISC_SET);
++
+ 	mxc_iomux_v3_setup_multiple_pads(suspend_exit_pads,
+ 			ARRAY_SIZE(suspend_exit_pads));
+ }
+@@ -1222,12 +1268,37 @@ static struct mxc_pm_platform_data mx50_pm_data = {
+ static void __init fixup_mxc_board(struct machine_desc *desc, struct tag *tags,
+ 				   char **cmdline, struct meminfo *mi)
+ {
++	struct tag *t;
++	char *str;
++	int capable_to_1GHz = 0;
++
+ 	mxc_set_cpu_type(MXC_CPU_MX50);
+ 
+-	get_cpu_wp = mx50_arm2_get_cpu_wp;
++	for_each_tag(t, tags)
++	{
++		if (t->hdr.tag == ATAG_CMDLINE)
++		{
++			str = t->u.cmdline.cmdline;
++			if( str != NULL &&
++				strstr(str, "mx50_1GHz") != NULL )
++			{
++				capable_to_1GHz = 1;
++			}
++		}
++	}
++
++	if( capable_to_1GHz )
++	{
++		get_cpu_wp = mx50_arm2_get_fast_cpu_wp;
++		num_cpu_wp = ARRAY_SIZE(fast_cpu_wp_auto);
++	}
++	else
++	{
++		get_cpu_wp = mx50_arm2_get_cpu_wp;
++		num_cpu_wp = ARRAY_SIZE(cpu_wp_auto);
++	}
+ 	set_num_cpu_wp = mx50_arm2_set_num_cpu_wp;
+ 	get_dvfs_core_wp = mx50_arm2_get_dvfs_core_table;
+-	num_cpu_wp = ARRAY_SIZE(cpu_wp_auto);
+ }
+ 
+ static void __init mx50_arm2_io_init(void)
+diff --git a/arch/arm/mach-mx5/mx50_arm2_pmic_mc13892.c b/arch/arm/mach-mx5/mx50_arm2_pmic_mc13892.c
+index 567f08d..8a8a6ff 100644
+--- a/arch/arm/mach-mx5/mx50_arm2_pmic_mc13892.c
++++ b/arch/arm/mach-mx5/mx50_arm2_pmic_mc13892.c
+@@ -89,6 +89,7 @@
+ 
+ #define	SWMODE_MASK	0xF
+ #define SWMODE_AUTO	0x8
++#define SWMODE_PWM_AUTO	0x6
+ 
+ /* CPU */
+ static struct regulator_consumer_supply sw1_consumers[] = {
+@@ -367,7 +368,7 @@ static int mc13892_regulator_init(struct mc13892 *mc13892)
+ 		register_mask = (SWMODE_MASK << SW1MODE_LSB) |
+ 		       (SWMODE_MASK << SW2MODE_LSB);
+ 		value &= ~register_mask;
+-		value |= (SWMODE_AUTO << SW1MODE_LSB) |
++		value |= (SWMODE_PWM_AUTO << SW1MODE_LSB) |
+ 			(SWMODE_AUTO << SW2MODE_LSB);
+ 		pmic_write_reg(REG_SW_4, value, 0xffffff);
+ 
+diff --git a/arch/arm/mach-mx5/mx50_ddr_freq.S b/arch/arm/mach-mx5/mx50_ddr_freq.S
+index 06bb4fa..3a46769 100644
+--- a/arch/arm/mach-mx5/mx50_ddr_freq.S
++++ b/arch/arm/mach-mx5/mx50_ddr_freq.S
+@@ -26,12 +26,13 @@
+  *  IRQs are already disabled.
+  */
+ ENTRY(mx50_ddr_freq_change)
+-    stmfd   sp!, {r4,r5,r6, r7, r8, r9}      @ Save registers
++    stmfd   sp!, {r4,r5,r6, r7, r8, r9, r10}      @ Save registers
+ 
+     mov    r6, r0                       @save CCM address
+     mov    r5, r1                       @save DataBahn address
+     mov    r4, r2                       @save new freq requested
+     mov    r8, r3                       @save the DRAM settings array
++    ldr    r10,[sp,#28]                 @save pll1 freq
+ 
+     /* Make sure no TLB miss will occur when the DDR is in self refresh. */
+     /* Invalidate TLB single entry to ensure that the address is not
+@@ -153,7 +154,7 @@ LoopCKE0:
+     ble    databahn_ddr_24
+ 
+     /*Source DDR from PLL1.  Setup the dividers accordingly. */
+-    ldr    r0, =800000000
++    mov    r0, r10
+     ldr    r3, =1
+ Loop1:
+     sub    r0, r0, r4
+@@ -238,11 +239,25 @@ Async_Mode:
+     str     r0, [r6, #0x94]
+ 
+     /* Set the new divider. */
++    ldr     r0, =800000000
++    cmp     r0, r10
++    blt     Div_is_5
++
++    /* New divider is 4 if PLL1=800MHz */
+     ldr     r0, [r6, #0x94]
+     bic    r0, r0, #0x3f
+     orr     r0, r0, #4
+     str     r0, [r6, #0x94]
++    b       NewDivDone
++
++    /* New divider is 5 if PLL1=1000MHz */
++Div_is_5:
++    ldr     r0, [r6, #0x94]
++    bic    r0, r0, #0x3f
++    orr     r0, r0, #5
++    str     r0, [r6, #0x94]
+ 
++NewDivDone:
+    /* Enable SYS_PLL_CLKGATE. */
+     ldr     r0, [r6, #0x94]
+     orr     r0, r0, #0x30000000
+@@ -265,7 +280,7 @@ Sys_Clk_Not_24:
+     str    r0, [r5, #0xdc]
+ 
+     /*Source DDR from PLL1.  Setup the dividers accordingly. */
+-    ldr    r0, =800000000
++    mov    r0, r10
+     ldr    r3, =1
+ Loop2:
+     sub    r0, r0, r4
+@@ -384,7 +399,7 @@ LoopCKE1:
+     str     r9,[r5, #0x50]
+ 
+     /* Restore registers */
+-    ldmfd sp!, {r4,r5,r6, r7, r8, r9}
++    ldmfd sp!, {r4,r5,r6, r7, r8, r9, r10}
+     mov     pc, lr
+ 
+     .type   mx50_do_ddr_freq_change, #object
+diff --git a/arch/arm/mach-mx5/mx50_freq.c b/arch/arm/mach-mx5/mx50_freq.c
+index 0259e6a..52dda07 100644
+--- a/arch/arm/mach-mx5/mx50_freq.c
++++ b/arch/arm/mach-mx5/mx50_freq.c
+@@ -51,7 +51,7 @@ void *ddr_freq_change_iram_base;
+ void __iomem *databahn_base;
+ 
+ void (*change_ddr_freq)(void *ccm_addr, void *databahn_addr,
+-			u32 freq, void *iram_ddr_settings) = NULL;
++			u32 freq, void *iram_ddr_settings, u32 pll_rate) = NULL;
+ void *wait_in_iram_base;
+ void (*wait_in_iram)(void *ccm_addr, void *databahn_addr, u32 sys_clk_count);
+ 
+@@ -61,9 +61,11 @@ extern void __iomem *ccm_base;
+ extern void __iomem *databahn_base;
+ extern void mx50_ddr_freq_change(u32 ccm_base,
+ 					u32 databahn_addr, u32 freq);
++extern struct cpu_wp *(*get_cpu_wp)(int *wp);
+ 
+ static void __iomem *qosc_base;
+ static int ddr_settings_size;
++static u32 pll_rate;
+ 
+ unsigned long lpddr2_databhan_regs_offsets[][2] = {
+ 	{0x8, 0x0},
+@@ -309,15 +311,24 @@ int update_ddr_freq(int ddr_rate)
+ 			for (i = 0; i < iram_ddr_settings[0][0]; i++) {
+ 				if (iram_ddr_settings[i + 1][0] == 0x40) {
+ 					if (mx50_ddr_type == MX50_LPDDR2)
+-						/* LPDDR2 133MHz. */
++						/* LPDDR2 133MHz(125MHz). */
+ 						iram_ddr_settings[i + 1][1] =
+-								0x00050180;
++								0x000501d8;
+ 					else
+-						/* mDDR 133MHz. */
++						/* mDDR 133MHz(125MHz). */
+ 						iram_ddr_settings[i + 1][1] =
+-								0x00050208;
+-					break;
++								0x000503bf;
+ 				}
++				else if(iram_ddr_settings[i + 1][0] == 0x24) {
++					if (mx50_ddr_type == MX50_LPDDR2)
++						/* LPDDR2 133MHz(125MHz). */
++						iram_ddr_settings[i + 1][1] =
++								0x00222605;
++					if(mx50_ddr_type == MX50_MDDR)
++						/* mDDR 133MHz(125MHz) */
++						iram_ddr_settings[i + 1][1] =
++								0x00222602;
++                }
+ 			}
+ 		}
+ 	}
+@@ -331,7 +342,7 @@ int update_ddr_freq(int ddr_rate)
+ 
+ 	/* Set the DDR to default freq. */
+ 	change_ddr_freq(ccm_base, databahn_base, ddr_rate,
+-					iram_ddr_settings);
++					iram_ddr_settings, pll_rate);
+ 
+ 	/* Enable all masters to access the DDR. */
+ 	__raw_writel(reg, qosc_base + HW_QOS_DISABLE_CLR);
+@@ -344,8 +355,12 @@ void init_ddr_settings(void)
+ 	unsigned long iram_paddr;
+ 	unsigned int reg;
+ 	int i;
++	struct cpu_wp *cpu_wp_tbl;
+ 	struct clk *ddr_clk = clk_get(NULL, "ddr_clk");
+ 
++	cpu_wp_tbl = get_cpu_wp(&i);
++	pll_rate = cpu_wp_tbl[0].pll_rate;
++	
+ 	databahn_base = ioremap(MX50_DATABAHN_BASE_ADDR, SZ_16K);
+ 
+ 	/* Find the memory type, LPDDR2 or mddr. */
+diff --git a/arch/arm/mach-mx5/mx50_rdp.c b/arch/arm/mach-mx5/mx50_rdp.c
+index c39a19c..c51bc00 100644
+--- a/arch/arm/mach-mx5/mx50_rdp.c
++++ b/arch/arm/mach-mx5/mx50_rdp.c
+@@ -495,8 +495,8 @@ static struct cpu_wp cpu_wp_auto[] = {
+ 	 .cpu_rate = 800000000,
+ 	 .pdf = 0,
+ 	 .mfi = 8,
+-	 .mfd = 2,
+-	 .mfn = 1,
++	 .mfd = 179,
++	 .mfn = 60,
+ 	 .cpu_podf = 0,
+ 	 .cpu_voltage = 1050000,},
+ 	{
+@@ -508,7 +508,30 @@ static struct cpu_wp cpu_wp_auto[] = {
+ 	 .pll_rate = 800000000,
+ 	 .cpu_rate = 160000000,
+ 	 .cpu_podf = 4,
+-	 .cpu_voltage = 850000,},
++	 .cpu_voltage = 900000,},
++};
++
++/* working point(wp): 0 - 1000MHz; 1 - 500MHz, 2 - 166MHz; */
++static struct cpu_wp fast_cpu_wp_auto[] = {
++	{
++	 .pll_rate = 1000000000,
++	 .cpu_rate = 1000000000,
++	 .pdf = 0,
++	 .mfi = 10,
++	 .mfd = 179,
++	 .mfn = 75,
++	 .cpu_podf = 0,
++	 .cpu_voltage = 1275000,},
++	{
++	 .pll_rate = 1000000000,
++	 .cpu_rate = 500000000,
++	 .cpu_podf = 1,
++	 .cpu_voltage = 1050000,},
++	{
++	 .pll_rate = 1000000000,
++	 .cpu_rate = 166666666,
++	 .cpu_podf = 5,
++	 .cpu_voltage = 900000,},
+ };
+ 
+ static struct dvfs_wp *mx50_rdp_get_dvfs_core_table(int *wp)
+@@ -523,6 +546,12 @@ static struct cpu_wp *mx50_rdp_get_cpu_wp(int *wp)
+ 	return cpu_wp_auto;
+ }
+ 
++static struct cpu_wp *mx50_rdp_get_fast_cpu_wp(int *wp)
++{
++    *wp = num_cpu_wp;
++    return fast_cpu_wp_auto;
++}
++
+ static void mx50_rdp_set_num_cpu_wp(int num)
+ {
+ 	num_cpu_wp = num;
+@@ -1795,7 +1824,7 @@ static struct mxc_pm_platform_data mx50_pm_data = {
+ 	.suspend_exit = mx50_suspend_exit,
+ };
+ 
+-/*!
++/*
+  * Board specific fixup function. It is called by \b setup_arch() in
+  * setup.c file very early on during kernel starts. It allows the user to
+  * statically fill in the proper values for the passed-in parameters. None of
+@@ -1809,12 +1838,37 @@ static struct mxc_pm_platform_data mx50_pm_data = {
+ static void __init fixup_mxc_board(struct machine_desc *desc, struct tag *tags,
+ 				   char **cmdline, struct meminfo *mi)
+ {
++	struct tag *t;
++	char *str;
++	int capable_to_1GHz = 0;	
++
+ 	mxc_set_cpu_type(MXC_CPU_MX50);
+ 
+-	get_cpu_wp = mx50_rdp_get_cpu_wp;
++	for_each_tag(t, tags) 
++	{
++		if (t->hdr.tag == ATAG_CMDLINE) 
++		{
++			str = t->u.cmdline.cmdline;
++			if( str != NULL &&
++				strstr(str, "mx50_1GHz") != NULL ) 
++			{
++				capable_to_1GHz = 1;
++			}
++		}
++	}
++
++	if( capable_to_1GHz )
++	{
++		get_cpu_wp = mx50_rdp_get_fast_cpu_wp;
++		num_cpu_wp = ARRAY_SIZE(fast_cpu_wp_auto);
++	}
++	else
++	{
++		get_cpu_wp = mx50_rdp_get_cpu_wp;
++		num_cpu_wp = ARRAY_SIZE(cpu_wp_auto);
++	}
+ 	set_num_cpu_wp = mx50_rdp_set_num_cpu_wp;
+ 	get_dvfs_core_wp = mx50_rdp_get_dvfs_core_table;
+-	num_cpu_wp = ARRAY_SIZE(cpu_wp_auto);
+ }
+ 
+ static void __init mx50_rdp_io_init(void)
+@@ -1887,8 +1941,7 @@ static void __init mx50_rdp_io_init(void)
+ 	gpio_request(HDMI_RESET, "hdmi-reset");
+ 	gpio_direction_output(HDMI_RESET, 1);
+ 	gpio_request(HDMI_PWR_ENABLE, "hdmi-pwr-enable");
+-	gpio_direction_output(HDMI_PWR_ENABLE, 1);
+-	gpio_set_value(HDMI_PWR_ENABLE, 0);
++	gpio_direction_output(HDMI_PWR_ENABLE, 0);
+ 	gpio_request(HDMI_DETECT, "hdmi-detect");
+ 	gpio_direction_input(HDMI_DETECT);
+ 
+diff --git a/arch/arm/mach-mx5/mx50_rdp_pmic_mc13892.c b/arch/arm/mach-mx5/mx50_rdp_pmic_mc13892.c
+index fd2faf1..a51ec12 100644
+--- a/arch/arm/mach-mx5/mx50_rdp_pmic_mc13892.c
++++ b/arch/arm/mach-mx5/mx50_rdp_pmic_mc13892.c
+@@ -86,6 +86,7 @@
+ 
+ #define	SWMODE_MASK	0xF
+ #define SWMODE_AUTO	0x8
++#define SWMODE_PWM_AUTO	0x6
+ 
+ /* CPU */
+ static struct regulator_consumer_supply sw1_consumers[] = {
+@@ -364,7 +365,7 @@ static int mc13892_regulator_init(struct mc13892 *mc13892)
+ 		register_mask = (SWMODE_MASK << SW1MODE_LSB) |
+ 		       (SWMODE_MASK << SW2MODE_LSB);
+ 		value &= ~register_mask;
+-		value |= (SWMODE_AUTO << SW1MODE_LSB) |
++		value |= (SWMODE_PWM_AUTO << SW1MODE_LSB) |
+ 			(SWMODE_AUTO << SW2MODE_LSB);
+ 		pmic_write_reg(REG_SW_4, value, 0xffffff);
+ 
+diff --git a/arch/arm/mach-mx5/mx50_rdp_pmic_mc34708.c b/arch/arm/mach-mx5/mx50_rdp_pmic_mc34708.c
+index 40f03a6..7adb218 100644
+--- a/arch/arm/mach-mx5/mx50_rdp_pmic_mc34708.c
++++ b/arch/arm/mach-mx5/mx50_rdp_pmic_mc34708.c
+@@ -49,7 +49,7 @@
+ 
+ #define SW1A_MODE_MASK		(0xf << 0)
+ #define SW2_MODE_MASK		(0xf << 14)
+-#define SW1A_MODE_VALUE		(0xc << 0)
++#define SW1A_MODE_VALUE		(0xd << 0)
+ #define SW2_MODE_VALUE		(0xc << 14)
+ 
+ #define REG_SW_1_2_MASK	(SW1A_MODE_MASK | SW2_MODE_MASK)
+diff --git a/arch/arm/mach-mx5/mx50_suspend.S b/arch/arm/mach-mx5/mx50_suspend.S
+index 64874b1..0e7d0cc 100644
+--- a/arch/arm/mach-mx5/mx50_suspend.S
++++ b/arch/arm/mach-mx5/mx50_suspend.S
+@@ -158,13 +158,34 @@ LoopCKE0:
+     orr     r1, r1, #0x4
+     str     r1, [r8, #0x0c]
+ 
+-    /* Now do the MFN changes to relock PLL1 at 864MHz. */
++    /* Now do the MFN changes to relock PLL1 at 1056MHz. */
+     ldr     r1, [r12, #MXC_PLL_DP_CONFIG]
+     bic     r1, r1, #0x2
+     str     r1, [r12, #MXC_PLL_DP_CONFIG] /* disable auto-restart AREN bit */
+ 
++     ldr     r0, [r12, #MXC_PLL_DP_OP]	
++     and     r0, r0, #0x000000F0
++     ldr     r1, =0xA0
++     cmp     r0, r1
++     beq     Relock_1056MHz
++
+    /* MFI = 8, MFN = 180, MFD = 179. PLL1 Freq = ~ 864MHz. */
+-    ldr     r1, =0x80
++     ldr     r1, =0x80
++     str     r1, [r12, #MXC_PLL_DP_OP]
++     str     r1, [r12, #MXC_PLL_DP_HFS_OP]
++
++     ldr     r1, =180
++     str     r1, [r12, #MXC_PLL_DP_MFN]
++     str     r1, [r12, #MXC_PLL_DP_HFS_MFN]
++
++     ldr     r1, =179
++     str     r1, [r12, #MXC_PLL_DP_MFD]
++     str     r1, [r12, #MXC_PLL_DP_HFS_MFD]
++     b       RestartPLL
++
++Relock_1056MHz:
++   /* MFI = 10, MFN = 180, MFD = 179. PLL1 Freq = ~ 1056MHz. */
++    ldr     r1, =0xA0
+     str     r1, [r12, #MXC_PLL_DP_OP]
+     str     r1, [r12, #MXC_PLL_DP_HFS_OP]
+ 
+@@ -176,6 +197,7 @@ LoopCKE0:
+     str     r1, [r12, #MXC_PLL_DP_MFD]
+     str     r1, [r12, #MXC_PLL_DP_HFS_MFD]
+ 
++RestartPLL:
+     /* Manually restart PLL1 */
+     ldr     r1, =0x00001236 /* Set PLM =1, manual restart and enable PLL*/
+     str     r1, [r12, #MXC_PLL_DP_CTL]
+@@ -201,11 +223,25 @@ LoopCKE0:
+ 	ands  r1, r1, #0x1
+ 	beq   1b
+ 
+-    /* Set PLL1 to 800MHz, MFN = 60. */
+-    ldr    r1, =60
++     ldr     r0, [r12, #MXC_PLL_DP_OP]
++     and     r0, r0, #0x000000F0
++     ldr     r1, =0xA0
++     cmp     r0, r1
++     beq     Relock_1000MHz
++
++     /* Set PLL1 to 800MHz, MFN = 60. */
++     ldr    r1, =60
++     str    r1, [r12, #MXC_PLL_DP_MFN]
++     str    r1, [r12, #MXC_PLL_DP_HFS_MFN]
++	 b      WaitLDREQ
++
++Relock_1000MHz:
++    /* Set PLL1 to 1000MHz, MFN = 75. */
++    ldr    r1, =75
+     str   r1, [r12, #MXC_PLL_DP_MFN]
+     str   r1, [r12, #MXC_PLL_DP_HFS_MFN]
+ 
++WaitLDREQ:
+     /* Set up the LDREQ */
+     ldr    r1, [r12, #MXC_PLL_DP_CONFIG]
+     orr    r1, r1, #1
+diff --git a/arch/arm/mach-mx5/serial.h b/arch/arm/mach-mx5/serial.h
+index 9fbb0b3..473a5e1 100644
+--- a/arch/arm/mach-mx5/serial.h
++++ b/arch/arm/mach-mx5/serial.h
+@@ -51,7 +51,7 @@
+ #define UART2_UFCR_TXTL         16
+ /* UART 3 configuration */
+ #define UART3_UCR4_CTSTL        16
+-#define UART3_DMA_ENABLE	0
++#define UART3_DMA_ENABLE	1
+ #define UART3_DMA_RXBUFSIZE     1024
+ #define UART3_UFCR_RXTL         16
+ #define UART3_UFCR_TXTL         16
+diff --git a/arch/arm/plat-mxc/clock.c b/arch/arm/plat-mxc/clock.c
+index 34c4be1..3b2eaa7 100644
+--- a/arch/arm/plat-mxc/clock.c
++++ b/arch/arm/plat-mxc/clock.c
+@@ -475,6 +475,15 @@ static int mxc_proc_clocks_seq_show(struct seq_file *file, void *data)
+ 	unsigned long  range_divisor;
+ 	const char     *range_units;
+ 	int rate = clk_get_rate(clock->reg_clk);
++    struct mxc_clk    *current_clock = NULL;
++    struct mxc_clk    *parent_clk = NULL;
++
++    /* Examine the clock list. */
++
++    list_for_each_entry(current_clock, &clocks, node) {
++        if(parent == current_clock->reg_clk)
++            parent_clk = current_clock;
++    }
+ 
+ 	if (rate >= 1000000) {
+ 		range_divisor = 1000000;
+@@ -486,12 +495,14 @@ static int mxc_proc_clocks_seq_show(struct seq_file *file, void *data)
+ 		range_divisor = 1;
+ 		range_units   = "Hz";
+ 	}
+-	result = seq_printf(file,
+-		"%s-%-d%*s  %*s  %c%c%c%c%c%c  %3d",
+-		clock->name,
+-		clock->reg_clk->id,
+-		longest_length - strlen(clock->name), "",
+-		longest_length + 2, "",
++    result = seq_printf(file,
++        "%s-%-d%*s  %s-%-d%*s  %c%c%c%c%c%c  %3d",
++        clock->name,
++        clock->reg_clk->id,
++        longest_length - strlen(clock->name), "",
++        (parent_clk==NULL)?"":parent_clk->name,
++        (parent_clk==NULL)?0:parent_clk->reg_clk->id,
++        (parent_clk==NULL)?longest_length:longest_length-strlen(parent_clk->name), "",
+ 		(clock->reg_clk->flags & RATE_PROPAGATES)      ? 'P' : '_',
+ 		(clock->reg_clk->flags & ALWAYS_ENABLED)       ? 'A' : '_',
+ 		(clock->reg_clk->flags & RATE_FIXED)           ? 'F' : '_',
+diff --git a/arch/arm/plat-mxc/cpufreq.c b/arch/arm/plat-mxc/cpufreq.c
+index 5ba4a71..dd1a0a8 100644
+--- a/arch/arm/plat-mxc/cpufreq.c
++++ b/arch/arm/plat-mxc/cpufreq.c
+@@ -69,6 +69,7 @@ int set_cpu_freq(int freq)
+ 	int gp_volt = 0;
+ 	int i;
+ 
++	freq = clk_round_rate(cpu_clk, freq);
+ 	org_cpu_rate = clk_get_rate(cpu_clk);
+ 	if (org_cpu_rate == freq)
+ 		return ret;
+diff --git a/drivers/regulator/reg-mc13892.c b/drivers/regulator/reg-mc13892.c
+index e3c6ab3..7abc9f2 100644
+--- a/drivers/regulator/reg-mc13892.c
++++ b/drivers/regulator/reg-mc13892.c
+@@ -337,9 +337,25 @@ static int mc13892_sw_set_voltage(struct regulator_dev *reg, int MiniV, int uV)
+ 
+ 	switch (sw) {
+ 	case MC13892_SW1:
+-		register1 = REG_SW_0;
+-		register_val = BITFVAL(SW1, voltage);
+-		register_mask = BITFMASK(SW1);
++		if(voltage >= 18) {
++			// change voltage after op mode at high voltage
++			CHECK_ERROR(pmic_write_reg(REG_SW_4, 0x06, 0x0f));
++
++			register1 = REG_SW_0;
++			register_val = BITFVAL(SW1, voltage);
++			register_mask = BITFMASK(SW1);
++		}
++		else {
++			// change voltage before op mode at low voltage
++			register1 = REG_SW_0;
++			register_val = BITFVAL(SW1, voltage);
++			register_val |= (hi << SWXHI_LSH);
++			register_mask = BITFMASK(SW1);
++			register_mask |= (1 << SWXHI_LSH);
++			CHECK_ERROR(pmic_write_reg(register1, register_val, register_mask));
++
++			return pmic_write_reg(REG_SW_4, 0x08, 0x0f);
++		}
+ 		break;
+ 	case MC13892_SW2:
+ 		register1 = REG_SW_1;
+diff --git a/drivers/regulator/reg-mc34708.c b/drivers/regulator/reg-mc34708.c
+index b0fa381..7ffc28f 100644
+--- a/drivers/regulator/reg-mc34708.c
++++ b/drivers/regulator/reg-mc34708.c
+@@ -693,9 +693,25 @@ static int mc34708_sw_set_normal_voltage(struct regulator_dev *reg, int minuV,
+ 		voltage =
+ 			uv_to_bit_value(mV * 1000, SW1_MIN_UV, SW1_MAX_UV,
+ 				    SW1_STEP_UV);
+-		register_val = BITFVAL(SW1A, voltage);
+-		register_mask = BITFMASK(SW1A);
+-		register1 = MC34708_REG_SW1AB;
++		if(voltage >= 32) {
++			// change voltage after op mode for high voltage
++			pmic_write_reg(MC34708_REG_SW_OP_MODE_1_2, 0x0D, 0x0F);
++
++			register_val = BITFVAL(SW1A, voltage);
++			register_mask = BITFMASK(SW1A);
++			register1 = MC34708_REG_SW1AB;
++		}
++		else {
++			// change voltage before op mode for low voltage
++			register_val = BITFVAL(SW1A, voltage);
++			register_mask = BITFMASK(SW1A);
++			register1 = MC34708_REG_SW1AB;
++			pmic_write_reg(register1, register_val, register_mask);
++			
++			register_val = 0x0C;
++			register_mask = 0x0F;
++			register1 = MC34708_REG_SW_OP_MODE_1_2;
++		}
+ 		break;
+ 	case MC34708_SW1B:
+ 		voltage =
