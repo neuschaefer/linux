@@ -1951,6 +1951,36 @@ config FEC
 	  Say Y here if you want to use the built-in 10/100 Fast ethernet
 	  controller on some Motorola ColdFire and Freescale i.MX processors.
 
+config FEC_NAPI
+       bool "Use NAPI for FEC driver"
+       depends on FEC
+       help
+         This option enables NAPI support for the FEC's on-chip
+         Fast Ethernet Controller driver.
+
+config FEC_1588
+	bool "Enable FEC 1588 timestamping"
+	depends on FEC
+
+choice
+	prompt "IEEE 1588 operation mode"
+	depends on (ARCH_MX5 || ARCH_MX6) && FEC_1588
+	default OUT_OF_BAND
+
+config OUT_OF_BAND
+	bool "out-of-band mode"
+	help
+	  IEEE 1588 operation mode is out-of-band, in this mode, the Tx and Rx
+	  timestamp will be caputred into special registers.
+
+config IN_BAND
+	bool "in-band mode"
+	help
+	  IEEE 1588 operation mode is in-band, in this mode, the Tx timestamp
+	  will be captured into special retisters, but the Rx timestamp will be
+	  captured into the first eight bytes of received ethernet packet.
+endchoice
+
 config FEC_MPC52xx
 	tristate "MPC52xx FEC driver"
 	depends on PPC_MPC52xx && PPC_BESTCOMM
@@ -3323,6 +3353,23 @@ config PPPOL2TP
 	  Support for PPP-over-L2TP socket family. L2TP is a protocol
 	  used by ISPs and enterprises to tunnel PPP traffic over UDP
 	  tunnels. L2TP is replacing PPTP for VPN uses.
+
+config PPPOLAC
+	tristate "PPP on L2TP Access Concentrator"
+	depends on PPP && INET
+	help
+	  L2TP (RFC 2661) is a tunneling protocol widely used in virtual private
+	  networks. This driver handles L2TP data packets between a UDP socket
+	  and a PPP channel, but only permits one session per socket. Thus it is
+	  fairly simple and suited for clients.
+
+config PPPOPNS
+	tristate "PPP on PPTP Network Server"
+	depends on PPP && INET
+	help
+	  PPTP (RFC 2637) is a tunneling protocol widely used in virtual private
+	  networks. This driver handles PPTP data packets between a RAW socket
+	  and a PPP channel. It is fairly simple and easy to use.
 
 config SLIP
 	tristate "SLIP (serial line) support"

@@ -29,9 +29,16 @@ static int audio_buf_size = 48000;
 module_param(audio_buf_size, int, S_IRUGO);
 MODULE_PARM_DESC(audio_buf_size, "Audio buffer size");
 
+/* The first usb audio buf to alsa playback */
+static int first_audio_buf_size = 65500;
+module_param(first_audio_buf_size, int, S_IRUGO);
+MODULE_PARM_DESC(first_audio_buf_size, "First Audio buffer size");
+
 static int generic_set_cmd(struct usb_audio_control *con, u8 cmd, int value);
 static int generic_get_cmd(struct usb_audio_control *con, u8 cmd);
 
+/* Flag to use buffer with first_audio_buf_size to asla */
+static int first_copy_audio_buffer = 1;
 /*
  * DESCRIPTORS ... most are static, but strings and full
  * configuration descriptors are built on demand.
@@ -329,13 +336,27 @@ static int f_audio_out_ep_complete(struct usb_ep *ep, struct usb_request *req)
 	if (!copy_buf)
 		return -EINVAL;
 
+	if (!first_copy_audio_buffer) {
 	/* Copy buffer is full, add it to the play_queue */
-	if (audio_buf_size - copy_buf->actual < req->actual) {
-		list_add_tail(&copy_buf->list, &audio->play_queue);
-		schedule_work(&audio->playback_work);
-		copy_buf = f_audio_buffer_alloc(audio_buf_size);
-		if (IS_ERR(copy_buf))
-			return -ENOMEM;
+		if (audio_buf_size - copy_buf->actual < req->actual) {
+			list_add_tail(&copy_buf->list, &audio->play_queue);
+			schedule_work(&audio->playback_work);
+			copy_buf = f_audio_buffer_alloc(audio_buf_size);
+
+			if (IS_ERR(copy_buf))
+				return -ENOMEM;
+		}
+	} else {
+		if (first_audio_buf_size - copy_buf->actual < req->actual) {
+			list_add_tail(&copy_buf->list, &audio->play_queue);
+			schedule_work(&audio->playback_work);
+			copy_buf = f_audio_buffer_alloc(audio_buf_size);
+
+			if (IS_ERR(copy_buf))
+				return -ENOMEM;
+
+			first_copy_audio_buffer = 0;
+		}
 	}
 
 	memcpy(copy_buf->buf + copy_buf->actual, req->buf, req->actual);
@@ -461,7 +482,7 @@ static int audio_set_endpoint_req(struct usb_function *f,
 
 	switch (ctrl->bRequest) {
 	case UAC_SET_CUR:
-		value = 0;
+		value = len;
 		break;
 
 	case UAC_SET_MIN:
@@ -500,7 +521,7 @@ static int audio_get_endpoint_req(struct usb_function *f,
 	case UAC_GET_MIN:
 	case UAC_GET_MAX:
 	case UAC_GET_RES:
-		value = 3;
+		value = len;
 		break;
 	case UAC_GET_MEM:
 		break;
@@ -577,7 +598,7 @@ static int f_audio_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 		if (alt == 1) {
 			usb_ep_enable(out_ep, audio->out_desc);
 			out_ep->driver_data = audio;
-			audio->copy_buf = f_audio_buffer_alloc(audio_buf_size);
+			audio->copy_buf = f_audio_buffer_alloc(first_audio_buf_size);
 			if (IS_ERR(audio->copy_buf))
 				return -ENOMEM;
 
@@ -614,6 +635,7 @@ static int f_audio_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 						&audio->play_queue);
 				schedule_work(&audio->playback_work);
 			}
+			first_copy_audio_buffer = 1;
 		}
 	}
 
@@ -622,6 +644,10 @@ static int f_audio_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 
 static void f_audio_disable(struct usb_function *f)
 {
+	struct f_audio		*audio = func_to_audio(f);
+
+	usb_ep_disable(audio->out_ep);
+
 	return;
 }
 
@@ -681,17 +707,18 @@ f_audio_bind(struct usb_configuration *c, struct usb_function *f)
 
 	status = -ENOMEM;
 
-	/* supcard all relevant hardware speeds... we expect that when
+	/* copy descriptors, and track endpoint copies */
+	f->descriptors = usb_copy_descriptors(f_audio_desc);
+
+	/*
+	 * support all relevant hardware speeds... we expect that when
 	 * hardware is dual speed, all bulk-capable endpoints work at
 	 * both speeds
 	 */
-
-	/* copy descriptors, and track endpoint copies */
 	if (gadget_is_dualspeed(c->cdev->gadget)) {
 		c->highspeed = true;
 		f->hs_descriptors = usb_copy_descriptors(f_audio_desc);
-	} else
-		f->descriptors = usb_copy_descriptors(f_audio_desc);
+	}
 
 	return 0;
 

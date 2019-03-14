@@ -3,7 +3,7 @@
  * Copyright 2008 Juergen Beisert, kernel@pengutronix.de
  *
  * Based on code from Freescale,
- * Copyright (C) 2004-2010 Freescale Semiconductor, Inc. All Rights Reserved.
+ * Copyright (C) 2004-2013 Freescale Semiconductor, Inc.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -26,6 +26,7 @@
 #include <linux/gpio.h>
 #include <mach/hardware.h>
 #include <asm-generic/bug.h>
+#include <asm/mach/irq.h>
 
 static struct mxc_gpio_port *mxc_gpio_ports;
 static int gpio_table_size;
@@ -176,11 +177,16 @@ static void mx3_gpio_irq_handler(u32 irq, struct irq_desc *desc)
 {
 	u32 irq_stat;
 	struct mxc_gpio_port *port = irq_get_handler_data(irq);
+	struct irq_chip *chip = irq_get_chip(irq);
+
+	chained_irq_enter(chip, desc);
 
 	irq_stat = __raw_readl(port->base + GPIO_ISR) &
 			__raw_readl(port->base + GPIO_IMR);
 
 	mxc_gpio_irq_handler(port, irq_stat);
+
+	chained_irq_exit(chip, desc);
 }
 
 /* MX2 has one interrupt *for all* gpio ports */
@@ -246,16 +252,15 @@ static void _set_gpio_direction(struct gpio_chip *chip, unsigned offset,
 {
 	struct mxc_gpio_port *port =
 		container_of(chip, struct mxc_gpio_port, chip);
-	u32 l;
 	unsigned long flags;
 
 	spin_lock_irqsave(&port->lock, flags);
-	l = __raw_readl(port->base + GPIO_GDIR);
+	port->dir = __raw_readl(port->base + GPIO_GDIR);
 	if (dir)
-		l |= 1 << offset;
+		port->dir |= (1 << offset);
 	else
-		l &= ~(1 << offset);
-	__raw_writel(l, port->base + GPIO_GDIR);
+		port->dir &= (~(1 << offset));
+	__raw_writel(port->dir, port->base + GPIO_GDIR);
 	spin_unlock_irqrestore(&port->lock, flags);
 }
 
@@ -277,8 +282,14 @@ static int mxc_gpio_get(struct gpio_chip *chip, unsigned offset)
 {
 	struct mxc_gpio_port *port =
 		container_of(chip, struct mxc_gpio_port, chip);
+	u32 gpio_direction;
 
-	return (__raw_readl(port->base + GPIO_PSR) >> offset) & 1;
+	gpio_direction = __raw_readl(port->base + GPIO_GDIR);
+	if (((gpio_direction >> offset) & 1)) /* output mode */
+		return (__raw_readl(port->base + GPIO_DR) >> offset) & 1;
+	else /* input mode */
+		return (__raw_readl(port->base + GPIO_PSR) >> offset) & 1;
+
 }
 
 static int mxc_gpio_direction_input(struct gpio_chip *chip, unsigned offset)
@@ -301,9 +312,10 @@ static int mxc_gpio_direction_output(struct gpio_chip *chip,
  */
 static struct lock_class_key gpio_lock_class;
 
-int __init mxc_gpio_init(struct mxc_gpio_port *port, int cnt)
+int mxc_gpio_init(struct mxc_gpio_port *port, int cnt)
 {
 	int i, j;
+	static bool initialed;
 
 	/* save for local usage */
 	mxc_gpio_ports = port;
@@ -330,13 +342,17 @@ int __init mxc_gpio_init(struct mxc_gpio_port *port, int cnt)
 		port[i].chip.set = mxc_gpio_set;
 		port[i].chip.base = i * 32;
 		port[i].chip.ngpio = 32;
+		port[i].dir = 0;
 
 		spin_lock_init(&port[i].lock);
 
-		/* its a serious configuration bug when it fails */
-		BUG_ON( gpiochip_add(&port[i].chip) < 0 );
+		if (!initialed)
+			/* its a serious configuration bug when it fails */
+			BUG_ON(gpiochip_add(&port[i].chip) < 0);
 
-		if (cpu_is_mx1() || cpu_is_mx3() || cpu_is_mx25() || cpu_is_mx51()) {
+		if (cpu_is_mx1() || cpu_is_mx3() || cpu_is_mx25() ||
+			cpu_is_mx51() || cpu_is_mx53() || cpu_is_mx6q() ||
+			cpu_is_mx6dl() || cpu_is_mx6sl()) {
 			/* setup one handler for each entry */
 			irq_set_chained_handler(port[i].irq,
 						mx3_gpio_irq_handler);
@@ -350,7 +366,7 @@ int __init mxc_gpio_init(struct mxc_gpio_port *port, int cnt)
 			}
 		}
 	}
-
+	initialed = true;
 	if (cpu_is_mx2()) {
 		/* setup one handler for all GPIO interrupts */
 		irq_set_chained_handler(port[0].irq, mx2_gpio_irq_handler);

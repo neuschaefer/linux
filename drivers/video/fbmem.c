@@ -1051,6 +1051,15 @@ fb_blank(struct fb_info *info, int blank)
  	return ret;
 }
 
+
+#define _FORCE_REPORT_4BIT	1
+
+#ifdef _FORCE_REPORT_4BIT //[
+#include "mxc/ntx_hwconfig.h"
+extern volatile NTX_HWCONFIG *gptHWCFG;
+#endif //] _FORCE_REPORT_4BIT
+
+
 static long do_fb_ioctl(struct fb_info *info, unsigned int cmd,
 			unsigned long arg)
 {
@@ -1070,8 +1079,57 @@ static long do_fb_ioctl(struct fb_info *info, unsigned int cmd,
 			return -ENODEV;
 		var = info->var;
 		unlock_fb_info(info);
-
 		ret = copy_to_user(argp, &var, sizeof(var)) ? -EFAULT : 0;
+		#ifdef _FORCE_REPORT_4BIT //[ gallen test .
+		{
+			if(gptHWCFG&&0==gptHWCFG->m_val.bUIStyle) {
+				struct fb_var_screeninfo *pvar;
+				
+				pvar=(struct fb_var_screeninfo *)(argp);
+				
+				
+				pvar->bits_per_pixel = 4;
+				pvar->grayscale = 1;
+				pvar->red.offset=0;
+				pvar->red.length=4;
+				pvar->green.offset=0;
+				pvar->green.length=4;
+				pvar->blue.offset=0;
+				pvar->blue.length=4;
+				if (1==gptHWCFG->m_val.bDisplayResolution) {
+					pvar->xres_virtual = 758;
+					pvar->yres_virtual = 1024;
+					pvar->xres = 758;
+					pvar->yres = 1024;
+				}
+				else if (3==gptHWCFG->m_val.bDisplayResolution) {
+					pvar->xres_virtual = 1080;
+					pvar->yres_virtual = 1440;
+					pvar->xres = 1080;
+					pvar->yres = 1440;
+				}
+				else if (5==gptHWCFG->m_val.bDisplayResolution) {
+					pvar->xres_virtual = 1072;
+					pvar->yres_virtual = 1448;
+					pvar->xres = 1072;
+					pvar->yres = 1448;
+				}
+				else if (2==gptHWCFG->m_val.bDisplayResolution) {
+					pvar->xres_virtual = 768;
+					pvar->yres_virtual = 1024;
+					pvar->xres = 768;
+					pvar->yres = 1024;
+				}
+				else {
+					pvar->xres_virtual = 600;
+					pvar->yres_virtual = 800;
+					pvar->xres = 600;
+					pvar->yres = 800;
+				}
+			}
+		}
+		#endif//]_FORCE_REPORT_4BIT
+
 		break;
 	case FBIOPUT_VSCREENINFO:
 		if (copy_from_user(&var, argp, sizeof(var)))

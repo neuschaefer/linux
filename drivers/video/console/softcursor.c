@@ -28,6 +28,8 @@ int soft_cursor(struct fb_info *info, struct fb_cursor *cursor)
 	struct fb_image *image;
 	u8 *src, *dst;
 
+	return 0;
+
 	if (info->state != FBINFO_STATE_RUNNING)
 		return 0;
 

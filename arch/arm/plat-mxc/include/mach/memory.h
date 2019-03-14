@@ -1,5 +1,5 @@
 /*
- * Copyright 2004-2007 Freescale Semiconductor, Inc. All Rights Reserved.
+ * Copyright 2004-2012 Freescale Semiconductor, Inc. All Rights Reserved.
  */
 
 /*
@@ -11,6 +11,9 @@
 #ifndef __ASM_ARCH_MXC_MEMORY_H__
 #define __ASM_ARCH_MXC_MEMORY_H__
 
+#include <asm/sizes.h>
+#include <asm/page.h>
+
 #define MX1_PHYS_OFFSET		UL(0x08000000)
 #define MX21_PHYS_OFFSET	UL(0xc0000000)
 #define MX25_PHYS_OFFSET	UL(0x80000000)
@@ -19,6 +22,8 @@
 #define MX50_PHYS_OFFSET	UL(0x70000000)
 #define MX51_PHYS_OFFSET	UL(0x90000000)
 #define MX53_PHYS_OFFSET	UL(0x70000000)
+#define MX6_PHYS_OFFSET		UL(0x10000000)
+#define MX6SL_PHYS_OFFSET	UL(0x80000000)
 
 #if !defined(CONFIG_RUNTIME_PHYS_OFFSET)
 # if defined CONFIG_ARCH_MX1
@@ -37,6 +42,10 @@
 #  define PLAT_PHYS_OFFSET		MX51_PHYS_OFFSET
 # elif defined CONFIG_ARCH_MX53
 #  define PLAT_PHYS_OFFSET		MX53_PHYS_OFFSET
+# elif defined CONFIG_ARCH_MX50
+#  define PLAT_PHYS_OFFSET		MX50_PHYS_OFFSET
+# elif defined CONFIG_ARCH_MX6
+#  define PLAT_PHYS_OFFSET		MX6_PHYS_OFFSET
 # endif
 #endif
 
@@ -53,6 +62,18 @@
  * This is required for i.MX camera driver to capture at least four VGA frames.
  */
 #define CONSISTENT_DMA_SIZE SZ_4M
+#else
+
+#ifndef CONFIG_ZONE_DMA
+#define CONSISTENT_DMA_SIZE     (64 * SZ_1M)
+#elif defined(CONFIG_ARCH_MX5) || defined(CONFIG_ARCH_MX6)
+#define ARM_DMA_ZONE_SIZE	(184 * SZ_1M)
+#define CONSISTENT_DMA_SIZE	ARM_DMA_ZONE_SIZE
+#else
+#define CONSISTENT_DMA_SIZE     (32 * SZ_1M)
+#endif
+
 #endif /* CONFIG_MX1_VIDEO || CONFIG_VIDEO_MX2_HOSTSUPPORT */
+
 
 #endif /* __ASM_ARCH_MXC_MEMORY_H__ */

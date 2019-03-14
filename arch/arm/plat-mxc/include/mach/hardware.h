@@ -1,5 +1,5 @@
 /*
- * Copyright 2004-2007 Freescale Semiconductor, Inc. All Rights Reserved.
+ * Copyright 2004-2012 Freescale Semiconductor, Inc.
  * Copyright 2008 Juergen Beisert, kernel@pengutronix.de
  *
  * This program is free software; you can redistribute it and/or
@@ -88,7 +88,7 @@
  *	AIPS2	0x83f00000+0x100000	->	0xf4300000+0x100000
  */
 #define IMX_IO_P2V(x)	(						\
-			0xf4000000 +					\
+			0xf2000000 +					\
 			(((x) & 0x50000000) >> 6) +			\
 			(((x) & 0x0b000000) >> 4) +			\
 			(((x) & 0x000fffff)))
@@ -101,6 +101,10 @@
 #include <mach/mx50.h>
 #include <mach/mx51.h>
 #include <mach/mx53.h>
+#endif
+
+#ifdef CONFIG_ARCH_MX6
+#include <mach/mx6.h>
 #endif
 
 #ifdef CONFIG_ARCH_MX3
@@ -133,5 +137,10 @@
 	.length = soc ## _ ## name ## _SIZE,				\
 	.type = _type,							\
 }
+
+/* macro to get at IO space when running virtually */
+#define PCIBIOS_MIN_IO		0x00000000
+#define PCIBIOS_MIN_MEM		0x00000000
+#define pcibios_assign_all_busses()	0
 
 #endif /* __ASM_ARCH_MXC_HARDWARE_H__ */

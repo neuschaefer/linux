@@ -134,7 +134,7 @@ config MMC_SDHCI_CNS3XXX
 
 config MMC_SDHCI_ESDHC_IMX
 	bool "SDHCI platform support for the Freescale eSDHC i.MX controller"
-	depends on MMC_SDHCI_PLTFM && (ARCH_MX25 || ARCH_MX35 || ARCH_MX5)
+	depends on MMC_SDHCI_PLTFM && (ARCH_MX25 || ARCH_MX35 || ARCH_MX5 || ARCH_MX6)
 	select MMC_SDHCI_IO_ACCESSORS
 	help
 	  This selects the Freescale eSDHC controller support on the platform
@@ -579,3 +579,9 @@ config MMC_USHC
 
 	  Note: These controllers only support SDIO cards and do not
 	  support MMC or SD memory cards.
+config SDHCI_USE_LEDS_CLASS
+	tristate "Support LEDs indicators for SDHC HOST"
+	depends on MMC_SDHCI && LEDS_CLASS
+	help
+	  This selects support for  SDHCI HOST Controllers use LED Class
+          to control the status of LEDs

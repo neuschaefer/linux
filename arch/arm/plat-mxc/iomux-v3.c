@@ -1,5 +1,5 @@
 /*
- * Copyright 2004-2006 Freescale Semiconductor, Inc. All Rights Reserved.
+ * Copyright 2004-2012 Freescale Semiconductor, Inc.
  * Copyright (C) 2008 by Sascha Hauer <kernel@pengutronix.de>
  * Copyright (C) 2009 by Jan Weitzel Phytec Messtechnik GmbH,
  *                       <armlinux@phytec.de>
@@ -56,6 +56,36 @@ int mxc_iomux_v3_setup_pad(iomux_v3_cfg_t pad)
 }
 EXPORT_SYMBOL(mxc_iomux_v3_setup_pad);
 
+/*
+ * Read a single pad in the iomuxer
+ */
+int mxc_iomux_v3_get_pad(iomux_v3_cfg_t *pad)
+{
+	u32 mux_ctrl_ofs = (*pad & MUX_CTRL_OFS_MASK) >> MUX_CTRL_OFS_SHIFT;
+	u32 pad_ctrl_ofs = (*pad & MUX_PAD_CTRL_OFS_MASK)
+						>> MUX_PAD_CTRL_OFS_SHIFT;
+	u32 sel_input_ofs = (*pad & MUX_SEL_INPUT_OFS_MASK)
+						>> MUX_SEL_INPUT_OFS_SHIFT;
+	u32 mux_mode = 0;
+	u32 sel_input = 0;
+	u32 pad_ctrl = 0;
+	iomux_v3_cfg_t pad_info = 0;
+
+	mux_mode = __raw_readl(base + mux_ctrl_ofs) & 0xFF;
+	pad_ctrl = __raw_readl(base + pad_ctrl_ofs) & 0x1FFFF;
+	sel_input = __raw_readl(base + sel_input_ofs) & 0x7;
+
+	pad_info = (((iomux_v3_cfg_t)mux_mode << MUX_MODE_SHIFT) | \
+		((iomux_v3_cfg_t)pad_ctrl << MUX_PAD_CTRL_SHIFT) | \
+		((iomux_v3_cfg_t)sel_input << MUX_SEL_INPUT_SHIFT));
+
+	*pad &= ~(MUX_MODE_MASK | MUX_PAD_CTRL_MASK | MUX_SEL_INPUT_MASK);
+	*pad |= pad_info;
+
+	return 0;
+}
+
+
 int mxc_iomux_v3_setup_multiple_pads(iomux_v3_cfg_t *pad_list, unsigned count)
 {
 	iomux_v3_cfg_t *p = pad_list;
@@ -71,6 +101,46 @@ int mxc_iomux_v3_setup_multiple_pads(iomux_v3_cfg_t *pad_list, unsigned count)
 	return 0;
 }
 EXPORT_SYMBOL(mxc_iomux_v3_setup_multiple_pads);
+
+/*
+ * Read multiple pads in the iomuxer
+ */
+int mxc_iomux_v3_get_multiple_pads(iomux_v3_cfg_t *pad_list, unsigned count)
+{
+	iomux_v3_cfg_t *p = pad_list;
+	int i;
+
+	for (i = 0; i < count; i++) {
+		mxc_iomux_v3_get_pad(p);
+		p++;
+	}
+	return 0;
+}
+EXPORT_SYMBOL(mxc_iomux_v3_get_multiple_pads);
+
+void mxc_iomux_set_gpr_register(int group, int start_bit, int num_bits, int value)
+{
+	int i = 0;
+	u32 reg;
+	reg = __raw_readl(base + group * 4);
+	while (num_bits) {
+		reg &= ~(1<<(start_bit + i));
+		i++;
+		num_bits--;
+	}
+	reg |= (value << start_bit);
+	__raw_writel(reg, base + group * 4);
+}
+EXPORT_SYMBOL(mxc_iomux_set_gpr_register);
+void mxc_iomux_set_specialbits_register(u32 pad_addr, u32 value, u32 mask)
+{
+	u32 reg;
+	reg = __raw_readl(base + pad_addr);
+	reg &= ~mask;
+	reg |= value;
+	__raw_writel(reg, base + pad_addr);
+}
+EXPORT_SYMBOL(mxc_iomux_set_specialbits_register);
 
 void mxc_iomux_v3_init(void __iomem *iomux_v3_base)
 {

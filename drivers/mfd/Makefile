@@ -1,7 +1,6 @@
 #
 # Makefile for multifunction miscellaneous devices
 #
-
 88pm860x-objs			:= 88pm860x-core.o 88pm860x-i2c.o
 obj-$(CONFIG_MFD_88PM860X)	+= 88pm860x.o
 obj-$(CONFIG_MFD_SM501)		+= sm501.o
@@ -42,9 +41,9 @@ obj-$(CONFIG_TWL4030_MADC)      += twl4030-madc.o
 obj-$(CONFIG_TWL4030_POWER)    += twl4030-power.o
 obj-$(CONFIG_TWL4030_CODEC)	+= twl4030-codec.o
 obj-$(CONFIG_TWL6030_PWM)	+= twl6030-pwm.o
-
 obj-$(CONFIG_MFD_MC13XXX)	+= mc13xxx-core.o
-
+obj-$(CONFIG_MFD_MC_PMIC)	+= mc-pmic-core.o
+obj-$(CONFIG_MFD_PFUZE)		+= pfuze-core.o
 obj-$(CONFIG_MFD_CORE)		+= mfd-core.o
 
 obj-$(CONFIG_EZX_PCAP)		+= ezx-pcap.o
@@ -89,9 +88,19 @@ obj-$(CONFIG_MFD_JZ4740_ADC)	+= jz4740-adc.o
 obj-$(CONFIG_MFD_TPS6586X)	+= tps6586x.o
 obj-$(CONFIG_MFD_VX855)		+= vx855.o
 obj-$(CONFIG_MFD_WL1273_CORE)	+= wl1273-core.o
+
+obj-$(CONFIG_MFD_MXC_HDMI)       += mxc-hdmi-core.o
 obj-$(CONFIG_MFD_CS5535)	+= cs5535-mfd.o
+obj-$(CONFIG_MFD_MAX17135)  += max17135-core.o
+
+#ifeq ($(CONFIG_PMIC_DIALOG),y)
+da9052-objs			:= da9052-spi.o da9052-i2c.o da9052-core.o
+obj-$(CONFIG_PMIC_DIALOG)	+= da9052.o
+#endif
+
 obj-$(CONFIG_MFD_OMAP_USB_HOST)	+= omap-usb-host.o
 obj-$(CONFIG_MFD_PM8921_CORE) 	+= pm8921-core.o
 obj-$(CONFIG_MFD_PM8XXX_IRQ) 	+= pm8xxx-irq.o
 obj-$(CONFIG_MFD_TPS65910)	+= tps65910.o tps65910-irq.o
 obj-$(CONFIG_TPS65911_COMPARATOR)	+= tps65911-comparator.o
+obj-$(CONFIG_MFD_RICOH619)	+= ricoh619.o ricoh619-irq.o

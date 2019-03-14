@@ -333,6 +333,23 @@ __dma_alloc(struct device *dev, size_t size, dma_addr_t *handle, gfp_t gfp,
  * virtual and bus address for that space.
  */
 void *
+dma_alloc_noncached(struct device *dev, size_t size, dma_addr_t *handle, gfp_t gfp)
+{
+	void *memory;
+
+	if (dma_alloc_from_coherent(dev, size, handle, &memory))
+		return memory;
+
+	return __dma_alloc(dev, size, handle, gfp,
+			   pgprot_noncached(pgprot_kernel));
+}
+EXPORT_SYMBOL(dma_alloc_noncached);
+
+/*
+ * Allocate DMA-coherent memory space and return both the kernel remapped
+ * virtual and bus address for that space.
+ */
+void *
 dma_alloc_coherent(struct device *dev, size_t size, dma_addr_t *handle, gfp_t gfp)
 {
 	void *memory;
@@ -356,6 +373,31 @@ dma_alloc_writecombine(struct device *dev, size_t size, dma_addr_t *handle, gfp_
 			   pgprot_writecombine(pgprot_kernel));
 }
 EXPORT_SYMBOL(dma_alloc_writecombine);
+
+/*
+ *  Allocate DMA-writethrough memory space and return both the kernel remapped
+ * virtual and bus address for that space.
+ */
+void *
+dma_alloc_writethrough(struct device *dev, size_t size, dma_addr_t *handle, gfp_t gfp)
+{
+	return __dma_alloc(dev, size, handle, gfp,
+			  pgprot_writethrough(pgprot_kernel));
+}
+EXPORT_SYMBOL(dma_alloc_writethrough);
+
+/*
+ *  Allocate noncacheable memory space and return both the kernel remapped
+ * virtual and bus address for that space.
+ */
+void *
+dma_alloc_noncacheable(struct device *dev, size_t size, dma_addr_t *handle, gfp_t gfp)
+{
+	return __dma_alloc(dev, size, handle, gfp,
+			  /*pgprot_writethrough(pgprot_kernel));*/
+			  pgprot_noncached(pgprot_kernel));
+}
+EXPORT_SYMBOL(dma_alloc_noncacheable);
 
 static int dma_mmap(struct device *dev, struct vm_area_struct *vma,
 		    void *cpu_addr, dma_addr_t dma_addr, size_t size)

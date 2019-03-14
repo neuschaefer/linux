@@ -1198,8 +1198,13 @@ static int usb_suspend_both(struct usb_device *udev, pm_message_t msg)
 	if (status == 0) {
 		status = usb_suspend_device(udev, msg);
 
-		/* Again, ignore errors during system sleep transitions */
-		if (!(msg.event & PM_EVENT_AUTO))
+	       /*
+		* Ignore errors from non-root-hub devices during
+		* system sleep transitions.  For the most part,
+		* these devices should go to low power anyway when
+		* the entire bus is suspended.
+		*/
+		if (udev->parent && !(msg.event & PM_EVENT_AUTO))
 			status = 0;
 	}
 
@@ -1314,6 +1319,7 @@ int usb_suspend(struct device *dev, pm_message_t msg)
 	choose_wakeup(udev, msg);
 	return usb_suspend_both(udev, msg);
 }
+EXPORT_SYMBOL(usb_suspend);
 
 /* The device lock is held by the PM core */
 int usb_resume(struct device *dev, pm_message_t msg)
@@ -1348,6 +1354,7 @@ int usb_resume(struct device *dev, pm_message_t msg)
 		status = 0;
 	return status;
 }
+EXPORT_SYMBOL(usb_resume);
 
 #endif /* CONFIG_PM */
 

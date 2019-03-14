@@ -64,11 +64,16 @@ static int pwm_backlight_get_brightness(struct backlight_device *bl)
 }
 
 static int pwm_backlight_check_fb(struct backlight_device *bl,
-				  struct fb_info *info)
+					struct fb_info *info)
 {
-	struct pwm_bl_data *pb = dev_get_drvdata(&bl->dev);
-
-	return !pb->check_fb || pb->check_fb(pb->dev, info);
+	char *id = info->fix.id;
+	if (!strcmp(id, "DISP3 BG") ||
+		!strcmp(id, "DISP3 BG - DI1") ||
+		!strcmp(id, "DISP4 BG") ||
+		!strcmp(id, "DISP4 BG - DI1"))
+	    return 1;
+	else
+	return 0;
 }
 
 static const struct backlight_ops pwm_backlight_ops = {

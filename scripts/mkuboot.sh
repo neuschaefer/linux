@@ -15,5 +15,23 @@ if [ -z "${MKIMAGE}" ]; then
 	fi
 fi
 
+KREV="r$(LANG=C svn info|grep "Last Changed Rev:"|awk '{print $4}')"
+
+if [ "${KREV}" = "r" ];then
+	KREV="$(git rev-list HEAD -1 |head -c 6)"
+fi
+
+if [ -z "${KREV}" ];then
+	KREV="?"
+fi
+
+UTS_VER="$(cat include/generated/compile.h |grep "UTS_VERSION"|awk -F\" '{print $2}'|awk '{print $1,$4,$5,$6}')"
+if [ -z "${UTS_VER}" ];then
+	UTS_VER="?"
+fi
+
+
 # Call "mkimage" to create U-Boot image
-${MKIMAGE} "$@"
+#${MKIMAGE} "$@"
+${MKIMAGE} -n "${KREV}_${UTS_VER}" "$@"
+

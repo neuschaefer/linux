@@ -23,6 +23,8 @@ source "drivers/gpu/drm/Kconfig"
 
 source "drivers/gpu/stub/Kconfig"
 
+source "drivers/gpu/ion/Kconfig"
+
 config VGASTATE
        tristate
        default n
@@ -2388,6 +2390,18 @@ source "drivers/video/omap2/Kconfig"
 
 source "drivers/video/backlight/Kconfig"
 source "drivers/video/display/Kconfig"
+
+if ARCH_MXC
+source "drivers/video/mxc/Kconfig"
+endif
+
+config FB_MXC_HDMI
+	depends on FB_MXC_SYNC_PANEL && I2C
+	tristate "MXC HDMI driver support"
+	select MFD_MXC_HDMI
+	help
+	  Driver for the on-chip MXC HDMI controller.
+
 
 if VT
 	source "drivers/video/console/Kconfig"

@@ -6,6 +6,7 @@
  * published by the Free Software Foundation.
  *
  * Derived from pxa PWM driver by eric miao <eric.miao@marvell.com>
+ * Copyright 2009-2013 Freescale Semiconductor, Inc. All Rights Reserved.
  */
 
 #include <linux/module.h>
@@ -16,6 +17,7 @@
 #include <linux/clk.h>
 #include <linux/io.h>
 #include <linux/pwm.h>
+#include <linux/fsl_devices.h>
 #include <mach/hardware.h>
 
 
@@ -37,9 +39,15 @@
 #define MX3_PWMCR_DBGEN			(1 << 22)
 #define MX3_PWMCR_CLKSRC_IPG_HIGH (2 << 16)
 #define MX3_PWMCR_CLKSRC_IPG      (1 << 16)
+#define MX3_PWMCR_SWR             (1 << 3)
 #define MX3_PWMCR_EN              (1 << 0)
 
-
+#define MX3_PWMCR_STOPEN		(1 << 25)
+#define MX3_PWMCR_DOZEEN                (1 << 24)
+#define MX3_PWMCR_WAITEN                (1 << 23)
+#define MX3_PWMCR_DBGEN			(1 << 22)
+#define MX3_PWMCR_CLKSRC_IPG		(1 << 16)
+#define MX3_PWMCR_CLKSRC_IPG_32k	(3 << 16)
 
 struct pwm_device {
 	struct list_head	node;
@@ -53,6 +61,9 @@ struct pwm_device {
 
 	unsigned int	use_count;
 	unsigned int	pwm_id;
+	int		pwmo_invert;
+	void (*enable_pwm_pad)(void);
+	void (*disable_pwm_pad)(void);
 };
 
 int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
@@ -60,10 +71,13 @@ int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
 	if (pwm == NULL || period_ns == 0 || duty_ns > period_ns)
 		return -EINVAL;
 
-	if (cpu_is_mx27() || cpu_is_mx3() || cpu_is_mx25() || cpu_is_mx51()) {
+	if (!(cpu_is_mx1() || cpu_is_mx21())) {
 		unsigned long long c;
 		unsigned long period_cycles, duty_cycles, prescale;
 		u32 cr;
+
+		if (pwm->pwmo_invert)
+			duty_ns = period_ns - duty_ns;
 
 		c = clk_get_rate(pwm->clk);
 		c = c * period_ns;
@@ -90,8 +104,8 @@ int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
 		writel(period_cycles, pwm->mmio_base + MX3_PWMPR);
 
 		cr = MX3_PWMCR_PRESCALER(prescale) |
-			MX3_PWMCR_DOZEEN | MX3_PWMCR_WAITEN |
-			MX3_PWMCR_DBGEN | MX3_PWMCR_EN;
+			MX3_PWMCR_STOPEN | MX3_PWMCR_DOZEEN |
+			MX3_PWMCR_WAITEN | MX3_PWMCR_DBGEN;
 
 		if (cpu_is_mx25())
 			cr |= MX3_PWMCR_CLKSRC_IPG;
@@ -117,7 +131,10 @@ int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
 		 * (/2 .. /16).
 		 */
 		u32 max = readl(pwm->mmio_base + MX1_PWMP);
-		u32 p = max * duty_ns / period_ns;
+		u32 p;
+		if (pwm->pwmo_invert)
+			duty_ns = period_ns - duty_ns;
+		p = max * duty_ns / period_ns;
 		writel(max - p, pwm->mmio_base + MX1_PWMS);
 	} else {
 		BUG();
@@ -129,6 +146,7 @@ EXPORT_SYMBOL(pwm_config);
 
 int pwm_enable(struct pwm_device *pwm)
 {
+	unsigned long reg;
 	int rc = 0;
 
 	if (!pwm->clk_enabled) {
@@ -136,13 +154,26 @@ int pwm_enable(struct pwm_device *pwm)
 		if (!rc)
 			pwm->clk_enabled = 1;
 	}
+
+	reg = readl(pwm->mmio_base + MX3_PWMCR);
+	reg |= MX3_PWMCR_EN;
+	writel(reg, pwm->mmio_base + MX3_PWMCR);
+
+	if (pwm->enable_pwm_pad)
+		pwm->enable_pwm_pad();
+
 	return rc;
 }
 EXPORT_SYMBOL(pwm_enable);
 
 void pwm_disable(struct pwm_device *pwm)
 {
-	writel(0, pwm->mmio_base + MX3_PWMCR);
+	if (pwm->disable_pwm_pad)
+		pwm->disable_pwm_pad();
+
+	writel(MX3_PWMCR_SWR, pwm->mmio_base + MX3_PWMCR);
+	while (readl(pwm->mmio_base + MX3_PWMCR) & MX3_PWMCR_SWR)
+		;
 
 	if (pwm->clk_enabled) {
 		clk_disable(pwm->clk);
@@ -200,6 +231,7 @@ static int __devinit mxc_pwm_probe(struct platform_device *pdev)
 {
 	struct pwm_device *pwm;
 	struct resource *r;
+	struct mxc_pwm_platform_data *plat_data = pdev->dev.platform_data;
 	int ret = 0;
 
 	pwm = kzalloc(sizeof(struct pwm_device), GFP_KERNEL);
@@ -220,6 +252,11 @@ static int __devinit mxc_pwm_probe(struct platform_device *pdev)
 	pwm->use_count = 0;
 	pwm->pwm_id = pdev->id;
 	pwm->pdev = pdev;
+	if (plat_data != NULL) {
+		pwm->pwmo_invert = plat_data->pwmo_invert;
+		pwm->enable_pwm_pad = plat_data->enable_pwm_pad;
+		pwm->disable_pwm_pad = plat_data->disable_pwm_pad;
+	}
 
 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (r == NULL) {

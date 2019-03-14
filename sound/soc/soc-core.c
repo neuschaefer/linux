@@ -5,6 +5,7 @@
  * Copyright 2005 Openedhand Ltd.
  * Copyright (C) 2010 Slimlogic Ltd.
  * Copyright (C) 2010 Texas Instruments Inc.
+ * Copyright (C) 2012 Freescale Semiconductor, Inc.
  *
  * Author: Liam Girdwood <lrg@slimlogic.co.uk>
  *         with code, comments and ideas from :-
@@ -747,6 +748,9 @@ static int soc_codec_close(struct snd_pcm_substream *substream)
 	codec_dai->active--;
 	codec->active--;
 
+	if (!cpu_dai->active && !codec_dai->active)
+		rtd->rate = 0;
+
 	/* Muting the DAC suppresses artifacts caused during digital
 	 * shutdown, for example from stopping clocks.
 	 */
@@ -986,6 +990,46 @@ static int soc_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 		if (ret < 0)
 			return ret;
 	}
+
+	if (rtd->dai_link->ops && rtd->dai_link->ops->trigger) {
+		ret = rtd->dai_link->ops->trigger(substream, cmd);
+		if (ret < 0)
+			return ret;
+	}
+	return 0;
+}
+
+static int soc_pcm_ioctl(struct snd_pcm_substream *substream, unsigned int cmd, void *arg)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct snd_soc_platform *platform = rtd->platform;
+	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
+	struct snd_soc_dai *codec_dai = rtd->codec_dai;
+	int ret;
+
+	if (rtd->dai_link->ops && rtd->dai_link->ops->ioctl) {
+		ret = rtd->dai_link->ops->ioctl(substream, cmd, arg);
+		if (ret < 0)
+			return ret;
+	}
+
+	if (codec_dai->driver->ops->ioctl) {
+		ret = codec_dai->driver->ops->ioctl(substream, cmd, arg, codec_dai);
+		if (ret < 0)
+			return ret;
+	}
+
+	if (platform->driver->ops->ioctl) {
+		ret = platform->driver->ops->ioctl(substream, cmd, arg);
+		if (ret < 0)
+			return ret;
+	}
+
+	if (cpu_dai->driver->ops->ioctl) {
+		ret = cpu_dai->driver->ops->ioctl(substream, cmd, arg, cpu_dai);
+		if (ret < 0)
+			return ret;
+	}
 	return 0;
 }
 
@@ -1020,17 +1064,6 @@ static snd_pcm_uframes_t soc_pcm_pointer(struct snd_pcm_substream *substream)
 
 	return offset;
 }
-
-/* ASoC PCM operations */
-static struct snd_pcm_ops soc_pcm_ops = {
-	.open		= soc_pcm_open,
-	.close		= soc_codec_close,
-	.hw_params	= soc_pcm_hw_params,
-	.hw_free	= soc_pcm_hw_free,
-	.prepare	= soc_pcm_prepare,
-	.trigger	= soc_pcm_trigger,
-	.pointer	= soc_pcm_pointer,
-};
 
 #ifdef CONFIG_PM_SLEEP
 /* powers down audio subsystem for suspend */
@@ -1269,13 +1302,15 @@ int snd_soc_resume(struct device *dev)
 		struct snd_soc_dai *cpu_dai = card->rtd[i].cpu_dai;
 		ac97_control |= cpu_dai->driver->ac97_control;
 	}
-	if (ac97_control) {
-		dev_dbg(dev, "Resuming AC97 immediately\n");
-		soc_resume_deferred(&card->deferred_resume_work);
-	} else {
-		dev_dbg(dev, "Scheduling resume work\n");
-		if (!schedule_work(&card->deferred_resume_work))
-			dev_err(dev, "resume work item may be lost\n");
+	if (card->num_rtd) {
+		if (ac97_control) {
+			dev_dbg(dev, "Resuming AC97 immediately\n");
+			soc_resume_deferred(&card->deferred_resume_work);
+		} else {
+			dev_dbg(dev, "Scheduling resume work\n");
+			if (!schedule_work(&card->deferred_resume_work))
+				dev_err(dev, "resume work item may be lost\n");
+		}
 	}
 
 	return 0;
@@ -2056,6 +2091,7 @@ static int soc_cleanup_card_resources(struct snd_soc_card *card)
 
 	snd_soc_dapm_free(&card->dapm);
 
+	kfree(card->rtd->ops);
 	kfree(card->rtd);
 	snd_card_free(card->snd_card);
 	return 0;
@@ -2118,8 +2154,16 @@ static int soc_new_pcm(struct snd_soc_pcm_runtime *rtd, int num)
 	struct snd_soc_dai *codec_dai = rtd->codec_dai;
 	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
 	struct snd_pcm *pcm;
+	struct snd_pcm_ops *soc_pcm_ops;
 	char new_name[64];
 	int ret = 0, playback = 0, capture = 0;
+
+	/* ASoC PCM operations */
+	soc_pcm_ops = kzalloc(sizeof(struct snd_pcm_ops), GFP_KERNEL);
+	if (soc_pcm_ops == NULL) {
+		printk(KERN_ERR "asoc: can't create pcm ops for codec %s\n", codec->name);
+		return -ENOMEM;
+	}
 
 	/* check client and interface hw capabilities */
 	snprintf(new_name, sizeof(new_name), "%s %s-%d",
@@ -2135,32 +2179,44 @@ static int soc_new_pcm(struct snd_soc_pcm_runtime *rtd, int num)
 			num, playback, capture, &pcm);
 	if (ret < 0) {
 		printk(KERN_ERR "asoc: can't create pcm for codec %s\n", codec->name);
+		kfree(soc_pcm_ops);
 		return ret;
 	}
 
 	rtd->pcm = pcm;
 	pcm->private_data = rtd;
+
+	soc_pcm_ops->open = soc_pcm_open;
+	soc_pcm_ops->close = soc_codec_close;
+	soc_pcm_ops->hw_params = soc_pcm_hw_params;
+	soc_pcm_ops->hw_free = soc_pcm_hw_free;
+	soc_pcm_ops->prepare = soc_pcm_prepare;
+	soc_pcm_ops->pointer = soc_pcm_pointer;
+	soc_pcm_ops->trigger = soc_pcm_trigger;
+	soc_pcm_ops->ioctl = soc_pcm_ioctl;
+
 	if (platform->driver->ops) {
-		soc_pcm_ops.mmap = platform->driver->ops->mmap;
-		soc_pcm_ops.pointer = platform->driver->ops->pointer;
-		soc_pcm_ops.ioctl = platform->driver->ops->ioctl;
-		soc_pcm_ops.copy = platform->driver->ops->copy;
-		soc_pcm_ops.silence = platform->driver->ops->silence;
-		soc_pcm_ops.ack = platform->driver->ops->ack;
-		soc_pcm_ops.page = platform->driver->ops->page;
+		soc_pcm_ops->mmap = platform->driver->ops->mmap;
+		soc_pcm_ops->copy = platform->driver->ops->copy;
+		soc_pcm_ops->silence = platform->driver->ops->silence;
+		soc_pcm_ops->ack = platform->driver->ops->ack;
+		soc_pcm_ops->page = platform->driver->ops->page;
 	}
 
+	rtd->ops = soc_pcm_ops;
+
 	if (playback)
-		snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, &soc_pcm_ops);
+		snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, soc_pcm_ops);
 
 	if (capture)
-		snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_CAPTURE, &soc_pcm_ops);
+		snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_CAPTURE, soc_pcm_ops);
 
 	if (platform->driver->pcm_new) {
 		ret = platform->driver->pcm_new(rtd->card->snd_card,
 						codec_dai, pcm);
 		if (ret < 0) {
 			pr_err("asoc: platform pcm constructor failed\n");
+			kfree(rtd->ops);
 			return ret;
 		}
 	}
@@ -3774,13 +3830,16 @@ int snd_soc_register_codec(struct device *dev,
 		 * kernel might have freed the array by the time we initialize
 		 * the cache.
 		 */
-		if (codec_drv->reg_cache_default) {
-			codec->reg_def_copy = kmemdup(codec_drv->reg_cache_default,
-						      reg_size, GFP_KERNEL);
-			if (!codec->reg_def_copy) {
-				ret = -ENOMEM;
-				goto fail;
-			}
+		if (codec_drv->reg_cache_default)
+			codec->reg_def_copy =
+				kmemdup(codec_drv->reg_cache_default,
+					reg_size, GFP_KERNEL);
+		else
+			codec->reg_def_copy = kzalloc(reg_size, GFP_KERNEL);
+
+		if (!codec->reg_def_copy) {
+			ret = -ENOMEM;
+			goto fail;
 		}
 	}
 

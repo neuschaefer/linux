@@ -99,7 +99,7 @@ struct pch_dma_desc {
 struct pch_dma_chan {
 	struct dma_chan		chan;
 	void __iomem *membase;
-	enum dma_data_direction	dir;
+	enum dma_transfer_direction dir;
 	struct tasklet_struct	tasklet;
 	unsigned long		err_status;
 
@@ -607,7 +607,7 @@ static void pd_issue_pending(struct dma_chan *chan)
 
 static struct dma_async_tx_descriptor *pd_prep_slave_sg(struct dma_chan *chan,
 			struct scatterlist *sgl, unsigned int sg_len,
-			enum dma_data_direction direction, unsigned long flags)
+			enum dma_transfer_direction direction, unsigned long flags)
 {
 	struct pch_dma_chan *pd_chan = to_pd_chan(chan);
 	struct pch_dma_slave *pd_slave = chan->private;
@@ -623,9 +623,9 @@ static struct dma_async_tx_descriptor *pd_prep_slave_sg(struct dma_chan *chan,
 		return NULL;
 	}
 
-	if (direction == DMA_FROM_DEVICE)
+	if (direction == DMA_DEV_TO_MEM)
 		reg = pd_slave->rx_reg;
-	else if (direction == DMA_TO_DEVICE)
+	else if (direction == DMA_MEM_TO_DEV)
 		reg = pd_slave->tx_reg;
 	else
 		return NULL;

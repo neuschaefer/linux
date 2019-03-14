@@ -41,23 +41,40 @@ static int __power_supply_changed_work(struct device *dev, void *data)
 
 static void power_supply_changed_work(struct work_struct *work)
 {
+	unsigned long flags;
 	struct power_supply *psy = container_of(work, struct power_supply,
 						changed_work);
 
 	dev_dbg(psy->dev, "%s\n", __func__);
 
-	class_for_each_device(power_supply_class, NULL, psy,
-			      __power_supply_changed_work);
+	spin_lock_irqsave(&psy->changed_lock, flags);
+	if (psy->changed) {
+		psy->changed = false;
+		spin_unlock_irqrestore(&psy->changed_lock, flags);
 
-	power_supply_update_leds(psy);
+		class_for_each_device(power_supply_class, NULL, psy,
+				      __power_supply_changed_work);
 
-	kobject_uevent(&psy->dev->kobj, KOBJ_CHANGE);
+		power_supply_update_leds(psy);
+
+		kobject_uevent(&psy->dev->kobj, KOBJ_CHANGE);
+		spin_lock_irqsave(&psy->changed_lock, flags);
+	}
+	if (!psy->changed)
+		wake_unlock(&psy->work_wake_lock);
+	spin_unlock_irqrestore(&psy->changed_lock, flags);
 }
 
 void power_supply_changed(struct power_supply *psy)
 {
+	unsigned long flags;
+
 	dev_dbg(psy->dev, "%s\n", __func__);
 
+	spin_lock_irqsave(&psy->changed_lock, flags);
+	psy->changed = true;
+	wake_lock(&psy->work_wake_lock);
+	spin_unlock_irqrestore(&psy->changed_lock, flags);
 	schedule_work(&psy->changed_work);
 }
 EXPORT_SYMBOL_GPL(power_supply_changed);
@@ -93,6 +110,37 @@ int power_supply_am_i_supplied(struct power_supply *psy)
 	return error;
 }
 EXPORT_SYMBOL_GPL(power_supply_am_i_supplied);
+
+static int power_supply_find_supplier(struct device *dev, void *data)
+{
+	struct power_supply *psy = (struct power_supply *)data;
+	struct power_supply *epsy = dev_get_drvdata(dev);
+	int i;
+
+	for (i = 0; i < epsy->num_supplicants; i++)
+		if (!strcmp(epsy->supplied_to[i], psy->name))
+			return 1;
+	return 0;
+}
+
+int power_supply_get_supplier_property(struct power_supply *psy,
+					enum power_supply_property psp,
+					union power_supply_propval *val)
+{
+	struct power_supply *epsy;
+	struct device *dev;
+
+	dev = class_find_device(power_supply_class, NULL, psy,
+				power_supply_find_supplier);
+	if (!dev)
+		return 1;
+
+	epsy = dev_get_drvdata(dev);
+	put_device(dev);
+
+	return epsy->get_property(epsy, psp, val);
+}
+EXPORT_SYMBOL_GPL(power_supply_get_supplier_property);
 
 static int __power_supply_is_system_supplied(struct device *dev, void *data)
 {
@@ -177,6 +225,9 @@ int power_supply_register(struct device *parent, struct power_supply *psy)
 	if (rc)
 		goto kobject_set_name_failed;
 
+	spin_lock_init(&psy->changed_lock);
+	wake_lock_init(&psy->work_wake_lock, WAKE_LOCK_SUSPEND, "power-supply");
+
 	rc = device_add(dev);
 	if (rc)
 		goto device_add_failed;
@@ -190,6 +241,7 @@ int power_supply_register(struct device *parent, struct power_supply *psy)
 	goto success;
 
 create_triggers_failed:
+	wake_lock_destroy(&psy->work_wake_lock);
 	device_del(dev);
 kobject_set_name_failed:
 device_add_failed:
@@ -203,6 +255,7 @@ void power_supply_unregister(struct power_supply *psy)
 {
 	cancel_work_sync(&psy->changed_work);
 	power_supply_remove_triggers(psy);
+	wake_lock_destroy(&psy->work_wake_lock);
 	device_unregister(psy->dev);
 }
 EXPORT_SYMBOL_GPL(power_supply_unregister);

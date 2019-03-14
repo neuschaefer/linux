@@ -17,6 +17,11 @@
 #include <linux/io.h>
 #include <linux/mmc/host.h>
 
+struct sdhci_host_next {
+	unsigned int	sg_count;
+	s32		cookie;
+};
+
 struct sdhci_host {
 	/* Data set by hardware interface driver */
 	const char *hw_name;	/* Hardware bus name */
@@ -87,6 +92,9 @@ struct sdhci_host {
 #define SDHCI_QUIRK_BROKEN_ADMA_ZEROLEN_DESC		(1<<30)
 /* The read-only detection via SDHCI_PRESENT_STATE register is unstable */
 #define SDHCI_QUIRK_UNSTABLE_RO_DETECT			(1<<31)
+
+	unsigned int quirks2;   /* More deviations from spec. */
+#define SDHCI_QUIRK_BROKEN_AUTO_CMD23			(1<<0)
 
 	int irq;		/* Device IRQ */
 	void __iomem *ioaddr;	/* Mapped address */
@@ -159,7 +167,15 @@ struct sdhci_host {
 	unsigned int		tuning_mode;	/* Re-tuning mode supported by host */
 #define SDHCI_TUNING_MODE_1	0
 	struct timer_list	tuning_timer;	/* Timer for tuning */
+	unsigned int		tuning_min;
+	unsigned int		tuning_max;
+	unsigned int		tuning_step;
 
+	struct delayed_work	clk_worker;	/* Clock delayed worker */
+	unsigned int		clk_mgr_en;
+	unsigned int		clk_status;
+	unsigned char		power_mode;
+	struct sdhci_host_next	next_data;
 	unsigned long private[0] ____cacheline_aligned;
 };
 #endif /* __SDHCI_H */

@@ -177,6 +177,28 @@ config TOUCHSCREEN_EETI
 	  To compile this driver as a module, choose M here: the
 	  module will be called eeti_ts.
 
+config TOUCHSCREEN_EGALAX
+	tristate "EETI eGalax multi-touchscreen panel support"
+	depends on I2C
+	help
+	  Say Y here to enable support for I2C connected EETI
+	  eGalax multiple touch panels.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called egalax_ts.
+
+config TOUCHSCREEN_ELAN
+	tristate "ELAN touchscreen input driver"
+	depends on I2C
+	help
+	  Say Y here if you have an I2C ELAN touchscreen
+	  attached.
+
+	  If unsure, say N.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called elan-touch.
+
 config TOUCHSCREEN_FUJITSU
 	tristate "Fujitsu serial touchscreen"
 	select SERIO
@@ -382,6 +404,12 @@ config TOUCHSCREEN_TNETV107X
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called tnetv107x-ts.
+
+config TOUCHSCREEN_SYNAPTICS_I2C_RMI
+	tristate "Synaptics i2c touchscreen"
+	depends on I2C
+	help
+	  This enables support for Synaptics RMI over I2C based touchscreens.
 
 config TOUCHSCREEN_TOUCHRIGHT
 	tristate "Touchright serial touchscreen"
@@ -640,6 +668,19 @@ config TOUCHSCREEN_USB_NEXIO
 	bool "NEXIO/iNexio device support" if EXPERT
 	depends on TOUCHSCREEN_USB_COMPOSITE
 
+config TOUCHSCREEN_NOVATEK
+       tristate "NOVATEK touchscreens"
+       depends on I2C
+       help
+         Say Y here if you have a Novatek NT11003 Touchscreen
+	 controller.
+
+	 If unsure, say N.
+
+	 To compile this driver as a module, choose M here: the
+	 module will be called novatek_ts
+
+
 config TOUCHSCREEN_TOUCHIT213
 	tristate "Sahara TouchIT-213 touchscreen"
 	select SERIO
@@ -714,6 +755,18 @@ config TOUCHSCREEN_STMPE
 	  To compile this driver as a module, choose M here: the
 	  module will be called stmpe-ts.
 
+config TOUCHSCREEN_P1003
+       tristate "HannStar P1003 touchscreens"
+       depends on I2C
+       help
+         Say Y here if you have a P1003 touchscreen
+	 controller.
+
+	 If unsure, say N.
+
+	 To compile this driver as a module, choose M here: the
+	 module will be called p1003-ts.
+
 config TOUCHSCREEN_TPS6507X
 	tristate "TPS6507x based touchscreens"
 	depends on I2C
@@ -725,5 +778,40 @@ config TOUCHSCREEN_TPS6507X
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called tps6507x_ts.
+
+config TOUCHSCREEN_DA9052
+        tristate "Dialog DA9052 TSI"
+        depends on PMIC_DIALOG
+        help
+          Say y here to support the touchscreen found on
+          Dialog Semiconductor DA9052 PMIC
+
+config TOUCHSCREEN_ZFORCE
+       tristate "Neonode zForce IR touchscreen"
+       depends on I2C
+       help
+        Say Y here if you have a zForce touchscreen
+        controller
+
+        If unsure, say N.
+
+config TOUCHSCREEN_ELAN_TOUCH
+	tristate "Elan Capacitive touchpad on PVI EPD"
+	help
+	  If you say yes here you get support for Elan Capacitive touchpad on PVI EPD controller chip.
+	 
+	  This driver can also be built as a module.  If so, the module
+	  will be called elan_touch.
+
+config TOUCHSCREEN_WACOM_I2C
+	tristate "Wacom i2c penabled serial touchscreen"
+	help
+	  Say Y here if you have an Wacom i2c penabled serial touchscreen
+	  connected to your system.
+
+	  If unsure, say N.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called wacom_i2c.
 
 endif

@@ -15,6 +15,7 @@
 		.id = _id,						\
 		.iobase = soc ## _WDOG ## _hwid ## _BASE_ADDR,		\
 		.iosize = _size,					\
+		.irq = soc ## _INT_WDOG ## _hwid,			\
 	}
 #define imx_imx2_wdt_data_entry(soc, _id, _hwid, _size)			\
 	[_id] = imx_imx2_wdt_data_entry_single(soc, _id, _hwid, _size)
@@ -62,6 +63,15 @@ const struct imx_imx2_wdt_data imx53_imx2_wdt_data[] __initconst = {
 };
 #endif /* ifdef CONFIG_SOC_IMX53 */
 
+#ifdef CONFIG_SOC_IMX6Q
+const struct imx_imx2_wdt_data imx6q_imx2_wdt_data[] __initconst = {
+#define imx6q_imx2_wdt_data_entry(_id, _hwid)                           \
+	imx_imx2_wdt_data_entry(MX6Q, _id, _hwid, SZ_16K)
+	imx6q_imx2_wdt_data_entry(0, 1),
+	imx6q_imx2_wdt_data_entry(1, 2),
+};
+#endif
+
 struct platform_device *__init imx_add_imx2_wdt(
 		const struct imx_imx2_wdt_data *data)
 {
@@ -70,6 +80,10 @@ struct platform_device *__init imx_add_imx2_wdt(
 			.start = data->iobase,
 			.end = data->iobase + data->iosize - 1,
 			.flags = IORESOURCE_MEM,
+		}, {
+			.start = data->irq,
+			.end = data->irq,
+			.flags = IORESOURCE_IRQ,
 		},
 	};
 	return imx_add_platform_device("imx2-wdt", data->id,

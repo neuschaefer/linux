@@ -17,14 +17,20 @@
 #include <linux/clockchips.h>
 #include <linux/irq.h>
 #include <linux/io.h>
+#include <linux/clk.h>
+#include <linux/cpufreq.h>
+#include <linux/err.h>
 
 #include <asm/smp_twd.h>
 #include <asm/hardware/gic.h>
 
 /* set up by the platform code */
 void __iomem *twd_base;
+static struct clk *twd_clk;
 
 static unsigned long twd_timer_rate;
+
+static struct clock_event_device __percpu **twd_evt;
 
 static void twd_set_mode(enum clock_event_mode mode,
 			struct clock_event_device *clk)
@@ -37,15 +43,18 @@ static void twd_set_mode(enum clock_event_mode mode,
 		ctrl = TWD_TIMER_CONTROL_ENABLE | TWD_TIMER_CONTROL_IT_ENABLE
 			| TWD_TIMER_CONTROL_PERIODIC;
 		__raw_writel(twd_timer_rate / HZ, twd_base + TWD_TIMER_LOAD);
+		gic_enable_ppi(clk->irq);
 		break;
 	case CLOCK_EVT_MODE_ONESHOT:
 		/* period set, and timer enabled in 'next_event' hook */
 		ctrl = TWD_TIMER_CONTROL_IT_ENABLE | TWD_TIMER_CONTROL_ONESHOT;
+		gic_enable_ppi(clk->irq);
 		break;
 	case CLOCK_EVT_MODE_UNUSED:
 	case CLOCK_EVT_MODE_SHUTDOWN:
 	default:
 		ctrl = 0;
+		gic_disable_ppi(clk->irq);
 	}
 
 	__raw_writel(ctrl, twd_base + TWD_TIMER_CONTROL);
@@ -80,6 +89,59 @@ int twd_timer_ack(void)
 	return 0;
 }
 
+static struct clk *twd_get_clock(void)
+{
+	return clk_get_sys("smp_twd", NULL);
+}
+
+#ifdef CONFIG_CPU_FREQ
+/*
+ * Updates clockevent frequency when the cpu frequency changes.
+ * Called on the cpu that is changing frequency with interrupts disabled.
+ */
+static void twd_update_frequency(void *data)
+{
+	twd_timer_rate = clk_get_rate(twd_clk);
+
+	clockevents_update_freq(*__this_cpu_ptr(twd_evt), twd_timer_rate);
+}
+
+static int twd_cpufreq_transition(struct notifier_block *nb,
+	unsigned long state, void *data)
+{
+	struct cpufreq_freqs *freqs = data;
+
+	/*
+	 * The twd clock events must be reprogrammed to account for the new
+	 * frequency.  The timer is local to a cpu, so cross-call to the
+	 * changing cpu.
+	 *
+	 * Only wait for it to finish, if the cpu is active to avoid
+	 * deadlock when cpu1 is spinning on while(!cpu_active(cpu1)) during
+	 * booting of that cpu.
+	 */
+	if (state == CPUFREQ_POSTCHANGE || state == CPUFREQ_RESUMECHANGE)
+		smp_call_function_single(freqs->cpu, twd_update_frequency,
+					 NULL, cpu_active(freqs->cpu));
+
+	return NOTIFY_OK;
+}
+
+static struct notifier_block twd_cpufreq_nb = {
+	.notifier_call = twd_cpufreq_transition,
+};
+
+static int twd_cpufreq_init(void)
+{
+	if (twd_evt && *__this_cpu_ptr(twd_evt) && !IS_ERR(twd_clk))
+		return cpufreq_register_notifier(&twd_cpufreq_nb,
+			CPUFREQ_TRANSITION_NOTIFIER);
+
+	return 0;
+}
+core_initcall(twd_cpufreq_init);
+
+#endif
 static void __cpuinit twd_calibrate_rate(void)
 {
 	unsigned long count;
@@ -124,7 +186,24 @@ static void __cpuinit twd_calibrate_rate(void)
  */
 void __cpuinit twd_timer_setup(struct clock_event_device *clk)
 {
-	twd_calibrate_rate();
+	struct clock_event_device **this_cpu_clk;
+
+	if (!twd_evt) {
+
+		twd_evt = alloc_percpu(struct clock_event_device *);
+		if (!twd_evt) {
+			pr_err("twd: can't allocate memory\n");
+			return;
+		}
+	}
+
+	if (!twd_clk)
+		twd_clk = twd_get_clock();
+
+	if (!IS_ERR_OR_NULL(twd_clk))
+		twd_timer_rate = clk_get_rate(twd_clk);
+	else
+		twd_calibrate_rate();
 
 	clk->name = "local_timer";
 	clk->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT |
@@ -132,13 +211,13 @@ void __cpuinit twd_timer_setup(struct clock_event_device *clk)
 	clk->rating = 350;
 	clk->set_mode = twd_set_mode;
 	clk->set_next_event = twd_set_next_event;
-	clk->shift = 20;
-	clk->mult = div_sc(twd_timer_rate, NSEC_PER_SEC, clk->shift);
-	clk->max_delta_ns = clockevent_delta2ns(0xffffffff, clk);
-	clk->min_delta_ns = clockevent_delta2ns(0xf, clk);
+
+	this_cpu_clk = __this_cpu_ptr(twd_evt);
+	*this_cpu_clk = clk;
+
+	clockevents_config_and_register(clk, twd_timer_rate,
+					0xf, 0xffffffff);
 
 	/* Make sure our local interrupt controller has this enabled */
 	gic_enable_ppi(clk->irq);
-
-	clockevents_register_device(clk);
 }

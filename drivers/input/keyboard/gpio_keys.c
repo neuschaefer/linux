@@ -26,6 +26,11 @@
 #include <linux/workqueue.h>
 #include <linux/gpio.h>
 
+#include <linux/wakelock.h>
+struct timer_list hallsensor_trigger_timer;
+int g_hallsensor_trigger_allow = 1;
+static struct wake_lock wakelock;
+
 struct gpio_button_data {
 	struct gpio_keys_button *button;
 	struct input_dev *input;
@@ -43,6 +48,8 @@ struct gpio_keys_drvdata {
 	void (*disable)(struct device *dev);
 	struct gpio_button_data data[0];
 };
+
+static struct input_dev *pindev=0;
 
 /*
  * SYSFS interface for enabling/disabling keys and switches:
@@ -136,6 +143,52 @@ static void gpio_keys_enable_button(struct gpio_button_data *bdata)
 		bdata->disabled = false;
 	}
 }
+
+static struct gpio_button_data *_keybutton_to_btndata(struct gpio_keys_button *button)
+{
+	int i;
+	struct gpio_button_data *ret_bdata = 0,*tmp_bdata;
+	struct gpio_keys_drvdata *ddata;
+
+	//ASSERT(button);
+	//ASSERT(pindev);
+
+	ddata = input_get_drvdata(pindev);
+
+	for (i = 0; i < ddata->n_buttons; i++) {
+		tmp_bdata = &ddata->data[i];
+		if (tmp_bdata->button == button) {
+			ret_bdata=tmp_bdata;
+			break;
+		}
+	}
+
+	return ret_bdata;
+}
+
+void gpiokeys_enable_button(struct gpio_keys_button *button,int iIsEnable)
+{
+	struct gpio_button_data *bdata;
+
+	if(!button) {
+		printk(KERN_ERR"%s() parameter error !\n",__FUNCTION__);
+		return ;
+	}
+	if(!pindev) {
+		printk(KERN_ERR"%s() gpiokeys not ready !\n",__FUNCTION__);
+		return ;
+	}
+
+	bdata = _keybutton_to_btndata(button);
+
+	if(iIsEnable) {
+		gpio_keys_enable_button(bdata);
+	}
+	else {
+		gpio_keys_disable_button(bdata);
+	}
+}
+
 
 /**
  * gpio_keys_attr_show_helper() - fill in stringified bitmap of buttons
@@ -317,6 +370,8 @@ static struct attribute_group gpio_keys_attr_group = {
 	.attrs = gpio_keys_attrs,
 };
 
+int gKernel_Enter_Suspend = 0;
+
 static void gpio_keys_report_event(struct gpio_button_data *bdata)
 {
 	struct gpio_keys_button *button = bdata->button;
@@ -324,13 +379,50 @@ static void gpio_keys_report_event(struct gpio_button_data *bdata)
 	unsigned int type = button->type ?: EV_KEY;
 	int state = (gpio_get_value_cansleep(button->gpio) ? 1 : 0) ^ button->active_low;
 
+	/*
+	if (state != bdata->isr_state) {	// do nothing if key bounced.
+		printk("skip report \"%s\" btn %d,because bounced !\n",button->desc,state);
+		return;
+	}
+	*/
+
+	if(button->hook) {
+		if( button->hook(button,state)<0 ) {
+			//printk("skip report \"%s\" btn %d,because hook return fail !\n",button->desc,state);
+			return ;
+		}
+	}
+
 	if (type == EV_ABS) {
 		if (state)
 			input_event(input, type, button->code, button->value);
+	} else if (type == EV_SW) { //Terry add
+		printk("[%s %d] state = %d\n",__func__,__LINE__,state);
+		wake_lock(&wakelock);
+		if( g_hallsensor_trigger_allow ){
+			g_hallsensor_trigger_allow = 0;
+			input_event(input, type, button->code, !!state);	
+		} else {
+			printk("hallsensor trigger not allow!!\n\n");
+		}
+		mod_timer(&hallsensor_trigger_timer, jiffies + msecs_to_jiffies(500) );
+		
+		//input_event(input, type, button->code, !!state);
+		
 	} else {
+		//Yian, Drop Power key during kernel suspend, since the key will be queued 
+		//and next wakeup, android will get one more power key, then system sleep.
+		#ifdef CONFIG_PM
+		if (button->code == KEY_POWER && gKernel_Enter_Suspend){
+			printk("KEY_POWER Drop by driver\n");
+			return;
+		}
+		#endif
 		input_event(input, type, button->code, !!state);
 	}
+
 	input_sync(input);
+	
 }
 
 static void gpio_keys_work_func(struct work_struct *work)
@@ -380,7 +472,7 @@ static int __devinit gpio_keys_setup_key(struct platform_device *pdev,
 	if (error < 0) {
 		dev_err(dev, "failed to request GPIO %d, error %d\n",
 			button->gpio, error);
-		goto fail2;
+		//goto fail2;
 	}
 
 	error = gpio_direction_input(button->gpio);
@@ -414,6 +506,14 @@ static int __devinit gpio_keys_setup_key(struct platform_device *pdev,
 	 */
 	if (!button->can_disable)
 		irqflags |= IRQF_SHARED;
+	/*
+	 * Resume power key early during syscore instead of at device
+	 * resume time.
+	 * Some platform like Android need to konw the power key is pressed
+	 * then to reume the other devcies
+	 */
+	if (button->wakeup)
+		irqflags |= IRQF_NO_SUSPEND | IRQF_EARLY_RESUME;
 
 	error = request_any_context_irq(irq, gpio_keys_isr, irqflags, desc, bdata);
 	if (error < 0) {
@@ -445,6 +545,7 @@ static void gpio_keys_close(struct input_dev *input)
 		ddata->disable(input->dev.parent);
 }
 
+
 static int __devinit gpio_keys_probe(struct platform_device *pdev)
 {
 	struct gpio_keys_platform_data *pdata = pdev->dev.platform_data;
@@ -458,6 +559,8 @@ static int __devinit gpio_keys_probe(struct platform_device *pdev)
 			pdata->nbuttons * sizeof(struct gpio_button_data),
 			GFP_KERNEL);
 	input = input_allocate_device();
+	pindev = input ;
+
 	if (!ddata || !input) {
 		dev_err(dev, "failed to allocate state\n");
 		error = -ENOMEM;
@@ -505,6 +608,13 @@ static int __devinit gpio_keys_probe(struct platform_device *pdev)
 
 		input_set_capability(input, type, button->code);
 	}
+
+	// set capability for ntx gpiofn keys
+	input_set_capability(input, EV_KEY, KEY_POWER);
+	input_set_capability(input, EV_KEY, KEY_H);
+	input_set_capability(input, EV_KEY, KEY_F1);
+
+	input_set_capability(input, EV_SW, SW_LID);
 
 	error = sysfs_create_group(&pdev->dev.kobj, &gpio_keys_attr_group);
 	if (error) {
@@ -575,9 +685,11 @@ static int __devexit gpio_keys_remove(struct platform_device *pdev)
 
 
 #ifdef CONFIG_PM
+extern int gSleep_Mode_Suspend;
 static int gpio_keys_suspend(struct device *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev);
+	struct gpio_keys_drvdata *ddata = platform_get_drvdata(pdev);
 	struct gpio_keys_platform_data *pdata = pdev->dev.platform_data;
 	int i;
 
@@ -586,6 +698,14 @@ static int gpio_keys_suspend(struct device *dev)
 			struct gpio_keys_button *button = &pdata->buttons[i];
 			if (button->wakeup) {
 				int irq = gpio_to_irq(button->gpio);
+				if (gSleep_Mode_Suspend && (KEY_POWER != button->code) && (EV_SW != button->type)) {
+					free_irq(irq, &ddata->data[i]);
+					if (ddata->data[i].timer_debounce)
+						del_timer_sync(&ddata->data[i].timer);
+					cancel_work_sync(&ddata->data[i].work);
+					gpio_free(pdata->buttons[i].gpio);
+					continue;
+				}
 				enable_irq_wake(irq);
 			}
 		}
@@ -600,12 +720,17 @@ static int gpio_keys_resume(struct device *dev)
 	struct gpio_keys_drvdata *ddata = platform_get_drvdata(pdev);
 	struct gpio_keys_platform_data *pdata = pdev->dev.platform_data;
 	int i;
-
+	
 	for (i = 0; i < pdata->nbuttons; i++) {
 
 		struct gpio_keys_button *button = &pdata->buttons[i];
+		struct gpio_button_data *bdata = &ddata->data[i];
 		if (button->wakeup && device_may_wakeup(&pdev->dev)) {
 			int irq = gpio_to_irq(button->gpio);
+			if (gSleep_Mode_Suspend && (KEY_POWER != button->code) && (EV_SW != button->type)) {
+				gpio_keys_setup_key(pdev, bdata, button);
+				continue;
+			}
 			disable_irq_wake(irq);
 		}
 
@@ -627,6 +752,8 @@ static struct platform_driver gpio_keys_device_driver = {
 	.remove		= __devexit_p(gpio_keys_remove),
 	.driver		= {
 		.name	= "gpio-keys",
+		//.name	= "mxckpd",
+		//.name	= "imx-keypad",
 		.owner	= THIS_MODULE,
 #ifdef CONFIG_PM
 		.pm	= &gpio_keys_pm_ops,
@@ -634,13 +761,53 @@ static struct platform_driver gpio_keys_device_driver = {
 	}
 };
 
+void gpiokeys_report_event(unsigned int type, unsigned int code, int value)
+{
+	if (pindev) {
+		input_event(pindev, type, code, value);
+		input_sync(pindev);
+	}
+}
+void gpiokeys_report_key(int isDown,__u16 wKeyCode)
+{
+	gpiokeys_report_event(EV_KEY,wKeyCode,isDown);
+}
+
+void gpiokeys_report_power(int isDown)
+{
+	gpiokeys_report_key(isDown,KEY_POWER);
+}
+
+static int hallsensor_trigger(void)
+{
+	printk("[%s %d] -=-=-=-=-= !!\n",__func__,__LINE__);
+	wake_unlock(&wakelock);
+	g_hallsensor_trigger_allow = 1;
+	return 0;
+}
+
+static void hallsensor_trigger_timer_init(void)
+{  
+  printk("hallsensor trigger timer init start\n");
+  init_timer(&hallsensor_trigger_timer);
+  hallsensor_trigger_timer.function = hallsensor_trigger;
+  hallsensor_trigger_timer.data = ((unsigned long) 0);
+  hallsensor_trigger_timer.expires = jiffies + 5*HZ;
+}
+
+
+
+
 static int __init gpio_keys_init(void)
 {
+	hallsensor_trigger_timer_init();
+	wake_lock_init(&wakelock, WAKE_LOCK_SUSPEND, "hallsensor");
 	return platform_driver_register(&gpio_keys_device_driver);
 }
 
 static void __exit gpio_keys_exit(void)
 {
+	wake_lock_destroy(&wakelock);
 	platform_driver_unregister(&gpio_keys_device_driver);
 }
 

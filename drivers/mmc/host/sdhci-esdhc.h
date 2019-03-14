@@ -1,7 +1,7 @@
 /*
  * Freescale eSDHC controller driver generics for OF and pltfm.
  *
- * Copyright (c) 2007 Freescale Semiconductor, Inc.
+ * Copyright (C) 2007, 2011, 2012 Freescale Semiconductor, Inc.
  * Copyright (c) 2009 MontaVista Software, Inc.
  * Copyright (c) 2010 Pengutronix e.K.
  *   Author: Wolfram Sang <w.sang@pengutronix.de>
@@ -13,6 +13,7 @@
 
 #ifndef _DRIVERS_MMC_SDHCI_ESDHC_H
 #define _DRIVERS_MMC_SDHCI_ESDHC_H
+#include <linux/platform_device.h>
 
 /*
  * Ops and quirks for the Freescale eSDHC controller.
@@ -42,12 +43,27 @@
 
 #define ESDHC_HOST_CONTROL_RES	0x05
 
+#define SDHCI_MIX_CTRL			0x48
+#define SDHCI_MIX_CTRL_DDREN		(1 << 3)
+
 static inline void esdhc_set_clock(struct sdhci_host *host, unsigned int clock)
 {
 	int pre_div = 2;
 	int div = 1;
 	u32 temp;
+	struct esdhc_platform_data *boarddata;
+	int ddr_mode = 0;
+	struct platform_device *pdev = to_platform_device(host->mmc->parent);
 
+	boarddata = host->mmc->parent->platform_data;
+	if (cpu_is_mx6q() || cpu_is_mx6dl() || cpu_is_mx6sl()) {
+		pre_div = 1;
+		if (readl(host->ioaddr + SDHCI_MIX_CTRL) &
+				SDHCI_MIX_CTRL_DDREN) {
+			ddr_mode = 1;
+			pre_div = 2;
+		}
+	}
 	temp = sdhci_readl(host, ESDHC_SYSTEM_CONTROL);
 	temp &= ~(ESDHC_CLOCK_IPGEN | ESDHC_CLOCK_HCKEN | ESDHC_CLOCK_PEREN
 		| ESDHC_CLOCK_MASK);
@@ -65,7 +81,7 @@ static inline void esdhc_set_clock(struct sdhci_host *host, unsigned int clock)
 	dev_dbg(mmc_dev(host->mmc), "desired SD clock: %d, actual: %d\n",
 		clock, host->max_clk / pre_div / div);
 
-	pre_div >>= 1;
+	pre_div >>= (1 + ddr_mode);
 	div--;
 
 	temp = sdhci_readl(host, ESDHC_SYSTEM_CONTROL);
@@ -73,7 +89,17 @@ static inline void esdhc_set_clock(struct sdhci_host *host, unsigned int clock)
 		| (div << ESDHC_DIVIDER_SHIFT)
 		| (pre_div << ESDHC_PREDIV_SHIFT));
 	sdhci_writel(host, temp, ESDHC_SYSTEM_CONTROL);
-	mdelay(100);
+	mdelay(1);
+
+	/* if there's board callback function
+	 * for pad setting change, that means
+	 * board needs to reconfig its pad for
+	 * corresponding sd bus frequency
+	 */
+	if (boarddata->platform_pad_change) {
+		BUG_ON(!pdev);
+		boarddata->platform_pad_change(pdev->id, clock);
+	}
 out:
 	host->clock = clock;
 }

@@ -106,6 +106,24 @@ config RTC_INTF_DEV_UIE_EMUL
 	  clock several times per second, please enable this option
 	  only if you know that you really need it.
 
+config RTC_INTF_ALARM
+	bool "Android alarm driver"
+	depends on RTC_CLASS
+	default y
+	help
+	  Provides non-wakeup and rtc backed wakeup alarms based on rtc or
+	  elapsed realtime, and a non-wakeup alarm on the monotonic clock.
+	  Also provides an interface to set the wall time which must be used
+	  for elapsed realtime to work.
+
+config RTC_INTF_ALARM_DEV
+	bool "Android alarm device"
+	depends on RTC_INTF_ALARM
+	default y
+	help
+	  Exports the alarm interface to user-space.
+
+
 config RTC_DRV_TEST
 	tristate "Test driver/device"
 	help
@@ -634,6 +652,29 @@ config RTC_MXC
 	   This driver can also be built as a module, if so, the module
 	   will be called "rtc-mxc".
 
+config RTC_DRV_MXC_V2
+	tristate "Freescale MXC Secure Real Time Clock"
+	depends on ARCH_MXC
+	depends on RTC_CLASS
+	help
+	   Support for Freescale SRTC MXC
+
+config RTC_DRV_SNVS
+	tristate "Freescale SNVS Real Time Clock"
+	depends on ARCH_MXC
+	depends on RTC_CLASS
+	help
+	   If you say yes here you get support for the Freescale SNVS
+	   Low Power (LP) RTC module.
+
+config RTC_DRV_NTX_MISC
+	tristate "Netronix misc Real Time Clock"
+	depends on ARCH_MXC
+	depends on RTC_CLASS
+	help
+	   If you say yes here you get support for the Netronix MISC
+	   micro P RTC module.
+
 config RTC_DRV_BQ4802
 	tristate "TI BQ4802"
 	help
@@ -1004,6 +1045,13 @@ config RTC_DRV_MC13XXX
 	  This enables support for the RTCs found on Freescale's PMICs
 	  MC13783 and MC13892.
 
+config RTC_DRV_MC34708
+	depends on MFD_MC_PMIC
+	tristate "Freescale MC34708 RTC"
+	help
+	  This enables support for the RTCs found on Freescale's PMICs
+	  MC34708.
+
 config RTC_DRV_MPC5121
 	tristate "Freescale MPC5121 built-in RTC"
 	depends on PPC_MPC512x && RTC_CLASS
@@ -1034,6 +1082,13 @@ config RTC_DRV_LPC32XX
 	  This driver can also be buillt as a module. If so, the module
 	  will be called rtc-lpc32xx.
 
+config RTC_DRV_DA9052
+	tristate "Dialog DA9052 RTC"
+	depends on PMIC_DIALOG
+	help
+	  Say y here to support the RTC found on
+	  Dialog Semiconductor DA9052 PMIC.
+
 config RTC_DRV_TEGRA
 	tristate "NVIDIA Tegra Internal RTC driver"
 	depends on RTC_CLASS && ARCH_TEGRA
@@ -1059,5 +1114,15 @@ config RTC_DRV_PUV3
 
 	  This drive can also be built as a module. If so, the module
 	  will be called rtc-puv3.
+
+config RTC_DRV_R5T619
+	tristate "Ricoh R5T619 PMIC RTC driver"
+	depends on MFD_RICOH619
+	default n
+	help
+	  If you say yes here you get support for the Ricoh R5T619 RTC module.
+
+	  This driver can also be built as a module. If so, the module
+	  will be called rtc-r5t619.
 
 endif # RTC_CLASS

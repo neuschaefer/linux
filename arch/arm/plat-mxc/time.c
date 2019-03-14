@@ -57,7 +57,14 @@
 /* MX31, MX35, MX25, MX5 */
 #define V2_TCTL_WAITEN		(1 << 3) /* Wait enable mode */
 #define V2_TCTL_CLK_IPG		(1 << 6)
-#define V2_TCTL_FRR		(1 << 9)
+#define V2_TCTL_CLK_PER		(2 << 6)
+#define V2_TCTL_CLK_OSC_DIV8	 (5 << 6)
+#define V2_TCTL_CLK_OSC		(7 << 6)
+#define V2_TCTL_FRR			(1 << 9)
+#define V2_TCTL_ENABLE24M	(1 << 10)
+#define V2_TPRER_PRE24M_DIV8	7
+#define V2_TPRER_PRE24M_MASK	0xF
+#define V2_TPRER_PRE24M_OFFSET	12
 #define V2_IR			0x0c
 #define V2_TSTAT		0x08
 #define V2_TSTAT_OF1		(1 << 0)
@@ -158,7 +165,8 @@ static int v2_set_next_event(unsigned long evt,
 
 	__raw_writel(tcmp, timer_base + V2_TCMP);
 
-	return (int)(tcmp - __raw_readl(timer_base + V2_TCN)) < 0 ?
+	return evt < 0x7fffffff &&
+		(int)(tcmp - __raw_readl(timer_base + V2_TCN)) < 0 ?
 				-ETIME : 0;
 }
 
@@ -291,6 +299,7 @@ static int __init mxc_clockevent_init(struct clk *timer_clk)
 void __init mxc_timer_init(struct clk *timer_clk, void __iomem *base, int irq)
 {
 	uint32_t tctl_val;
+	u32 reg;
 
 	clk_enable(timer_clk);
 
@@ -303,9 +312,24 @@ void __init mxc_timer_init(struct clk *timer_clk, void __iomem *base, int irq)
 	__raw_writel(0, timer_base + MXC_TCTL);
 	__raw_writel(0, timer_base + MXC_TPRER); /* see datasheet note */
 
-	if (timer_is_v2())
-		tctl_val = V2_TCTL_CLK_IPG | V2_TCTL_FRR | V2_TCTL_WAITEN | MXC_TCTL_TEN;
-	else
+	if (timer_is_v2()) {
+		if (cpu_is_mx5() || cpu_is_mx6sl() ||
+			mx6q_revision() == IMX_CHIP_REVISION_1_0)
+			tctl_val = V2_TCTL_CLK_PER | V2_TCTL_FRR |
+						V2_TCTL_WAITEN | MXC_TCTL_TEN;
+		else {
+			tctl_val = V2_TCTL_CLK_OSC_DIV8 | V2_TCTL_FRR |
+						V2_TCTL_WAITEN | MXC_TCTL_TEN;
+			if (!cpu_is_mx6q()) {
+				reg = __raw_readl(timer_base + MXC_TPRER);
+				reg |= (V2_TPRER_PRE24M_DIV8 <<
+							V2_TPRER_PRE24M_OFFSET);
+				__raw_writel(reg, timer_base + MXC_TPRER);
+				/* Enable the 24MHz input clock. */
+				tctl_val |= V2_TCTL_ENABLE24M;
+			}
+		}
+	} else
 		tctl_val = MX1_2_TCTL_FRR | MX1_2_TCTL_CLK_PCLK1 | MXC_TCTL_TEN;
 
 	__raw_writel(tctl_val, timer_base + MXC_TCTL);

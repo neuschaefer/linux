@@ -48,12 +48,30 @@ config ARCH_MX51
 	help
 	  This enables support for systems based on the Freescale i.MX51 family
 
+config ARCH_MX6
+	bool "MX6-based"
+	select CPU_V7
+	help
+	  This enable support for systems based on the Freescale i.MX 6 Series family
+
 endchoice
 
 source "arch/arm/mach-imx/Kconfig"
 source "arch/arm/mach-mx5/Kconfig"
+source "arch/arm/mach-mx6/Kconfig"
 
 endmenu
+## Freescale private USB driver support
+# set if we need the 1504 transceiver
+config ISP1504_MXC
+	bool
+	default y
+
+# set if we need the UTMI transceiver
+config UTMI_MXC
+	bool
+	default y
+	depends on ARCH_MX25 || ARCH_MX35 || ARCH_MX37 || ARCH_MX5
 
 config MXC_IRQ_PRIOR
 	bool "Use IRQ priority"
@@ -91,6 +109,17 @@ config MXC_DEBUG_BOARD
 config HAVE_EPIT
 	bool
 
+config MXC_REBOOT_MFGMODE
+       bool "Enable reboot to MFG mode function"
+       help
+          Enable this config to perform "reboot download" to enter download mode.
+
+config MXC_REBOOT_ANDROID_CMD
+       bool "Enable reboot to android recovery and android fastboot"
+       help
+           Enable this config to use "reboot fastboot", "reboot recovery" to
+	   enter fastboot and recovery mode.
+
 config MXC_USE_EPIT
 	bool "Use EPIT instead of GPT"
 	depends on HAVE_EPIT
@@ -104,6 +133,9 @@ config MXC_ULPI
 	bool
 
 config ARCH_HAS_RNGA
+	bool
+
+config ARCH_HAS_RNGC
 	bool
 
 config IMX_HAVE_IOMUX_V1
@@ -120,6 +152,22 @@ config ARCH_MXC_AUDMUX_V2
 
 config IRAM_ALLOC
 	bool
+        default y
 	select GENERIC_ALLOCATOR
+
+config CLK_DEBUG
+	bool "clock debug information export to user space"
+	depends on PM_DEBUG && DEBUG_FS
+	default n
+	help
+	  export clk debug information to user space
+
+config DMA_ZONE_SIZE
+        int "DMA memory zone size"
+        range 0 184
+        default 24
+        help
+          This is the size in MB for the DMA zone. The DMA zone is used for
+          dedicated memory for large contiguous video buffers
 
 endif

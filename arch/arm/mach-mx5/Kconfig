@@ -21,6 +21,7 @@ config SOC_IMX50
 	select ARCH_HAS_CPUFREQ
 	select ARCH_MX5
 	select ARCH_MX50
+	select ARCH_HAS_RNGC
 
 config	SOC_IMX51
 	bool
@@ -31,6 +32,15 @@ config	SOC_IMX51
 	select ARCH_MXC_AUDMUX_V2
 	select ARCH_HAS_CPUFREQ
 	select ARCH_MX5
+	select IMX_HAVE_PLATFORM_FEC
+	select IMX_HAVE_PLATFORM_MXC_PWM
+	select IMX_HAVE_PLATFORM_IMX_IPUV3
+	select IMX_HAVE_PLATFORM_IMX_TVE
+	select IMX_HAVE_PLATFORM_IMX_VPU
+	select IMX_HAVE_PLATFORM_IMX_DVFS
+	select IMX_HAVE_PLATFORM_IMX_SSI
+	select IMX_HAVE_PLATFORM_IMX_IIM
+	select IMX_HAVE_PLATFORM_IMX_SPDIF
 
 config	SOC_IMX53
 	bool
@@ -40,19 +50,39 @@ config	SOC_IMX53
 	select ARCH_MXC_IOMUX_V3
 	select ARCH_MX5
 	select ARCH_MX53
+	select ARCH_HAS_CPUFREQ
+	select IMX_HAVE_PLATFORM_FEC
+	select IMX_HAVE_PLATFORM_MXC_PWM
+	select IMX_HAVE_PLATFORM_IMX_IPUV3
+	select IMX_HAVE_PLATFORM_IMX_TVE
+	select IMX_HAVE_PLATFORM_IMX_VPU
+	select IMX_HAVE_PLATFORM_IMX_DVFS
+	select IMX_HAVE_PLATFORM_IMX_SSI
+	select IMX_HAVE_PLATFORM_IMX_IIM
+	select IMX_HAVE_PLATFORM_LDB
+	select IMX_HAVE_PLATFORM_IMX_SPDIF
+	select IMX_HAVE_PLATFORM_IMX_ESAI
 
 if ARCH_MX50_SUPPORTED
 #comment "i.MX50 machines:"
 
 config MACH_MX50_RDP
 	bool "Support MX50 reference design platform"
-	depends on BROKEN
 	select SOC_IMX50
+	select IMX_HAVE_PLATFORM_DMA
 	select IMX_HAVE_PLATFORM_IMX_I2C
 	select IMX_HAVE_PLATFORM_IMX_UART
 	select IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX
 	select IMX_HAVE_PLATFORM_SPI_IMX
 	select IMX_HAVE_PLATFORM_FEC
+	select IMX_HAVE_PLATFORM_GPMI_NFC
+	select IMX_HAVE_PLATFORM_IMX_OCOTP
+	select IMX_HAVE_PLATFORM_IMX_VIIM
+	select IMX_HAVE_PLATFORM_IMX_DCP
+	select IMX_HAVE_PLATFORM_RANDOM_RNGC
+    select IMX_HAVE_PLATFORM_PERFMON
+    select IMX_HAVE_PLATFORM_IMX_PXP
+	select IMX_HAVE_PLATFORM_IMX_EPDC
 	help
 	  Include support for MX50 reference design platform (RDP) board. This
 	  includes specific configurations for the board and its peripherals.
@@ -174,8 +204,10 @@ config MACH_MX53_EVK
 	select IMX_HAVE_PLATFORM_IMX2_WDT
 	select IMX_HAVE_PLATFORM_IMX_UART
 	select IMX_HAVE_PLATFORM_IMX_I2C
+	select IMX_HAVE_PLATFORM_MXC_GPU
 	select IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX
 	select IMX_HAVE_PLATFORM_SPI_IMX
+	select IMX_HAVE_PLATFORM_AHCI
 	help
 	  Include support for MX53 EVK platform. This includes specific
 	  configurations for the board and its peripherals.
@@ -186,7 +218,11 @@ config MACH_MX53_SMD
 	select IMX_HAVE_PLATFORM_IMX2_WDT
 	select IMX_HAVE_PLATFORM_IMX_I2C
 	select IMX_HAVE_PLATFORM_IMX_UART
+	select IMX_HAVE_PLATFORM_IMX_I2C
+	select IMX_HAVE_PLATFORM_MXC_GPU
 	select IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX
+	select IMX_HAVE_PLATFORM_IMX_SRTC
+	select IMX_HAVE_PLATFORM_AHCI
 	help
 	  Include support for MX53 SMD platform. This includes specific
 	  configurations for the board and its peripherals.
@@ -197,12 +233,31 @@ config MACH_MX53_LOCO
 	select IMX_HAVE_PLATFORM_IMX2_WDT
 	select IMX_HAVE_PLATFORM_IMX_I2C
 	select IMX_HAVE_PLATFORM_IMX_UART
+	select IMX_HAVE_PLATFORM_IMX_SRTC
+	select IMX_HAVE_PLATFORM_MXC_GPU
 	select IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX
 	select IMX_HAVE_PLATFORM_GPIO_KEYS
+	select IMX_HAVE_PLATFORM_AHCI
 	help
 	  Include support for MX53 LOCO platform. This includes specific
 	  configurations for the board and its peripherals.
 
+config MACH_MX53_ARD
+	bool "Support MX53 ARD platform"
+	select SOC_IMX53
+	select IMX_HAVE_PLATFORM_IMX2_WDT
+	select IMX_HAVE_PLATFORM_IMX_UART
+	select IMX_HAVE_PLATFORM_MXC_GPU
+	select IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX
+	select IMX_HAVE_PLATFORM_AHCI
+	help
+	  Include support for MX53 ARD platform. This includes specific
+	  configurations for the board and its peripherals.
 endif # ARCH_MX53_SUPPORTED
 
+config MACH_IMX_BLUETOOTH_RFKILL
+       tristate "i.MX Bluetooth rfkill interface support"
+       depends on RFKILL
+       ---help---
+	Say Y to get the standard rfkill interface of Bluetooth
 endif

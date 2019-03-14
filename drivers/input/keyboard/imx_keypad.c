@@ -172,9 +172,9 @@ static void imx_keypad_fire_events(struct imx_keypad *keypad,
 				continue; /* Row does not contain changes */
 
 			code = MATRIX_SCAN_CODE(row, col, MATRIX_ROW_SHIFT);
-			input_event(input_dev, EV_MSC, MSC_SCAN, code);
+			/* value should be 1 when key pressed, 0 for released */
 			input_report_key(input_dev, keypad->keycodes[code],
-				matrix_volatile_state[col] & (1 << row));
+				     (matrix_volatile_state[col] >> row) & 0x1);
 			dev_dbg(&input_dev->dev, "Event code: %d, val: %d",
 				keypad->keycodes[code],
 				matrix_volatile_state[col] & (1 << row));
@@ -408,6 +408,35 @@ open_err:
 	return -EIO;
 }
 
+static struct input_dev *mxckbd_dev;
+
+void mxc_kpp_report_event(unsigned int type, unsigned int code, int value)
+{
+	if (mxckbd_dev) {
+		input_event(mxckbd_dev, type, code, value);
+		input_sync(mxckbd_dev);
+	}
+	else { 
+		printk ("[%s-%d] error mxckbd_dev not assigned.\n",__func__,__LINE__);
+	}
+
+#if 0 // debug code .
+	printk("%s():mxckbd_dev@%p,Keycode=0x%x,%s\n",\
+			__FUNCTION__,mxckbd_dev,wKeyCode,isDown?"DOWN":"UP");
+#endif
+}
+
+
+void mxc_kpp_report_key(int isDown,__u16 wKeyCode)
+{
+	mxc_kpp_report_event(EV_KEY,wKeyCode,isDown);
+}
+
+void mxc_kpp_report_power(int isDown)
+{
+	mxc_kpp_report_key(isDown,KEY_POWER);
+}
+
 static int __devinit imx_keypad_probe(struct platform_device *pdev)
 {
 	const struct matrix_keymap_data *keymap_data = pdev->dev.platform_data;
@@ -445,6 +474,7 @@ static int __devinit imx_keypad_probe(struct platform_device *pdev)
 		error = -ENOMEM;
 		goto failed_rel_mem;
 	}
+	mxckbd_dev = input_dev;
 
 	keypad = kzalloc(sizeof(struct imx_keypad), GFP_KERNEL);
 	if (!keypad) {
@@ -496,7 +526,13 @@ static int __devinit imx_keypad_probe(struct platform_device *pdev)
 	input_dev->dev.parent = &pdev->dev;
 	input_dev->open = imx_keypad_open;
 	input_dev->close = imx_keypad_close;
-	input_dev->evbit[0] = BIT_MASK(EV_KEY) | BIT_MASK(EV_REP);
+
+	/* Should not set BIT_MASK(EV_REP) to evbit[0] when some keys(like
+	   power key) in keypad don't require to repeat, otherwise it will
+	   auto repeat the key event if long press those keys. The disadvantage
+	   is all keys in keypad, will not auto repeat when long pressed, but it
+	   should be acceptable to remove the EV_REP flag*/
+	input_dev->evbit[0] = BIT_MASK(EV_KEY);
 	input_dev->keycode = keypad->keycodes;
 	input_dev->keycodesize = sizeof(keypad->keycodes[0]);
 	input_dev->keycodemax = ARRAY_SIZE(keypad->keycodes);
@@ -505,6 +541,7 @@ static int __devinit imx_keypad_probe(struct platform_device *pdev)
 				keypad->keycodes, input_dev->keybit);
 
 	input_set_capability(input_dev, EV_MSC, MSC_SCAN);
+	input_set_capability(input_dev, EV_SW, SW_LID);
 	input_set_drvdata(input_dev, keypad);
 
 	/* Ensure that the keypad will stay dormant until opened */
@@ -567,10 +604,50 @@ static int __devexit imx_keypad_remove(struct platform_device *pdev)
 	return 0;
 }
 
+#ifdef CONFIG_PM
+extern int gSleep_Mode_Suspend;
+
+static int imx_keypad_suspend(struct device *dev)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct imx_keypad *keypad = platform_get_drvdata(pdev);
+
+	if (device_may_wakeup(&pdev->dev) && !gSleep_Mode_Suspend) {
+		enable_irq_wake(keypad->irq);
+	} else {
+		disable_irq(keypad->irq);
+	}
+
+	return 0;
+}
+
+static int imx_keypad_resume(struct device *dev)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct imx_keypad *keypad = platform_get_drvdata(pdev);
+
+	if (device_may_wakeup(&pdev->dev) && !gSleep_Mode_Suspend) {
+		disable_irq_wake(keypad->irq);
+	} else {
+		enable_irq(keypad->irq);
+	}		
+
+	return 0;
+}
+
+static const struct dev_pm_ops imx_keypad_pm_ops = {
+	.suspend	= imx_keypad_suspend,
+	.resume		= imx_keypad_resume,
+};
+#endif
+
 static struct platform_driver imx_keypad_driver = {
 	.driver		= {
 		.name	= "imx-keypad",
 		.owner	= THIS_MODULE,
+#ifdef CONFIG_PM
+		.pm	= &imx_keypad_pm_ops,
+#endif
 	},
 	.probe		= imx_keypad_probe,
 	.remove		= __devexit_p(imx_keypad_remove),

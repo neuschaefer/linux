@@ -276,7 +276,9 @@
 #define DRIVER_VERSION		"1 September 2010"
 
 static       char fsg_string_manufacturer[64];
-static const char fsg_string_product[] = DRIVER_DESC;
+//static const char fsg_string_product[] = DRIVER_DESC;
+static const char fsg_string_product[40];
+static       char fsg_string_serial[13];
 static const char fsg_string_config[] = "Self-powered";
 static const char fsg_string_interface[] = "Mass Storage";
 
@@ -325,7 +327,12 @@ static struct {
 	char		*transport_name;
 	int		protocol_type;
 	char		*protocol_name;
-
+	// Joseph 100316
+	char		*vendor_id;
+	char		*product_id;
+	char		*desc_p;
+	char		*desc_m;
+	char		*serial_no;
 } mod_data = {					// Default values
 	.transport_parm		= "BBB",
 	.protocol_parm		= "SCSI",
@@ -336,6 +343,11 @@ static struct {
 	.product		= FSG_PRODUCT_ID,
 	.release		= 0xffff,	// Use controller chip type
 	.buflen			= 16384,
+	// Joseph 100316
+	.vendor_id		= "Linux   ",
+	.product_id		= "File-Stor Gadget",
+	.serial_no		= "0123456789ABCDEF01",
+	
 	};
 
 
@@ -387,6 +399,23 @@ MODULE_PARM_DESC(release, "USB release number");
 
 module_param_named(buflen, mod_data.buflen, uint, S_IRUGO);
 MODULE_PARM_DESC(buflen, "I/O buffer size");
+
+// Joseph 100316
+module_param_named(vendor_id, mod_data.vendor_id, charp, S_IRUGO);
+MODULE_PARM_DESC(vendor, "USB Vendor ID string");
+
+module_param_named(product_id, mod_data.product_id, charp, S_IRUGO);
+MODULE_PARM_DESC(product, "USB Product ID string");
+
+module_param_named(desp_m, mod_data.desc_m, charp, S_IRUGO);
+MODULE_PARM_DESC(vendor, "USB descriptor M string");
+
+module_param_named(desp_p, mod_data.desc_p, charp, S_IRUGO);
+MODULE_PARM_DESC(product, "USB descriptor P string");
+
+module_param_named(SN, mod_data.serial_no, charp, S_IRUGO);
+MODULE_PARM_DESC(product, "serial no string");
+
 
 #endif /* CONFIG_USB_FILE_STORAGE_TEST */
 
@@ -488,7 +517,15 @@ struct fsg_dev {
 	unsigned int		nluns;
 	struct fsg_lun		*luns;
 	struct fsg_lun		*curlun;
+
+#ifdef CONFIG_FSL_UTP
+	void			*utp;
+#endif
 };
+
+#ifdef CONFIG_FSL_UTP
+#include "fsl_updater.h"
+#endif
 
 typedef void (*fsg_routine_t)(struct fsg_dev *);
 
@@ -557,7 +594,11 @@ device_desc = {
 
 	.iManufacturer =	FSG_STRING_MANUFACTURER,
 	.iProduct =		FSG_STRING_PRODUCT,
+#ifdef CONFIG_FSL_UTP
+	.iSerialNumber = 0,
+#else
 	.iSerialNumber =	FSG_STRING_SERIAL,
+#endif
 	.bNumConfigurations =	1,
 };
 
@@ -1565,8 +1606,14 @@ static int do_inquiry(struct fsg_dev *fsg, struct fsg_buffhd *bh)
 {
 	u8	*buf = (u8 *) bh->buf;
 
+#if 0	// Joseph 100315
 	static char vendor_id[] = "Linux   ";
 	static char product_disk_id[] = "File-Stor Gadget";
+#else
+	static char vendor_id[] = "        ";
+	static char product_disk_id[] = "                ";
+#endif	
+
 	static char product_cdrom_id[] = "File-CD Gadget  ";
 
 	if (!fsg->curlun) {		// Unsupported LUNs are okay
@@ -1585,6 +1632,19 @@ static int do_inquiry(struct fsg_dev *fsg, struct fsg_buffhd *bh)
 	buf[3] = 2;		// SCSI-2 INQUIRY data format
 	buf[4] = 31;		// Additional length
 				// No special options
+
+	// Joseph 100315 //[
+	if ( 8 > strlen (mod_data.vendor_id))
+		memcpy (vendor_id, mod_data.vendor_id, strlen (mod_data.vendor_id));
+	else
+		memcpy (vendor_id, mod_data.vendor_id, 8);
+	
+	if ( 16 > strlen (mod_data.product_id))
+		memcpy (product_disk_id, mod_data.product_id, strlen (mod_data.product_id));
+	else
+		memcpy (product_disk_id, mod_data.product_id, 16);
+	//] Joseph 100315
+				 
 	sprintf(buf + 8, "%-8s%-16s%04x", vendor_id,
 			(mod_data.cdrom ? product_cdrom_id :
 				product_disk_id),
@@ -1622,6 +1682,13 @@ static int do_request_sense(struct fsg_dev *fsg, struct fsg_buffhd *bh)
 	}
 #endif
 
+#ifdef CONFIG_FSL_UTP
+	if (utp_get_sense(fsg) == 0) {	/* got the sense from the UTP */
+		sd = UTP_CTX(fsg)->sd;
+		sdinfo = UTP_CTX(fsg)->sdinfo;
+		valid = 0;
+	} else
+#endif
 	if (!curlun) {		// Unsupported LUNs are okay
 		fsg->bad_lun_okay = 1;
 		sd = SS_LOGICAL_UNIT_NOT_SUPPORTED;
@@ -1643,6 +1710,9 @@ static int do_request_sense(struct fsg_dev *fsg, struct fsg_buffhd *bh)
 	buf[7] = 18 - 8;			// Additional sense length
 	buf[12] = ASC(sd);
 	buf[13] = ASCQ(sd);
+#ifdef CONFIG_FSL_UTP
+	put_unaligned_be32(UTP_CTX(fsg)->sdinfo_h, &buf[8]);
+#endif
 	return 18;
 }
 
@@ -2134,7 +2204,11 @@ static int send_status(struct fsg_dev *fsg)
 		sd = SS_INVALID_COMMAND;
 	} else if (sd != SS_NO_SENSE) {
 		DBG(fsg, "sending command-failure status\n");
+#ifdef CONFIG_FSL_UTP
+		status = USB_STATUS_PASS;
+#else
 		status = USB_STATUS_FAIL;
+#endif
 		VDBG(fsg, "  sense data: SK x%02x, ASC x%02x, ASCQ x%02x;"
 				"  info x%x\n",
 				SK(sd), ASC(sd), ASCQ(sd), sdinfo);
@@ -2355,6 +2429,13 @@ static int do_scsi_command(struct fsg_dev *fsg)
 	}
 	fsg->phase_error = 0;
 	fsg->short_packet_received = 0;
+
+#ifdef CONFIG_FSL_UTP
+	reply = utp_handle_message(fsg, fsg->cmnd, reply);
+
+	if (reply != -EINVAL)
+		return reply;
+#endif
 
 	down_read(&fsg->filesem);	// We're using the backing file
 	switch (fsg->cmnd[0]) {
@@ -3016,8 +3097,9 @@ static void handle_exception(struct fsg_dev *fsg)
 		break;
 
 	case FSG_STATE_DISCONNECT:
-		for (i = 0; i < fsg->nluns; ++i)
-			fsg_lun_fsync_sub(fsg->luns + i);
+		if (fsg->config != 0)
+			for (i = 0; i < fsg->nluns; ++i)
+				fsg_lun_fsync_sub(fsg->luns + i);
 		do_set_config(fsg, 0);		// Unconfigured state
 		break;
 
@@ -3048,10 +3130,12 @@ static int fsg_main_thread(void *fsg_)
 	/* Allow the thread to be frozen */
 	set_freezable();
 
+#ifndef CONFIG_FSL_UTP
 	/* Arrange for userspace references to be interpreted as kernel
 	 * pointers.  That way we can pass a kernel pointer to a routine
 	 * that expects a __user pointer and it will work okay. */
 	set_fs(get_ds());
+#endif
 
 	/* The main loop */
 	while (fsg->state != FSG_STATE_TERMINATED) {
@@ -3103,7 +3187,6 @@ static int fsg_main_thread(void *fsg_)
 	complete_and_exit(&fsg->thread_notifier, 0);
 }
 
-
 /*-------------------------------------------------------------------------*/
 
 
@@ -3142,6 +3225,15 @@ static void /* __init_or_exit */ fsg_unbind(struct usb_gadget *gadget)
 	DBG(fsg, "unbind\n");
 	clear_bit(REGISTERED, &fsg->atomic_bitflags);
 
+	/* If the thread isn't already dead, tell it to exit now */
+	if (fsg->state != FSG_STATE_TERMINATED) {
+		raise_exception(fsg, FSG_STATE_EXIT);
+		wait_for_completion(&fsg->thread_notifier);
+
+		/* The cleanup routine waits for this completion also */
+		complete(&fsg->thread_notifier);
+	}
+
 	/* Unregister the sysfs attribute files and the LUNs */
 	for (i = 0; i < fsg->nluns; ++i) {
 		curlun = &fsg->luns[i];
@@ -3155,15 +3247,6 @@ static void /* __init_or_exit */ fsg_unbind(struct usb_gadget *gadget)
 		}
 	}
 
-	/* If the thread isn't already dead, tell it to exit now */
-	if (fsg->state != FSG_STATE_TERMINATED) {
-		raise_exception(fsg, FSG_STATE_EXIT);
-		wait_for_completion(&fsg->thread_notifier);
-
-		/* The cleanup routine waits for this completion also */
-		complete(&fsg->thread_notifier);
-	}
-
 	/* Free the data buffers */
 	for (i = 0; i < FSG_NUM_BUFFERS; ++i)
 		kfree(fsg->buffhds[i].buf);
@@ -3175,6 +3258,9 @@ static void /* __init_or_exit */ fsg_unbind(struct usb_gadget *gadget)
 	}
 
 	set_gadget_data(gadget, NULL);
+#ifdef CONFIG_FSL_UTP
+	utp_exit(fsg);
+#endif
 }
 
 
@@ -3197,6 +3283,9 @@ static int __init check_parameters(struct fsg_dev *fsg)
 		mod_data.can_stall = 0;
 
 	if (mod_data.release == 0xffff) {	// Parameter wasn't set
+#if 1	// Joseph 20100903 for Calibre
+		mod_data.release = 0x0110;
+#else
 		gcnum = usb_gadget_controller_number(fsg->gadget);
 		if (gcnum >= 0)
 			mod_data.release = 0x0300 + gcnum;
@@ -3205,9 +3294,21 @@ static int __init check_parameters(struct fsg_dev *fsg)
 				fsg->gadget->name);
 			mod_data.release = 0x0399;
 		}
+#endif //] Joseph 20100903 for Calibre
 	}
 
 	prot = simple_strtol(mod_data.protocol_parm, NULL, 0);
+
+#ifdef CONFIG_FSL_UTP
+	mod_data.can_stall = 0;
+	mod_data.removable = 1;
+	mod_data.nluns = 1;
+	mod_data.file[0] = NULL;
+	mod_data.vendor = 0x066F;
+	mod_data.product = 0x37FF;
+	pr_info("%s:UTP settings are in place now, overriding defaults\n",
+		__func__);
+#endif
 
 #ifdef CONFIG_USB_FILE_STORAGE_TEST
 	if (strnicmp(mod_data.transport_parm, "BBB", 10) == 0) {
@@ -3297,9 +3398,11 @@ static int __init check_parameters(struct fsg_dev *fsg)
 
 	return 0;
 }
+#ifdef CONFIG_FSL_UTP
+#include "fsl_updater.c"
+#endif
 
-
-static int __init fsg_bind(struct usb_gadget *gadget)
+static int __ref fsg_bind(struct usb_gadget *gadget)
 {
 	struct fsg_dev		*fsg = the_fsg;
 	int			rc;
@@ -3329,6 +3432,9 @@ static int __init fsg_bind(struct usb_gadget *gadget)
 	/* Only for removable media? */
 	dev_attr_nofua.attr.mode = 0644;
 	dev_attr_nofua.store = fsg_store_nofua;
+#ifdef CONFIG_FSL_UTP
+	utp_init(fsg);
+#endif
 
 	/* Find out how many LUNs there should be */
 	i = mod_data.nluns;
@@ -3472,11 +3578,37 @@ static int __init fsg_bind(struct usb_gadget *gadget)
 
 	/* This should reflect the actual gadget power source */
 	usb_gadget_set_selfpowered(gadget);
-
+	if (mod_data.desc_p && strlen (mod_data.desc_p))// Joseph 20100921
+		strcpy (fsg_string_product, mod_data.desc_p);
+	else if (mod_data.product_id && strlen (mod_data.product_id))// Joseph 20100827
+		strcpy (fsg_string_product, mod_data.product_id);
+	else
+		strcpy (fsg_string_product, DRIVER_DESC);
+	
+	if (mod_data.desc_m && strlen (mod_data.desc_m))// Joseph 20100921
+		strcpy (fsg_string_manufacturer, mod_data.desc_m);
+	else if (mod_data.vendor_id && strlen (mod_data.vendor_id))
+		strcpy (fsg_string_manufacturer, mod_data.vendor_id);
+	else
 	snprintf(fsg_string_manufacturer, sizeof fsg_string_manufacturer,
 			"%s %s with %s",
 			init_utsname()->sysname, init_utsname()->release,
 			gadget->name);
+
+	if (mod_data.serial_no && strlen (mod_data.serial_no))// Joseph 100921
+		strcpy (fsg_string_serial, mod_data.serial_no);
+	else {
+	/* On a real device, serial[] would be loaded from permanent
+	 * storage.  We just encode it from the driver version string. */
+	for (i = 0; i < sizeof fsg_string_serial - 2; i += 2) {
+		unsigned char		c = DRIVER_VERSION[i / 2];
+
+		if (!c)
+			break;
+		sprintf(&fsg_string_serial[i], "%02X", c);
+	}
+	}
+	printk ("[%s-%d] mfg = %s , SN = %s\n",__func__, __LINE__, fsg_string_manufacturer, fsg_string_serial);
 
 	fsg->thread_task = kthread_create(fsg_main_thread, fsg,
 			"file-storage-gadget");

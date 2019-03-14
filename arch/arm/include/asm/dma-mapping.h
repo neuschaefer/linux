@@ -173,6 +173,19 @@ static inline void dma_free_noncoherent(struct device *dev, size_t size,
 }
 
 /**
+ * dma_alloc_noncached - allocate consistent memory for DMA
+ * @dev: valid struct device pointer, or NULL for ISA and EISA-like devices
+ * @size: required memory size
+ * @handle: bus-specific DMA address
+ *
+ * Allocate some uncached, unbuffered memory for a device for
+ * performing DMA.  This function allocates pages, and will
+ * return the CPU-viewed address, and sets @handle to be the
+ * device-viewed address.
+ */
+extern void *dma_alloc_noncached(struct device *, size_t, dma_addr_t *, gfp_t);
+
+/**
  * dma_alloc_coherent - allocate consistent memory for DMA
  * @dev: valid struct device pointer, or NULL for ISA and EISA-like devices
  * @size: required memory size
@@ -184,6 +197,32 @@ static inline void dma_free_noncoherent(struct device *dev, size_t size,
  * device-viewed address.
  */
 extern void *dma_alloc_coherent(struct device *, size_t, dma_addr_t *, gfp_t);
+
+/**
+ * dma_alloc_writethrough - allocate consistent memory for DMA
+ * @dev: valid struct device pointer, or NULL for ISA and EISA-like devices
+ * @size: required memory size
+ * @handle: bus-specific DMA address
+ *
+ * Allocate some writethrough cached,  for a device for
+ * performing DMA.  This function allocates pages, and will
+ * return the CPU-viewed address, and sets @handle to be the
+ * device-viewed address.
+ */
+extern void *dma_alloc_writethrough(struct device *, size_t, dma_addr_t *, gfp_t);
+
+/**
+ * dma_alloc_noncacheable - allocate consistent memory for DMA
+ * @dev: valid struct device pointer, or NULL for ISA and EISA-like devices
+ * @size: required memory size
+ * @handle: bus-specific DMA address
+ *
+ * Allocate some noncacheable memory,  for a device for
+ * performing DMA.  This function allocates pages, and will
+ * return the CPU-viewed address, and sets @handle to be the
+ * device-viewed address.
+ */
+extern void *dma_alloc_noncacheable(struct device *, size_t, dma_addr_t *, gfp_t);
 
 /**
  * dma_free_coherent - free memory allocated by dma_alloc_coherent

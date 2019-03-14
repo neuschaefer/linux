@@ -37,4 +37,7 @@ obj-$(CONFIG_BACKLIGHT_ADP8860)	+= adp8860_bl.o
 obj-$(CONFIG_BACKLIGHT_ADP8870)	+= adp8870_bl.o
 obj-$(CONFIG_BACKLIGHT_88PM860X) += 88pm860x_bl.o
 obj-$(CONFIG_BACKLIGHT_PCF50633)	+= pcf50633-backlight.o
-
+obj-$(CONFIG_BACKLIGHT_DA9052)	+= da9052_bl.o
+obj-$(CONFIG_BACKLIGHT_LM3630A)	+= lm3630a_bl.o lm3630a_bl_tables.o
+obj-$(CONFIG_BACKLIGHT_MXC_MSP430) += mxc_msp430_fl.o
+obj-y				+= fl_ht68f20.o

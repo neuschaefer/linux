@@ -29,6 +29,10 @@
 /*-------------------------------------------------------------------------*/
 #include <linux/usb/otg.h>
 
+#ifdef CONFIG_ARCH_MX6
+#define MX6_USB_HOST_HACK
+#include <linux/fsl_devices.h>
+#endif
 #define	PORT_WAKE_BITS	(PORT_WKOC_E|PORT_WKDISC_E|PORT_WKCONN_E)
 
 #ifdef	CONFIG_PM
@@ -426,6 +430,14 @@ static int ehci_bus_resume (struct usb_hcd *hcd)
 		spin_unlock_irq(&ehci->lock);
 		msleep(20);
 		spin_lock_irq(&ehci->lock);
+#ifdef MX6_USB_HOST_HACK
+		{
+			struct fsl_usb2_platform_data *pdata;
+			pdata = hcd->self.controller->platform_data;
+			if (pdata && pdata->platform_rh_resume)
+				pdata->platform_rh_resume(pdata);
+		}
+#endif
 	}
 
 	i = HCS_N_PORTS (ehci->hcs_params);
@@ -822,6 +834,7 @@ static int ehci_hub_control (
 				msleep(5);/* wait to leave low-power mode */
 				spin_lock_irqsave(&ehci->lock, flags);
 			}
+
 			/* resume signaling for 20 msec */
 			temp &= ~(PORT_RWC_BITS | PORT_WAKE_BITS);
 			ehci_writel(ehci, temp | PORT_RESUME, status_reg);
@@ -1062,6 +1075,14 @@ static int ehci_hub_control (
 			temp &= ~PORT_WKCONN_E;
 			temp |= PORT_WKDISC_E | PORT_WKOC_E;
 			ehci_writel(ehci, temp | PORT_SUSPEND, status_reg);
+#ifdef MX6_USB_HOST_HACK
+			{
+				struct fsl_usb2_platform_data *pdata;
+				pdata = hcd->self.controller->platform_data;
+				if (pdata && pdata->platform_rh_suspend)
+					pdata->platform_rh_suspend(pdata);
+			}
+#endif
 			if (hostpc_reg) {
 				spin_unlock_irqrestore(&ehci->lock, flags);
 				msleep(5);/* 5ms for HCD enter low pwr mode */

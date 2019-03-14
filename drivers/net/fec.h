@@ -15,7 +15,8 @@
 
 #if defined(CONFIG_M523x) || defined(CONFIG_M527x) || defined(CONFIG_M528x) || \
     defined(CONFIG_M520x) || defined(CONFIG_M532x) || \
-    defined(CONFIG_ARCH_MXC) || defined(CONFIG_SOC_IMX28)
+    defined(CONFIG_ARCH_MXC) || defined(CONFIG_SOC_IMX28) || \
+    defined(CONFIG_ARCH_MX6)
 /*
  *	Just figures, Motorola would have to change the offsets for
  *	registers in the same peripheral device on different models
@@ -44,9 +45,23 @@
 #define FEC_R_DES_START		0x180 /* Receive descriptor ring */
 #define FEC_X_DES_START		0x184 /* Transmit descriptor ring */
 #define FEC_R_BUFF_SIZE		0x188 /* Maximum receive buff size */
+#define FEC_R_FIFO_RSFL		0x190 /* Receive FIFO section full threshold */
+#define FEC_R_FIFO_RSEM		0x194 /* Receive FIFO section empty threshold */
+#define FEC_R_FIFO_RAEM		0x198 /* Receive FIFO almost empty threshold */
+#define FEC_R_FIFO_RAFL		0x19c /* Receive FIFO almost full threshold */
 #define FEC_MIIGSK_CFGR		0x300 /* MIIGSK Configuration reg */
 #define FEC_MIIGSK_ENR		0x308 /* MIIGSK Enable reg */
 
+/* Define the FEC 1588 registers offset */
+#if defined(CONFIG_SOC_IMX28) || defined(CONFIG_ARCH_MX6)
+#define FEC_ATIME_CTRL		0x400
+#define FEC_ATIME		0x404
+#define FEC_ATIME_EVT_OFFSET	0x408
+#define FEC_ATIME_EVT_PERIOD	0x40c
+#define FEC_ATIME_CORR		0x410
+#define FEC_ATIME_INC		0x414
+#define FEC_TS_TIMESTAMP	0x418
+#endif
 #else
 
 #define FEC_ECNTRL		0x000 /* Ethernet control reg */
@@ -76,14 +91,27 @@
 #endif /* CONFIG_M5272 */
 
 
+#if (defined(CONFIG_SOC_IMX28) || defined(CONFIG_ARCH_MX6)) \
+				&& defined(CONFIG_FEC_1588)
+#define CONFIG_ENHANCED_BD
+#endif
+
 /*
  *	Define the buffer descriptor structure.
  */
-#if defined(CONFIG_ARCH_MXC) || defined(CONFIG_SOC_IMX28)
+#if defined(CONFIG_ARCH_MXC) || defined(CONFIG_SOC_IMX28) || \
+				defined(CONFIG_ARCH_MX6)
 struct bufdesc {
 	unsigned short cbd_datlen;	/* Data length */
 	unsigned short cbd_sc;	/* Control and status info */
 	unsigned long cbd_bufaddr;	/* Buffer address */
+#ifdef CONFIG_ENHANCED_BD
+	unsigned long cbd_esc;
+	unsigned long cbd_prot;
+	unsigned long cbd_bdu;
+	unsigned long ts;
+	unsigned short res0[4];
+#endif
 };
 #else
 struct bufdesc {
@@ -126,6 +154,9 @@ struct bufdesc {
 #define BD_ENET_RX_CL           ((ushort)0x0001)
 #define BD_ENET_RX_STATS        ((ushort)0x013f)        /* All status bits */
 
+#define BD_ENET_RX_INT          0x00800000
+#define BD_ENET_RX_PTP          ((ushort)0x0400)
+
 /* Buffer descriptor control/status used by Ethernet transmit.
 */
 #define BD_ENET_TX_READY        ((ushort)0x8000)
@@ -143,6 +174,8 @@ struct bufdesc {
 #define BD_ENET_TX_CSL          ((ushort)0x0001)
 #define BD_ENET_TX_STATS        ((ushort)0x03ff)        /* All status bits */
 
+#define BD_ENET_TX_INT          0x40000000
+#define BD_ENET_TX_PTP          ((ushort)0x0100)
 
 /****************************************************************************/
 #endif /* FEC_H */

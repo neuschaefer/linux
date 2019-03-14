@@ -30,6 +30,10 @@
 
 #include "usb.h"
 
+#ifdef CONFIG_ARCH_MX6
+#define MX6_USB_HOST_HACK
+#include <linux/fsl_devices.h>
+#endif
 /* if we are in debug mode, always announce new devices */
 #ifdef DEBUG
 #ifndef CONFIG_USB_ANNOUNCE_NEW_DEVICES
@@ -152,7 +156,50 @@ EXPORT_SYMBOL_GPL(ehci_cf_port_reset_rwsem);
 #define HUB_DEBOUNCE_STEP	  25
 #define HUB_DEBOUNCE_STABLE	 100
 
+#ifdef CONFIG_FSL_USB_TEST_MODE
+static u8 usb_device_white_list[] = {
+	USB_CLASS_HID,
+	USB_CLASS_HUB,
+	USB_CLASS_MASS_STORAGE
+};
 
+static inline int in_white_list(u8 interfaceclass)
+{
+	int i;
+	for (i = 0; i < sizeof(usb_device_white_list); i++)	{
+		if (interfaceclass == usb_device_white_list[i])
+			return 1;
+	}
+	return 0;
+}
+
+static inline int device_in_white_list(struct usb_device *udev)
+{
+	int i;
+	int num_configs;
+	struct usb_host_config *c;
+
+	/* for test fixture, we always return 1 */
+	if (udev->descriptor.idVendor == 0x1A0A)
+		return 1;
+
+	c = udev->config;
+	num_configs = udev->descriptor.bNumConfigurations;
+	for (i = 0; i < num_configs; (i++, c++)) {
+		struct usb_interface_descriptor	*desc = NULL;
+
+		/* It's possible that a config has no interfaces! */
+		if (c->desc.bNumInterfaces > 0)
+			desc = &c->intf_cache[0]->altsetting->desc;
+ 
+		if (desc && !in_white_list((u8)desc->bInterfaceClass))
+			continue;
+
+		return 1;
+	}
+	return 0;
+}
+#endif
 static int usb_reset_and_verify_device(struct usb_device *udev);
 
 static inline char *portspeed(struct usb_hub *hub, int portstatus)
@@ -1899,6 +1946,14 @@ int usb_new_device(struct usb_device *udev)
 	udev->dev.devt = MKDEV(USB_DEVICE_MAJOR,
 			(((udev->bus->busnum-1) * 128) + (udev->devnum-1)));
 
+#ifdef CONFIG_FSL_USB_TEST_MODE
+	if (!device_in_white_list(udev)) {
+		printk(KERN_ERR "unsupported device: not in white list\n");
+		goto fail;
+	} else {
+		printk(KERN_DEBUG "supported device\n");
+	}
+#endif
 	/* Tell the world! */
 	announce_device(udev);
 
@@ -2533,6 +2588,17 @@ int usb_port_resume(struct usb_device *udev, pm_message_t msg)
 				(msg.event & PM_EVENT_AUTO ? "auto-" : ""));
 		msleep(25);
 
+#ifdef MX6_USB_HOST_HACK
+		if (hub->hdev->parent == NULL) {
+			struct usb_device *hdev = hub->hdev;
+			struct usb_hcd *hcd = bus_to_hcd(hdev->bus);
+			struct fsl_usb2_platform_data *pdata;
+			pdata = hcd->self.controller->platform_data;
+			if (pdata && pdata->platform_rh_resume)
+				pdata->platform_rh_resume(pdata);
+		}
+#endif
+
 		/* Virtual root hubs can trigger on GET_PORT_STATUS to
 		 * stop resume signaling.  Then finish the resume
 		 * sequence.
@@ -2544,6 +2610,16 @@ int usb_port_resume(struct usb_device *udev, pm_message_t msg)
 	}
 
  SuspendCleared:
+#ifdef MX6_USB_HOST_HACK
+	if (hub->hdev->parent == NULL) {
+		struct usb_device *hdev = hub->hdev;
+		struct usb_hcd *hcd = bus_to_hcd(hdev->bus);
+		struct fsl_usb2_platform_data *pdata;
+		pdata = hcd->self.controller->platform_data;
+		if (pdata && pdata->platform_rh_resume)
+			pdata->platform_rh_resume(pdata);
+	}
+#endif
 	if (status == 0) {
 		if (hub_is_superspeed(hub->hdev)) {
 			if (portchange & USB_PORT_STAT_C_LINK_STATE)
@@ -3022,6 +3098,20 @@ hub_port_init (struct usb_hub *hub, struct usb_device *udev, int port1,
 			break;
 		}
 	}
+#ifdef MX6_USB_HOST_HACK
+	{	/*Must enable HOSTDISCONDETECT after second reset*/
+		if ((port1 == 1) && (udev->level == 1)) {
+			if (udev->speed == USB_SPEED_HIGH) {
+				struct device *dev = hcd->self.controller;
+				struct fsl_usb2_platform_data *pdata;
+				pdata = (struct fsl_usb2_platform_data *)
+					 dev->platform_data;
+				if (pdata && pdata->platform_set_disconnect_det)
+					pdata->platform_set_disconnect_det(pdata, 1);
+			}
+		}
+	}
+#endif
 	if (retval)
 		goto fail;
 
@@ -3199,6 +3289,25 @@ static void hub_port_connect_change(struct usb_hub *hub, int port1,
 		usb_disconnect(&hdev->children[port1-1]);
 	clear_bit(port1, hub->change_bits);
 
+#ifdef MX6_USB_HOST_HACK
+	{
+		struct device *dev = hcd->self.controller;
+		struct fsl_usb2_platform_data *pdata;
+
+		pdata = (struct fsl_usb2_platform_data *)dev->platform_data;
+		if (dev->parent && (hdev->level == 0) && dev->type) {
+			if (port1 == 1 && pdata && pdata->init)
+				pdata->init(NULL);
+		}
+		if ((port1 == 1) && (hdev->level == 0)) {
+			/* Must clear HOSTDISCONDETECT when port connect change happen*/
+			if (pdata && pdata->platform_set_disconnect_det)
+				pdata->platform_set_disconnect_det(pdata, 0);
+
+		}
+	}
+#endif
+
 	/* We can forget about a "removed" device when there's a physical
 	 * disconnect or the connect status changes.
 	 */
@@ -3251,6 +3360,10 @@ static void hub_port_connect_change(struct usb_hub *hub, int port1,
 		usb_set_device_state(udev, USB_STATE_POWERED);
  		udev->bus_mA = hub->mA_per_port;
 		udev->level = hdev->level + 1;
+#ifdef CONFIG_FSL_USB_TEST_MODE
+		printk(KERN_INFO "+++ %s:udev->level :%d", __func__,
+						udev->level);
+#endif
 		udev->wusb = hub_is_wusb(hub);
 
 		/* Only USB 3.0 devices are connected to SuperSpeed hubs. */
@@ -3469,6 +3582,10 @@ static void hub_events(void)
 			if (ret < 0)
 				continue;
 
+#ifdef CONFIG_FSL_USB_TEST_MODE
+			if (portstatus & USB_PORT_STAT_TEST)
+				continue;
+#endif
 			if (portchange & USB_PORT_STAT_C_CONNECTION) {
 				clear_port_feature(hdev, i,
 					USB_PORT_FEAT_C_CONNECTION);

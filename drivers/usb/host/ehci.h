@@ -152,6 +152,18 @@ struct ehci_hcd {			/* one per controller */
 	unsigned		has_ppcd:1; /* support per-port change bits */
 	u8			sbrn;		/* packed release number */
 
+	/*
+	 * OTG controllers and transceivers need software interaction;
+	 * other external transceivers should be software-transparent
+	 */
+	struct otg_transceiver   *transceiver;
+#ifdef CONFIG_USB_STATIC_IRAM
+	u32			iram_buffer[2];
+	u32			iram_buffer_v[2];
+	int  			iram_in_use[2];
+	int			usb_address[2];
+#endif
+
 	/* irq statistics */
 #ifdef EHCI_STATS
 	struct ehci_stats	stats;
@@ -164,10 +176,6 @@ struct ehci_hcd {			/* one per controller */
 #ifdef DEBUG
 	struct dentry		*debug_dir;
 #endif
-	/*
-	 * OTG controllers and transceivers need software interaction
-	 */
-	struct otg_transceiver	*transceiver;
 };
 
 /* convert between an HCD pointer and the corresponding EHCI_HCD */
@@ -255,6 +263,10 @@ struct ehci_qtd {
 	struct list_head	qtd_list;		/* sw qtd list */
 	struct urb		*urb;			/* qtd's urb */
 	size_t			length;			/* length of buffer */
+#ifdef CONFIG_USB_STATIC_IRAM
+	size_t			buffer_offset;
+	int			last_one;
+#endif
 } __attribute__ ((aligned (32)));
 
 /* mask NakCnt+T in qh->hw_alt_next */
@@ -753,12 +765,33 @@ static inline unsigned ehci_read_frame_index(struct ehci_hcd *ehci)
 
 #endif
 
+/*
+ * Writing to dma coherent memory on ARM may be delayed via L2
+ * writing buffer, so introduce the helper which can flush L2 writing
+ * buffer into memory immediately, especially used to flush ehci
+ * descriptor to memory.
+ * */
+#ifdef	CONFIG_ARM_DMA_MEM_BUFFERABLE
+static inline void ehci_sync_mem(void)
+{
+	mb();
+}
+#else
+static inline void ehci_sync_mem(void)
+{
+}
+#endif
+
 /*-------------------------------------------------------------------------*/
 
 #ifndef DEBUG
 #define STUB_DEBUG_FILES
 #endif	/* DEBUG */
 
+#ifdef CONFIG_USB_STATIC_IRAM
+#define IRAM_TD_SIZE	1024		/* size of 1 qTD's buffer */
+#define IRAM_NTD	2		/* number of TDs in IRAM  */
+#endif
 /*-------------------------------------------------------------------------*/
 
 #endif /* __LINUX_EHCI_HCD_H */

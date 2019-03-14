@@ -48,6 +48,20 @@
 #include <asm/system.h>
 #include <asm/unaligned.h>
 
+#ifdef CONFIG_FSL_USB_TEST_MODE
+static u32 single_step_desc_data_on;
+void set_single_step_desc_data_on(void)
+{
+	single_step_desc_data_on = 1;
+}
+EXPORT_SYMBOL_GPL(set_single_step_desc_data_on);
+
+void clear_single_step_desc_data_on(void)
+{
+	single_step_desc_data_on = 0;
+}
+EXPORT_SYMBOL_GPL(clear_single_step_desc_data_on);
+#endif
 /*-------------------------------------------------------------------------*/
 
 /*
@@ -335,8 +349,13 @@ static void ehci_work(struct ehci_hcd *ehci);
 
 #include "ehci-hub.c"
 #include "ehci-lpm.c"
+#ifdef CONFIG_USB_STATIC_IRAM
+#include "ehci-mem-iram.c"
+#include "ehci-q-iram.c"
+#else
 #include "ehci-mem.c"
 #include "ehci-q.c"
+#endif
 #include "ehci-sched.c"
 
 /*-------------------------------------------------------------------------*/
@@ -959,8 +978,22 @@ static int ehci_urb_enqueue (
 		/* FALLTHROUGH */
 	/* case PIPE_BULK: */
 	default:
-		if (!qh_urb_transaction (ehci, urb, &qtd_list, mem_flags))
-			return -ENOMEM;
+#ifdef CONFIG_FSL_USB_TEST_MODE
+		if (!single_step_desc_data_on) {
+			printk(KERN_DEBUG "in test mode, but single step NOT on\n");
+			if (!qh_urb_transaction(ehci, urb, &qtd_list,
+						mem_flags))
+				return -ENOMEM;
+		} else {
+			printk(KERN_DEBUG "in test mode, single step on\n");
+			if (!single_step_qh_urb_transaction(ehci, urb,
+				&qtd_list, mem_flags))
+				return -ENOMEM;
+		}
+#else
+		if (!qh_urb_transaction(ehci, urb, &qtd_list, mem_flags))
+ 			return -ENOMEM;
+#endif
 		return submit_async(ehci, urb, &qtd_list, mem_flags);
 
 	case PIPE_INTERRUPT:
@@ -1230,6 +1263,11 @@ MODULE_LICENSE ("GPL");
 #ifdef CONFIG_USB_EHCI_HCD_OMAP
 #include "ehci-omap.c"
 #define        PLATFORM_DRIVER         ehci_hcd_omap_driver
+#endif
+
+#ifdef CONFIG_USB_EHCI_ARC
+#include "ehci-arc.c"
+#define	PLATFORM_DRIVER		ehci_fsl_driver
 #endif
 
 #ifdef CONFIG_PPC_PS3

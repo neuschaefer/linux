@@ -469,6 +469,64 @@ config MFD_PCF50633
 	  facilities, and registers devices for the various functions
 	  so that function-specific drivers can bind to them.
 
+config PMIC_DIALOG
+	bool "Support Dialog Semiconductor PMIC"
+	depends on I2C=y
+	depends on SPI=y
+	select MFD_CORE
+	help
+	Support for Dialog semiconductor PMIC chips.
+	Use the options provided to support the desired PMIC's.
+choice
+	prompt "Chip Type"
+	depends on PMIC_DIALOG
+config PMIC_DA9052
+	bool "Support Dialog Semiconductor DA9052 PMIC"
+	help
+	Support for Dialog semiconductor DA9052 PMIC with inbuilt
+	SPI & I2C connectivities.
+	This driver provides common support for accessing  the device,
+	additional drivers must be enabled in order to use the
+	functionality of the device.
+config PMIC_DA9053AA
+	bool "Support Dialog Semiconductor DA9053 AA PMIC"
+	help
+	Support for Dialog semiconductor DA9053 AA PMIC with inbuilt
+	SPI & I2C connectivities.
+	This driver provides common support for accessing  the device,
+	additional drivers must be enabled in order to use the
+	functionality of the device.
+config PMIC_DA9053Bx
+	bool "Support Dialog Semiconductor DA9053 BA/BB PMIC"
+	help
+	Support for Dialog semiconductor DA9053 BA/BB PMIC with inbuilt
+	SPI & I2C connectivities.
+	This driver provides common support for accessing  the device,
+	additional drivers must be enabled in order to use the
+	functionality of the device.
+endchoice
+
+
+config MFD_MC_PMIC
+	tristate "Support Freescale Freescale's PMIC"
+	depends on I2C
+	select MFD_CORE
+	help
+	  Support for the Freescale's PMIC .
+	  This driver provides common support for accessing  the device,
+	  additional drivers must be enabled in order to use the
+	  functionality of the device.
+config MFD_MC34708
+	tristate "Support for Freescale's PMIC MC34708"
+	select MFD_MC_PMIC
+	help
+	  Support for the Freescale's PMIC MC34708
+config MFD_PFUZE
+	tristate "Support for Freescale's PMIC PFUZE"
+	depends on I2C
+	select MFD_CORE
+	help
+	 Support for Freescale's PMIC: PFUZE100
 config PCF50633_ADC
 	tristate "Support for NXP PCF50633 ADC"
 	depends on MFD_PCF50633
@@ -730,6 +788,33 @@ config MFD_TPS65910
 
 config TPS65911_COMPARATOR
 	tristate
+
+config MFD_MAX17135
+    tristate "Maxim MAX17135 EPD PMIC core"
+	depends on I2C
+    help
+      This is the MAX17135 PMIC support. It includes
+      core support for communication with the MAX17135 chip.
+
+config MFD_MXC_HDMI
+	tristate "MXC HDMI Core"
+	select MFD_CORE
+	default y
+	help
+	  This is the core driver for the i.Mx on-chip HDMI.  This MFD
+	  driver connects with the video and audio drivers for HDMI.
+
+config MFD_RICOH619
+	bool "Ricoh R5T619 Power Management system device"
+	depends on I2C && GPIOLIB && GENERIC_HARDIRQS
+	select MFD_CORE
+	default n
+	help
+	  If you say yes here you get support for the Ricoh R5T619
+	  Power Management system device.
+	  This driver provides common support for accessing the device,
+	  additional drivers must be enabled in order to use the
+	  functionality of the device.
 
 endif # MFD_SUPPORT
 

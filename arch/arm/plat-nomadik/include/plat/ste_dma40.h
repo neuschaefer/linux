@@ -10,6 +10,7 @@
 #define STE_DMA40_H
 
 #include <linux/dmaengine.h>
+#include <linux/scatterlist.h>
 #include <linux/workqueue.h>
 #include <linux/interrupt.h>
 
@@ -186,7 +187,7 @@ static inline struct
 dma_async_tx_descriptor *stedma40_slave_mem(struct dma_chan *chan,
 					    dma_addr_t addr,
 					    unsigned int size,
-					    enum dma_data_direction direction,
+					    enum dma_transfer_direction direction,
 					    unsigned long flags)
 {
 	struct scatterlist sg;
@@ -208,7 +209,7 @@ static inline struct
 dma_async_tx_descriptor *stedma40_slave_mem(struct dma_chan *chan,
 					    dma_addr_t addr,
 					    unsigned int size,
-					    enum dma_data_direction direction,
+					    enum dma_transfer_direction direction,
 					    unsigned long flags)
 {
 	return NULL;

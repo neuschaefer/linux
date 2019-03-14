@@ -214,6 +214,18 @@ config REGULATOR_MC13892
 	  Say y here to support the regulators found on the Freescale MC13892
 	  PMIC.
 
+config REGULATOR_MC34708
+	tristate "Support regulators on Freescale MC34708 PMIC"
+	depends on I2C
+	help
+	  Say y here to support the regulators found on the Freescale MC34708
+	  PMIC.
+config REGULATOR_PFUZE100
+	tristate "Support regulators on Freescale PFUZE100 PMIC"
+	depends on MFD_PFUZE
+	help
+	Say y here to support the regulators found on the Freescale PFUZE100
+	  PMIC.
 config REGULATOR_AB3100
 	tristate "ST-Ericsson AB3100 Regulator functions"
 	depends on AB3100_CORE
@@ -287,6 +299,14 @@ config REGULATOR_TPS6586X
 	help
 	  This driver supports TPS6586X voltage regulator chips.
 
+config REGULATOR_ANATOP
+	tristate "ANATOP LDO regulators"
+	depends on REGULATOR
+	depends on ARCH_MX6
+	default y
+	help
+	  Say y here to support ANATOP LDOs regulators.
+
 config REGULATOR_TPS6524X
 	tristate "TI TPS6524X Power regulators"
 	depends on SPI
@@ -297,11 +317,31 @@ config REGULATOR_TPS6524X
 	  serial interface currently supported on the sequencer serial
 	  port controller.
 
+config REGULATOR_MAX17135
+	tristate "Maxim MAX17135 Regulator Support"
+	depends on MFD_MAX17135
+	default n
+
+config REGULATOR_DA9052
+	tristate "Dialog DA9052 regulators"
+	depends on PMIC_DIALOG
+	help
+	  Say y here to support the BUCKs and LDOs regulators found on
+	  Dialog Semiconductor DA9052 PMIC.
+
 config REGULATOR_TPS65910
 	tristate "TI TPS65910 Power Regulator"
 	depends on MFD_TPS65910
 	help
 	  This driver supports TPS65910 voltage regulator chips.
+
+config REGULATOR_RICOH619
+	tristate "Ricoh R5T619 Power regulators"
+	depends on MFD_RICOH619
+	default n
+	help
+	  This driver supports regulator driver for the Ricoh R5T619
+	  Power Management device.
 
 endif
 

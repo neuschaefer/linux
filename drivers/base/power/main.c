@@ -27,6 +27,7 @@
 #include <linux/sched.h>
 #include <linux/async.h>
 #include <linux/suspend.h>
+#include <linux/timer.h>
 
 #include "../base.h"
 #include "power.h"
@@ -48,6 +49,12 @@ LIST_HEAD(dpm_noirq_list);
 
 static DEFINE_MUTEX(dpm_list_mtx);
 static pm_message_t pm_transition;
+
+static void dpm_drv_timeout(unsigned long data);
+struct dpm_drv_wd_data {
+	struct device *dev;
+	struct task_struct *tsk;
+};
 
 static int async_error;
 
@@ -179,6 +186,39 @@ static void initcall_debug_report(struct device *dev, ktime_t calltime,
 			error, (unsigned long long)ktime_to_ns(delta) >> 10);
 	}
 }
+#ifdef CONFIG_SUSPEND_DEVICE_TIME_DEBUG
+static void suspend_time_debug_start(ktime_t *start)
+{
+	*start = ktime_get();
+}
+
+static void suspend_time_debug_report(const char *name, struct device *dev,
+				      ktime_t starttime)
+{
+	ktime_t rettime;
+	s64 usecs64;
+	int usecs;
+
+	if (!dev->driver)
+		return;
+
+	rettime = ktime_get();
+	usecs64 = ktime_to_us(ktime_sub(rettime, starttime));
+	usecs = usecs64;
+	if (usecs == 0)
+		usecs = 1;
+
+	if (device_suspend_time_threshold
+	    && usecs > device_suspend_time_threshold)
+		pr_info("PM: device %s:%s %s too slow, it takes \t %ld.%03ld msecs\n",
+			dev->bus->name, dev_name(dev), name,
+			usecs / USEC_PER_MSEC, usecs % USEC_PER_MSEC);
+}
+#else
+static void suspend_time_debug_start(ktime_t *start) {}
+static void suspend_time_debug_report(const char *name, struct device *dev,
+				      ktime_t starttime) {}
+#endif /* CONFIG_SUSPEND_DEVICE_TIME_DEBUG */
 
 /**
  * dpm_wait - Wait for a PM operation to complete.
@@ -216,7 +256,7 @@ static int pm_op(struct device *dev,
 		 pm_message_t state)
 {
 	int error = 0;
-	ktime_t calltime;
+	ktime_t calltime, starttime;
 
 	calltime = initcall_debug_start(dev);
 
@@ -224,13 +264,17 @@ static int pm_op(struct device *dev,
 #ifdef CONFIG_SUSPEND
 	case PM_EVENT_SUSPEND:
 		if (ops->suspend) {
+			suspend_time_debug_start(&starttime);
 			error = ops->suspend(dev);
+			suspend_time_debug_report("suspend", dev, starttime);
 			suspend_report_result(ops->suspend, error);
 		}
 		break;
 	case PM_EVENT_RESUME:
 		if (ops->resume) {
+			suspend_time_debug_start(&starttime);
 			error = ops->resume(dev);
+			suspend_time_debug_report("resume", dev, starttime);
 			suspend_report_result(ops->resume, error);
 		}
 		break;
@@ -584,6 +628,30 @@ static bool is_async(struct device *dev)
 }
 
 /**
+ *	dpm_drv_timeout - Driver suspend / resume watchdog handler
+ *	@data: struct device which timed out
+ *
+ * 	Called when a driver has timed out suspending or resuming.
+ * 	There's not much we can do here to recover so
+ * 	BUG() out for a crash-dump
+ *
+ */
+static void dpm_drv_timeout(unsigned long data)
+{
+	struct dpm_drv_wd_data *wd_data = (void *)data;
+	struct device *dev = wd_data->dev;
+	struct task_struct *tsk = wd_data->tsk;
+
+	printk(KERN_EMERG "**** DPM device timeout: %s (%s)\n", dev_name(dev),
+	       (dev->driver ? dev->driver->name : "no driver"));
+
+	printk(KERN_EMERG "dpm suspend stack:\n");
+	show_stack(tsk, NULL);
+
+	BUG();
+}
+
+/**
  * dpm_resume - Execute "resume" callbacks for non-sysdev devices.
  * @state: PM transition of the system being carried out.
  *
@@ -801,9 +869,20 @@ int dpm_suspend_noirq(pm_message_t state)
 			list_move(&dev->power.entry, &dpm_noirq_list);
 		put_device(dev);
 	}
+
+	//Yian, Drop Power key during kernel suspend, since the key will be queued 
+	//and next wakeup, android will get two power keys, then system sleep.
+	{
+		extern int gKernel_Enter_Suspend;
+		gKernel_Enter_Suspend = 0;
+		printk("==> Kernel Suspend Finish");
+	}
+	
 	mutex_unlock(&dpm_list_mtx);
-	if (error)
+	if (error) {
+		resume_irqs(true);
 		dpm_resume_noirq(resume_event(state));
+	}
 	else
 		dpm_show_time(starttime, state, "late");
 	return error;
@@ -841,8 +920,19 @@ static int legacy_suspend(struct device *dev, pm_message_t state,
 static int __device_suspend(struct device *dev, pm_message_t state, bool async)
 {
 	int error = 0;
+	struct timer_list timer;
+	struct dpm_drv_wd_data data;
 
 	dpm_wait_for_children(dev, async);
+
+	data.dev = dev;
+	data.tsk = get_current();
+	init_timer_on_stack(&timer);
+	timer.expires = jiffies + HZ * 12;
+	timer.function = dpm_drv_timeout;
+	timer.data = (unsigned long)&data;
+	add_timer(&timer);
+
 	device_lock(dev);
 
 	if (async_error)
@@ -892,6 +982,10 @@ static int __device_suspend(struct device *dev, pm_message_t state, bool async)
 
  Unlock:
 	device_unlock(dev);
+
+	del_timer_sync(&timer);
+	destroy_timer_on_stack(&timer);
+
 	complete_all(&dev->power.completion);
 
 	if (error)

@@ -12,6 +12,7 @@ struct gpio_keys_button {
 	int debounce_interval;	/* debounce ticks interval in msecs */
 	bool can_disable;
 	int value;		/* axis value for EV_ABS */
+	int (*hook)(struct gpio_keys_button *I_gpio_btn_data,int state);
 };
 
 struct gpio_keys_platform_data {
