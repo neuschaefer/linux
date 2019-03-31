@@ -1273,6 +1273,10 @@ config RTC_DRV_CROS_EC
 	  This driver can also be built as a module. If so, the module
 	  will be called rtc-cros-ec.
 
+config RTC_DRV_NTX_MSP430
+	tristate "Netronix MSP430 EC RTC driver"
+	depends on MFD_NTX_MSP430
+
 comment "on-CPU RTC drivers"
 
 config RTC_DRV_ASM9260
