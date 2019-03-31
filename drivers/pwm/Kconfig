@@ -314,6 +314,10 @@ config PWM_MXS
 	  To compile this driver as a module, choose M here: the module
 	  will be called pwm-mxs.
 
+config PWM_NTX_MSP430
+	tristate "Netronix MSP430 embedded controller PWM support"
+	depends on MFD_NTX_MSP430 && OF
+
 config PWM_OMAP_DMTIMER
 	tristate "OMAP Dual-Mode Timer PWM support"
 	depends on OF && ARCH_OMAP && OMAP_DM_TIMER
