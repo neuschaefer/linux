@@ -1,0 +1,27 @@
+PWM functionality in MSP430-based Netronix Embedded Controller
+
+Required properties:
+- compatible: should be "netronix,msp430-ec-pwm"
+- #pwm-cells: Should be 1.
+
+Available PWM channels:
+- 0: The PWM channel controlled by registers 0xa1-0xa7
+
+Example:
+
+	embedded-controller@43 {
+		compatible = "netronix,msp430-ec";
+		...
+
+		ec_pwm: pwm {
+			compatible = "netronix,msp430-ec-pwm";
+			#pwm-cells = <1>;
+		};
+	};
+
+	...
+
+	backlight {
+		compatible = "pwm-backlight";
+		pwms = <&ec_pwm 0 50000>;
+	};
