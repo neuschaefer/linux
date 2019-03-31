@@ -880,6 +880,13 @@ config MFD_VIPERBOARD
 	  You need to select the mfd cell drivers separately.
 	  The drivers do not support all features the board exposes.
 
+config MFD_NTX_MSP430
+	bool "Netronix MSP430-based Embedded Controller"
+	depends on I2C && OF
+	help
+	  Say yes here if you want to support the embedded controller of older
+	  e-book readers designed by the ODM Netronix.
+
 config MFD_RETU
 	tristate "Nokia Retu and Tahvo multi-function device"
 	select MFD_CORE
