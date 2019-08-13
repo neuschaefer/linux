@@ -1,5 +1,5 @@
 #
-# Nintendo GameCube EXI (Expansion Interface) support.
+# Nintendo GameCube EXI (External Interface) support.
 #
 
 if GAMECUBE_COMMON
