@@ -40,6 +40,7 @@ available subsections can be seen below.
    i3c/index
    interconnect
    hsi
+   exi
    edac
    scsi
    libata
