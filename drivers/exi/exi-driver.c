@@ -14,6 +14,14 @@
  *
  */
 
+#define DRV_MODULE_NAME	"exi"
+#define DRV_DESCRIPTION	"Nintendo GameCube/Wii EXternal Interface (EXI) driver"
+#define DRV_AUTHOR	"Arthur Othieno <a.othieno@bluewin.ch>, " \
+			"Todd Jeffreys <todd@voidpointer.org>, " \
+			"Albert Herranz"
+
+#define pr_fmt(fmt) DRV_MODULE_NAME ": " fmt
+
 #include <linux/delay.h>
 #include <linux/exi.h>
 #include <linux/init.h>
@@ -24,16 +32,7 @@
 #include <linux/of_platform.h>
 #include <linux/dma-mapping.h>
 
-#define DRV_MODULE_NAME	"exi"
-#define DRV_DESCRIPTION	"Nintendo GameCube/Wii EXternal Interface (EXI) driver"
-#define DRV_AUTHOR	"Arthur Othieno <a.othieno@bluewin.ch>, " \
-			"Todd Jeffreys <todd@voidpointer.org>, " \
-			"Albert Herranz"
-
 static char exi_driver_version[] = "4.0i";
-
-#define drv_printk(level, format, arg...) \
-	printk(level DRV_MODULE_NAME ": " format , ## arg)
 
 
 struct exi_map_id_to_name {
@@ -162,7 +161,7 @@ static int exi_bus_match(struct device *dev, struct device_driver *drv)
  */
 static void exi_bus_device_release(struct device *dev)
 {
-	drv_printk(KERN_WARNING, "exi_bus_device_release called!\n");
+	pr_warning("exi_bus_device_release called!\n");
 }
 
 static void exi_device_release(struct device *dev);
@@ -331,27 +330,27 @@ static void exi_device_rescan(struct exi_device *exi_device)
 
 	if (exi_device->eid.id != EXI_ID_INVALID) {
 		/* device removed or changed */
-		drv_printk(KERN_INFO, "about to remove [%s] id=0x%08x %s\n",
-			   dev_name(&exi_device->dev),
-			   exi_device->eid.id,
-			   exi_name_id(exi_device->eid.id));
+		pr_info("about to remove [%s] id=0x%08x %s\n",
+			dev_name(&exi_device->dev),
+			exi_device->eid.id,
+			exi_name_id(exi_device->eid.id));
 		device_unregister(&exi_device->dev);
-		drv_printk(KERN_INFO, "remove completed\n");
+		pr_info("remove completed\n");
 		exi_device->eid.id = EXI_ID_INVALID;
 	}
 
 	if (id != EXI_ID_INVALID) {
 		/* a new device has been found */
-		drv_printk(KERN_INFO, "about to add [%s] id=0x%08x %s\n",
-			   dev_name(&exi_device->dev),
-			   id, exi_name_id(id));
+		pr_info("about to add [%s] id=0x%08x %s\n",
+			dev_name(&exi_device->dev), id, exi_name_id(id));
 		exi_device->eid.id = id;
 		error = device_register(&exi_device->dev);
 		if (error) {
-			drv_printk(KERN_INFO, "add failed (%d)\n", error);
+			pr_info("add failed (%d)\n", error);
 			exi_device->eid.id = EXI_ID_INVALID;
-		} else
-			drv_printk(KERN_INFO, "add completed\n");
+		} else {
+			pr_info("add completed\n");
+		}
 	}
 
 	exi_update_ext_status(exi_get_exi_channel(exi_device));
@@ -473,7 +472,7 @@ static int exi_init(struct resource *mem, unsigned int irq)
 	init_waitqueue_head(&exi_bus_waitq);
 	exi_bus_task = kthread_run(exi_bus_thread, NULL, "kexid");
 	if (IS_ERR(exi_bus_task))
-		drv_printk(KERN_WARNING, "failed to start exi kernel thread\n");
+		pr_warning("failed to start exi kernel thread\n");
 
 	return 0;
 
@@ -498,8 +497,7 @@ static int __init exi_layer_init(void)
 	struct resource res;
 	int retval;
 
-	drv_printk(KERN_INFO, "%s - version %s\n", DRV_DESCRIPTION,
-		   exi_driver_version);
+	pr_info("%s - version %s\n", DRV_DESCRIPTION, exi_driver_version);
 
 	np = of_find_matching_node(NULL, node_matches);
 	if (!np)
@@ -507,7 +505,7 @@ static int __init exi_layer_init(void)
 
 	retval = of_address_to_resource(np, 0, &res);
 	if (retval) {
-		drv_printk(KERN_ERR, "no io memory range found\n");
+		pr_err("no io memory range found\n");
 		return -ENOMEM;
 	}
 
