@@ -148,6 +148,18 @@ __secondary_data:
 #endif /* defined(CONFIG_SMP) */
 
 
+#ifdef CONFIG_ARCH_HERMON
+/*
+ * This provides a C-API version of the printascii
+ */
+ENTRY(EarlyPrintk_Asm)
+	stmfd	sp!, {r0 - r12, lr}
+	bl	EarlyPrintk
+	ldmfd	sp!, {r0 - r12, pc}
+
+#endif
+
+
 
 /*
  * Setup common bits before finally enabling the MMU.  Essentially
