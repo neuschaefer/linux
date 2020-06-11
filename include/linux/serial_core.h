@@ -130,6 +130,9 @@
 /* SUN4V Hypervisor Console */
 #define PORT_SUNHV	72
 
+/* Winbond WPCM450 SoC and derivatives thereof */
+#define PORT_WPCM450    73
+
 #ifdef __KERNEL__
 
 #include <linux/config.h>

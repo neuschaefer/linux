@@ -234,6 +234,21 @@ config USB_DUMMY_HCD
 	default USB_GADGET
 	select USB_GADGET_SELECTED
 
+
+
+config USB_GADGET_WPCM450_KBD
+	boolean "WPCM450 Keyboard Driver"
+	depends on MACH_WPCM450
+	help
+	  This target WPCM450 keyboard controller driver 
+
+config USB_WPCM450_KBD
+	tristate
+	depends on USB_GADGET_WPCM450_KBD
+	default USB_GADGET
+	select USB_GADGET_SELECTED
+
+
 # NOTE:  Please keep dummy_hcd LAST so that "real hardware" appears
 # first and will be selected by default.
 

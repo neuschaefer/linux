@@ -19,6 +19,7 @@
 #endif
 
 #define EXEC_PAGESIZE	4096
+#define sysclk	24000000
 
 #ifndef NOGROUP
 #define NOGROUP         (-1)

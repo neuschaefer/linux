@@ -63,6 +63,15 @@ config MTD_M25P80
 	  used for program and data storage.  Set up your spi devices
 	  with the right board-specific platform data.
 
+config MTD_WPCM450_SPI_FLASH
+        tristate "Support for WPCM450 SPI Flash"
+        depends on MTD && SPI_MASTER && EXPERIMENTAL
+        help
+          This enables access to WPCM450 and similar SPI flash chips,
+          used for program and data storage.  Set up your spi devices
+          with the right board-specific platform data.
+
+
 config MTD_SLRAM
 	tristate "Uncached system RAM"
 	depends on MTD

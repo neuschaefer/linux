@@ -49,7 +49,9 @@ $(obj)/xipImage: FORCE
 $(obj)/Image: vmlinux FORCE
 	$(call if_changed,objcopy)
 	@echo '  Kernel: $@ is ready'
-
+	@echo '  Kernel: Copy Image to /image/'
+#	mkdir -p ../image
+	cp $@ 	../image
 $(obj)/compressed/vmlinux: $(obj)/Image FORCE
 	$(Q)$(MAKE) $(build)=$(obj)/compressed $@
 

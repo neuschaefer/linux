@@ -1,7 +1,7 @@
 #
 # Makefile for the kernel serial device drivers.
 #
-#  $Id: Makefile,v 1.8 2002/07/21 21:32:30 rmk Exp $
+#  $Id: Makefile 1.2 2008/01/02 14:46:57Z afishman Exp $
 #
 
 obj-$(CONFIG_SERIAL_CORE) += serial_core.o
@@ -55,3 +55,4 @@ obj-$(CONFIG_SERIAL_VR41XX) += vr41xx_siu.o
 obj-$(CONFIG_SERIAL_SGI_IOC4) += ioc4_serial.o
 obj-$(CONFIG_SERIAL_SGI_IOC3) += ioc3_serial.o
 obj-$(CONFIG_SERIAL_AT91) += at91_serial.o
+obj-$(CONFIG_SERIAL_WPCM450) += wpcm450.o

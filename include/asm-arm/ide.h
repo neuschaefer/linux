@@ -14,7 +14,7 @@
 #ifdef __KERNEL__
 
 #ifndef MAX_HWIFS
-#define MAX_HWIFS	4
+#define MAX_HWIFS	1//zswan add it20070516
 #endif
 
 #if !defined(CONFIG_ARCH_L7200)

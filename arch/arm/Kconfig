@@ -270,6 +270,11 @@ config ARCH_AT91RM9200
 	  Say Y here if you intend to run this kernel on an Atmel
 	  AT91RM9200-based board.
 
+config MACH_WPCM450
+	bool "Winbond WPCM450 (Hermon)"
+	help
+	  Winbond WPCM450 CPU based systems (Hermon).
+
 endchoice
 
 source "arch/arm/mach-clps711x/Kconfig"
@@ -313,6 +318,8 @@ source "arch/arm/mach-aaec2000/Kconfig"
 source "arch/arm/mach-realview/Kconfig"
 
 source "arch/arm/mach-at91rm9200/Kconfig"
+
+source "arch/arm/mach-wpcm450/Kconfig"
 
 # Definitions to make life easier
 config ARCH_ACORN

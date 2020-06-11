@@ -517,7 +517,7 @@ asmlinkage void __init start_kernel(void)
 	numa_policy_init();
 	if (late_time_init)
 		late_time_init();
-	calibrate_delay();
+	//calibrate_delay();
 	pidmap_init();
 	pgtable_cache_init();
 	prio_tree_init();

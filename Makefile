@@ -1,7 +1,7 @@
 VERSION = 2
 PATCHLEVEL = 6
 SUBLEVEL = 17
-EXTRAVERSION = .13
+EXTRAVERSION := .WB_WPCM450.1.3
 NAME=Crazed Snow-Weasel
 
 # *DOCUMENTATION*
@@ -172,8 +172,12 @@ SUBARCH := $(shell uname -m | sed -e s/i.86/i386/ -e s/sun4u/sparc64/ \
 # Default value for CROSS_COMPILE is not to prefix executables
 # Note: Some architectures assign CROSS_COMPILE in their arch/*/Makefile
 
-ARCH		?= $(SUBARCH)
-CROSS_COMPILE	?=
+# ARCH		?= $(SUBARCH) 
+# CROSS_COMPILE	?=
+ARCH = arm
+#CROSS_COMPILE = arm-none-linux-gnueabi-
+#CROSS_COMPILE = arm-none-eabi-
+CROSS_COMPILE = arm-linux-
 
 # Architecture as present in compile.h
 UTS_MACHINE := $(ARCH)
@@ -293,7 +297,7 @@ MODFLAGS	= -DMODULE
 CFLAGS_MODULE   = $(MODFLAGS)
 AFLAGS_MODULE   = $(MODFLAGS)
 LDFLAGS_MODULE  = -r
-CFLAGS_KERNEL	=
+CFLAGS_KERNEL	= -gdwarf-2 -w
 AFLAGS_KERNEL	=
 
 
@@ -565,7 +569,7 @@ libs-y		:= $(libs-y1) $(libs-y2)
 # System.map is generated to document addresses of all kernel symbols
 
 vmlinux-init := $(head-y) $(init-y)
-vmlinux-main := $(core-y) $(libs-y) $(drivers-y) $(net-y)
+vmlinux-main := $(core-y) $(libs-y) $(drivers-y) $(net-y) $(mm-y)
 vmlinux-all  := $(vmlinux-init) $(vmlinux-main)
 vmlinux-lds  := arch/$(ARCH)/kernel/vmlinux.lds
 

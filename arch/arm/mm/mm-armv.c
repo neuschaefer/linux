@@ -349,7 +349,17 @@ static struct mem_types mem_types[] __initdata = {
 		.prot_sect = PMD_TYPE_SECT | PMD_SECT_NONSHARED_DEV |
 				PMD_SECT_AP_WRITE,
 		.domain    = DOMAIN_IO,
+	},	
+// avif	start
+	[MT_DEVICE_USER] = {
+		.prot_pte  = L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY |
+				L_PTE_WRITE | L_PTE_USER,
+		.prot_l1   = PMD_TYPE_TABLE,
+		.prot_sect = PMD_TYPE_SECT | PMD_SECT_UNCACHED |
+				PMD_SECT_AP_WRITE | PMD_SECT_AP_READ,
+		.domain    = DOMAIN_IO,
 	}
+// avif end       
 };
 
 /*

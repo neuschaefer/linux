@@ -39,3 +39,9 @@ config ARM_AT91_ETHER
 	help
 	  If you wish to compile a kernel for the AT91RM9200 and enable
 	  ethernet support, then you should always answer Y to this.
+	  
+config ETH_WPCM450
+	tristate "Winbond WPCM450 ethernet driver"
+	depends on NET_ETHERNET && ARM && MACH_WPCM450
+	help 
+	 no	

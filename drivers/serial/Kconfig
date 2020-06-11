@@ -1,7 +1,7 @@
 #
 # Serial device configuration
 #
-# $Id: Kconfig,v 1.11 2004/03/11 18:08:04 lethal Exp $
+# $Id: Kconfig 1.2 2008/01/02 14:46:57Z afishman Exp $
 #
 
 menu "Serial drivers"
@@ -368,6 +368,31 @@ config SERIAL_S3C2410_CONSOLE
 	select SERIAL_CORE_CONSOLE
 	help
 	  Allow selection of the S3C2410 on-board serial ports for use as
+	  an virtual console.
+
+	  Even if you say Y here, the currently visible virtual console
+	  (/dev/tty0) will still be used as the system console by default, but
+	  you can alter that using a kernel command line option such as
+	  "console=ttySACx". (Try "man bootparam" or see the documentation of
+	  your boot loader about how to pass options to the kernel at
+	  boot time.)
+
+config SERIAL_WPCM450
+	tristate "Winbond WPCM450 Serial port support"
+	depends on ARM && MACH_WPCM450
+	select SERIAL_CORE
+	help
+	  Support for the on-chip UARTs on the Winbond WPCM450 CPU,
+	  providing /dev/ttySAC0, 1 and 2 (note, some machines may not
+	  provide all of these ports, depending on how the serial port
+	  pins are configured.
+
+config SERIAL_WPCM450_CONSOLE
+	bool "Support for console on WPCM450 serial port"
+	depends on SERIAL_WPCM450=y
+	select SERIAL_CORE_CONSOLE
+	help
+	  Allow selection of the WPCM450 on-board serial ports for use as
 	  an virtual console.
 
 	  Even if you say Y here, the currently visible virtual console
@@ -803,7 +828,6 @@ config SERIAL_MPC52xx
 	tristate "Freescale MPC52xx family PSC serial support"
 	depends on PPC_MPC52xx
 	select SERIAL_CORE
-	select FW_LOADER
 	help
 	  This drivers support the MPC52xx PSC serial ports. If you would
 	  like to use them, you must answer Y or M to this option. Not that

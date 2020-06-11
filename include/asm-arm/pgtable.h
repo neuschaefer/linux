@@ -165,8 +165,8 @@ extern void __pgd_error(const char *file, int line, unsigned long val);
 /*
  * The following macros handle the cache and bufferable bits...
  */
-#define _L_PTE_DEFAULT	L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_CACHEABLE | L_PTE_BUFFERABLE
-#define _L_PTE_READ	L_PTE_USER | L_PTE_EXEC
+#define _L_PTE_DEFAULT	(L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_CACHEABLE | L_PTE_BUFFERABLE)
+#define _L_PTE_READ	(L_PTE_USER | L_PTE_EXEC)
 
 extern pgprot_t		pgprot_kernel;
 

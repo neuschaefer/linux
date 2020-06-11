@@ -16,6 +16,9 @@ OBJCOPYFLAGS	:=-O binary -R .note -R .comment -S
 GZFLAGS		:=-9
 #CFLAGS		+=-pipe
 
+CFLAGS += -D__linux__ -Dlinux
+#clyu
+
 # Do not use arch/arm/defconfig - it's always outdated.
 # Select a platform tht is kept up-to-date
 KBUILD_DEFCONFIG := versatile_defconfig
@@ -116,6 +119,7 @@ endif
  machine-$(CONFIG_ARCH_REALVIEW)   := realview
  machine-$(CONFIG_ARCH_AT91RM9200) := at91rm9200
  machine-$(CONFIG_ARCH_EP93XX)     := ep93xx
+ machine-$(CONFIG_MACH_WPCM450)	   := wpcm450
 
 ifeq ($(CONFIG_ARCH_EBSA110),y)
 # This is what happens if you forget the IOCS16 line.

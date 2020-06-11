@@ -27,6 +27,7 @@ struct meminfo;
 #define MT_ROM			6
 #define MT_IXP2000_DEVICE	7
 #define MT_NONSHARED_DEVICE	8
+#define MT_DEVICE_USER	9 // avif
 
 extern void create_memmap_holes(struct meminfo *);
 extern void memtable_init(struct meminfo *);

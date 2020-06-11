@@ -40,7 +40,7 @@
 #include "compat.h"
 
 #ifndef MEM_SIZE
-#define MEM_SIZE	(16*1024*1024)
+#define MEM_SIZE	(36*1024*1024)
 #endif
 
 #if defined(CONFIG_FPE_NWFPE) || defined(CONFIG_FPE_FASTFPE)

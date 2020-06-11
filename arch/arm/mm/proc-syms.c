@@ -16,6 +16,7 @@
 
 #ifndef MULTI_CPU
 EXPORT_SYMBOL(cpu_dcache_clean_area);
+EXPORT_SYMBOL(dmac_clean_range);
 EXPORT_SYMBOL(cpu_set_pte);
 #else
 EXPORT_SYMBOL(processor);

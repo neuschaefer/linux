@@ -77,6 +77,8 @@ ENTRY(stext)
 	bl	__lookup_processor_type		@ r5=procinfo r9=cpuid
 	movs	r10, r5				@ invalid processor (r5=0)?
 	beq	__error_p			@ yes, error 'p'
+	mov		r1, #0x600		@afishman: r1 = machine number. MACH_TYPE_WPCM450 = 1597
+	add 	r1, r1, #0x3d   @afishman
 	bl	__lookup_machine_type		@ r5=machinfo
 	movs	r8, r5				@ invalid machine (r5=0)?
 	beq	__error_a			@ yes, error 'a'
@@ -251,7 +253,7 @@ __create_page_tables:
 	/*
 	 * Then map first 1MB of ram in case it contains our boot params.
 	 */
-	add	r0, r4, #PAGE_OFFSET >> 18
+	add r0, r4, #PAGE_OFFSET >> 18
 	orr	r6, r7, #PHYS_OFFSET
 	str	r6, [r0]
 

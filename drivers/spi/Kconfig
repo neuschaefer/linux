@@ -114,6 +114,12 @@ config SPI_S3C24XX
 	help
 	  SPI driver for Samsung S3C24XX series ARM SoCs
 
+config SPI_WPCM450
+	tristate "Winbond WPCM450 series SPI"
+	depends on SPI_MASTER && MACH_WPCM450 && EXPERIMENTAL
+	help
+	  SPI driver for Winbond WPCM450 series ARM SoCs
+
 #
 # There are lots of SPI device types, with sensors and memory
 # being probably the most widely used ones.

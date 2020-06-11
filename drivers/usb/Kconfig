@@ -11,7 +11,6 @@ config USB_ARCH_HAS_HCD
 	boolean
 	default y if USB_ARCH_HAS_OHCI
 	default y if USB_ARCH_HAS_EHCI
-	default y if ARM				# SL-811
 	default PCI
 
 # many non-PCI SOC chips embed OHCI
