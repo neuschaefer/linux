@@ -26,7 +26,7 @@ config MMC_PXA
 
 config MMC_SDHCI
 	tristate "Secure Digital Host Controller Interface support  (EXPERIMENTAL)"
-	depends on PCI && EXPERIMENTAL
+#	depends on PCI && EXPERIMENTAL
 	help
 	  This select the generic Secure Digital Host Controller Interface.
 	  It is used by manufacturers such as Texas Instruments(R), Ricoh(R)

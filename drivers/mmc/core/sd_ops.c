@@ -38,7 +38,7 @@ static int mmc_app_cmd(struct mmc_host *host, struct mmc_card *card)
 		cmd.flags = MMC_RSP_SPI_R1 | MMC_RSP_R1 | MMC_CMD_BCR;
 	}
 
-	err = mmc_wait_for_cmd(host, &cmd, 0);
+	err = mmc_wait_for_cmd(host, &cmd, 2);
 	if (err)
 		return err;
 
@@ -209,7 +209,7 @@ int mmc_send_if_cond(struct mmc_host *host, u32 ocr)
 	cmd.arg = ((ocr & 0xFF8000) != 0) << 8 | test_pattern;
 	cmd.flags = MMC_RSP_SPI_R7 | MMC_RSP_R7 | MMC_CMD_BCR;
 
-	err = mmc_wait_for_cmd(host, &cmd, 0);
+	err = mmc_wait_for_cmd(host, &cmd, 2);
 	if (err)
 		return err;
 

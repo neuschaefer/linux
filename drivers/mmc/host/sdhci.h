@@ -201,12 +201,17 @@ struct sdhci_host {
 	struct tasklet_struct	finish_tasklet;
 
 	struct timer_list	timer;		/* Timer for timeouts */
+
+	
 };
 
 struct sdhci_chip {
 	struct pci_dev		*pdev;
+	//struct platform_device *pdev;
 
 	unsigned long		quirks;
+
+	void __iomem *		gpiobase;
 
 	int			num_slots;	/* Slots on controller */
 	struct sdhci_host	*hosts[0];	/* Pointers to hosts */
