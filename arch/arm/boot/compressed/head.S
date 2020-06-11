@@ -399,7 +399,11 @@ __setup_mmu:	sub	r3, r4, #16384		@ Page directory size
 		orr	r1, r1, #3 << 10
 		add	r2, r3, #16384
 1:		cmp	r1, r9			@ if virt > start of RAM
-		orrhs	r1, r1, #0x0c		@ set cacheable, bufferable
+#ifdef CONFIG_CPU_DCACHE_WRITETHROUGH
+		orrhs	r1, r1, #0x08		@ Write Through Cache
+#else
+		orrhs	r1, r1, #0x0c		@ Write Back Cache
+#endif
 		cmp	r1, r10			@ if virt > end of RAM
 		bichs	r1, r1, #0x0c		@ clear cacheable, bufferable
 		str	r1, [r0], #4		@ 1:1 mapping
@@ -412,7 +416,11 @@ __setup_mmu:	sub	r3, r4, #16384		@ Page directory size
  * so there is no map overlap problem for up to 1 MB compressed kernel.
  * If the execution is in RAM then we would only be duplicating the above.
  */
-		mov	r1, #0x1e
+#ifdef CONFIG_CPU_DCACHE_WRITETHROUGH 
+		mov	r1, #0x1a       @ Write Through Cache
+#else
+		mov	r1, #0x1e   	@ Write Back Cache
+#endif
 		orr	r1, r1, #3 << 10
 		mov	r2, pc, lsr #20
 		orr	r1, r1, r2, lsl #20
