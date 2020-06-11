@@ -11,6 +11,12 @@ FONTC	= $(srctree)/drivers/video/console/font_acorn_8x8.c
 #
 # Architecture dependencies
 #
+
+ifeq ($(CONFIG_ARCH_HERMON),y)
+OBJS		+= head-hermon.o
+endif
+
+
 ifeq ($(CONFIG_ARCH_ACORN),y)
 OBJS		+= ll_char_wr.o font.o
 endif
