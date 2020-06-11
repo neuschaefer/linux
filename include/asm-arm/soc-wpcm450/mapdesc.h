@@ -1,0 +1,8 @@
+#ifndef WPCM450_MAP_DESC
+
+#define WPCM450_MAP_DESC					\
+{WPCM_REGISTER_VA_BASE, __phys_to_pfn(WPCM_REGISTER_BASE), SZ_256M, MT_DEVICE }
+
+#endif
+
+
