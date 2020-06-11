@@ -28,4 +28,12 @@ config MTD_SPI_ST
 	help
 	  Select this if you want to use ST Microelectronics SPI devices
 
+config MTD_WPCM450_SPI
+	bool "WPCM450 SOC SPI Controller"
+	default y if SOC_WPCM450
+	depends on MTD_SPI && SOC_WPCM450
+	help 
+	   If you are using SPI device on Pilot-II SOC, select Y
+	  
+
 endmenu
