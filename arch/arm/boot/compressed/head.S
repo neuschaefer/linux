@@ -430,6 +430,13 @@ __setup_mmu:	sub	r3, r4, #16384		@ Page directory size
 		str	r1, [r0]
 		mov	pc, lr
 
+__armv4_no_cache:
+		orr	r0,r0,#0
+		orr	r0,r0,#0
+		mov	pc,lr
+		orr	r0,r0,#0
+		orr	r0,r0,#0
+
 __armv4_mmu_cache_on:
 		mov	r12, lr
 		bl	__setup_mmu
