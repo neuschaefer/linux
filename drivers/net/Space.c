@@ -86,6 +86,9 @@ extern struct net_device *mac89x0_probe(int unit);
 extern struct net_device *mc32_probe(int unit);
 extern struct net_device *cops_probe(int unit);
 extern struct net_device *ltpc_probe(void);
+#ifdef CONFIG_WPCM450_MAC
+extern struct net_device *wpcm450_mac_probe(int unit);
+#endif
 
 /* Detachable devices ("pocket adaptors") */
 extern struct net_device *de620_probe(int unit);
@@ -238,6 +241,9 @@ static struct devprobe2 isa_probes[] __initdata = {
 #endif
 #ifdef CONFIG_NI65
 	{ni65_probe, 0},
+#endif
+#ifdef CONFIG_WPCM450_MAC
+	{wpcm450_mac_probe,0 },
 #endif
 	{NULL, 0},
 };
