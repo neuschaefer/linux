@@ -1,0 +1,64 @@
+Bigphysarea
+===========
+
+This set of functions give you the ability to allocate big
+contineous (DMAable) memory for the entire runtime of Linux.
+Big meaning here more than 128KB, the maximum allocation
+limit of kmalloc(). Due to fragmentation reasons kmalloc()
+is unable to garantee allocs of this order during a prolonged
+run of the kernel. This new pool of memory blob can be used
+during the initialization or use of soundcards of framegrabbers
+which are designed without DMA scatter-gatter capabilities.
+
+For a sample use, see the zoran driver in drivers/char/zr36120_mem.c
+
+Enjoy,
+  Pauline Middelink
+
+How to start
+============
+First add bigphysarea=<number of pages to alloc> to the
+commandline of your kernel. Either do this by adding an
+append= line to your /etc/lilo/conf setup or use some
+magic marker...
+After booting the new kernel there should be a /proc/bigphysarea
+file telling your how many blocks/bytes are available.
+
+The interface description
+=========================
+The big physical area is mainly managed by two functions. The first one,
+
+caddr_t bigphysarea_alloc_pages(int count, int align, int priority)
+
+allocates 'count' pages. The pages are aligned so that there base
+address is a multiple of 'PAGE_SIZE * align'. If you don't need more
+than page alignment, set 'align' to 0 or 1. 'priority' has the same
+meaning as in kmalloc, it can be GFP_ATOMIC (for calls from interrupt
+handlers) or GFP_KERNEL (for usual calls). The base address of the
+allocated area is returned.
+
+Allocation can fail for two reasons, in both cases NULL is
+returned. First, the physical area is scattered too much or there is
+not enough memory, second it is not possible to allocate some memory
+with kmalloc for administration of the physical area (very unlikely).
+
+To free an allocated area, just call
+
+void bigphysarea_free_pages(caddr_t base)
+
+with 'base' set to the value returned by 'bigphysarea_alloc_pages'. 
+
+An example how to use this functions can be found in 'module.c'.
+
+There is still the old interface introduced by M. Welsh:
+
+caddr_t bigphysarea_alloc(int size)
+void bigphysarea_free(caddr_t addr, int size)
+
+The first function allocates 'size' bytes physically continous
+memory. To free the area, bigphysarea_free with a pointer to the area
+and its size has to be called. Due to a new allocation algorithm, the
+size parameter is no longer really needed when freeing an area.
+
+In the current version it is not safe to call any of the functions
+from an interrupt handler.

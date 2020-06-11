@@ -708,6 +708,14 @@ config NODES_SHIFT
 
 source "mm/Kconfig"
 
+config BIGPHYS_AREA
+	bool "Support for big physical area reservation"
+	---help---
+	  Enables kernel support for reserving large areas of physical memory
+	  at boot-time for use by certain device drivers (such as video
+	  framegrabbers, etc.) which require it. To use this feature, boot
+	  the kernel with the boot-time option 'bigphysarea=nnn' where
+	  'nnn' is the number of pages (a page is usually 4K) to reserve.
 config LEDS
 	bool "Timer and CPU usage LEDs"
 	depends on ARCH_CDB89712 || ARCH_CO285 || ARCH_EBSA110 || \

@@ -20,6 +20,9 @@
 #include <linux/proc_fs.h>
 #include <linux/sched.h>	/* for cond_resched */
 #include <linux/mm.h>
+#ifdef CONFIG_BIGPHYS_AREA
+#include <linux/bigphysarea.h>
+#endif
 #include <linux/ctype.h>
 
 #include <asm/sections.h>
@@ -494,4 +497,10 @@ static int __init kallsyms_init(void)
 __initcall(kallsyms_init);
 
 EXPORT_SYMBOL(__print_symbol);
+#ifdef CONFIG_BIGPHYS_AREA
+EXPORT_SYMBOL(bigphysarea_alloc);
+EXPORT_SYMBOL(bigphysarea_free);
+EXPORT_SYMBOL(bigphysarea_alloc_pages);
+EXPORT_SYMBOL(bigphysarea_free_pages);
+#endif
 EXPORT_SYMBOL_GPL(sprint_symbol);
