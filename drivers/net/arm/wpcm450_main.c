@@ -23,6 +23,8 @@ extern unsigned long enetaddr[4][6];
 
 extern unsigned long wpcm_mac_io[MAX_WPCM_MAC]; 
 extern unsigned int  wpcm_mac_irq[MAX_WPCM_MAC];
+extern int isMACInitialized;
+extern unsigned long init_wpcm_mac_eth(void);
 
 void
 FindMACAddress(int unit, char *mac_addr)
@@ -61,6 +63,8 @@ struct net_device * __init wpcm450_mac_probe(int unit)
 
 	sprintf(dev->name, "eth%d", unit);
 	netdev_boot_setup_check(dev);
+
+	if(!isMACInitialized) init_wpcm_mac_eth();
 
 	dev->base_addr = wpcm_mac_io[unit];
 	dev->irq = wpcm_mac_irq[unit];
