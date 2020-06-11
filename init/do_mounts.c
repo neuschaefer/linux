@@ -398,7 +398,13 @@ void __init mount_root(void)
 			return;
 
 		printk(KERN_ERR "VFS: Unable to mount root fs via NFS, trying floppy.\n");
+
+// Patch by AMI for CRAMFS Ramdisk 
+#ifdef CONFIG_BLK_DEV_FD
 		ROOT_DEV = Root_FD0;
+#else
+		ROOT_DEV = Root_RAM0;	
+#endif
 	}
 #endif
 #ifdef CONFIG_BLK_DEV_FD
