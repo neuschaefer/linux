@@ -400,6 +400,9 @@ uart_get_divisor(struct uart_port *port, unsigned int baud)
 {
 	unsigned int quot;
 
+#ifdef CONFIG_WPCM450_SERIAL	
+	quot = (port->uartclk  / (16 * baud))-2;
+#else
 	/*
 	 * Old custom speed handling.
 	 */
@@ -407,6 +410,7 @@ uart_get_divisor(struct uart_port *port, unsigned int baud)
 		quot = port->custom_divisor;
 	else
 		quot = (port->uartclk + (8 * baud)) / (16 * baud);
+#endif
 
 	return quot;
 }
