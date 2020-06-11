@@ -143,6 +143,16 @@ struct tag_memclk {
 	__u32 fmemclk;
 };
 
+/* ATAG to pass MAC address and clock to OS - AMI Extension */
+#define ATAG_ENETADDR 0x41000901
+struct tag_enetaddr {
+	 unsigned long enet_count;
+	 unsigned char enet0_addr[6];
+	 unsigned char enet1_addr[6];
+	 unsigned char enet2_addr[6];
+	 unsigned char enet3_addr[6];
+};
+
 struct tag {
 	struct tag_header hdr;
 	union {
@@ -165,6 +175,10 @@ struct tag {
 		 * DC21285 specific
 		 */
 		struct tag_memclk	memclk;
+		/*
+		 * AMI Extensions 
+		 */
+		struct tag_enetaddr	 enetaddr;
 	} u;
 };
 

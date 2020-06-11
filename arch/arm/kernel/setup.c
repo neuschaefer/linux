@@ -724,6 +724,26 @@ static int __init parse_tag_cmdline(const struct tag *tag)
 
 __tagtable(ATAG_CMDLINE, parse_tag_cmdline);
 
+/* AMI Extensiosn Start */
+unsigned long enetaddr[4][6];
+
+static int __init parse_tag_enetaddr(const struct tag *tag)
+{
+	if (tag->u.enetaddr.enet_count > 0)
+		memcpy(enetaddr[0],tag->u.enetaddr.enet0_addr,6);
+	if (tag->u.enetaddr.enet_count > 1)
+		memcpy(enetaddr[1],tag->u.enetaddr.enet1_addr,6);
+	if (tag->u.enetaddr.enet_count > 2)
+		memcpy(enetaddr[2],tag->u.enetaddr.enet2_addr,6);
+	if (tag->u.enetaddr.enet_count > 3)
+		memcpy(enetaddr[3],tag->u.enetaddr.enet3_addr,6);
+	return 0;
+}
+__tagtable(ATAG_ENETADDR, parse_tag_enetaddr);
+
+/* AMI Extensiosn End */
+
+
 /*
  * Scan the tag table for this tag, and call its parse function.
  * The tag table is built by the linker from all the __tagtable
