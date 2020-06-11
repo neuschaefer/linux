@@ -288,6 +288,8 @@ config MTD_OOPS
 
 source "drivers/mtd/chips/Kconfig"
 
+source "drivers/mtd/spichips/Kconfig"
+
 source "drivers/mtd/maps/Kconfig"
 
 source "drivers/mtd/devices/Kconfig"
