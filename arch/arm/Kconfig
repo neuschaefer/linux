@@ -144,7 +144,7 @@ menu "System Type"
 
 choice
 	prompt "ARM system type"
-	default ARCH_VERSATILE
+        default ARCH_HERMON
 
 config ARCH_AAEC2000
 	bool "Agilent AAEC-2000 based"
@@ -182,6 +182,14 @@ config ARCH_AT91
 	help
 	  This enables support for systems based on the Atmel AT91RM9200
 	  and AT91SAM9xxx processors.
+
+config ARCH_HERMON
+	bool "Winbond Hermon Board"
+	select SOC_WPCM450
+	help
+	  This is an evaluation board (Hermon) from Winbond based on WPCM450 SOC
+	  If you would like to build your kernel to run on one of these boards
+	  then you must say 'Y' here. Otherwise say 'N'
 
 config ARCH_CLPS7500
 	bool "Cirrus CL-PS7500FE"
