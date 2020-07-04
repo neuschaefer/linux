@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * Prolific PL2303 USB to serial adaptor driver
  *
  * Copyright (C) 2001-2007 Greg Kroah-Hartman (greg@kroah.com)
@@ -30,7 +34,12 @@
 #include <linux/usb.h>
 #include <linux/usb/serial.h>
 #include "pl2303.h"
+#include "atpconfig.h"
 
+#ifdef SUPPORT_ATP_FTDILIST_CONFIG
+#include <linux/fs.h>   
+#include <linux/uaccess.h>  
+#endif
 /*
  * Version Information
  */
@@ -38,9 +47,25 @@
 
 static bool debug;
 
+#ifdef SUPPORT_ATP_FTDILIST_CONFIG
+static __u16 vendor = PL2303_VENDOR_ID;
+static __u16 product;
+
+typedef struct tag_pl2303_usb_device_list
+{
+    struct tag_pl2303_usb_device_list             *pstNext;
+    unsigned int ulVID;
+    unsigned int ulPID;
+}ATP_PL2303_USB_DEVICE_LIST;
+#endif
+
 #define PL2303_CLOSING_WAIT	(30*HZ)
 
+#ifdef SUPPORT_ATP_FTDILIST_CONFIG
+static struct usb_device_id id_table[] = {
+#else
 static const struct usb_device_id id_table[] = {
+#endif
 	{ USB_DEVICE(PL2303_VENDOR_ID, PL2303_PRODUCT_ID) },
 	{ USB_DEVICE(PL2303_VENDOR_ID, PL2303_PRODUCT_ID_RSAQ2) },
 	{ USB_DEVICE(PL2303_VENDOR_ID, PL2303_PRODUCT_ID_DCU11) },
@@ -92,6 +117,159 @@ static const struct usb_device_id id_table[] = {
 	{ USB_DEVICE(SANWA_VENDOR_ID, SANWA_PRODUCT_ID) },
 	{ USB_DEVICE(ADLINK_VENDOR_ID, ADLINK_ND6530_PRODUCT_ID) },
 	{ USB_DEVICE(SMART_VENDOR_ID, SMART_PRODUCT_ID) },
+	#ifdef SUPPORT_ATP_FTDILIST_CONFIG	
+    { }, /*0*/
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },/*100*/
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },/*110*/
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },/*120*/
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },/*130*/
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },/*140*/
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },/*150*/
+	{ },/* Optional parameter entry */  	
+#endif  	
 	{ }					/* Terminating entry */
 };
 
@@ -855,7 +1033,85 @@ static struct usb_serial_driver * const serial_drivers[] = {
 	&pl2303_device, NULL
 };
 
+#ifdef SUPPORT_ATP_FTDILIST_CONFIG
+static int read_pl2303_usb_list_from_user(void)
+{
+    int table_size = sizeof(id_table)/sizeof(struct usb_device_id);
+    struct file *fp;  
+    mm_segment_t fs;  
+    loff_t pos;  
+    ATP_PL2303_USB_DEVICE_LIST stPl2303UsbDevice;
+    int i;
+
+    memset((void *)&stPl2303UsbDevice, 0, sizeof(ATP_PL2303_USB_DEVICE_LIST));
+    printk("the size of id_table is %d\n", table_size);
+
+	for (i = 0; id_table[i].idVendor; i++)
+    {
+        ;//find empty  
+    }   
+    
+    fp = filp_open("/var/pl-2303DevList", O_RDONLY, 0644);  
+    if (IS_ERR(fp)) 
+    {  
+        printk("open pl2303 list file error\n");  
+        return -1;  
+    }  
+
+    fs = get_fs();  
+    set_fs(KERNEL_DS);  
+    pos = 0;  
+    while(sizeof(ATP_PL2303_USB_DEVICE_LIST) == vfs_read(fp, &stPl2303UsbDevice, sizeof(ATP_PL2303_USB_DEVICE_LIST), &pos))
+    {        
+        if ((i < table_size) && (stPl2303UsbDevice.ulVID >= 0) && (stPl2303UsbDevice.ulVID <= 0xFFFF) 
+            && (stPl2303UsbDevice.ulPID >= 0) && (stPl2303UsbDevice.ulPID <= 0xFFFF))
+        {
+        	id_table[i].match_flags = USB_DEVICE_ID_MATCH_DEVICE;
+        	id_table[i].idVendor = stPl2303UsbDevice.ulVID;
+        	id_table[i].idProduct = stPl2303UsbDevice.ulPID;
+            printk("idVendor: 0x%04x idProduct: 0x%04x\n", id_table[i].idVendor, id_table[i].idProduct);
+        	i++;
+        }         
+    }
+    printk("the size of used table is %d\n", i);
+    filp_close(fp, NULL);  
+    set_fs(fs);
+    
+    return 0;  
+}
+
+static int __init pl2303_init(void) 
+{
+    int retval;
+
+	dbg("%s", __func__);
+	if(vendor > 0 && product > 0) {
+		/* Add user specified VID/PID to reserved element of table. */
+		int i;
+		for (i = 0; id_table[i].idVendor; i++)
+			;
+		id_table[i].match_flags = USB_DEVICE_ID_MATCH_DEVICE;
+		id_table[i].idVendor = vendor;
+		id_table[i].idProduct = product;
+	}
+    read_pl2303_usb_list_from_user();
+	retval = usb_serial_register_drivers(&pl2303_driver, serial_drivers); 
+	if(0 == retval)
+		printk(KERN_INFO KBUILD_MODNAME ": " DRIVER_DESC "\n");
+	return retval;
+}
+
+static void __exit pl2303_exit(void) 
+{
+    dbg("%s", __func__);
+	usb_serial_deregister_drivers(&pl2303_driver, serial_drivers);
+}
+
+module_init(pl2303_init); 
+module_exit(pl2303_exit);
+#else
 module_usb_serial_driver(pl2303_driver, serial_drivers);
+#endif
 
 MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL");

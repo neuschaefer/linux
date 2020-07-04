@@ -1,3 +1,7 @@
+/*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
 /* FTP extension for connection tracking. */
 
 /* (C) 1999-2001 Paul `Rusty' Russell
@@ -63,6 +67,10 @@ unsigned int (*nf_nat_ftp_hook)(struct sk_buff *skb,
 				struct nf_conntrack_expect *exp);
 EXPORT_SYMBOL_GPL(nf_nat_ftp_hook);
 
+#ifdef CONFIG_NF_CONNTRACK_FTP
+extern int alg_ftp_enable;
+#endif
+
 static int try_rfc959(const char *, size_t, struct nf_conntrack_man *, char);
 static int try_eprt(const char *, size_t, struct nf_conntrack_man *, char);
 static int try_epsv_response(const char *, size_t, struct nf_conntrack_man *,
@@ -114,6 +122,7 @@ static struct ftp_search {
 	},
 };
 
+#ifndef CONFIG_SUPPORT_ATP
 static int
 get_ipv6_addr(const char *src, size_t dlen, struct in6_addr *dst, u_int8_t term)
 {
@@ -123,6 +132,105 @@ get_ipv6_addr(const char *src, size_t dlen, struct in6_addr *dst, u_int8_t term)
 		return (int)(end - src);
 	return 0;
 }
+#else
+
+/*
+带scopeID的ipv6格式为|2|3ffe::1%10|6275|
+
+函数返回值的说明：
+返回找到 % 的位置
+*/
+static char* find_scope_id_in_ipv6_addr(const char *ipv6_str, int ipv6_len)
+{
+	int i = 0;
+	for(i = 0; i < ipv6_len; i++)
+	{
+		if( '%' == *(ipv6_str+i) )
+		{
+			return (ipv6_str+i) ;
+		}
+	}
+
+	return NULL;
+}
+
+/*
+带scopeID的ipv6格式为|2|3ffe::1%10|6275|
+输入参数说明:
+ipv6_str 为整个整个EPRT命令中的ipv6和port部分。如:3ffe::1%10|6275|
+函数返回值的说明：
+返回找到的第一个 | 的位置
+
+*/
+static char* find_1st_term_in_ipv6_addr(const char *ipv6_str, int ipv6_len, u_int8_t term)
+{
+	int i = 0;
+	
+	for(i = 0; i < ipv6_len; i++)
+	{
+		if( term == *(ipv6_str+i) )
+		{
+			return (ipv6_str+i) ;
+		}
+	}
+
+	return NULL;
+}
+/*
+带scopeID的ipv6格式为|2|3ffe::1%10|6275|
+输入参数说明:
+ipv6_str 为整个整个EPRT命令中的ipv6和port部分。如:3ffe::1%10|6275|
+函数返回值的说明：
+取%和 |之间的长度，含%字符，被忽略的长度，因为后面的函数get_port需要这个长度。
+
+*/
+static int get_skiped_len_of_scope_id_in_ipv6_str(const char *ipv6_str, int ipv6_len, u_int8_t term)
+{
+	int i = 0;
+	int skiped_len = 0;
+	char *find_1st_term = NULL;
+	char *find_ptr = NULL;
+	
+	find_ptr = find_scope_id_in_ipv6_addr(ipv6_str, ipv6_len);
+	if( NULL != find_ptr )
+	{
+		find_1st_term = find_1st_term_in_ipv6_addr(ipv6_str, ipv6_len, term);
+		if( NULL == find_1st_term ) /*如果没找到，则不正常，那么就做异常处理*/
+		{
+			find_1st_term = ipv6_str;
+		}
+		skiped_len = find_1st_term - find_ptr;
+		if(skiped_len < 0)
+			skiped_len = 0;
+	}
+	return skiped_len;
+}
+
+static int
+get_ipv6_addr(const char *src, size_t dlen, struct in6_addr *dst, u_int8_t term)
+{
+	const char *end;
+	int skiped_len = 0;
+
+//	printk("dlen==[%d]----------------\n",dlen);
+//	printk("src==[%s]\n",src);
+//	printk("src==[0x%x]\n",src);
+//	printk("term==[%c]\n",term);
+	skiped_len = get_skiped_len_of_scope_id_in_ipv6_str(src, dlen, term);
+	if( skiped_len > 0)/*找到%，也就是存在scope id*/
+	{
+		term = '%';
+	}
+//	printk("skiped_len==[%d]\n",skiped_len);
+	int ret = in6_pton(src, min_t(size_t, dlen, 0xffff), (u8 *)dst, term, &end);
+//	printk("ret==[%d]\n",ret);
+//	printk("(int)(end - src + skiped_len)==[%d]\n",(int)(end - src + skiped_len));
+	if (ret > 0)
+		return (int)(end - src + skiped_len);/*skiped_len 在后面的get_port的输入参数需要。*/
+	return 0;
+}
+#endif
+
 
 static int try_number(const char *data, size_t dlen, u_int32_t array[],
 		      int array_size, char sep, char term)
@@ -380,6 +488,13 @@ static int help(struct sk_buff *skb,
 	int found = 0, ends_in_nl;
 	typeof(nf_nat_ftp_hook) nf_nat_ftp;
 
+#if defined(CONFIG_SYSCTL) && defined(CONFIG_NF_CONNTRACK_FTP) && defined(CONFIG_NF_CONNTRACK_PROC_COMPAT)	
+	if (!alg_ftp_enable)
+	{
+		return NF_ACCEPT;
+	}
+#endif
+
 	/* Until there's been traffic both ways, don't look in packets. */
 	if (ctinfo != IP_CT_ESTABLISHED &&
 	    ctinfo != IP_CT_ESTABLISHED_REPLY) {
@@ -460,6 +575,17 @@ static int help(struct sk_buff *skb,
 		ret = NF_ACCEPT;
 		goto out_update_nl;
 	}
+	
+#if defined(CONFIG_TUNNEL) && defined(CONFIG_BCM_KF_NETFILTER) && defined(CONFIG_BLOG)
+	/*发往lan侧的227 报文不进行alg处理*/
+	if ((NF_CT_FTP_PASV == search[dir][i].ftptype)
+		&& (IP_CT_DIR_REPLY == dir)
+		&& (0 == strcmp(skb->dev->name, "br0"))) {
+		//printk("PASV mode for pptp 227, just ignore\n");
+		ret = NF_ACCEPT;
+		goto out_update_nl;
+	}
+#endif
 
 	pr_debug("conntrack_ftp: match `%.*s' (%u bytes at %u)\n",
 		 matchlen, fb_ptr + matchoff,
@@ -605,9 +731,17 @@ static int __init nf_conntrack_ftp_init(void)
 			ftp[i][j].help = help;
 			tmpname = &ftp_names[i][j][0];
 			if (ports[i] == FTP_PORT)
+#ifdef CONFIG_SUPPORT_ATP
+				snprintf(tmpname, sizeof(ftp_names[i][j]), "ftp");
+#else
 				sprintf(tmpname, "ftp");
+#endif
 			else
+#ifdef CONFIG_SUPPORT_ATP
+				snprintf(tmpname, sizeof(ftp_names[i][j]), "ftp-%d", ports[i]);
+#else
 				sprintf(tmpname, "ftp-%d", ports[i]);
+#endif
 			ftp[i][j].name = tmpname;
 
 			pr_debug("nf_ct_ftp: registering helper for pf: %d "

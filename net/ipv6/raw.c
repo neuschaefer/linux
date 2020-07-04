@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *	RAW sockets for IPv6
  *	Linux INET6 implementation
  *
@@ -167,6 +171,29 @@ static int ipv6_raw_deliver(struct sk_buff *skb, int nexthdr)
 	__u8 hash;
 	struct net *net;
 
+#ifdef CONFIG_ATP_HYBRID
+    u8     *h;
+    __be16 gre_proto;
+
+    /*收到IPG_GRE的数据包只接收GRE控制报文gre_proto=0x0101;*/
+    do{
+        if (IPPROTO_GRE == nexthdr)    
+        {
+            h = skb->data;
+        	gre_proto = *(__be16 *)(h + 2);
+            if (htons(ETH_P_IPGRE_CTL) == gre_proto)
+            {
+                break;
+            }
+            else
+            {
+                return delivered;
+            }
+        }
+    }
+    while(0);
+#endif
+    
 #if defined(CONFIG_MIPS_BCM963XX) && defined(CONFIG_BCM_KF_UNALIGNED_EXCEPTION)
 	memcpy(&saddr, &ipv6_hdr(skb)->saddr, sizeof(struct in6_addr));
 	memcpy(&daddr, &ipv6_hdr(skb)->daddr, sizeof(struct in6_addr));
@@ -497,9 +524,9 @@ static int rawv6_recvmsg(struct kiocb *iocb, struct sock *sk,
 
 	if (flags & MSG_OOB)
 		return -EOPNOTSUPP;
-
-	if (addr_len)
-		*addr_len=sizeof(*sin6);
+	//CVE-2013-7263
+	//if (addr_len)
+	//	*addr_len=sizeof(*sin6);
 
 	if (flags & MSG_ERRQUEUE)
 		return ipv6_recv_error(sk, msg, len);
@@ -540,6 +567,9 @@ static int rawv6_recvmsg(struct kiocb *iocb, struct sock *sk,
 		sin6->sin6_scope_id = 0;
 		if (ipv6_addr_type(&sin6->sin6_addr) & IPV6_ADDR_LINKLOCAL)
 			sin6->sin6_scope_id = IP6CB(skb)->iif;
+        //CVE-2013-7263
+		if (addr_len)
+			*addr_len = sizeof(*sin6);
 	}
 
 	sock_recv_ts_and_drops(msg, sk, skb);
@@ -1005,20 +1035,6 @@ static int do_rawv6_setsockopt(struct sock *sk, int level, int optname,
 
 	switch (optname) {
 	case IPV6_CHECKSUM:
-#if !defined(CONFIG_BCM_KF_IP)
-		if (inet_sk(sk)->inet_num == IPPROTO_ICMPV6 &&
-		    level == IPPROTO_IPV6) {
-			/*
-			 * RFC3542 tells that IPV6_CHECKSUM socket
-			 * option in the IPPROTO_IPV6 level is not
-			 * allowed on ICMPv6 sockets.
-			 * If you want to set it, use IPPROTO_RAW
-			 * level IPV6_CHECKSUM socket option
-			 * (Linux extension).
-			 */
-			return -EINVAL;
-		}
-#endif
 
 		/* You may get strange result with a positive odd offset;
 		   RFC2292bis agrees with me. */

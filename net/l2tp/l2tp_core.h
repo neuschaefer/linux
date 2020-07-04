@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * L2TP internal definitions.
  *
  * Copyright (c) 2008,2009 Katalix Systems Ltd
@@ -7,6 +11,9 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
+#ifdef CONFIG_ATP_COMMON
+#include <linux/if_pppol2tp.h>
+#endif
 
 #ifndef _L2TP_CORE_H_
 #define _L2TP_CORE_H_
@@ -88,6 +95,10 @@ struct l2tp_session {
 
 	struct l2tp_tunnel	*tunnel;	/* back pointer to tunnel
 						 * context */
+#ifdef CONFIG_ATP_COMMON                            
+	struct pppol2tp_addr	tunnel_addr;	/* Description of tunnel */
+#endif
+                            
 	u32			session_id;
 	u32			peer_session_id;
 	u8			cookie[8];
@@ -157,6 +168,10 @@ struct l2tp_tunnel_cfg {
 
 struct l2tp_tunnel {
 	int			magic;		/* Should be L2TP_TUNNEL_MAGIC */
+#ifdef CONFIG_ATP_COMMON     
+    struct rcu_head rcu;
+#endif
+
 	rwlock_t		hlist_lock;	/* protect session_hlist */
 	struct hlist_head	session_hlist[L2TP_HASH_SIZE];
 						/* hashed list of sessions,

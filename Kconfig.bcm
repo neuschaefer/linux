@@ -15,32 +15,31 @@ config BCM_KERNEL_CUSTOM
 
 choice
 	prompt "Broadcom Commengine board type"
-	default BCM96362
+	default BCMDSL963268
 	depends on (BCM_KF_MIPS_BCM963XX || BCM_KF_ARM_BCM963XX)
 	help
 	  Select different Broadcom ADSL board
 
-config BCM963148
+config BCMDSL963148
 	bool "63148"
 	depends on BCM_KF_ARM_BCM963XX
 	depends on ARM
 	select EMBEDDED
 	select MACH_BCM963148
-
-config BCM963138
+config BCMDSL963138
 	bool "63138"
 	depends on BCM_KF_ARM_BCM963XX
 	depends on ARM
 	select EMBEDDED
 	select MACH_BCM963138
 
-config BCM960333
+config BCMDSL960333
 	bool "960333"
 	depends on BCM_KF_MIPS_BCM963XX
 	depends on MIPS_BCM963XX
 	select DMA_NONCOHERENT
 
-config BCM96318
+config BCMDSL96318
 	bool "96318 DSL board"
 	depends on BCM_KF_MIPS_BCM963XX
 	depends on MIPS_BCM963XX
@@ -48,7 +47,7 @@ config BCM96318
 	select SYS_SUPPORTS_SMP
 	select NR_CPUS_DEFAULT_2
 	
-config BCM96368
+config BCMDSL96368
 	bool "96368 VDSL board"
 	depends on BCM_KF_MIPS_BCM963XX
 	depends on MIPS_BCM963XX
@@ -56,7 +55,7 @@ config BCM96368
 	select SYS_SUPPORTS_SMP
 	select NR_CPUS_DEFAULT_2
 
-config BCM96816
+config BCMDSL96816
 	bool "96816 GPON board"
 	depends on BCM_KF_MIPS_BCM963XX
 	depends on MIPS_BCM963XX
@@ -64,7 +63,7 @@ config BCM96816
 	select DMA_NONCOHERENT
 	select NR_CPUS_DEFAULT_2
 
-config BCM96818
+config BCMDSL96818
 	bool "96818 GPON board"
 	depends on BCM_KF_MIPS_BCM963XX
 	depends on MIPS_BCM963XX
@@ -72,7 +71,7 @@ config BCM96818
 	select DMA_NONCOHERENT
 	select NR_CPUS_DEFAULT_2
 	
-config BCM96362
+config BCMDSL96362
 	bool "96362 ADSL board"
 	depends on BCM_KF_MIPS_BCM963XX
 	depends on MIPS_BCM963XX
@@ -80,7 +79,7 @@ config BCM96362
 	select SYS_SUPPORTS_SMP
 	select NR_CPUS_DEFAULT_2
 
-config BCM96328
+config BCMDSL96328
 	bool "96328 ADSL board"
 	depends on BCM_KF_MIPS_BCM963XX
 	depends on MIPS_BCM963XX
@@ -88,7 +87,7 @@ config BCM96328
 	select SYS_SUPPORTS_SMP
 	select NR_CPUS_DEFAULT_2
 
-config BCM963268
+config BCMDSL963268
 	bool "963268 VDSL board"
 	depends on BCM_KF_MIPS_BCM963XX
 	depends on MIPS_BCM963XX
@@ -96,7 +95,7 @@ config BCM963268
 	select SYS_SUPPORTS_SMP
 	select NR_CPUS_DEFAULT_2
 
-config BCM96828
+config BCMDSL96828
 	bool "96828 EPON board"
 	depends on BCM_KF_MIPS_BCM963XX
 	depends on MIPS_BCM963XX
@@ -105,7 +104,7 @@ config BCM96828
 	select NR_CPUS_DEFAULT_2
 	select GENERIC_GPIO
 
-config BCM96838
+config BCMDSL6838
 	bool "96838 GPON/EPON board"
 	depends on BCM_KF_MIPS_BCM963XX
 	depends on MIPS_BCM963XX
@@ -113,7 +112,7 @@ config BCM96838
 	select SYS_SUPPORTS_SMP
 	select NR_CPUS_DEFAULT_2
 
-config BCM963381
+config BCMDSL963381
 	bool "963381 VDSL board"
 	depends on BCM_KF_MIPS_BCM963XX
 	depends on MIPS_BCM963XX
@@ -126,12 +125,6 @@ endchoice
 config BRCM_CHIP_VER_A0
 	bool "Chip Revision A0"
 	default n
-config MACH_BCM963148
-	bool "BCM963148 board"
-	select EMBEDDED
-	select PLAT_B15_CORE
-	select PLAT_BCM63148
-	default y
 
 config MACH_BCM963138
 	bool "BCM963138 board"
@@ -324,7 +317,11 @@ config BCM_RDPA_BRIDGE
 
 config BCM_ENET
 	tristate "Support for Ethernet"
-
+	
+config BCM_KF_ENET_SWITCH
+	bool "Support for bridge forward"
+	default n
+	
 config BCM_DEF_NR_RX_DMA_CHANNELS
 	int "Number of RX DMA Channels"
 	range 1 4

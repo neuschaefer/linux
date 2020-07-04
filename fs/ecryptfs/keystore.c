@@ -1,3 +1,7 @@
+/*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
 /**
  * eCryptfs: Linux filesystem encryption layer
  * In-kernel key management code.  Includes functions to parse and
@@ -2448,6 +2452,7 @@ ecryptfs_generate_key_packet_set(char *dest_base,
 			}
 			(*len) += written;
 		} else if (auth_tok->token_type == ECRYPTFS_PRIVATE_KEY) {
+			printk("QHB Ecrypt Filename : %s\n", ecryptfs_dentry->d_iname);
 			rc = write_tag_1_packet(dest_base + (*len), &max,
 						auth_tok_key, auth_tok,
 						crypt_stat, key_rec, &written);

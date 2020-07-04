@@ -382,3 +382,5 @@ config SIGNATURE
 	  Implementation is done using GnuPG MPI library
 
 endmenu
+
+source "atpbuild/package/atp/KConfig.in"

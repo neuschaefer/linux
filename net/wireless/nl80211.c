@@ -315,6 +315,41 @@ static void nl80211_finish_netdev_dump(struct cfg80211_registered_device *rdev)
 	rtnl_unlock();
 }
 
+/* Beacon head validation */
+static bool is_valid_beacon_head(const struct nlattr *attr)
+{
+    const u8 *pos = nla_data(attr);
+    unsigned int len = nla_len(attr);
+    const struct ieee80211_mgmt *mgmt = (void *)pos;
+    unsigned int fixedlen = offsetof(struct ieee80211_mgmt, u.beacon.variable);
+
+    if (len < fixedlen)
+        return false;
+
+    if (ieee80211_hdrlen(mgmt->frame_control) != offsetof(struct ieee80211_mgmt, u.beacon))
+        return false;
+
+    pos += fixedlen;
+    len -= fixedlen;
+
+    while (len) {
+        u8 elemlen;
+
+        if (len < 2)
+            return false;
+        len -= 2;
+
+        elemlen = pos[1];
+        if (elemlen > len)
+            return false;
+
+        len -= elemlen;
+        pos += 2 + elemlen;
+    }
+
+    return true;
+}
+
 /* IE validation */
 static bool is_valid_ie_attr(const struct nlattr *attr)
 {
@@ -2090,7 +2125,8 @@ static int nl80211_parse_beacon(struct genl_info *info,
 	if (!is_valid_ie_attr(info->attrs[NL80211_ATTR_BEACON_TAIL]) ||
 	    !is_valid_ie_attr(info->attrs[NL80211_ATTR_IE]) ||
 	    !is_valid_ie_attr(info->attrs[NL80211_ATTR_IE_PROBE_RESP]) ||
-	    !is_valid_ie_attr(info->attrs[NL80211_ATTR_IE_ASSOC_RESP]))
+	    !is_valid_ie_attr(info->attrs[NL80211_ATTR_IE_ASSOC_RESP]) ||
+	    !is_valid_beacon_head(info->attrs[NL80211_ATTR_BEACON_HEAD]))
 		return -EINVAL;
 
 	memset(bcn, 0, sizeof(*bcn));

@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *	IPv6 tunneling device
  *	Linux INET6 implementation
  *
@@ -910,6 +914,7 @@ static int ip6_tnl_xmit2(struct sk_buff *skb,
 	u8 proto;
 	int err = -1;
 	int pkt_len;
+	int check = 0;
 #if defined(CONFIG_BCM_KF_IP)
 	u8 needFrag = 0;
 #endif
@@ -949,7 +954,14 @@ static int ip6_tnl_xmit2(struct sk_buff *skb,
 		mtu = IPV6_MIN_MTU;
 	if (skb_dst(skb))
 		skb_dst(skb)->ops->update_pmtu(skb_dst(skb), mtu);
-	if (skb->len > mtu) {
+    /*start  rfc 2473:Dslite报文不进行V4分片而进行V6分片*/
+    if ((t->parms.proto == IPPROTO_IPIP && ip_hdr(skb)->frag_off&htons(IP_DF))
+        || t->parms.proto == IPPROTO_IPV6){
+        check = 1;
+    }
+    /*end  rfc 2473:Dslite报文不进行V4分片而进行V6分片*/
+
+	if (skb->len > mtu && check) {
 		*pmtu = mtu;
 #if defined(CONFIG_BCM_KF_IP)
 		needFrag = 1;
@@ -984,6 +996,7 @@ static int ip6_tnl_xmit2(struct sk_buff *skb,
 		skb_dst_set_noref(skb, dst);
 	}
 	skb->transport_header = skb->network_header;
+    skb->local_df = 1;
 
 	proto = fl6->flowi6_proto;
 	if (encap_limit >= 0) {
@@ -994,7 +1007,7 @@ static int ip6_tnl_xmit2(struct sk_buff *skb,
 	skb_reset_network_header(skb);
 	ipv6h = ipv6_hdr(skb);
 	*(__be32*)ipv6h = fl6->flowlabel | htonl(0x60000000);
-	dsfield = INET_ECN_encapsulate(0, dsfield);
+	dsfield = INET_ECN_encapsulate(dsfield, dsfield);
 	ipv6_change_dsfield(ipv6h, ~INET_ECN_MASK, dsfield);
 	ipv6h->hop_limit = t->parms.hop_limit;
 	ipv6h->nexthdr = proto;

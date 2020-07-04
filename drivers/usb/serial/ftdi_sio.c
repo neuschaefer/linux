@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * USB FTDI SIO driver
  *
  *	Copyright (C) 2009 - 2010
@@ -47,7 +51,12 @@
 #include <linux/usb/serial.h>
 #include "ftdi_sio.h"
 #include "ftdi_sio_ids.h"
+#include "atpconfig.h"
 
+#ifdef SUPPORT_ATP_FTDILIST_CONFIG
+#include <linux/fs.h>   
+#include <linux/uaccess.h>  
+#endif
 /*
  * Version Information
  */
@@ -98,6 +107,13 @@ struct ftdi_sio_quirk {
 	/* Special settings for probed ports. */
 	void (*port_probe)(struct ftdi_private *);
 };
+
+typedef struct tag_ftdi_usb_device_list
+{
+    struct tag_ftdi_usb_device_list             *pstNext;
+    unsigned int ulVID;
+    unsigned int ulPID;
+}ATP_FTDI_USB_DEVICE_LIST;
 
 static int   ftdi_jtag_probe(struct usb_serial *serial);
 static int   ftdi_mtxorb_hack_setup(struct usb_serial *serial);
@@ -858,6 +874,158 @@ static struct usb_device_id id_table_combined [] = {
 	{ USB_DEVICE(FTDI_VID, FTDI_DISTORTEC_JTAG_LOCK_PICK_PID),
 		.driver_info = (kernel_ulong_t)&ftdi_jtag_quirk },
 	{ USB_DEVICE(FTDI_VID, FTDI_LUMEL_PD12_PID) },
+#ifdef SUPPORT_ATP_FTDILIST_CONFIG	
+    { }, /*0*/
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },/*100*/
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },/*110*/
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },/*120*/
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },/*130*/
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },/*140*/
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },/*150*/
+#endif  
 	{ },					/* Optional parameter entry */
 	{ }					/* Terminating entry */
 };
@@ -2433,6 +2601,52 @@ static int ftdi_ioctl(struct tty_struct *tty,
 	dbg("%s arg not supported - it was 0x%04x - check /usr/include/asm/ioctls.h", __func__, cmd);
 	return -ENOIOCTLCMD;
 }
+#ifdef SUPPORT_ATP_FTDILIST_CONFIG
+static int read_ftdi_usb_list_from_user(void)
+{
+    int table_size = sizeof(id_table_combined)/sizeof(struct usb_device_id );
+    struct file *fp;  
+    mm_segment_t fs;  
+    loff_t pos;  
+    ATP_FTDI_USB_DEVICE_LIST stFTDIUsbDevice;
+    int i;
+
+    memset((void *)&stFTDIUsbDevice, 0, sizeof(ATP_FTDI_USB_DEVICE_LIST));
+
+    printk("the size of id_table_combined is %d\n", table_size);
+
+	for (i = 0; id_table_combined[i].idVendor; i++)
+	;    
+    
+    fp = filp_open("/var/ftdiDevList", O_RDONLY, 0644);  
+    if (IS_ERR(fp)) 
+    {  
+        printk("open ftdi list file error\n");  
+        return -1;  
+    }  
+
+    fs = get_fs();  
+    set_fs(KERNEL_DS);  
+    pos = 0;  
+    while(sizeof(ATP_FTDI_USB_DEVICE_LIST) == vfs_read(fp, &stFTDIUsbDevice, sizeof(ATP_FTDI_USB_DEVICE_LIST), &pos))
+    { 
+        if ((i < table_size) && (stFTDIUsbDevice.ulVID >= 0) && (stFTDIUsbDevice.ulVID <= 0xFFFF) && (stFTDIUsbDevice.ulPID >= 0) && (stFTDIUsbDevice.ulPID <= 0xFFFF))
+        {
+        	id_table_combined[i].match_flags = USB_DEVICE_ID_MATCH_DEVICE;
+        	id_table_combined[i].idVendor = stFTDIUsbDevice.ulVID;
+        	id_table_combined[i].idProduct = stFTDIUsbDevice.ulPID;
+            printk("idVendor: 0x%04x idProduct: 0x%04x\n", id_table_combined[i].idVendor, id_table_combined[i].idProduct);
+        	i++;
+        }
+        
+    }
+    printk("the size of used table is %d\n", i);
+    filp_close(fp, NULL);  
+    set_fs(fs);  
+    return 0;  
+
+}
+#endif
 
 static int __init ftdi_init(void)
 {
@@ -2448,6 +2662,9 @@ static int __init ftdi_init(void)
 		id_table_combined[i].idVendor = vendor;
 		id_table_combined[i].idProduct = product;
 	}
+#ifdef SUPPORT_ATP_FTDILIST_CONFIG
+    read_ftdi_usb_list_from_user();
+#endif
 	retval = usb_serial_register_drivers(&ftdi_driver, serial_drivers);
 	if (retval == 0)
 		printk(KERN_INFO KBUILD_MODNAME ": " DRIVER_VERSION ":"

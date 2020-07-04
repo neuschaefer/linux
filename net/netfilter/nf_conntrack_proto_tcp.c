@@ -1,3 +1,7 @@
+/*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
 /* (C) 1999-2001 Paul `Rusty' Russell
  * (C) 2002-2004 Netfilter Core Team <coreteam@netfilter.org>
  *
@@ -33,7 +37,7 @@
 #include <linux/blog.h>
 #endif
 
-#if defined(CONFIG_BCM_KF_NETFILTER)
+#if defined(CONFIG_BCM_KF_NETFILTER) || defined(CONFIG_HSAN)
 static int nf_ct_tcp_be_liberal __read_mostly = 1;
 #else
 /* "Be conservative in what you do,

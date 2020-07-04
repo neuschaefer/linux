@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *	Linux NET3:	Internet Group Management Protocol  [IGMP]
  *
  *	Authors:
@@ -169,6 +173,10 @@ static inline struct igmpv3_query *
 
 extern int sysctl_igmp_max_memberships;
 extern int sysctl_igmp_max_msf;
+/* BEGIN: Added , 2010/7/1 For BT control igmp remotly, send number and interval .*/
+extern unsigned int g_lIgmpReportCount;
+extern unsigned int g_lIgmpReportInterval;
+/* END:   Added , 2010/7/1 */
 
 struct ip_sf_socklist {
 	unsigned int		sl_max;
@@ -218,6 +226,9 @@ struct ip_mc_list {
 		struct ip_mc_list __rcu *next_rcu;
 	};
 	struct timer_list	timer;
+    /* BEGIN: Added , 2010/7/10 v1 v2 leave timer */   
+    struct timer_list	timer1; 
+    /* END:   Added , 2010/7/10 */
 	int			users;
 	atomic_t		refcnt;
 	spinlock_t		lock;
@@ -262,6 +273,17 @@ extern void ip_mc_remap(struct in_device *);
 extern void ip_mc_dec_group(struct in_device *in_dev, __be32 addr);
 extern void ip_mc_inc_group(struct in_device *in_dev, __be32 addr);
 extern void ip_mc_rejoin_groups(struct in_device *in_dev);
+
+/*Start of ATP 2013-1-31 for RFC4604 : SSM模式下只能发type 1/5/6报文*/
+#ifdef CONFIG_IGMP_SSM
+extern int ip_mc_add_ssm(__be32 multiaddr);
+extern int ip_mc_del_ssm(__be32 multiaddr);
+extern int ip_mc_add_asm(__be32 multiaddr);
+extern int ip_mc_del_asm(__be32 multiaddr);
+extern int ip_mc_is_ssm(__be32 multiaddr);
+extern int ip_mc_is_asm(__be32 multiaddr);
+#endif
+/*End of ATP 2013-1-31 for RFC4604 */
 
 #endif
 #endif

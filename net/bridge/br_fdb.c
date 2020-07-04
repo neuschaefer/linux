@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *	Forwarding database
  *	Linux ethernet bridge
  *
@@ -22,6 +26,7 @@
 #include <linux/random.h>
 #include <linux/slab.h>
 #include <linux/atomic.h>
+#include <linux/export.h>
 #include <asm/unaligned.h>
 #include "br_private.h"
 #if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
@@ -41,10 +46,15 @@
 #endif /* CONFIG_BCM_RDPA || CONFIG_BCM_RDPA_MODULE */
 #endif /* CONFIG_BCM_KF_RUNNER */
 
+#include "atp_interface.h"
+
 #if defined(CONFIG_BCM_KF_WL)
 #include <linux/module.h>
 int (*fdb_check_expired_wl_hook)(unsigned char *addr) = NULL;
-int (*fdb_check_expired_dhd_hook)(unsigned char *addr) = NULL;
+#endif
+
+#if CONFIG_BCM_EXT_SWITCH
+extern int port_stp_flag;
 #endif
 
 static struct kmem_cache *br_fdb_cache __read_mostly;
@@ -264,7 +274,6 @@ void br_fdb_cleanup(unsigned long _data)
 				if (flag
 #if defined(CONFIG_BCM_KF_WL)
 				    || (fdb_check_expired_wl_hook && (fdb_check_expired_wl_hook(f->addr.addr) == 0))
-				    || (fdb_check_expired_dhd_hook && (fdb_check_expired_dhd_hook(f->addr.addr) == 0))
 #endif
 				    )
 				{
@@ -778,10 +787,19 @@ void br_fdb_update(struct net_bridge *br, struct net_bridge_port *source,
 	if (likely(fdb)) {
 		/* attempt to update an entry for a local interface */
 		if (unlikely(fdb->is_local)) {
+#if CONFIG_BCM_EXT_SWITCH
+			if (net_ratelimit()){
+                port_stp_flag |= (1<<('5' - source->dev->name[5]));
+				br_warn(br, "received packet on %s with "
+				       " own address as source address\n",
+				       source->dev->name);
+			}
+#else
 			if (net_ratelimit())
 				br_warn(br, "received packet on %s with "
 				       " own address as source address\n",
 				       source->dev->name);
+#endif
 		} else {
 #if defined(CONFIG_BCM_KF_RUNNER)
 #if defined(CONFIG_BCM_RDPA) || defined(CONFIG_BCM_RDPA_MODULE)
@@ -1196,6 +1214,34 @@ int br_fdb_delete(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)
 	return err;
 }
 
+#ifdef CONFIG_ATP_HYBRID_GREACCEL
+int hi_kenrel_br_get_port(int ifindex, unsigned char *addr)
+{
+	struct net_bridge *br = NULL;
+	struct net_bridge_fdb_entry *dst; 
+    struct net_device *dev = NULL; 
+
+    dev = dev_get_by_index(&init_net, ifindex); 
+    if (NULL == dev)
+    {
+        return -1; 
+    }
+
+    dev_put(dev); 
+    if ((IFF_EBRIDGE & dev->priv_flags) != IFF_EBRIDGE)
+    {
+        return -1; 
+    }
+    br = netdev_priv(dev); 
+    dst = __br_fdb_get(br, addr); 
+    if ((NULL != dst) && (!dst->is_local))
+    {
+        return dst->dst->dev->ifindex; 
+    }
+    return -1; 
+}
+EXPORT_SYMBOL(hi_kenrel_br_get_port); 
+#endif
 #if defined(CONFIG_BCM_KF_VLAN_AGGREGATION) && defined(CONFIG_BCM_VLAN_AGGREGATION)
 int br_fdb_get_vid(const unsigned char *addr)
 {
@@ -1230,5 +1276,95 @@ EXPORT_SYMBOL(br_fdb_get_vid);
 
 #if defined(CONFIG_BCM_KF_WL)
 EXPORT_SYMBOL(fdb_check_expired_wl_hook);
-EXPORT_SYMBOL(fdb_check_expired_dhd_hook);
+#endif
+
+#if (defined CONFIG_HSAN)
+int hi_br_get_port(int ifindex, unsigned char *addr)
+{
+    struct net_device           *dev  = NULL; 
+    struct net_bridge_fdb_entry *dst  = NULL; 
+    struct net_bridge           *br   = NULL;
+    
+    dev = dev_get_by_index(&init_net, ifindex); 
+    if (NULL == dev)
+    {
+        return -1; 
+    }
+    dev_put(dev); 
+    if ((IFF_EBRIDGE & dev->priv_flags) != IFF_EBRIDGE)
+    {
+        return -2; 
+    }
+    
+    br = netdev_priv(dev);
+    if ( NULL == br )
+    {
+        return -3; 
+    }
+    
+    dst = fdb_find_rcu(&br->hash[br_mac_hash(addr)], addr);
+    if ((NULL == dst) || (dst->is_local))
+    {
+        return -4; 
+    }
+
+    return dst->dst->dev->ifindex; 
+}
+EXPORT_SYMBOL(hi_br_get_port); 
+
+int hi_br_find_mac(struct net_device *dev, unsigned char *addr)
+{
+    struct net_bridge_port      *p    = NULL;
+    struct net_bridge_fdb_entry *dst  = NULL; 
+    
+    if ( NULL == dev )
+    {
+        return -1; 
+    }
+
+    p = br_port_get_rcu(dev);
+    if ( NULL == p )
+    {
+        return -1; 
+    }
+    
+    dst = fdb_find_rcu(&p->br->hash[br_mac_hash(addr)], addr);
+    if ((NULL == dst) || (dst->is_local))
+    {
+        return -1; 
+    }
+    if((NULL == dst->dst) || (NULL == dst->dst->dev) || (dst->dst->dev->ifindex != dev->ifindex))
+    {
+        return -1; 
+    }
+    return 0; 
+}
+EXPORT_SYMBOL(hi_br_find_mac); 
+
+struct net_bridge_fdb_entry * hi_br_find_fdb(struct net_device *dev, unsigned char *addr)
+{
+    struct net_bridge_port      *p    = NULL;
+    struct net_bridge_fdb_entry *dst  = NULL; 
+
+    if(NULL == dev)
+    {
+        return NULL; 
+    }
+
+    p = br_port_get_rcu(dev);
+    if ( NULL == p )
+    {
+        return NULL; 
+    }
+
+    dst = fdb_find_rcu(&p->br->hash[br_mac_hash(addr)], addr);
+    if ((NULL == dst) || (dst->is_local))
+    {
+        return NULL; 
+    }
+    
+    return dst; 
+}
+EXPORT_SYMBOL(hi_br_find_fdb); 
+
 #endif

@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * This header is used to share core functionality between the
  * standalone connection tracking module, and the compatibility layer's use
  * of connection tracking.
@@ -20,6 +24,14 @@
 /* This header is used to share core functionality between the
    standalone connection tracking module, and the compatibility layer's use
    of connection tracking. */
+#if defined(CONFIG_ATP_HYBRID_GREACCEL)
+#define HI_NF_NORMAL_DEATH_HOOK   1
+#define HI_NF_TIMEOUT_DEATH_HOOK  2    /*this is only used by GREACCEL*/
+typedef unsigned int (*hi_nf_conntrack_death_hook)(void*, int);
+extern unsigned int hi_nf_conntrack_register_death_hook(hi_nf_conntrack_death_hook hook);
+extern unsigned int hi_nf_conntrack_unregister_death_hook(void);
+#endif
+
 extern unsigned int nf_conntrack_in(struct net *net,
 				    u_int8_t pf,
 				    unsigned int hooknum,
@@ -76,4 +88,10 @@ print_tuple(struct seq_file *s, const struct nf_conntrack_tuple *tuple,
 
 extern spinlock_t nf_conntrack_lock ;
 
+#if (defined CONFIG_HSAN)
+extern int  link_spin_lock_bh(void);
+extern int  link_spin_unlock_bh(void);
+extern int  res_link_refresh_ct (struct nf_conn * pst_ct);
+extern int hi_nf_ct_get_packets(struct nf_conn *ct, u_int32_t mode, u_int32_t packets);
+#endif
 #endif /* _NF_CONNTRACK_CORE_H */

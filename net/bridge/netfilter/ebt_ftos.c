@@ -1,4 +1,8 @@
-#if defined(CONFIG_BCM_KF_NETFILTER)
+/*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*Start of viewed for qos function */
 /*
 *    Copyright (c) 2003-2012 Broadcom Corporation
 *    All Rights Reserved
@@ -48,6 +52,97 @@ Boston, MA 02111-1307, USA.
 #define PPP_TYPE_IPV4   0x0021  /* IPv4 in PPP */
 #define PPP_TYPE_IPV6   0x0057  /* IPv6 in PPP */
 
+/* START OF Add:   FOR 移植BCM Eth上行的QoS */
+#ifdef CONFIG_IP_PREC_TOS_REMARK
+/* start IP precedence and TOS remark  */
+#define QOS_IPP_MARK_ZERO   0x100 
+#define QOS_TOS_MARK_ZERO   0x200  
+#define QOS_DSCP_MARK       0x1 /* 区分ebtables ftos 是dscp还是tos或者ipp */
+
+#define IPTOS_IPP_MASK		0xE0
+/* end IP precedence and TOS remark */
+#define IPTOS_DSCP_MASK		0xFC
+#define IPTOS_DSCP(tos)		((tos)&IPTOS_DSCP_MASK)
+#endif
+/* END OF Add  */
+
+/*Start   2.4G 设置为20M WMM功能不生效 */
+#if defined(CONFIG_ARCH_SD56XX) 
+#define SKB_MARK_DSCP_REMARK_ENABLE    0x8 
+#endif
+/*End   2.4G 设置为20M WMM功能不生效 */
+
+/* START OF Add:  FOR 移植BCM Eth上行的QoS配置命令 */
+#ifdef CONFIG_IP_PREC_TOS_REMARK
+/* start of protocol mark precedence 或者tos字段需要保留原值A36D02507 
+iph->tos = ftosinfo->ftos;
+** NOTE:          tos field
+**                bit 7 ~ bit 5 = precedence (0 = normal, 7 = extremely high)
+**                bit 4 = D bit (minimize delay)
+**                bit 3 = T bit (maximize throughput)
+**                bit 2 = R bit (maximize reliability)
+**                bit 1 = C bit (minimize transmission cost)
+**                bit 0 = not used
+iph->tos = ftosinfo->ftos;
+*/
+/* start IP precedence and TOS remark */
+void ebt_get_DSCP_ftos(struct iphdr *iph, const struct ebt_ftos_t_info *ftosinfo)
+{
+	if (QOS_DSCP_MARK == (QOS_DSCP_MARK & ftosinfo->ftos))
+    {
+		iph->tos = (iph->tos & (~IPTOS_DSCP_MASK)) | IPTOS_DSCP(ftosinfo->ftos);
+    }
+    else
+    {
+        if ((QOS_TOS_MARK_ZERO & ftosinfo->ftos) && (QOS_IPP_MARK_ZERO & ftosinfo->ftos))
+        {
+            iph->tos = (iph->tos & 0x1);
+        }
+        else if (QOS_TOS_MARK_ZERO & ftosinfo->ftos)
+        {
+            if (IPTOS_PREC(ftosinfo->ftos))
+            {
+                iph->tos = IPTOS_PREC(ftosinfo->ftos) | (iph->tos & 0x1);
+            }
+            else
+            {
+                iph->tos = IPTOS_PREC(iph->tos) | (iph->tos & 0x1);
+            }
+        }
+        else if (QOS_IPP_MARK_ZERO & ftosinfo->ftos)
+        {
+            if (IPTOS_TOS(ftosinfo->ftos))
+            {
+                iph->tos = IPTOS_TOS(ftosinfo->ftos) | (iph->tos & 0x1);
+            }
+            else
+            {
+                iph->tos = IPTOS_TOS(iph->tos) | (iph->tos & 0x1);
+            }            
+        }
+        else
+        {
+            if (IPTOS_TOS(ftosinfo->ftos) 
+                && IPTOS_PREC(ftosinfo->ftos))
+            {
+                iph->tos = ftosinfo->ftos;
+            }
+            else if (IPTOS_TOS(ftosinfo->ftos))
+            {
+                iph->tos = (iph->tos & (~IPTOS_TOS_MASK)) | IPTOS_TOS(ftosinfo->ftos);
+            }
+            else if (IPTOS_PREC(ftosinfo->ftos))
+            {
+                iph->tos = (iph->tos & (~IPTOS_PREC_MASK)) | IPTOS_PREC(ftosinfo->ftos);
+            }
+        }
+    }
+}
+    /* end IP precedence and TOS remark  */
+	/* end of protocol mark precedence 或者tos字段需要保留原值A36D02507 */
+#endif
+/* END OF Add */
+
 static unsigned int ebt_ftos_tg(struct sk_buff *skb, const struct xt_action_param *par)   
 {
 	//struct ebt_ftos_t_info *ftosinfo = (struct ebt_ftos_t_info *)data;
@@ -67,6 +162,13 @@ static unsigned int ebt_ftos_tg(struct sk_buff *skb, const struct xt_action_para
          iph = (struct iphdr *)(skb->network_header + VLAN_HLEN);
       else if (*(unsigned short *)(skb->network_header + VLAN_HLEN - 2) == __constant_htons(ETH_P_IPV6))
          ipv6h = (struct ipv6hdr *)(skb->network_header + VLAN_HLEN);
+      else if (*(unsigned short *)(skb->network_header + VLAN_HLEN - 2) == __constant_htons(ETH_P_PPP_SES))
+      {
+         if (*(unsigned short *)(skb->network_header + VLAN_HLEN + PPPOE_HLEN) == PPP_TYPE_IPV4)
+         {
+             iph = (struct iphdr *)(skb->network_header + VLAN_HLEN + PPPOE_HLEN + 2);
+         }
+      }
    }
    else if (skb->protocol == __constant_htons(ETH_P_PPP_SES)) {
       if (*(unsigned short *)(skb->network_header + PPPOE_HLEN) == PPP_TYPE_IPV4)
@@ -83,7 +185,14 @@ static unsigned int ebt_ftos_tg(struct sk_buff *skb, const struct xt_action_para
 	if ((ftosinfo->ftos_set & FTOS_SETFTOS) && (iph->tos != ftosinfo->ftos)) {
                 //printk("ebt_target_ftos:FTOS_SETFTOS .....\n");
 		diffs[0] = htons(iph->tos) ^ 0xFFFF;
+/* START OF Add:  2011-05-21 FOR 移植BCM Eth上行的QoS */
+#ifdef CONFIG_IP_PREC_TOS_REMARK        
+        ebt_get_DSCP_ftos(iph, ftosinfo);
+#else
 		iph->tos = ftosinfo->ftos;
+#endif
+/* END OF Add:  2011-05-21 */
+
 		diffs[1] = htons(iph->tos);
 		iph->check = csum_fold(csum_partial((char *)diffs,
 		                                    sizeof(diffs),
@@ -130,10 +239,19 @@ static unsigned int ebt_ftos_tg(struct sk_buff *skb, const struct xt_action_para
       /* TOS consists of priority field and first 4 bits of flow_lbl */
       tos = ipv6_get_dsfield((struct ipv6hdr *)(skb->network_header));
 
-      if ((ftosinfo->ftos_set & FTOS_SETFTOS) && (tos != ftosinfo->ftos))
+      if ((ftosinfo->ftos_set & FTOS_SETFTOS) && ((tos>>2) != (ftosinfo->ftos>>2)))
       {
          //printk("ebt_target_ftos:FTOS_SETFTOS .....\n");
+#ifdef CONFIG_IP_PREC_TOS_REMARK
+         // IPv6 remark, clear QOS_DSCP_MARK(0x1)
+         unsigned char tmp_ftos = ftosinfo->ftos & (~QOS_DSCP_MARK);
+		 tmp_ftos = tmp_ftos |(tos & 0x3);
+         ipv6_change_dsfield((struct ipv6hdr *)(skb->network_header), 0, tmp_ftos);
+         //printk("ebt_target_ftos: FTOS_SETFTOS set tos=%x\n", tmp_ftos);
+#else
          ipv6_change_dsfield((struct ipv6hdr *)(skb->network_header), 0, ftosinfo->ftos);
+#endif
+
       } 
       else if (ftosinfo->ftos_set & FTOS_WMMFTOS) 
       {
@@ -208,4 +326,4 @@ module_exit(ebt_ftos_fini);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Song Wang, songw@broadcom.com");
 MODULE_DESCRIPTION("Target to overwrite the full TOS byte in IP header");
-#endif
+/*End of viewed for qos function */

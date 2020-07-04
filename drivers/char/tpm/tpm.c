@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * Copyright (C) 2004 IBM Corporation
  *
  * Authors:
@@ -1439,6 +1443,91 @@ out_free:
 	return NULL;
 }
 EXPORT_SYMBOL_GPL(tpm_register_hardware);
+
+static struct tpm_input_header startup_header = {
+	.tag = cpu_to_be16(193),
+	.length = cpu_to_be32(12),
+	.ordinal = cpu_to_be32(153),
+};
+int tpm_stm_startup(struct tpm_chip *chip)
+{
+	int rc;
+	struct tpm_cmd_t cmd;
+
+	cmd.header.in = startup_header;
+	cmd.params.readpubek_out_buffer[0] = 0x00;
+	cmd.params.readpubek_out_buffer[1] = 0x01;
+	rc = transmit_cmd(chip, &cmd, 12, "startup");
+	return rc;
+}
+EXPORT_SYMBOL_GPL(tpm_stm_startup);
+
+static struct tpm_input_header selftest_header = {
+	.tag = cpu_to_be16(193),
+	.length = cpu_to_be32(10),
+	.ordinal = cpu_to_be32(80),
+};
+int tpm_stm_selftest(struct tpm_chip *chip)
+{
+	int rc;
+	struct tpm_cmd_t cmd;
+
+	cmd.header.in = selftest_header;
+	rc = transmit_cmd(chip, &cmd, 10, "selftest");
+	return rc;
+}
+EXPORT_SYMBOL_GPL(tpm_stm_selftest);
+
+static struct tpm_input_header enable_header = {
+	.tag = cpu_to_be16(193),
+	.length = cpu_to_be32(10),
+	.ordinal = cpu_to_be32(0x6f),
+};
+int tpm_stm_enable(struct tpm_chip *chip)
+{
+	int rc;
+	struct tpm_cmd_t cmd;
+
+	cmd.header.in = enable_header;
+	rc = transmit_cmd(chip, &cmd, 10, "enable");
+	return rc;
+}
+EXPORT_SYMBOL_GPL(tpm_stm_enable);
+
+static struct tpm_input_header active_header = {
+	.tag = cpu_to_be16(193),
+	.length = cpu_to_be32(11),
+	.ordinal = cpu_to_be32(0x72),
+};
+int tpm_stm_active(struct tpm_chip *chip)
+{
+	int rc;
+	struct tpm_cmd_t cmd;
+
+	cmd.header.in = active_header;
+	cmd.params.readpubek_out_buffer[0] = 0x00;
+	rc = transmit_cmd(chip, &cmd, 11, "active");
+	return rc;
+}
+EXPORT_SYMBOL_GPL(tpm_stm_active);
+
+static struct tpm_input_header physicpresence_header = {
+	.tag = cpu_to_be16(193),
+	.length = cpu_to_be32(12),
+	.ordinal = cpu_to_be32(0x4000000A),
+};
+int tpm_stm_physicpresence(struct tpm_chip *chip, u8 state)
+{
+	int rc;
+	struct tpm_cmd_t cmd;
+
+	cmd.header.in = physicpresence_header;
+	cmd.params.readpubek_out_buffer[0] = 0x00;
+	cmd.params.readpubek_out_buffer[1] = state;
+	rc = transmit_cmd(chip, &cmd, 12, "physicpresence");
+	return rc;
+}
+EXPORT_SYMBOL_GPL(tpm_stm_physicpresence);
 
 MODULE_AUTHOR("Leendert van Doorn (leendert@watson.ibm.com)");
 MODULE_DESCRIPTION("TPM Driver");

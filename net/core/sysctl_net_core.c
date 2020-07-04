@@ -1,3 +1,7 @@
+/*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
 /* -*- linux-c -*-
  * sysctl_net_core.c: sysctl interface to net core subsystem.
  *
@@ -18,6 +22,13 @@
 #include <net/ip.h>
 #include <net/sock.h>
 #include <net/net_ratelimit.h>
+
+extern int net_msg_dns;
+extern char acdefaultdnsdomain[512];
+#ifdef CONFIG_ATP_SKB_LIMIT
+extern atomic_t skb_buff_alloc_num;
+extern volatile unsigned long skb_max_alloc_num;
+#endif
 
 #ifdef CONFIG_RPS
 static int rps_sock_flow_sysctl(ctl_table *table, int write,
@@ -188,6 +199,45 @@ static struct ctl_table net_core_table[] = {
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec
 	},
+    {
+		.procname	= "wlanctl_dnsstart",
+		.data		= &net_msg_dns,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec
+    },
+    {
+		.procname	= "defaultdomain",
+		.data		= acdefaultdnsdomain,
+		.maxlen		= 512,
+		.mode		= 0644,
+		.proc_handler	= proc_dostring
+    },
+#ifdef CONFIG_ATP_HYBRID_GREACCEL
+	{
+		.procname	= "hisi_sw_accel_flag",
+		.data		= &hisi_sw_accel_flag,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec
+	},
+#endif
+#ifdef CONFIG_ATP_SKB_LIMIT
+	{
+		.procname	= "skb_max_alloc_num",
+		.data		= &skb_max_alloc_num,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec
+	},
+	{
+		.procname	= "skb_alloc_num",
+		.data		= &skb_buff_alloc_num,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec
+	},
+#endif
 	{ }
 };
 

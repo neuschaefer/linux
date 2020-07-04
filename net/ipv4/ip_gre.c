@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *	Linux NET3:	GRE over IP protocol decoder.
  *
  *	Authors: Alexey Kuznetsov (kuznet@ms2.inr.ac.ru)
@@ -53,12 +57,10 @@
 #include <net/ip6_fib.h>
 #include <net/ip6_route.h>
 #endif
-
-#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
-#include <linux/nbuff.h>
-#include <linux/blog.h>
+#ifdef CONFIG_ATP_HYBRID_REORDER
+#include "atp_interface.h"
+#include "ipgre_reorder.h"
 #endif
-
 /*
    Problems & solutions
    --------------------
@@ -130,19 +132,40 @@ static int ipgre_tunnel_init(struct net_device *dev);
 static void ipgre_tunnel_setup(struct net_device *dev);
 static int ipgre_tunnel_bind_dev(struct net_device *dev);
 
-#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
-static inline 
-int __gre_rcv_check(struct ip_tunnel *tunnel, struct iphdr *iph, 
-	uint16_t len, uint32_t *pkt_seqno);
+#ifdef CONFIG_ATP_HYBRID_REORDER
+#ifdef CONFIG_ATP_BRCM
+extern int netif_rx_cpu(struct sk_buff *skb, int cpu);
+#endif
+struct gre_tunnel_o_seqno  g_stTunOSeq;
+int sysctl_ipgre_queue_timeout = IPGER_QUEUE_TIMEOUT_DEF;
+int sysctl_ipgre_skb_timeout = IPGER_SKB_TIMEOUT_DEF;
+int sysctl_ipgre_qlen_max = IPGER_QLEN_DEF;
+int sysctl_ipgre_badseq_interval = IPGER_BADSEQ_INTERVAL_DEF;
+int sysctl_ipgre_keepseq_enable = 1;
+int (*ipgre_reorder_hook)(struct sk_buff *) = NULL;
+void (*ipgre_reorder_seq_show_hook)(struct seq_file *seq) = NULL;
+void (*ipgre_reorder_set_enable_hook)(void) = NULL;
+void (*ipgre_reorder_set_seqno_hook)(unsigned int) = NULL;
 
-int gre_rcv_check(struct net_device *dev, struct iphdr *iph,
-	uint16_t len, void **tunl, uint32_t *pkt_seqno);
+EXPORT_SYMBOL(sysctl_ipgre_queue_timeout);
+EXPORT_SYMBOL(sysctl_ipgre_skb_timeout);
+EXPORT_SYMBOL(sysctl_ipgre_qlen_max);
+EXPORT_SYMBOL(sysctl_ipgre_badseq_interval);
+EXPORT_SYMBOL(sysctl_ipgre_keepseq_enable);
+EXPORT_SYMBOL(ipgre_reorder_hook);
+EXPORT_SYMBOL(ipgre_reorder_seq_show_hook);
+EXPORT_SYMBOL(ipgre_reorder_set_enable_hook);
+EXPORT_SYMBOL(ipgre_reorder_set_seqno_hook);
+EXPORT_SYMBOL(g_stTunOSeq);
+#endif
 
-static inline 
-void __gre_xmit_update(struct ip_tunnel *tunnel, struct iphdr *iph, 
-	uint16_t len);
-void gre_xmit_update(struct ip_tunnel *tunnel, struct iphdr *iph, 
-	uint16_t len);
+#ifdef CONFIG_ATP_HYBRID_GREACCEL
+unsigned int gre_get_seq_num(void);
+unsigned int (*ipgre_kernel_napt_gre_process_hook)(struct sk_buff *skb, struct net_device *dev) = NULL;
+unsigned int (*ipgre_kernel_ipv6_gre_process_hook)(struct sk_buff *skb, struct net_device *dev) = NULL;
+EXPORT_SYMBOL(ipgre_kernel_napt_gre_process_hook);
+EXPORT_SYMBOL(ipgre_kernel_ipv6_gre_process_hook);
+EXPORT_SYMBOL(gre_get_seq_num);
 #endif
 
 /* Fallback tunnel: no source, no destination, no key, no options */
@@ -155,6 +178,13 @@ struct ipgre_net {
 
 	struct net_device *fb_tunnel_dev;
 };
+
+#ifdef CONFIG_ATP_HYBRID_TUNNEL_IDLE
+enum ipgre_xmit_rcv_mask {
+    IPGRE_XMIT_MASK = 0,
+    IPGRE_RCV_MASK
+};
+#endif
 
 /* Tunnel hash table */
 
@@ -412,6 +442,17 @@ static struct ip_tunnel *ipgre_tunnel_find(struct net *net,
 	return t;
 }
 
+#ifdef CONFIG_ATP_HYBRID_GREACCEL
+struct ip_tunnel *ipgre_tunnel_find_bydev(struct net_device *dev)
+{
+	struct ip_tunnel *t;
+	t = netdev_priv(dev);
+	return t;
+}
+
+EXPORT_SYMBOL(ipgre_tunnel_find_bydev);
+#endif
+
 static struct ip_tunnel *ipgre_tunnel_locate(struct net *net,
 		struct ip_tunnel_parm *parms, int create)
 {
@@ -577,7 +618,382 @@ ipgre_ecn_encapsulate(u8 tos, const struct iphdr *old_iph, struct sk_buff *skb)
 	return INET_ECN_encapsulate(tos, inner);
 }
 
+#ifdef CONFIG_ATP_HYBRID_GREACCEL
+unsigned int gre_get_seq_num(void)
+{
+    unsigned int seqno = 0;
+    /* 两个隧道使用同一个序号，不再每个隧道单独编号，便于实现保序 */
+    spin_lock_bh(&g_stTunOSeq.lock);
+    seqno = g_stTunOSeq.o_seqno++;/*初始序号从0开始*/
+    spin_unlock_bh(&g_stTunOSeq.lock);
+    return seqno;
+}
+
+static void ip_copy_metadata(struct sk_buff *to, struct sk_buff *from)
+{
+	to->pkt_type = from->pkt_type;
+	to->priority = from->priority;
+	to->protocol = from->protocol;
+	skb_dst_drop(to);
+	skb_dst_copy(to, from);
+	to->dev = from->dev;
+	to->mark = from->mark;
+
+	/* Copy the flags to each fragment. */
+	IPCB(to)->flags = IPCB(from)->flags;
+
+#ifdef CONFIG_NET_SCHED
+	to->tc_index = from->tc_index;
+#endif
+	nf_copy(to, from);
+#if defined(CONFIG_NETFILTER_XT_TARGET_TRACE) || \
+    defined(CONFIG_NETFILTER_XT_TARGET_TRACE_MODULE)
+	to->nf_trace = from->nf_trace;
+#endif
+#if defined(CONFIG_IP_VS) || defined(CONFIG_IP_VS_MODULE)
+	to->ipvs_property = from->ipvs_property;
+#endif
+	skb_copy_secmark(to, from);
+}
+
+/*
+ *	This IP datagram is too large to be sent in one piece.  Break it up into
+ *	smaller pieces (each of size equal to IP header plus
+ *	a block of the data of the original IP data part) that will yet fit in a
+ *	single device frame, and queue such a frame for sending.
+ */
+
+int ip_fragment_gre(struct sk_buff *skb, netdev_tx_t (*output)(struct sk_buff *, struct net_device *))
+{
+	struct iphdr *iph;
+	int ptr;
+	struct net_device *dev;
+	struct sk_buff *skb2;
+	unsigned int mtu, hlen, left, len, ll_rs;
+	int offset;
+	__be16 not_last_frag;
+	int err = 0;
+#ifdef CONFIG_ATP_COMMON
+	struct dst_entry *dst = NULL;
+	unsigned int dstmtu = 0;
+#endif
+	dev = skb->dev;
+
+	/*
+	 *	Point into the IP datagram header.
+	 */
+
+	iph = ip_hdr(skb);
+
+	if (unlikely((iph->frag_off & htons(IP_DF)) && !skb->local_df)) {
+		IP_INC_STATS(dev_net(dev), IPSTATS_MIB_FRAGFAILS);
+		icmp_send(skb, ICMP_DEST_UNREACH, ICMP_FRAG_NEEDED,
+			  htonl(dev->mtu));
+		kfree_skb(skb);
+		return -EMSGSIZE;
+	}
+
+	/*
+	 *	Setup starting values.
+	 */
+#ifdef CONFIG_ATP_COMMON
+	dst = skb_dst(skb);
+	if (dst)
+	{
+        dstmtu = dst_mtu(dst);
+    }
+	hlen = iph->ihl * 4;
+	if ((dstmtu > 0) && (dstmtu < dev->mtu))
+	{
+	    mtu = dstmtu - hlen;
+	}
+	else
+#endif
+	{
+	    mtu = dev->mtu - hlen;	/* Size of data space */
+	}
+	IPCB(skb)->flags |= IPSKB_FRAG_COMPLETE;
+
+	/* When frag_list is given, use it. First, check its validity:
+	 * some transformers could create wrong frag_list or break existing
+	 * one, it is not prohibited. In this case fall back to copying.
+	 *
+	 * LATER: this step can be merged to real generation of fragments,
+	 * we can switch to copy when see the first bad fragment.
+	 */
+	if (skb_has_frag_list(skb)) {
+		struct sk_buff *frag, *frag2;
+		int first_len = skb_pagelen(skb);
+
+		if (first_len - hlen > mtu ||
+		    ((first_len - hlen) & 7) ||
+		    ip_is_fragment(iph) ||
+		    skb_cloned(skb))
+			goto slow_path;
+
+		skb_walk_frags(skb, frag) {
+			/* Correct geometry. */
+			if (frag->len > mtu ||
+			    ((frag->len & 7) && frag->next) ||
+			    skb_headroom(frag) < hlen)
+				goto slow_path_clean;
+
+			/* Partially cloned skb? */
+			if (skb_shared(frag))
+				goto slow_path_clean;
+
+			BUG_ON(frag->sk);
+			if (skb->sk) {
+				frag->sk = skb->sk;
+				frag->destructor = sock_wfree;
+			}
+			skb->truesize -= frag->truesize;
+		}
+
+		/* Everything is OK. Generate! */
+
+		err = 0;
+		offset = 0;
+		frag = skb_shinfo(skb)->frag_list;
+		skb_frag_list_init(skb);
+		skb->data_len = first_len - skb_headlen(skb);
+		skb->len = first_len;
+		iph->tot_len = htons(first_len);
+		iph->frag_off = htons(IP_MF);
+		ip_send_check(iph);
+
+		for (;;) {
+			/* Prepare header of the next frame,
+			 * before previous one went down. */
+			if (frag) {
+				frag->ip_summed = CHECKSUM_NONE;
+				skb_reset_transport_header(frag);
+				__skb_push(frag, hlen);
+				skb_reset_network_header(frag);
+				memcpy(skb_network_header(frag), iph, hlen);
+				iph = ip_hdr(frag);
+				iph->tot_len = htons(frag->len);
+				ip_copy_metadata(frag, skb);
+				if (offset == 0)
+					ip_options_fragment(frag);
+				offset += skb->len - hlen;
+				iph->frag_off = htons(offset>>3);
+				if (frag->next != NULL)
+					iph->frag_off |= htons(IP_MF);
+				/* Ready, complete checksum */
+				ip_send_check(iph);
+			}
+
+			err = output(skb, dev);
+
+			if (!err)
+				IP_INC_STATS(dev_net(dev), IPSTATS_MIB_FRAGCREATES);
+			if (err || !frag)
+				break;
+
+			skb = frag;
+			frag = skb->next;
+			skb->next = NULL;
+		}
+
+		if (err == 0) {
+			IP_INC_STATS(dev_net(dev), IPSTATS_MIB_FRAGOKS);
+			return 0;
+		}
+
+		while (frag) {
+			skb = frag->next;
+			kfree_skb(frag);
+			frag = skb;
+		}
+		IP_INC_STATS(dev_net(dev), IPSTATS_MIB_FRAGFAILS);
+		return err;
+
+slow_path_clean:
+		skb_walk_frags(skb, frag2) {
+			if (frag2 == frag)
+				break;
+			frag2->sk = NULL;
+			frag2->destructor = NULL;
+			skb->truesize += frag2->truesize;
+		}
+	}
+
+slow_path:
+	left = skb->len - hlen;		/* Space per frame */
+	ptr = hlen;		/* Where to start from */
+
+	/* for bridged IP traffic encapsulated inside f.e. a vlan header,
+	 * we need to make room for the encapsulating header
+	 */
+	ll_rs = LL_RESERVED_SPACE_EXTRA(dev, 0);
+
+	/*
+	 *	Fragment the datagram.
+	 */
+
+	offset = (ntohs(iph->frag_off) & IP_OFFSET) << 3;
+	not_last_frag = iph->frag_off & htons(IP_MF);
+
+	/*
+	 *	Keep copying data until we run out.
+	 */
+
+	while (left > 0) {
+		len = left;
+		/* IF: it doesn't fit, use 'mtu' - the data space left */
+		if (len > mtu)
+			len = mtu;
+		/* IF: we are not sending up to and including the packet end
+		   then align the next start on an eight byte boundary */
+		if (len < left)	{
+			len &= ~7;
+		}
+		/*
+		 *	Allocate buffer.
+		 */
+
+		if ((skb2 = alloc_skb(len+hlen+ll_rs, GFP_ATOMIC)) == NULL) {
+			NETDEBUG(KERN_INFO "IP: frag: no memory for new fragment!\n");
+			err = -ENOMEM;
+			goto fail;
+		}
+
+		/*
+		 *	Set up data on packet
+		 */
+
+		ip_copy_metadata(skb2, skb);
+		skb_reserve(skb2, ll_rs);
+		skb_put(skb2, len + hlen);
+		skb_reset_network_header(skb2);
+		skb2->transport_header = skb2->network_header + hlen;
+
+		/*
+		 *	Charge the memory for the fragment to any owner
+		 *	it might possess
+		 */
+
+		if (skb->sk)
+			skb_set_owner_w(skb2, skb->sk);
+
+		/*
+		 *	Copy the packet header into the new buffer.
+		 */
+
+		skb_copy_from_linear_data(skb, skb_network_header(skb2), hlen);
+
+		/*
+		 *	Copy a block of the IP datagram.
+		 */
+		if (skb_copy_bits(skb, ptr, skb_transport_header(skb2), len))
+			BUG();
+		left -= len;
+
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+        blog_xfer(skb2, skb);
+#endif
+		/*
+		 *	Fill in the new header fields.
+		 */
+		iph = ip_hdr(skb2);
+		iph->frag_off = htons((offset >> 3));
+
+		/* ANK: dirty, but effective trick. Upgrade options only if
+		 * the segment to be fragmented was THE FIRST (otherwise,
+		 * options are already fixed) and make it ONCE
+		 * on the initial skb, so that all the following fragments
+		 * will inherit fixed options.
+		 */
+		if (offset == 0)
+			ip_options_fragment(skb);
+
+		/*
+		 *	Added AC : If we are fragmenting a fragment that's not the
+		 *		   last fragment then keep MF on each bit
+		 */
+		if (left > 0 || not_last_frag)
+			iph->frag_off |= htons(IP_MF);
+		ptr += len;
+		offset += len;
+
+		/*
+		 *	Put this fragment into the sending queue.
+		 */
+		iph->tot_len = htons(len + hlen);
+
+		ip_send_check(iph);
+
+		err = output(skb2, dev);
+		if (err)
+			goto fail;
+
+		IP_INC_STATS(dev_net(dev), IPSTATS_MIB_FRAGCREATES);
+	}
+	kfree_skb(skb);
+	IP_INC_STATS(dev_net(dev), IPSTATS_MIB_FRAGOKS);
+	return err;
+
+fail:
+	kfree_skb(skb);
+	IP_INC_STATS(dev_net(dev), IPSTATS_MIB_FRAGFAILS);
+	return err;
+}
+
+#ifdef CONFIG_ATP_HYBRID_TUNNEL_IDLE
+static void ipgre_time_refresh(struct sk_buff *skb, struct ip_tunnel *tunnel, enum ipgre_xmit_rcv_mask mask)
+{
+    const struct iphdr  *iph;
+    struct ipv6hdr *ipv6h;
+    struct udphdr *uh;
+	
+    switch (skb->protocol) {
+        case htons(ETH_P_IP):
+            iph = ip_hdr(skb);
+            if (IPPROTO_UDP == iph->protocol)
+            {
+                uh = (struct udphdr *)(skb->data + ip_hdrlen(skb));
+                if ((htons(IPGER_DHCP_SERVER_PORT) == uh->dest)
+                    || (htons(IPGER_DHCP_CLIENT_PORT) == uh->dest))
+                {
+                    return;
+                }
+            }
+            break;
+
+        case htons(ETH_P_IPV6):
+            ipv6h = ipv6_hdr(skb);
+            if (IPPROTO_UDP == ipv6h->nexthdr)
+            {
+                /*START MODIFY:  idle hello功能开发*/
+                uh = (struct udphdr *)(skb->data + sizeof(struct ipv6hdr));
+                /*END MODIFY:  idle hello功能开发*/
+                if ((htons(IPGER_DHCPV6_SERVER_PORT) == uh->dest)
+                    || (htons(IPGER_DHCPV6_CLIENT_PORT) == uh->dest))
+                {
+                    return;
+                }
+            }
+            break;
+
+        default:
+            break;
+    }
+	
+	if (IPGRE_XMIT_MASK == mask) {
+        tunnel->last_xmit = jiffies;
+    } else {
+        tunnel->last_rcv = jiffies;
+    }
+    
+    return;
+}
+#endif
+
+int ipgre_rcv(struct sk_buff *skb)
+#else
 static int ipgre_rcv(struct sk_buff *skb)
+#endif
 {
 	const struct iphdr *iph;
 	u8     *h;
@@ -588,7 +1004,15 @@ static int ipgre_rcv(struct sk_buff *skb)
 	struct ip_tunnel *tunnel;
 	int    offset = 4;
 	__be16 gre_proto;
-
+#ifdef CONFIG_ATP_HYBRID_REORDER	
+	int ret = 0;
+#endif	
+#ifdef CONFIG_ATP_BRCM
+    union {
+        __be32 a32;
+        __be16 a16[2];
+        }tmp;
+#endif
 	if (!pskb_may_pull(skb, 16))
 		goto drop_nolock;
 
@@ -617,17 +1041,45 @@ static int ipgre_rcv(struct sk_buff *skb)
 			}
 			offset += 4;
 		}
+#ifdef CONFIG_ATP_BRCM		
+		if (flags&GRE_KEY) {
+
+            tmp.a16[0] = *(__be16 *)(h+offset);
+            tmp.a16[1] = *(__be16 *)(h+offset +2 );
+            key = tmp.a32;
+			offset += 4;
+		}
+		if (flags&GRE_SEQ) {
+
+            tmp.a16[0] = *(__be16 *)(h+offset);
+            tmp.a16[1] = *(__be16 *)(h+offset +2 );
+            seqno = tmp.a32;
+
+			seqno = ntohl(seqno);
+#else
 		if (flags&GRE_KEY) {
 			key = *(__be32*)(h + offset);
 			offset += 4;
 		}
 		if (flags&GRE_SEQ) {
 			seqno = ntohl(*(__be32*)(h + offset));
+#endif
 			offset += 4;
+#ifdef CONFIG_ATP_HYBRID_REORDER
+            IPGRE_SKB_CB(skb)->ipgre_seqno = seqno;
+            IPGRE_SKB_CB(skb)->ipgre_proto = IPPROTO_GRE;
+#endif
 		}
 	}
 
 	gre_proto = *(__be16 *)(h + 2);
+
+#ifdef CONFIG_ATP_HYBRID
+    if (htons(ETH_P_IPGRE_CTL) == gre_proto)
+    {
+        goto drop_nolock;
+    }
+#endif
 
 	rcu_read_lock();
 	if ((tunnel = ipgre_tunnel_lookup(skb->dev,
@@ -635,12 +1087,6 @@ static int ipgre_rcv(struct sk_buff *skb)
 					  gre_proto))) {
 		struct pcpu_tstats *tstats;
 
-#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
-		blog_link(IF_DEVICE, blog_ptr(skb), (void*)tunnel->dev, DIR_RX, 
-			skb->len);
-		blog_link(GRE_TUNL, blog_ptr(skb), (void*)tunnel, 0, 0);
-		blog_link(TOS_MODE, blog_ptr(skb), tunnel, DIR_RX, BLOG_TOS_FIXED);
-#endif   
 		secpath_reset(skb);
 
 		skb->protocol = gre_proto;
@@ -674,15 +1120,7 @@ static int ipgre_rcv(struct sk_buff *skb)
 			tunnel->dev->stats.rx_errors++;
 			goto drop;
 		}
-
-#if (defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG))
-		if (!blog_gre_tunnel_accelerated())
-		{
-			uint32_t pkt_seqno;
-			__gre_rcv_check(tunnel, (struct iphdr *)iph, 
-				(skb->len - (iph->ihl<<2)), &pkt_seqno);
-		}
-#else
+#ifndef CONFIG_ATP_HYBRID_REORDER         
 		if (tunnel->parms.i_flags&GRE_SEQ) {
 			if (!(flags&GRE_SEQ) ||
 			    (tunnel->i_seqno && (s32)(seqno - tunnel->i_seqno) < 0)) {
@@ -706,25 +1144,59 @@ static int ipgre_rcv(struct sk_buff *skb)
 			skb_postpull_rcsum(skb, eth_hdr(skb), ETH_HLEN);
 		}
 
-#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
-		if ((skb->protocol != htons(ETH_P_IP))
-#if IS_ENABLED(CONFIG_IPV6)
-			&& (skb->protocol != htons(ETH_P_IPV6)) 
-#endif
-		) {
-			blog_skip(skb);                         /* No blogging */
-		}
-#endif
+#ifndef CONFIG_ATP_HYBRID_REORDER
 		tstats = this_cpu_ptr(tunnel->dev->tstats);
 		tstats->rx_packets++;
 		tstats->rx_bytes += skb->len;
-
+#endif
 		__skb_tunnel_rx(skb, tunnel->dev);
 
 		skb_reset_network_header(skb);
 		ipgre_ecn_decapsulate(iph, skb);
 
+#ifdef CONFIG_ATP_HYBRID_REORDER 
+        if ((flags & GRE_SEQ) 
+            && (tunnel->parms.i_flags & GRE_SEQ))
+        {
+            if (sysctl_ipgre_keepseq_enable)
+            {
+                if (ipgre_reorder_hook != NULL)
+                {
+#ifdef CONFIG_ATP_HYBRID_TUNNEL_IDLE
+                    ipgre_time_refresh(skb, tunnel, IPGRE_RCV_MASK);
+#endif
+                    ret = ipgre_reorder_hook(skb);
+                    if (ret != 0)
+                    {
+                        goto drop;
+                    }
+                    rcu_read_unlock();
+                    return 0;    
+                }
+            }
+            else
+            {
+                /* update the o_seqno when the gre reorder is disabled */
+                ipgre_reorder_set_seqno_hook(seqno);
+            }
+        }
+        
+		tstats = this_cpu_ptr(tunnel->dev->tstats);
+		tstats->rx_packets++;
+		tstats->rx_bytes += skb->len;
+
+#ifdef CONFIG_ATP_HYBRID_TUNNEL_IDLE
+        ipgre_time_refresh(skb, tunnel, IPGRE_RCV_MASK);
+#endif
+        
+#ifdef CONFIG_ATP_BRCM
+        netif_rx_cpu(skb, 1);
+#else
+        netif_receive_skb(skb);
+#endif		
+#else
 		netif_rx(skb);
+#endif        
 
 		rcu_read_unlock();
 		return 0;
@@ -754,12 +1226,48 @@ static netdev_tx_t ipgre_tunnel_xmit(struct sk_buff *skb, struct net_device *dev
 	int    gre_hlen;
 	__be32 dst;
 	int    mtu;
+    
+#ifdef CONFIG_ATP_HYBRID    
+	struct udphdr *uh;
+    int    is_dhcp_packet = 0;
 
-#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
-	blog_link(IF_DEVICE, blog_ptr(skb), (void*)dev, DIR_TX, skb->len);
-	blog_link(GRE_TUNL, blog_ptr(skb), (void*)tunnel, 0, 0);
-#endif   
+#ifdef CONFIG_ATP_HYBRID_TUNNEL_IDLE
+    ipgre_time_refresh(skb, tunnel, IPGRE_XMIT_MASK);
+#endif
 
+#ifdef CONFIG_ATP_HYBRID_GREACCEL
+    if (htons(ETH_P_IP) == skb->protocol) 
+    {
+        if (ipgre_kernel_napt_gre_process_hook && 0 == ipgre_kernel_napt_gre_process_hook(skb, dev))
+        {
+            return NETDEV_TX_OK;
+        }
+
+        if (skb->len > dev->mtu)
+        {
+            return ip_fragment_gre(skb, ipgre_tunnel_xmit);
+        }		
+	}
+	else if (htons(ETH_P_IPV6) == skb->protocol) 
+    {
+        if (ipgre_kernel_ipv6_gre_process_hook && 0 == ipgre_kernel_ipv6_gre_process_hook(skb, dev))
+        {
+            return NETDEV_TX_OK;
+        }
+    }
+#endif
+    
+    /* 判断是否是dhcp报文 */
+    if (IPPROTO_UDP == old_iph->protocol)
+    {
+        uh = (struct udphdr *)(skb->data + ip_hdrlen(skb));
+        if ((htons(IPGER_DHCP_SERVER_PORT) == uh->dest)
+            || (htons(IPGER_DHCP_CLIENT_PORT) == uh->dest))
+        {
+            is_dhcp_packet = 1;
+        }
+    }
+#endif
 	if (dev->type == ARPHRD_ETHER)
 		IPCB(skb)->flags = 0;
 
@@ -768,6 +1276,13 @@ static netdev_tx_t ipgre_tunnel_xmit(struct sk_buff *skb, struct net_device *dev
 		tiph = (const struct iphdr *)skb->data;
 	} else {
 		gre_hlen = tunnel->hlen;
+#ifdef CONFIG_ATP_HYBRID  
+		if ((1 == is_dhcp_packet) && (tunnel->parms.o_flags&GRE_SEQ))
+		{
+		    /*dhcp报文不带序号*/
+		    gre_hlen -= 4;
+		}
+#endif
 		tiph = &tunnel->parms.iph;
 	}
 
@@ -881,15 +1396,6 @@ static netdev_tx_t ipgre_tunnel_xmit(struct sk_buff *skb, struct net_device *dev
 	}
 #endif
 
-#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
-	{
-		Blog_t * blog_p = blog_ptr(skb);
-
-		if (blog_p && blog_p->minMtu > mtu)
-			blog_p->minMtu = mtu;
-	}
-#endif
-
 	if (tunnel->err_count > 0) {
 		if (time_before(jiffies,
 				tunnel->err_time + IPTUNNEL_ERR_TIMEO)) {
@@ -942,10 +1448,6 @@ static netdev_tx_t ipgre_tunnel_xmit(struct sk_buff *skb, struct net_device *dev
 	iph->daddr		=	fl4.daddr;
 	iph->saddr		=	fl4.saddr;
 
-#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
-	blog_link(TOS_MODE, blog_ptr(skb), tunnel, DIR_TX, tiph->tos);
-#endif   
-
 	if ((iph->ttl = tiph->ttl) == 0) {
 		if (skb->protocol == htons(ETH_P_IP))
 			iph->ttl = old_iph->ttl;
@@ -962,19 +1464,56 @@ static netdev_tx_t ipgre_tunnel_xmit(struct sk_buff *skb, struct net_device *dev
 				   htons(ETH_P_TEB) : skb->protocol;
 
 	if (tunnel->parms.o_flags&(GRE_KEY|GRE_CSUM|GRE_SEQ)) {
+
+#ifdef CONFIG_ATP_BRCM
+        typedef union {
+            __be32 a32;
+            __be16 a16[2];
+            }tmp_union;
+        tmp_union tmp, *p;
+#endif
 		__be32 *ptr = (__be32*)(((u8*)iph) + tunnel->hlen - 4);
 
 		if (tunnel->parms.o_flags&GRE_SEQ) {
-#if (defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG))
-		if (!blog_gre_tunnel_accelerated()) ++tunnel->o_seqno;
+#ifdef CONFIG_ATP_HYBRID 
+            if (0 == is_dhcp_packet)
+            {
+                ++tunnel->o_seqno;
+                /* 两个隧道使用同一个序号，不再每个隧道单独编号，便于实现保序 */
+                spin_lock_bh(&g_stTunOSeq.lock);
+#ifdef CONFIG_ATP_BRCM
+                ++g_stTunOSeq.o_seqno;
+                tmp.a32 = htonl(g_stTunOSeq.o_seqno);
+                p=(tmp_union *)ptr;
+                p->a16[0]=tmp.a16[0];
+                p->a16[1] = tmp.a16[1];
 #else
-			++tunnel->o_seqno;
+                ++g_stTunOSeq.o_seqno;/*初始序号从0开始*/
+                *ptr = htonl(g_stTunOSeq.o_seqno);/*初始序号从0开始*/
+#endif				
+                spin_unlock_bh(&g_stTunOSeq.lock);
+            }
+            else
+            {
+                /*dhcp报文不带序列号，需要把GRE头部中S标记位置0*/
+                ((__be16 *)(iph + 1))[0] &= (~GRE_SEQ);
+            }
+#else
+            ++tunnel->o_seqno;
+    		*ptr = htonl(tunnel->o_seqno);
 #endif
-			*ptr = htonl(tunnel->o_seqno);
+           
 			ptr--;
 		}
 		if (tunnel->parms.o_flags&GRE_KEY) {
+#ifdef CONFIG_ATP_BRCM
+			tmp.a32 = tunnel->parms.o_key;
+            p=(tmp_union *)ptr;
+                p->a16[0] = tmp.a16[0];
+                p->a16[1] = tmp.a16[1]; 
+#else
 			*ptr = tunnel->parms.o_key;
+#endif				    
 			ptr--;
 		}
 		if (tunnel->parms.o_flags&GRE_CSUM) {
@@ -982,12 +1521,52 @@ static netdev_tx_t ipgre_tunnel_xmit(struct sk_buff *skb, struct net_device *dev
 			*(__sum16*)ptr = ip_compute_csum((void*)(iph+1), skb->len - sizeof(struct iphdr));
 		}
 	}
-#if (defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG))
-	skb->tunl = tunnel;
-#endif
 
 	nf_reset(skb);
 	tstats = this_cpu_ptr(dev->tstats);
+
+#ifdef CONFIG_ATP_HYBRID_GREACCEL
+    if (IS_GRE2_DEV(dev->name) && (1 == hisi_sw_accel_flag))
+    {
+        int err;
+        int pkt_len;
+        struct net_device *dev_nas = NULL;
+        struct ethhdr *pst_ethhdr;
+		
+        if ((skb->len <= dst_mtu(skb_dst(skb))) 
+            && ((dev_nas = dev_get_by_name(&init_net, "nas0")) != NULL))
+        {
+            pkt_len = skb->len;
+            iph->tot_len = htons(pkt_len);
+            ip_send_check(iph);
+                
+            skb_push(skb, 14);
+            pst_ethhdr = (struct ethhdr *)skb->data;
+
+            pst_ethhdr->h_proto = htons(ETH_P_IP);
+            if (skb_dst(skb) && skb_dst(skb)->_neighbour)
+            {
+                memcpy(pst_ethhdr->h_dest, skb_dst(skb)->_neighbour->ha, 6);
+                memcpy(pst_ethhdr->h_source, skb_dst(skb)->dev->dev_addr, 6);                
+            }
+
+            dev_put(dev_nas);
+            skb->dev = dev_nas;
+            err = dev_nas->netdev_ops->ndo_start_xmit(skb, dev_nas);
+            if (likely(net_xmit_eval(err) == 0)) 
+            {
+            	tstats->tx_bytes += pkt_len;
+            	tstats->tx_packets++;
+            } 
+            else 
+            {
+            	dev->stats.tx_errors++;
+            	dev->stats.tx_aborted_errors++;
+            }	            
+            return NETDEV_TX_OK;
+        }
+    } 
+#endif	   
 	__IPTUNNEL_XMIT(tstats, &dev->stats);
 	return NETDEV_TX_OK;
 
@@ -1070,6 +1649,12 @@ ipgre_tunnel_ioctl (struct net_device *dev, struct ifreq *ifr, int cmd)
 	struct ip_tunnel *t;
 	struct net *net = dev_net(dev);
 	struct ipgre_net *ign = net_generic(net, ipgre_net_id);
+#ifdef CONFIG_ATP_HYBRID 
+	static atomic_t tunnel_num = ATOMIC_INIT(0);/*记录隧道数目*/
+#ifdef CONFIG_ATP_HYBRID_TUNNEL_IDLE
+    unsigned long idle;
+#endif
+#endif    
 
 	switch (cmd) {
 	case SIOCGETTUNNEL:
@@ -1089,6 +1674,16 @@ ipgre_tunnel_ioctl (struct net_device *dev, struct ifreq *ifr, int cmd)
 		break;
 
 	case SIOCADDTUNNEL:
+#ifdef CONFIG_ATP_HYBRID 
+        /*第一次建隧道时初始化发包序号为0*/
+        if (0 == atomic_read(&tunnel_num))
+        {
+            spin_lock_bh(&g_stTunOSeq.lock);
+            g_stTunOSeq.o_seqno = 0;
+            spin_unlock_bh(&g_stTunOSeq.lock);
+        }
+	    atomic_inc(&tunnel_num);
+#endif
 	case SIOCCHGTUNNEL:
 		err = -EPERM;
 		if (!capable(CAP_NET_ADMIN))
@@ -1165,6 +1760,9 @@ ipgre_tunnel_ioctl (struct net_device *dev, struct ifreq *ifr, int cmd)
 		break;
 
 	case SIOCDELTUNNEL:
+#ifdef CONFIG_ATP_HYBRID 
+    	atomic_dec(&tunnel_num);
+#endif
 		err = -EPERM;
 		if (!capable(CAP_NET_ADMIN))
 			goto done;
@@ -1185,6 +1783,36 @@ ipgre_tunnel_ioctl (struct net_device *dev, struct ifreq *ifr, int cmd)
 		err = 0;
 		break;
 
+#ifdef CONFIG_ATP_HYBRID_TUNNEL_IDLE
+    case SIOCTUNNELGETIDLE:
+		err = -EPERM;
+		t = netdev_priv(dev);
+        if (NULL == t)
+			goto done;
+        //存在翻转的问题
+        if ((jiffies >= t->last_xmit) && (jiffies >= t->last_rcv))
+        {
+            idle = (jiffies - (t->last_xmit > t->last_rcv ? t->last_xmit : t->last_rcv)) / HZ;
+        }
+        else if ((jiffies < t->last_xmit) && (jiffies < t->last_rcv))
+        {
+            idle = (0xFFFFFFFF - (t->last_xmit > t->last_rcv ? t->last_xmit : t->last_rcv) + jiffies) / HZ;
+        }
+        else
+        {
+            idle = (jiffies - (t->last_xmit < t->last_rcv ? t->last_xmit : t->last_rcv))/HZ;
+        }
+		if (copy_to_user(ifr->ifr_ifru.ifru_data, &idle, sizeof(idle)))
+			err = -EFAULT;
+        err = 0;
+		break;
+    case SIOCTUNNELSETIDLE:
+		t = netdev_priv(dev);
+        t->last_rcv = jiffies;
+        t->last_xmit = jiffies;
+        break;
+#endif
+        
 	default:
 		err = -EINVAL;
 	}
@@ -1292,7 +1920,12 @@ static int ipgre_open(struct net_device *dev)
 		if (__in_dev_get_rtnl(dev) == NULL)
 			return -EADDRNOTAVAIL;
 		t->mlink = dev->ifindex;
+#ifdef CONFIG_DT_QOS
+		ip_mc_inc_group(__in_dev_get_rtnl(dev), t->parms.iph.daddr, 0);
+#else
 		ip_mc_inc_group(__in_dev_get_rtnl(dev), t->parms.iph.daddr);
+#endif
+
 	}
 	return 0;
 }
@@ -1375,7 +2008,9 @@ static int ipgre_tunnel_init(struct net_device *dev)
 	dev->tstats = alloc_percpu(struct pcpu_tstats);
 	if (!dev->tstats)
 		return -ENOMEM;
-
+#ifdef CONFIG_ATP_HYBRID_GREACCEL    
+    dev->iflink = tunnel->parms.link;
+#endif	
 	return 0;
 }
 
@@ -1692,134 +2327,6 @@ static int ipgre_changelink(struct net_device *dev, struct nlattr *tb[],
 	return 0;
 }
 
-#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
-static inline 
-int __gre_rcv_check(struct ip_tunnel *tunnel, struct iphdr *iph, 
-	uint16_t len, uint32_t *pkt_seqno)
-{
-	int ret = BLOG_GRE_RCV_NO_SEQNO;
-	int grehlen = 4;
-	int iph_len = iph->ihl<<2;
-	__be16 *p = (__be16*)((uint8_t *)iph+iph_len);
-	__be16 flags;
-
-	flags = p[0];
-
-	if (tunnel->parms.i_flags&GRE_CSUM) {
-		uint16_t csum;
-
-		grehlen += 4;
-		csum = *(((__be16 *)p) + 2);
-
-		if (!csum)
-			goto no_csum;
-
-		csum = ip_compute_csum((void*)(iph+1), len - iph_len);
-
-		if (csum) {
-			tunnel->dev->stats.rx_crc_errors++;
-			tunnel->dev->stats.rx_errors++;
-			ret = BLOG_GRE_RCV_CHKSUM_ERR;
-			goto rcv_done;
-		}
-	}
-
-no_csum:
-	if ((tunnel->parms.i_flags&GRE_KEY) && (flags&GRE_KEY))
-		grehlen += 4;
-
-	if (tunnel->parms.i_flags&GRE_SEQ) {
-		uint32_t seqno = *(((__be32 *)p) + (grehlen / 4));
-		*pkt_seqno = seqno;
-		if (tunnel->i_seqno && (s32)(seqno - tunnel->i_seqno) == 0) {
-			tunnel->i_seqno = seqno + 1;
-			ret = BLOG_GRE_RCV_IN_SEQ;
-		} else if (tunnel->i_seqno && (s32)(seqno - tunnel->i_seqno) < 0) {
-			tunnel->dev->stats.rx_fifo_errors++;
-			tunnel->dev->stats.rx_errors++;
-			ret = BLOG_GRE_RCV_OOS_LT;
-		} else {
-			tunnel->i_seqno = seqno + 1;
-			ret = BLOG_GRE_RCV_OOS_GT;
-		}
-	}
-
-rcv_done:
-	return ret;
-}
-
-int gre_rcv_check(struct net_device *dev, struct iphdr *iph, 
-	uint16_t len, void **tunl, uint32_t *pkt_seqno)
-{
-	int ret = BLOG_GRE_RCV_NO_TUNNEL;
-	int grehlen = 4;
-	int iph_len = iph->ihl<<2;
-	struct ip_tunnel *t;
-	__be16 *p = (__be16*)((uint8_t *)iph+iph_len);
-	__be16 flags;
-
-	flags = p[0];
-
-	if (flags&GRE_CSUM)
-		grehlen += 4;
-
-	t = ipgre_tunnel_lookup(dev, iph->saddr, iph->daddr,
-		flags & GRE_KEY ? *(((__be32 *)p) + (grehlen / 4)) : 0, p[1]);
-
-	if (t) {
-		if (t->parms.i_flags == flags) {
-			rcu_read_lock();
-			ret =  __gre_rcv_check(t, iph, len, pkt_seqno);
-			rcu_read_unlock();
-		}
-		else
-			ret = BLOG_GRE_RCV_FLAGS_MISSMATCH;
-	}
-
-	*tunl = (void *) t;	
-	return ret;
-}
-EXPORT_SYMBOL(gre_rcv_check);
-
-/* Adds the TX seqno, Key and updates the GRE checksum */
-static inline 
-void __gre_xmit_update(struct ip_tunnel *tunnel, struct iphdr *iph, 
-	uint16_t len)
-{
-	if (tunnel->parms.o_flags&(GRE_KEY|GRE_CSUM|GRE_SEQ)) {
-		int iph_len = iph->ihl<<2;
-		__be32 *ptr = (__be32*)(((u8*)iph) + tunnel->hlen - 4);
-
-		if (tunnel->parms.o_flags&GRE_SEQ) {
-			++tunnel->o_seqno;
-			*ptr = htonl(tunnel->o_seqno);
-			ptr--;
-		}
-
-		if (tunnel->parms.o_flags&GRE_KEY) {
-			*ptr = tunnel->parms.o_key;
-			ptr--;
-		}
-
-		if (tunnel->parms.o_flags&GRE_CSUM) {
-			*ptr = 0;
-			*(__sum16*)ptr = ip_compute_csum((void*)(iph+1), len - iph_len);
-		}
-		cache_flush_len(ptr, tunnel->hlen);
-	}
-}
-
-/* Adds the oseqno and updates the GRE checksum */
-void gre_xmit_update(struct ip_tunnel *tunnel, struct iphdr *iph, 
-	uint16_t len)
-{
-	rcu_read_lock();
-	__gre_xmit_update(tunnel, iph, len);
-	rcu_read_unlock();
-}
-EXPORT_SYMBOL(gre_xmit_update);
-#endif
-
 static size_t ipgre_get_size(const struct net_device *dev)
 {
 	return
@@ -1934,11 +2441,6 @@ static int __init ipgre_init(void)
 	err = rtnl_link_register(&ipgre_tap_ops);
 	if (err < 0)
 		goto tap_ops_failed;
-
-#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
-	blog_gre_rcv_check_fn = (blog_gre_rcv_check_t) gre_rcv_check;
-	blog_gre_xmit_update_fn = (blog_gre_xmit_upd_t) gre_xmit_update;
-#endif
 
 out:
 	return err;

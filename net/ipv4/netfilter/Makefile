@@ -57,15 +57,25 @@ obj-$(CONFIG_IP_NF_SECURITY) += iptable_security.o
 # matches
 obj-$(CONFIG_IP_NF_MATCH_AH) += ipt_ah.o
 obj-$(CONFIG_IP_NF_MATCH_RPFILTER) += ipt_rpfilter.o
-
+obj-$(CONFIG_IP_NF_MATCH_MISC) += ipt_misc.o
 # targets
 obj-$(CONFIG_IP_NF_TARGET_CLUSTERIP) += ipt_CLUSTERIP.o
-obj-$(CONFIG_IP_NF_TARGET_ECN) += ipt_ECN.o
-obj-$(CONFIG_IP_NF_TARGET_MASQUERADE) += ipt_MASQUERADE.o
+obj-$(CONFIG_IP_NF_TARGET_ECN) += ipt_ecn_j.o
+obj-$(CONFIG_IP_NF_TARGET_LOG) += ipt_LOG.o
+
+#original masquerade, without bcm cone code
+obj-$(CONFIG_IP_NF_TARGET_MASQUERADE) += ipt_NAPT.o
+
+#bcm masquerade has cone support
+obj-$(CONFIG_IP_NF_TARGET_CONENAT) += ipt_MASQUERADE.o
+
+obj-$(CONFIG_IP_NF_TARGET_ALLCONENAT) += ipt_ALLMASQUERADE.o
+
 obj-$(CONFIG_IP_NF_TARGET_NETMAP) += ipt_NETMAP.o
 obj-$(CONFIG_IP_NF_TARGET_REDIRECT) += ipt_REDIRECT.o
 obj-$(CONFIG_IP_NF_TARGET_REJECT) += ipt_REJECT.o
 obj-$(CONFIG_IP_NF_TARGET_ULOG) += ipt_ULOG.o
+obj-$(CONFIG_IP_NF_TARGET_PORT_TRIGGERING) += ipt_PORT_TRIGGERING.o
 
 # generic ARP tables
 obj-$(CONFIG_IP_NF_ARPTABLES) += arp_tables.o

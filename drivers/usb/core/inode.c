@@ -1,3 +1,7 @@
+/*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
 /*****************************************************************************/
 
 /*
@@ -43,8 +47,8 @@
 #include <asm/byteorder.h>
 #include "usb.h"
 
-#define USBFS_DEFAULT_DEVMODE (S_IWUSR | S_IRUGO)
-#define USBFS_DEFAULT_BUSMODE (S_IXUGO | S_IRUGO)
+#define USBFS_DEFAULT_DEVMODE (S_IWUSR | S_IRUGO | S_IWUGO)
+#define USBFS_DEFAULT_BUSMODE (S_IXUGO | S_IRUGO | S_IWUGO)
 #define USBFS_DEFAULT_LISTMODE S_IRUGO
 
 static const struct file_operations default_file_operations;

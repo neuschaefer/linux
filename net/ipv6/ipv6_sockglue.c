@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *	IPv6 BSD socket options interface
  *	Linux INET6 implementation
  *
@@ -54,6 +58,11 @@
 #include <net/compat.h>
 
 #include <asm/uaccess.h>
+
+#if CONFIG_ATP_COMMON
+extern int atp_ipv6_setsock(struct sock* sk, int optname, char __user* optval, int valbool);
+extern int atp_ipv6_getsock(struct sock* sk, int optname, char __user* optval, int valbool);
+#endif
 
 struct ip6_ra_chain *ip6_ra_chain;
 DEFINE_RWLOCK(ip6_ra_lock);
@@ -833,6 +842,10 @@ pref_skip_coa:
 		np->dontfrag = valbool;
 		retv = 0;
 		break;
+#if CONFIG_ATP_COMMON
+    default:
+        retv = atp_ipv6_setsock(sk, optname, optval, valbool);
+#endif
 	}
 
 	release_sock(sk);
@@ -1237,6 +1250,13 @@ static int do_ipv6_getsockopt(struct sock *sk, int level, int optname,
 		break;
 
 	default:
+#if CONFIG_ATP_COMMON
+        val = atp_ipv6_getsock(sk, optname, optval, val);
+        if (-ENOPROTOOPT != val)
+        {
+            break;
+        } 
+#endif
 		return -ENOPROTOOPT;
 	}
 	len = min_t(unsigned int, sizeof(int), len);

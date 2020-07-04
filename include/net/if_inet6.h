@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *	inet6 interface/address list definitions
  *	Linux INET6 implementation 
  *
@@ -193,6 +197,10 @@ struct inet6_dev {
 	struct timer_list	regen_timer;
 	struct list_head	tempaddr_list;
 #endif
+
+/* start of by  2009-12-03 解决IP地址冲突 */
+    u8 aucIfID[8];
+/* end of by  2009-12-03 解决IP地址冲突 */
 
 	struct neigh_parms	*nd_parms;
 	struct inet6_dev	*next;

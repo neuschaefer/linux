@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * INET		An implementation of the TCP/IP protocol suite for the LINUX
  *		operating system.  INET is implemented using the  BSD Socket
  *		interface as the means of communication with the user level.
@@ -58,6 +62,8 @@
 
 #define IFF_ECHO	0x40000		/* echo sent packets		*/
 
+#define IFF_ALLOWPASS 0x80000 /*ATPÐÞ¸Ä£¬allow packet from other brigde to pass*/
+
 #define IFF_VOLATILE	(IFF_LOOPBACK|IFF_POINTOPOINT|IFF_BROADCAST|IFF_ECHO|\
 		IFF_MASTER|IFF_SLAVE|IFF_RUNNING|IFF_LOWER_UP|IFF_DORMANT)
 
@@ -87,7 +93,7 @@
 #define IFF_TEAM_PORT	0x40000		/* device used as team port */
 #define IFF_SUPP_NOFCS	0x80000		/* device supports sending custom FCS */
 
-#if defined(CONFIG_BCM_KF_ENET_SWITCH)
+//#if defined(CONFIG_BCM_KF_ENET_SWITCH)
 #if (defined(CONFIG_BCM96816) || defined(CONFIG_BCM96818))  && defined(CONFIG_BCM_GPON_MODULE)
 #define IFF_HW_SWITCH  0x00000
 #else /* All platforms including 6819_BHR except 6816/6818G w/ GPON */
@@ -95,7 +101,7 @@
 #endif
 #define IFF_EXT_SWITCH 0x80000             /* Indicates the interface is an external switch interface */
 
-#endif /* CONFIG_BCM_KF_ENET_SWITCH */
+//#endif /* CONFIG_BCM_KF_ENET_SWITCH */
 
 #if defined(CONFIG_BCM_KF_IP)
 #define IFF_EPON_IF    0x100000            /* Indicates SFU hardware switching.  */
@@ -110,6 +116,9 @@
 #define IFF_PPP        0x800000            /* PPP Interface */
 #endif
 
+/*ATP smuxÐÂÔö*/
+#define IFF_RSMUX      0x800             /* smux real interface          */
+#define IFF_OSMUX      0x1000             /* smux overlay interface       */
 
 #define IF_GET_IFACE	0x0001		/* for querying only */
 #define IF_GET_PROTO	0x0002

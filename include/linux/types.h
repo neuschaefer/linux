@@ -1,3 +1,7 @@
+/*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
 #ifndef _LINUX_TYPES_H
 #define _LINUX_TYPES_H
 
@@ -265,6 +269,8 @@ struct rcu_head {
 #define LINUX_NET_PACKED 
 #endif /* CONFIG_MIPS_BCM963XX */
 #endif /* CONFIG_BCM_KF_UNALIGNED_EXCEPTION  */
+
+#define LINUX_NET_PACKED __attribute__((packed))
 
 #endif /*  __ASSEMBLY__ */
 #endif /* _LINUX_TYPES_H */

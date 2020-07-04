@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * INET		An implementation of the TCP/IP protocol suite for the LINUX
  *		operating system.  INET is implemented using the  BSD Socket
  *		interface as the means of communication with the user level.
@@ -14,7 +18,11 @@
  *					TOS tweaks.
  *		Mike McLagan	:	Routing by source
  */
-
+/*
+ * 2017/11/14     CVE-2017-5970
+ * (C) Huawei Technologies Co., Ltd. < >
+ */
+ 
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/mm.h>
@@ -43,6 +51,13 @@
 
 #include <linux/errqueue.h>
 #include <asm/uaccess.h>
+
+#include <linux/atphooks.h>
+
+#ifdef CONFIG_ATP_COMMON
+extern int atp_ip_getsock(struct sock *sk, int optname, char __user *optval, int val);
+extern int atp_ip_setsock(struct sock *sk, int optname, char __user *optval, int val);
+#endif
 
 #define IP_CMSG_PKTINFO		1
 #define IP_CMSG_TTL		2
@@ -144,6 +159,17 @@ static void ip_cmsg_recv_dstaddr(struct msghdr *msg, struct sk_buff *skb)
 	put_cmsg(msg, SOL_IP, IP_ORIGDSTADDR, sizeof(sin), &sin);
 }
 
+static void ip_cmsg_recv_indev(struct msghdr *msg, struct sk_buff *skb)
+{
+    char acName[IFNAMSIZ] = {0};
+
+    if(skb->lanindev)
+    {
+        memcpy(acName, skb->lanindev->name, IFNAMSIZ);
+    }
+    put_cmsg(msg, SOL_IP, IP_ORIGINDEV, IFNAMSIZ, acName);
+}
+
 void ip_cmsg_recv(struct msghdr *msg, struct sk_buff *skb)
 {
 	struct inet_sock *inet = inet_sk(skb->sk);
@@ -183,6 +209,12 @@ void ip_cmsg_recv(struct msghdr *msg, struct sk_buff *skb)
 	if (flags & 1)
 		ip_cmsg_recv_dstaddr(msg, skb);
 
+    /*Start of ATP 2013-3-12 for get original dev */
+    if ((flags>>=1) == 0)
+		return;
+	if (flags & 1)
+		ip_cmsg_recv_indev(msg, skb);
+    /*End of ATP 2013-3-12 for get original dev */
 }
 EXPORT_SYMBOL(ip_cmsg_recv);
 
@@ -468,7 +500,12 @@ static int do_ip_setsockopt(struct sock *sk, int level,
 	    optname == IP_MULTICAST_TTL ||
 	    optname == IP_MULTICAST_ALL ||
 	    optname == IP_MULTICAST_LOOP ||
-	    optname == IP_RECVORIGDSTADDR) {
+	    optname == IP_RECVORIGDSTADDR ||
+	    optname == MCAST_SSM_ADD ||
+	    optname == MCAST_SSM_DEL ||
+	    optname == MCAST_ASM_ADD ||
+	    optname == MCAST_ASM_DEL ||
+	    optname == IP_ORIGINDEV) {
 		if (optlen >= sizeof(int)) {
 			if (get_user(val, (int __user *) optval))
 				return -EFAULT;
@@ -999,6 +1036,14 @@ mc_msf_out:
 
 	default:
 		err = -ENOPROTOOPT;
+#ifdef CONFIG_ATP_COMMON
+		err = atp_ip_setsock(sk, optname, optval, val);
+		if (0 != err)
+		{
+			release_sock(sk);
+			return err;
+		}
+#endif
 		break;
 	}
 	release_sock(sk);
@@ -1030,7 +1075,14 @@ void ipv4_pktinfo_prepare(struct sk_buff *skb)
 		pktinfo->ipi_ifindex = 0;
 		pktinfo->ipi_spec_dst.s_addr = 0;
 	}
-	skb_dst_drop(skb);
+	/* We need to keep the dst for __ip_options_echo()
+	 * We could restrict the test to opt.ts_needtime || opt.srr,
+	 * but the following is good enough as IP options are not often used.
+	 */
+	if (unlikely(IPCB(skb)->opt.optlen))
+		skb_dst_force(skb);
+	else
+		skb_dst_drop(skb);
 }
 
 int ip_setsockopt(struct sock *sk, int level,
@@ -1099,6 +1151,7 @@ static int do_ip_getsockopt(struct sock *sk, int level, int optname,
 	struct inet_sock *inet = inet_sk(sk);
 	int val;
 	int len;
+	int ret;
 
 	if (level != SOL_IP)
 		return -EOPNOTSUPP;
@@ -1301,8 +1354,15 @@ static int do_ip_getsockopt(struct sock *sk, int level, int optname,
 		val = inet->min_ttl;
 		break;
 	default:
-		release_sock(sk);
-		return -ENOPROTOOPT;
+		ret = -ENOPROTOOPT;
+#ifdef CONFIG_ATP_COMMON
+		ret = atp_ip_getsock(sk, optname, optval, val);
+#endif
+		if (0 != ret)
+		{
+			release_sock(sk);
+			return ret;
+		}
 	}
 	release_sock(sk);
 

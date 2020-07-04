@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * INET		An implementation of the TCP/IP protocol suite for the LINUX
  *		operating system.  INET is implemented using the  BSD Socket
  *		interface as the means of communication with the user level.
@@ -109,6 +113,11 @@
 #include <trace/events/udp.h>
 #include "udp_impl.h"
 
+#ifdef CONFIG_FIREWALL_LOG
+#include "atplogdef.h"
+#include "msg/kcmsmonitormsgtypes.h"
+#define  ATP_LOOPBACK_ADDR_STR "127.0.0.1"
+#endif
 struct udp_table udp_table __read_mostly;
 EXPORT_SYMBOL(udp_table);
 
@@ -325,6 +334,27 @@ int udp_v4_get_port(struct sock *sk, unsigned short snum)
 	return udp_lib_get_port(sk, snum, ipv4_rcv_saddr_equal, hash2_nulladdr);
 }
 
+#ifdef CONFIG_ATP_HYBRID
+#include "atp_interface.h"
+static inline int check_gre_intf(struct sock *sk, struct net *net, int dif)
+{
+    struct net_device *skDev= NULL;
+    struct net_device *dDev = NULL;
+
+    if (sk->sk_bound_dev_if == dif)
+        return 0;
+
+    skDev = __dev_get_by_index(net, sk->sk_bound_dev_if);
+    if ((skDev) && IS_GRE_DEV(skDev->name)) {
+        dDev = __dev_get_by_index(net, dif);
+        if ((dDev) && IS_GRE_DEV(dDev->name))
+            return 0;
+    }
+
+    return -1;    
+}
+#endif
+
 static inline int compute_score(struct sock *sk, struct net *net, __be32 saddr,
 			 unsigned short hnum,
 			 __be16 sport, __be32 daddr, __be16 dport, int dif)
@@ -352,7 +382,11 @@ static inline int compute_score(struct sock *sk, struct net *net, __be32 saddr,
 			score += 2;
 		}
 		if (sk->sk_bound_dev_if) {
+#ifndef CONFIG_ATP_HYBRID	
 			if (sk->sk_bound_dev_if != dif)
+#else
+            if (0 != check_gre_intf(sk ,net, dif))
+#endif			
 				return -1;
 			score += 2;
 		}
@@ -390,7 +424,11 @@ static inline int compute_score2(struct sock *sk, struct net *net,
 			score += 2;
 		}
 		if (sk->sk_bound_dev_if) {
+#ifndef CONFIG_ATP_HYBRID		
 			if (sk->sk_bound_dev_if != dif)
+#else
+            if (0 != check_gre_intf(sk ,net, dif))
+#endif			
 				return -1;
 			score += 2;
 		}
@@ -768,7 +806,8 @@ send:
 /*
  * Push out all pending data as one UDP datagram. Socket is locked.
  */
-static int udp_push_pending_frames(struct sock *sk)
+// CVE-2013-4162
+int udp_push_pending_frames(struct sock *sk)
 {
 	struct udp_sock  *up = udp_sk(sk);
 	struct inet_sock *inet = inet_sk(sk);
@@ -787,6 +826,8 @@ out:
 	up->pending = 0;
 	return err;
 }
+// CVE-2013-4162
+EXPORT_SYMBOL(udp_push_pending_frames); 
 
 int udp_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 		size_t len)
@@ -1176,8 +1217,9 @@ int udp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 	/*
 	 *	Check any passed addresses
 	 */
-	if (addr_len)
-		*addr_len = sizeof(*sin);
+	//CVE-2013-7263
+	//if (addr_len)
+	//	*addr_len = sizeof(*sin);
 
 	if (flags & MSG_ERRQUEUE)
 		return ip_recv_error(sk, msg, len);
@@ -1233,6 +1275,9 @@ try_again:
 		sin->sin_port = udp_hdr(skb)->source;
 		sin->sin_addr.s_addr = ip_hdr(skb)->saddr;
 		memset(sin->sin_zero, 0, sizeof(sin->sin_zero));
+		//CVE-2013-7263
+		if (addr_len)
+			*addr_len = sizeof(*sin);
 	}
 	if (inet->cmsg_flags)
 		ip_cmsg_recv(msg, skb);
@@ -1626,6 +1671,10 @@ int __udp4_lib_rcv(struct sk_buff *skb, struct udp_table *udptable,
 	__be32 saddr, daddr;
 	struct net *net = dev_net(skb->dev);
 
+#ifdef CONFIG_FIREWALL_LOG
+	u_int8_t* pszLogBuf = NULL;
+#endif
+
 	/*
 	 *  Validate the packet.
 	 */
@@ -1677,7 +1726,28 @@ int __udp4_lib_rcv(struct sk_buff *skb, struct udp_table *udptable,
 		goto csum_error;
 
 	UDP_INC_STATS_BH(net, UDP_MIB_NOPORTS, proto == IPPROTO_UDPLITE);
-	icmp_send(skb, ICMP_DEST_UNREACH, ICMP_PORT_UNREACH, 0);
+
+#ifdef CONFIG_FIREWALL_LOG
+    pszLogBuf = (u_int8_t*)kmalloc(ATP_LOG_LENGTH_128, GFP_ATOMIC);
+    if (NULL != pszLogBuf)
+    {
+        memset(pszLogBuf, 0, ATP_LOG_LENGTH_128);
+	    snprintf(pszLogBuf, ATP_LOG_LENGTH_128, "Detect UDP port scan attack, scan packet from "NIPQUAD_FMT".\n", 
+	        NIPQUAD(saddr));
+	    if (NULL == strstr(pszLogBuf, ATP_LOOPBACK_ADDR_STR))
+	    {
+		    syswatch_sendLog(ATP_LOG_TYPE_FIREWALL, ATP_LOG_LEVEL_WARNING, 0, pszLogBuf);
+	    }
+        kfree(pszLogBuf);
+    }
+#endif
+
+    /* BEGIN: Added , 2010/8/5 For port scan .*/
+    if ( !sysctl_port_scan )
+    {  
+    	icmp_send(skb, ICMP_DEST_UNREACH, ICMP_PORT_UNREACH, 0);
+    }
+    /* END:   Added , 2010/8/5 */
 
 	/*
 	 * Hmm.  We got an UDP packet to a port to which we

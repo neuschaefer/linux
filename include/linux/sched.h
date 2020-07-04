@@ -1,3 +1,7 @@
+/*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
 #ifndef _LINUX_SCHED_H
 #define _LINUX_SCHED_H
 
@@ -2218,6 +2222,9 @@ extern int task_curr(const struct task_struct *p);
 extern int idle_cpu(int cpu);
 extern int sched_setscheduler(struct task_struct *, int,
 			      const struct sched_param *);
+#if (defined CONFIG_HSAN)
+extern int sched_setscheduler_export(struct task_struct *p, int policy,struct sched_param *param);
+#endif				  
 extern int sched_setscheduler_nocheck(struct task_struct *, int,
 				      const struct sched_param *);
 extern struct task_struct *idle_task(int cpu);

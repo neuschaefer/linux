@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * Core registration and callback routines for MTD
  * drivers and users.
  *
@@ -41,6 +45,13 @@
 #include <linux/mtd/partitions.h>
 
 #include "mtdcore.h"
+#include "atpconfig.h"
+
+/*<Start:   monitor flash opteration>*/
+#ifdef SUPPORT_ATP_FLASH_MONITOR
+#include "bhal.h"
+#endif
+/*<End:   monitor flash opteration>*/
 /*
  * backing device capabilities for non-mappable devices (such as NAND flash)
  * - permits private mappings, copies are taken of the data
@@ -101,6 +112,51 @@ static LIST_HEAD(mtd_notifiers);
 #else
 #define MTD_DEVT(index) 0
 #endif
+/*<Start:   monitor flash opteration>*/
+#ifdef SUPPORT_ATP_FLASH_MONITOR
+extern hi_nand_operate_info g_flash_operation_info;
+
+static int nand_mtd_monitor(struct mtd_info *pst_mtd, uint optmod)
+{
+    const char monitormtd[HI_NAND_MONITOR_MAX][32] = 
+    {
+        "config",
+        "bundles",
+        "module",
+        "osigconfig"
+    };
+    uint index = 0;
+    for(index = 0; index < HI_NAND_MONITOR_MAX; index++)
+    {
+        if(0 == strcmp(pst_mtd->name, monitormtd[index]))
+        {
+            break;
+        }
+    }
+    if(index >= HI_NAND_MONITOR_MAX)
+    {
+        return 0;
+    }
+    /*renew opteration frequenry*/
+    switch(optmod)
+    {
+        case HI_NAND_MONITOR_WRITE:
+        {
+            g_flash_operation_info.writetimes[index] += 1;
+            break;
+        }
+        case HI_NAND_MONITOR_ERASE:
+        {
+            g_flash_operation_info.erasetimes[index] += 1;
+            break;
+        }
+        default:
+            break;
+    }
+    return 0;
+}
+#endif
+/*<End:   monitor flash opteration>*/
 
 /* REVISIT once MTD uses the driver model better, whoever allocates
  * the mtd_info will probably want to use the release() hook...
@@ -701,6 +757,11 @@ int mtd_erase(struct mtd_info *mtd, struct erase_info *instr)
 		mtd_erase_callback(instr);
 		return 0;
 	}
+/*<Start:   monitor flash opteration>*/
+#ifdef SUPPORT_ATP_FLASH_MONITOR
+         nand_mtd_monitor(mtd, HI_NAND_MONITOR_ERASE);
+#endif
+/*<End:   monitor flash opteration>*/
 	return mtd->_erase(mtd, instr);
 }
 EXPORT_SYMBOL_GPL(mtd_erase);
@@ -776,6 +837,11 @@ int mtd_write(struct mtd_info *mtd, loff_t to, size_t len, size_t *retlen,
 		return -EROFS;
 	if (!len)
 		return 0;
+/*<Start:   monitor flash opteration>*/
+#ifdef SUPPORT_ATP_FLASH_MONITOR
+         nand_mtd_monitor(mtd, HI_NAND_MONITOR_WRITE);
+#endif
+/*<End:   monitor flash opteration>*/
 	return mtd->_write(mtd, to, len, retlen, buf);
 }
 EXPORT_SYMBOL_GPL(mtd_write);

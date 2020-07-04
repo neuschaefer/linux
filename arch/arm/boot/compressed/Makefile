@@ -132,7 +132,7 @@ ifdef BCM_KF # defined(CONFIG_BCM_KF_ARM_BCM963XX)
 EXTRA_CFLAGS += -I$(INC_BRCMDRIVER_PUB_PATH)/$(BRCM_BOARD) -I$(INC_BRCMSHARED_PUB_PATH)/$(BRCM_BOARD)
 endif # BCM_KF # defined(CONFIG_BCM_KF_MISC_MAKEFILE)
 # Supply kernel BSS size to the decompressor via a linker symbol.
-KBSS_SZ = $(shell $(CROSS_COMPILE)size $(obj)/../../../../vmlinux | \
+KBSS_SZ =  $(shell /opt/toolchain-hsan-linux-3.4.11/bin/arm-hsan-linux-uclibcgnueabi-size $(obj)/../../../../vmlinux | \
 		awk 'END{print $$3}')
 LDFLAGS_vmlinux = --defsym _kernel_bss_size=$(KBSS_SZ)
 # Supply ZRELADDR to the decompressor via a linker symbol.

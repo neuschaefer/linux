@@ -1,3 +1,7 @@
+/*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
 /*********************************************************************
  *
  * Filename:      af_irda.c
@@ -1449,8 +1453,8 @@ static int irda_recvmsg_stream(struct kiocb *iocb, struct socket *sock,
 	err = 0;
 	target = sock_rcvlowat(sk, flags & MSG_WAITALL, size);
 	timeo = sock_rcvtimeo(sk, noblock);
-
-	msg->msg_namelen = 0;
+	//CVE-2013-7270
+	//msg->msg_namelen = 0;
 
 	do {
 		int chunk;

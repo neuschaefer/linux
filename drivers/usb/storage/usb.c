@@ -1,3 +1,7 @@
+/*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
 /* Driver for USB Mass Storage compliant devices
  *
  * Current development and maintenance by:
@@ -76,6 +80,8 @@
 
 #include "sierra_ms.h"
 #include "option_ms.h"
+#include "msg/kcmsmonitormsgtypes.h"
+
 
 /* Some informational data */
 MODULE_AUTHOR("Matthew Dharm <mdharm-usb@one-eyed-alien.net>");
@@ -1029,10 +1035,14 @@ BadDevice:
 }
 EXPORT_SYMBOL_GPL(usb_stor_probe2);
 
+extern bool sd_not_mount_device(struct us_data *us);
 /* Handle a USB mass-storage disconnect */
 void usb_stor_disconnect(struct usb_interface *intf)
 {
 	struct us_data *us = usb_get_intfdata(intf);
+    
+    if (!sd_not_mount_device(us))
+	    syswatch_nl_send( ATP_MSG_MONITOR_EVT_USBSTORAGE_PLUGOUT, NULL, 0 );
 
 	US_DEBUGP("storage_disconnect() called\n");
 	quiesce_and_remove_host(us);

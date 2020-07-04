@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * Open Host Controller Interface (OHCI) driver for USB.
  *
  * Maintainer: Alan Stern <stern@rowland.harvard.edu>
@@ -993,6 +997,11 @@ MODULE_AUTHOR (DRIVER_AUTHOR);
 MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE ("GPL");
 
+#if (defined CONFIG_HSAN)
+#include "../hsan/hi_ohci.c"
+#define PLATFORM_DRIVER g_st_ohci_driver
+#endif
+
 #ifdef CONFIG_PCI
 #include "ohci-pci.c"
 #define PCI_DRIVER		ohci_pci_driver
@@ -1155,6 +1164,13 @@ static int __init ohci_hcd_mod_init(void)
 		retval = -ENOENT;
 		goto error_debug;
 	}
+
+#if (defined CONFIG_HSAN)
+    retval = hi_ohci_init(); 
+    if (0 != retval)
+    {
+        return retval; 
+    }
 #endif
 
 #ifdef PS3_SYSTEM_BUS_DRIVER
@@ -1264,6 +1280,9 @@ static int __init ohci_hcd_mod_init(void)
 	debugfs_remove(ohci_debug_root);
 	ohci_debug_root = NULL;
  error_debug:
+
+#if (defined CONFIG_HSAN)
+    hi_ohci_exit(); 
 #endif
 
 	clear_bit(USB_OHCI_LOADED, &usb_hcds_loaded);
@@ -1273,6 +1292,9 @@ module_init(ohci_hcd_mod_init);
 
 static void __exit ohci_hcd_mod_exit(void)
 {
+#if (defined CONFIG_HSAN)
+    hi_ohci_exit(); 
+#endif
 #ifdef TMIO_OHCI_DRIVER
 	platform_driver_unregister(&TMIO_OHCI_DRIVER);
 #endif

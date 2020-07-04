@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *  ebtables
  *
  *  Author:
@@ -115,10 +119,20 @@ ebt_dev_check(const char *entry, const struct net_device *device)
 	if (!device)
 		return 1;
 	devname = device->name;
-	/* 1 is the wildcard token */
-	while (entry[i] != '\0' && entry[i] != 1 && entry[i] == devname[i])
-		i++;
-	return (devname[i] != entry[i] && entry[i] != 1);
+
+    /* DT Huawei modify */
+#if 0
+        /* 1 is the wildcard token */
+        while (entry[i] != '\0' && entry[i] != 1 && entry[i] == devname[i])
+            i++;
+        return (devname[i] != entry[i] && entry[i] != 1);
+#else
+        /* '+' is the wildcard token */
+        while (entry[i] != '\0' && entry[i] != '+' && entry[i] == devname[i])
+            i++;
+        return (devname[i] != entry[i] && entry[i] != '+');
+#endif
+    /* DT Huawei end */
 }
 
 #define FWINV2(bool,invflg) ((bool) ^ !!(e->invflags & invflg))
@@ -196,6 +210,11 @@ unsigned int ebt_do_table (unsigned int hook, struct sk_buff *skb,
 	const char *base;
 	const struct ebt_table_info *private;
 	struct xt_action_param acpar;
+#ifdef CONFIG_BRIDGE_EBT_QINQ
+	/* Start of macfilter support QinQ by Huawei 20060714 */
+	struct ethhdr eth8021q;
+	unsigned char* p8021q ;
+#endif
 
 	acpar.family  = NFPROTO_BRIDGE;
 	acpar.in      = in;
@@ -217,9 +236,49 @@ unsigned int ebt_do_table (unsigned int hook, struct sk_buff *skb,
 	counter_base = cb_base + private->hook_entry[hook]->counter_offset;
 	/* base for chain jumps */
 	base = private->entries;
+#ifdef CONFIG_BRIDGE_EBT_QINQ
+    /* Start of macfilter support QinQ by Huawei 20060714 */
+	p8021q = skb->data;
+	if (nentries > 0)
+	{
+        // 协议类型默认为IP
+        memcpy(&eth8021q, eth_hdr(skb), sizeof(struct ethhdr));
+        if (skb->protocol == __constant_htons(ETH_P_8021Q))
+        {
+            p8021q += 2; // VLAN+IP
+            eth8021q.h_proto = *(unsigned short*)p8021q;
+            if (*(unsigned short*)p8021q == __constant_htons(ETH_P_PPP_SES))
+            {
+                // PPP_IP == 0x0021
+                if (*(unsigned short*)(p8021q + 2 + 6) == __constant_htons(0x0021))
+                {
+                    eth8021q.h_proto = __constant_htons(ETH_P_IP); // VLAN+PPP+IP
+                }
+            }
+        }
+        else if (skb->protocol == __constant_htons(ETH_P_PPP_SES))
+        {
+            if (*(unsigned short*)(p8021q + 6) == __constant_htons(0x0021))
+            {
+                eth8021q.h_proto = __constant_htons(ETH_P_IP); // PPP+IP
+            }
+        }
+        else 
+        {
+            // 缺省的协议类型为IP
+        }
+        /* End of macfilter support QinQ by Huawei 20060714 */
+	}
+#endif    
+    
 	i = 0;
 	while (i < nentries) {
+#ifdef CONFIG_BRIDGE_EBT_QINQ
+  		if ((ebt_basic_match(point, &eth8021q, in, out))
+                && (ebt_basic_match(point, skb, in, out)))//support QinQ by Huawei
+#else
 		if (ebt_basic_match(point, skb, in, out))
+#endif
 			goto letscontinue;
 
 		if (EBT_MATCH_ITERATE(point, ebt_do_match, skb, &acpar) != 0)

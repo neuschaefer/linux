@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * USB Serial Converter driver
  *
  * Copyright (C) 1999 - 2005 Greg Kroah-Hartman (greg@kroah.com)
@@ -36,7 +40,7 @@
 #include <linux/usb/serial.h>
 #include <linux/kfifo.h>
 #include "pl2303.h"
-
+#include "atpconfig.h"
 /*
  * Version Information
  */
@@ -129,6 +133,66 @@ static struct usb_serial *get_free_serial(struct usb_serial *serial,
 	mutex_unlock(&table_lock);
 	return NULL;
 }
+
+#if defined(CONFIG_USB_SERIAL_XR21V1410) || defined(SUPPORT_ATP_FTDILIST_CONFIG)
+static struct usb_serial *get_free_serial_for_QHB(struct usb_serial *serial,
+					int num_ports, unsigned int *minor)
+{
+	unsigned int i, j;
+	int good_spot;
+	int istartMinorNum = 0;
+	int iendMinorIdx = 0;
+
+	dbg("%s %d", __func__, num_ports);
+
+    if (0 == strcmp(serial->type->driver.name,"option1"))  //∑÷≈‰ttyUSB0-ttyUSB7
+    {
+        istartMinorNum = 0;
+        iendMinorIdx =  8;
+        printk("This option1 GSM device\n");
+    }
+    else if (0 == strcmp(serial->type->driver.name,"xr_usb_serial"))   //∑÷≈‰ttyUSB8-ttyUSB9
+    {
+        istartMinorNum = 8; 
+        iendMinorIdx = 10; 
+        printk("This xr_usb_serial device\n");
+    }
+    else //∑÷≈‰ttyUSB10--
+    {
+        istartMinorNum = 10; 
+        iendMinorIdx = SERIAL_TTY_MINORS;
+        printk("This other usb device\n");
+    }
+	*minor = istartMinorNum;
+	mutex_lock(&table_lock);
+	for (i = istartMinorNum; i < iendMinorIdx; ++i) {
+		if (serial_table[i])
+			continue;
+
+		good_spot = 1;
+		for (j = 1; j <= num_ports-1; ++j)
+			if ((i+j >= iendMinorIdx) || (serial_table[i+j])) {
+				good_spot = 0;
+				i += j;
+				break;
+			}
+		if (good_spot == 0)
+			continue;
+
+		*minor = i;
+		j = 0;
+		dbg("%s - minor base = %d", __func__, *minor);
+		for (i = *minor; (i < (*minor + num_ports)) && (i < iendMinorIdx); ++i) {
+			serial_table[i] = serial;
+			serial->port[j++]->number = i;
+		}
+		mutex_unlock(&table_lock);
+		return serial;
+	}
+	mutex_unlock(&table_lock);
+	return NULL;
+}
+#endif
 
 static void return_serial(struct usb_serial *serial)
 {
@@ -1066,11 +1130,17 @@ int usb_serial_probe(struct usb_interface *interface,
 	 * registered.
 	 */
 	serial->disconnected = 1;
-
+#if defined(CONFIG_USB_SERIAL_XR21V1410) || defined(SUPPORT_ATP_FTDILIST_CONFIG)
+    if (get_free_serial_for_QHB(serial, num_ports, &minor) == NULL) {
+        dev_err(&interface->dev, "No more free serial devices\n");
+        goto probe_error;
+    }
+#else
 	if (get_free_serial(serial, num_ports, &minor) == NULL) {
 		dev_err(&interface->dev, "No more free serial devices\n");
 		goto probe_error;
 	}
+#endif
 	serial->minor = minor;
 
 	/* register all of the individual ports with the driver core */
@@ -1235,10 +1305,10 @@ static int __init usb_serial_init(void)
 	usb_serial_tty_driver->flags = TTY_DRIVER_REAL_RAW |
 						TTY_DRIVER_DYNAMIC_DEV;
 	usb_serial_tty_driver->init_termios = tty_std_termios;
-	usb_serial_tty_driver->init_termios.c_cflag = B9600 | CS8 | CREAD
+	usb_serial_tty_driver->init_termios.c_cflag = B115200 | CS8 | CREAD
 							| HUPCL | CLOCAL;
-	usb_serial_tty_driver->init_termios.c_ispeed = 9600;
-	usb_serial_tty_driver->init_termios.c_ospeed = 9600;
+	usb_serial_tty_driver->init_termios.c_ispeed = 115200;
+	usb_serial_tty_driver->init_termios.c_ospeed = 115200;
 	tty_set_operations(usb_serial_tty_driver, &serial_ops);
 	result = tty_register_driver(usb_serial_tty_driver);
 	if (result) {

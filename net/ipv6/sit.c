@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *	IPv6 over IPv4 tunnel device - Simple Internet Transition (SIT)
  *	Linux INET6 implementation
  *
@@ -802,6 +806,10 @@ static netdev_tx_t ipip6_tunnel_xmit(struct sk_buff *skb,
 		}
 
 		addr6 = (const struct in6_addr*)&neigh->primary_key;
+#ifdef CONFIG_SUPPORT_ATP
+        dst = try_6rd(addr6, tunnel);
+        if (!dst) {
+#endif
 		addr_type = ipv6_addr_type(addr6);
 
 		if (addr_type == IPV6_ADDR_ANY) {
@@ -817,6 +825,9 @@ static netdev_tx_t ipip6_tunnel_xmit(struct sk_buff *skb,
 		neigh_release(neigh);
 		if (do_tx_error)
 			goto tx_error;
+#ifdef CONFIG_SUPPORT_ATP
+        }
+#endif
 	}
 
 	rt = ip_route_output_ports(dev_net(dev), &fl4, NULL,

@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * INET		An implementation of the TCP/IP protocol suite for the LINUX
  *		operating system.  INET is implemented using the  BSD Socket
  *		interface as the means of communication with the user level.
@@ -93,6 +97,8 @@
 #ifdef CONFIG_INET
 #include <net/inet_common.h>
 #endif
+
+#include <linux/atphooks.h>
 
 /*
    Assumptions:
@@ -1383,6 +1389,7 @@ static int packet_rcv_spkt(struct sk_buff *skb, struct net_device *dev,
 {
 	struct sock *sk;
 	struct sockaddr_pkt *spkt;
+	struct packet_sock *po;
 
 	/*
 	 *	When we registered the protocol we saved the socket in the data
@@ -1427,7 +1434,14 @@ static int packet_rcv_spkt(struct sk_buff *skb, struct net_device *dev,
 	 */
 
 	spkt->spkt_family = dev->type;
-	strlcpy(spkt->spkt_device, dev->name, sizeof(spkt->spkt_device));
+
+	/*bridge pass up 的arp报文的dev已经在bridge local in时设置了*/
+	po = pkt_sk(sk);
+	if ((htons(ETH_P_ARP) != po->num) || 0 == strlen(spkt->spkt_device))
+	{
+		strlcpy(spkt->spkt_device, dev->name, sizeof(spkt->spkt_device));
+	}
+
 	spkt->spkt_protocol = skb->protocol;
 
 	/*
@@ -1554,6 +1568,15 @@ retry:
 	skb->priority = sk->sk_priority;
 	skb->mark = sk->sk_mark;
 	err = sock_tx_timestamp(sk, &skb_shinfo(skb)->tx_flags);
+
+	/*Start of added  for qos tr069 function 2011-12-3 */
+#if defined(CONFIG_IMQ)
+    skb->mark = sk->sk_mark;
+    /* if qos enable, all packet to IMQ */
+    skb->mark |= QOS_DEFAULT_MARK;   
+#endif
+	/*End of added  for qos tr069 function 2011-12-3 */
+
 	if (err < 0)
 		goto out_unlock;
 
@@ -1634,6 +1657,8 @@ static int packet_rcv(struct sk_buff *skb, struct net_device *dev,
 			skb_pull(skb, skb_network_offset(skb));
 		}
 	}
+
+    ATP_HOOK(ATP_AF_PKT_RCV, skb, dev, NULL, 0);
 
 	snaplen = skb->len;
 
@@ -2354,7 +2379,12 @@ static int packet_snd(struct socket *sock,
 	skb->dev = dev;
 	skb->priority = sk->sk_priority;
 	skb->mark = sk->sk_mark;
-
+	/*Start of added  for qos function 2011-12-3 */
+#if defined(CONFIG_IMQ)
+    /* if qos enable, all packet to IMQ */
+    skb->mark |= QOS_DEFAULT_MARK;  
+#endif
+	/*End of added  for qos  function 2011-12-3 */
 	if (po->has_vnet_hdr) {
 		if (vnet_hdr.flags & VIRTIO_NET_HDR_F_NEEDS_CSUM) {
 			if (!skb_partial_csum_set(skb, vnet_hdr.csum_start,
@@ -2685,6 +2715,23 @@ out:
 	return err;
 }
 
+
+/* 把接收报文的原始设备接口名称送上套接字层，给应用层读取*/
+static int packet_cmsg_Set_InDev(struct msghdr *msg, struct sk_buff *skb)
+{
+    char acOriginInDeivce[IFNAMSIZ];
+
+    memset(acOriginInDeivce, 0, sizeof(acOriginInDeivce));
+    if (skb->lanindev)
+    {
+        snprintf(acOriginInDeivce, sizeof(acOriginInDeivce), "%s", skb->lanindev->name);
+        put_cmsg(msg, SOL_PACKET, PACKET_IN_DEVICE, sizeof(acOriginInDeivce), acOriginInDeivce);
+    }
+    
+    return 0;
+}
+
+
 /*
  *	Pull a packet from our receive queue and hand it to the user.
  *	If necessary we block.
@@ -2696,7 +2743,8 @@ static int packet_recvmsg(struct kiocb *iocb, struct socket *sock,
 	struct sock *sk = sock->sk;
 	struct sk_buff *skb;
 	int copied, err;
-	struct sockaddr_ll *sll;
+	//CVE-2013-7270
+	//struct sockaddr_ll *sll;
 	int vnet_hdr_len = 0;
 
 	err = -EINVAL;
@@ -2783,12 +2831,12 @@ static int packet_recvmsg(struct kiocb *iocb, struct socket *sock,
 	 *	If the address length field is there to be filled in, we fill
 	 *	it in now.
 	 */
-
-	sll = &PACKET_SKB_CB(skb)->sa.ll;
-	if (sock->type == SOCK_PACKET)
-		msg->msg_namelen = sizeof(struct sockaddr_pkt);
-	else
-		msg->msg_namelen = sll->sll_halen + offsetof(struct sockaddr_ll, sll_addr);
+	//CVE-2013-7270
+	//sll = &PACKET_SKB_CB(skb)->sa.ll;
+	//if (sock->type == SOCK_PACKET)
+	//	msg->msg_namelen = sizeof(struct sockaddr_pkt);
+	//else
+	//	msg->msg_namelen = sll->sll_halen + offsetof(struct sockaddr_ll, sll_addr);
 
 	/*
 	 *	You lose any data beyond the buffer you gave. If it worries a
@@ -2807,9 +2855,28 @@ static int packet_recvmsg(struct kiocb *iocb, struct socket *sock,
 
 	sock_recv_ts_and_drops(msg, sk, skb);
 
-	if (msg->msg_name)
+	//CVE-2013-7270
+	if (msg->msg_name) {
+        /* If the address length field is there to be filled
+        * in, we fill it in now.
+        */
+        if (sock->type == SOCK_PACKET) {
+            msg->msg_namelen = sizeof(struct sockaddr_pkt);
+        } else {
+            struct sockaddr_ll *sll = &PACKET_SKB_CB(skb)->sa.ll;
+            msg->msg_namelen = sll->sll_halen +
+                offsetof(struct sockaddr_ll, sll_addr);
+        }
+    
 		memcpy(msg->msg_name, &PACKET_SKB_CB(skb)->sa,
 		       msg->msg_namelen);
+    }
+
+    if (1 == test_and_clear_bit(SOCK_IN_DEVICE, &sock->flags))
+    {
+        set_bit(SOCK_IN_DEVICE, &sock->flags);
+        packet_cmsg_Set_InDev(msg, skb);
+    }
 
 	if (pkt_sk(sk)->auxdata) {
 		struct tpacket_auxdata aux;
@@ -3216,6 +3283,26 @@ packet_setsockopt(struct socket *sock, int level, int optname, char __user *optv
 
 		return fanout_add(sk, val & 0xffff, val >> 16);
 	}
+    case PACKET_IN_DEVICE:
+    {
+        int val;
+        
+        if (optlen < sizeof(val))
+            return -EINVAL;
+
+        if (copy_from_user(&val, optval, sizeof(val)))
+            return -EFAULT;
+
+        if (val)
+        {
+            set_bit(SOCK_IN_DEVICE, &sock->flags);
+        }
+        else
+        {
+            clear_bit(SOCK_IN_DEVICE, &sock->flags);
+        }
+        break;
+    }
 	default:
 		return -ENOPROTOOPT;
 	}

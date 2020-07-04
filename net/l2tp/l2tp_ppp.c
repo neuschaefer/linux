@@ -1,3 +1,7 @@
+/*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
 /*****************************************************************************
  * Linux PPP over L2TP (PPPoX/PPPoL2TP) Sockets
  *
@@ -200,7 +204,8 @@ static int pppol2tp_recvmsg(struct kiocb *iocb, struct socket *sock,
 	if (sk->sk_state & PPPOX_BOUND)
 		goto end;
 
-	msg->msg_namelen = 0;
+	//CVE-2013-7270
+	//msg->msg_namelen = 0;
 
 	err = 0;
 	skb = skb_recv_datagram(sk, flags & ~MSG_DONTWAIT,
@@ -640,6 +645,7 @@ static int pppol2tp_connect(struct socket *sock, struct sockaddr *uservaddr,
 	u32 session_id, peer_session_id;
 	int ver = 2;
 	int fd;
+    struct inet_sock *inet = NULL;
 
 	lock_sock(sk);
 
@@ -708,6 +714,12 @@ static int pppol2tp_connect(struct socket *sock, struct sockaddr *uservaddr,
 			goto end;
 	}
 
+    /*start  for l2tp连接建立不成功*/
+    inet = inet_sk(tunnel->sock);
+    inet->inet_daddr = sp->pppol2tp.addr.sin_addr.s_addr;
+    inet->inet_dport = sp->pppol2tp.addr.sin_port;
+    /*End  for l2tp连接建立不成功*/
+
 	if (tunnel->recv_payload_hook == NULL)
 		tunnel->recv_payload_hook = pppol2tp_recv_payload_hook;
 
@@ -756,6 +768,11 @@ static int pppol2tp_connect(struct socket *sock, struct sockaddr *uservaddr,
 	ps->sock	     = sk;
 	ps->tunnel_sock = tunnel->sock;
 
+#ifdef CONFIG_ATP_COMMON 
+       /* BEGIN: add for FON: l2tp隧道内的ppp包无法发送 */ 
+       session->tunnel_addr = sp->pppol2tp;
+       /* END: add for FON: l2tp隧道内的ppp包无法发送 */ 
+#endif       
 	session->recv_skb	= pppol2tp_recv;
 	session->session_close	= pppol2tp_session_close;
 #if defined(CONFIG_L2TP_DEBUGFS) || defined(CONFIG_L2TP_DEBUGFS_MODULE)
@@ -1348,7 +1365,8 @@ static int pppol2tp_setsockopt(struct socket *sock, int level, int optname,
 	int err;
 
 	if (level != SOL_PPPOL2TP)
-		return udp_prot.setsockopt(sk, level, optname, optval, optlen);
+		// CVE-2014-4943
+		return -EINVAL;
 
 	if (optlen < sizeof(int))
 		return -EINVAL;
@@ -1474,7 +1492,8 @@ static int pppol2tp_getsockopt(struct socket *sock, int level,
 	struct pppol2tp_session *ps;
 
 	if (level != SOL_PPPOL2TP)
-		return udp_prot.getsockopt(sk, level, optname, optval, optlen);
+		// CVE-2014-4943
+		return -EINVAL;
 
 	if (get_user(len, (int __user *) optlen))
 		return -EFAULT;
@@ -1633,8 +1652,13 @@ static void pppol2tp_seq_session_show(struct seq_file *m, void *v)
 
 	if (tunnel->sock) {
 		struct inet_sock *inet = inet_sk(tunnel->sock);
+#ifdef CONFIG_ATP_COMMON 
+		ip = ntohl(inet->inet_daddr);
+		port = ntohs(inet->inet_dport);
+#else
 		ip = ntohl(inet->inet_saddr);
 		port = ntohs(inet->inet_sport);
+#endif
 	}
 
 	seq_printf(m, "  SESSION '%s' %08X/%d %04X/%04X -> "

@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * connection tracking expectations.
  */
 
@@ -98,6 +102,11 @@ static inline void nf_ct_unlink_expect(struct nf_conntrack_expect *exp)
 {
 	nf_ct_unlink_expect_report(exp, 0, 0);
 }
+
+#ifdef CONFIG_NF_CONNTRACK_PRI
+struct nf_conntrack_expect *
+nf_ct_find_expectation_safe(struct net *net, const struct nf_conntrack_tuple *tuple);
+#endif
 
 void nf_ct_remove_expectations(struct nf_conn *ct);
 void nf_ct_unexpect_related(struct nf_conntrack_expect *exp);

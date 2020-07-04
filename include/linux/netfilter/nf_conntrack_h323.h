@@ -1,9 +1,18 @@
+/*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
 #ifndef _NF_CONNTRACK_H323_H
 #define _NF_CONNTRACK_H323_H
 
 #ifdef __KERNEL__
 
 #include <linux/netfilter/nf_conntrack_h323_asn1.h>
+
+#ifdef CONFIG_ATP_COMMON
+#include <linux/inetdevice.h>
+#include <linux/netdevice.h>
+#endif
 
 #define RAS_PORT 1719
 #define Q931_PORT 1720
@@ -46,6 +55,37 @@ struct nf_ct_h323_master {
 
 struct nf_conn;
 
+#ifdef CONFIG_ATP_COMMON
+#define MEDIA_CONTROL_CHANNEL   1
+#define MEDIA_CHANNEL           0
+
+
+static inline int is_local_addr(union nf_inet_addr addr)
+{
+    struct net_device *brdev = NULL;
+    struct in_device *indev = NULL;
+    struct in_ifaddr *ifa = NULL;
+    
+    brdev = __dev_get_by_name(&init_net, "br0");
+    if (brdev)
+    {
+        indev = __in_dev_get_rtnl(brdev);
+        if (indev && (NULL != (ifa = indev->ifa_list)))
+        {
+            for (; ifa; ifa = ifa->ifa_next)
+            {
+                if ((ifa->ifa_local & ifa->ifa_mask) == (addr.ip & ifa->ifa_mask))
+                {
+                    return 1;
+                }
+            }
+        }
+    }
+
+    return 0;
+}
+#endif
+
 #if defined(CONFIG_BCM_KF_NETFILTER)
 extern int have_direct_route(union nf_inet_addr *src, union nf_inet_addr *dst,
 			     int family);
@@ -82,6 +122,7 @@ extern int (*set_ras_addr_hook) (struct sk_buff *skb,
 				 enum ip_conntrack_info ctinfo,
 				 unsigned char **data,
 				 TransportAddress *taddr, int count);
+#ifndef CONFIG_ATP_COMMON
 extern int (*nat_rtp_rtcp_hook) (struct sk_buff *skb,
 				 struct nf_conn *ct,
 				 enum ip_conntrack_info ctinfo,
@@ -90,6 +131,17 @@ extern int (*nat_rtp_rtcp_hook) (struct sk_buff *skb,
 				 __be16 port, __be16 rtp_port,
 				 struct nf_conntrack_expect *rtp_exp,
 				 struct nf_conntrack_expect *rtcp_exp);
+#else
+extern int (*nat_rtp_rtcp_hook) (struct sk_buff *skb,
+				 struct nf_conn *ct,
+				 enum ip_conntrack_info ctinfo,
+				 unsigned char **data, int dataoff,
+				 H245_TransportAddress *taddr,
+				 __be16 port, __be16 rtp_port,
+				 struct nf_conntrack_expect *rtp_exp,
+				 struct nf_conntrack_expect *rtcp_exp,
+				 unsigned int mediatype);
+#endif
 extern int (*nat_t120_hook) (struct sk_buff *skb, struct nf_conn *ct,
 			     enum ip_conntrack_info ctinfo,
 			     unsigned char **data, int dataoff,

@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *	Linux NET3:	Internet Group Management Protocol  [IGMP]
  *
  *	This code implements the IGMP protocol as defined in RFC1112. There has
@@ -105,10 +109,14 @@
 #include <linux/seq_file.h>
 #endif
 
+#ifndef CONFIG_IGMP_MAX_GROUP_NUMBER
 #define IP_MAX_MEMBERSHIPS	20
 #define IP_MAX_MSF		10
+#else
+#define IP_MAX_MEMBERSHIPS	    CONFIG_IGMP_MAX_GROUP_NUMBER
+#define IP_MAX_MSF		CONFIG_IGMP_MAX_MSF
+#endif
 
-#ifdef CONFIG_IP_MULTICAST
 /* Parameter names and values are taken from igmp-v2-06 draft */
 
 #define IGMP_V1_Router_Present_Timeout		(400*HZ)
@@ -117,8 +125,24 @@
 #define IGMP_Query_Response_Interval		(10*HZ)
 #define IGMP_Unsolicited_Report_Count		2
 
+/* BEGIN: Added , 2010/7/1 For BT control igmp remotly, send number and interval .*/
+unsigned int g_lIgmpReportCount    = IGMP_Unsolicited_Report_Count;
+unsigned int g_lIgmpReportInterval = 1 * HZ;
+/* END:   Added , 2010/7/1 */
 
 #define IGMP_Initial_Report_Delay		(1)
+
+/*为避免加宏太多，未启用SSM特性时也定义ip_mc_is_ssm*/
+#ifndef CONFIG_IGMP_SSM
+static inline int ip_mc_is_ssm(__be32 multiaddr)
+{
+    return 0;
+}
+#else
+extern void ip_group_list_init(void);
+#endif
+
+#ifdef CONFIG_IP_MULTICAST
 
 /* IGMP_Initial_Report_Delay is not from IGMP specs!
  * IGMP specs require to report membership immediately after
@@ -184,13 +208,33 @@ static void igmp_stop_timer(struct ip_mc_list *im)
 }
 
 /* It must be called with locked im->lock */
+static void igmp_start_leave_timer(struct ip_mc_list *im, int max_delay)
+{
+	int tv = net_random() % max_delay;
+
+	im->tm_running = 1;
+#if 1
+	if (!mod_timer(&im->timer1, jiffies+tv+2))
+		atomic_inc(&im->refcnt);
+#else
+    /* 原发送间隔设置为0至最大延时之间的随机数,但是BT要求保证发送间隔为设置时间 */
+    if (!mod_timer(&im->timer, jiffies+max_delay))
+		atomic_inc(&im->refcnt);
+#endif
+}
+
 static void igmp_start_timer(struct ip_mc_list *im, int max_delay)
 {
 	int tv = net_random() % max_delay;
 
 	im->tm_running = 1;
+#if (defined CONFIG_HSAN)
+	if (!mod_timer(&im->timer, jiffies))
+		atomic_inc(&im->refcnt);
+#else
 	if (!mod_timer(&im->timer, jiffies+tv+2))
 		atomic_inc(&im->refcnt);
+#endif
 }
 
 static void igmp_gq_start_timer(struct in_device *in_dev)
@@ -205,15 +249,25 @@ static void igmp_gq_start_timer(struct in_device *in_dev)
 static void igmp_ifc_start_timer(struct in_device *in_dev, int delay)
 {
 	int tv = net_random() % delay;
-
+#if (defined CONFIG_HSAN)
+	if (!mod_timer(&in_dev->mr_ifc_timer, jiffies))
+		in_dev_hold(in_dev);
+#else
 	if (!mod_timer(&in_dev->mr_ifc_timer, jiffies+tv+2))
 		in_dev_hold(in_dev);
+#endif
 }
 
 static void igmp_mod_timer(struct ip_mc_list *im, int max_delay)
 {
 	spin_lock_bh(&im->lock);
+    /* BEGIN: 发送报文数改为 1 */
+#ifdef CONFIG_SUPPORT_ATP
+	im->unsolicit_count = 1;
+#else
 	im->unsolicit_count = 0;
+#endif
+    /* END:   */
 	if (del_timer(&im->timer)) {
 		if ((long)(im->timer.expires-jiffies) < max_delay) {
 			add_timer(&im->timer);
@@ -360,12 +414,57 @@ static struct sk_buff *igmpv3_newpack(struct net_device *dev, int size)
 	return skb;
 }
 
+
+static int igmpv3_parse_leave(struct igmpv3_report *pstRepV3)
+{
+    int k;
+    struct igmpv3_grec   *pstGrec;
+    
+   // pstRepV3 = (struct igmpv3_report *)(skb->data + (pip->ihl << 2));
+    pstGrec = &pstRepV3->grec[0];
+    // 遍历所有的组记录
+    /*Start of Protocol :igmp无法播放问题 */
+    for (k = 0; k < ntohs(pstRepV3->ngrec); k++)
+    /*End of Protocol :igmp无法播放问题 */
+    {
+        // IS_EXCLUDE/CHANGE_TO_EXCLUDE模式都是表示新增组的
+        // 如果当前为IS_INCLUDE并且对应的INCLUDE不为NULL那么表示只是需要新增，如果为NULL那么可能就表示LEAVE消息了
+        // 如果是CHANGE_TO_INCLUDE那么如果源不为NULL也表示是新增
+        // 总之这几种模式都表示是需要新增，只有当INCLUDE并且源为NULL那么才是leave消息
+        // 所以实际上，我们这里并没有做非常精确的判断，比如到底include哪个地址，EXCLUDE哪个地址等而是一股脑的全部允许
+        // 实际上，某个PC可能只是需要INCLUDE某一个源地址的，其它的非该源地址的该PC也许不需要处理
+        if ((IGMPV3_CHANGE_TO_INCLUDE == pstGrec->grec_type && pstGrec->grec_nsrcs == 0) || 
+                 (pstGrec->grec_nsrcs == 0 && IGMPV3_MODE_IS_INCLUDE == pstGrec->grec_type) || 
+                 (IGMPV3_BLOCK_OLD_SOURCES == pstGrec->grec_type))  //前面两种表示LEAVE消息，后面一种也可能表示LEAVE消息
+        {
+            //printk("delete IGMPv3 entry\r\n");
+			return 1;
+        }
+        
+        /*Start of Protocol :igmp无法播放问题 */
+        pstGrec = (struct igmpv3_grec *)((char *)pstGrec + sizeof(struct igmpv3_grec) + ntohs(pstGrec->grec_nsrcs) * sizeof(struct in_addr)); 
+        /*End of Protocol :igmp无法播放问题 */
+    }
+	
+    return 0;
+}
+
 static int igmpv3_sendpack(struct sk_buff *skb)
 {
 	struct igmphdr *pig = igmp_hdr(skb);
 	const int igmplen = skb->tail - skb->transport_header;
 
+	if (1 == igmpv3_parse_leave(pig))
+	{
+	    skb->mark = skb->mark & (~PPP_TRIGER_MARK);
+	}
+
 	pig->csum = ip_compute_csum(igmp_hdr(skb), igmplen);
+
+#if defined(CONFIG_IMQ) || defined(CONFIG_IMQ_MODULE)
+    /* mark with the highest subpriority value */
+    skb->mark = 0x100007;
+#endif
 
 	return ip_local_out(skb);
 }
@@ -717,6 +816,11 @@ static int igmp_send_report(struct in_device *in_dev, struct ip_mc_list *pmc,
 	ih->group = group;
 	ih->csum = ip_compute_csum((void *)ih, sizeof(struct igmphdr));
 
+#if defined(CONFIG_IMQ) || defined(CONFIG_IMQ_MODULE)
+    /* mark with the highest subpriority value */
+    skb->mark = 0x100007;
+#endif
+
 	return ip_local_out(skb);
 }
 
@@ -736,7 +840,11 @@ static void igmp_ifc_timer_expire(unsigned long data)
 	igmpv3_send_cr(in_dev);
 	if (in_dev->mr_ifc_count) {
 		in_dev->mr_ifc_count--;
+#ifdef CONFIG_SUPPORT_ATP
+		igmp_ifc_start_timer(in_dev, g_lIgmpReportInterval);
+#else
 		igmp_ifc_start_timer(in_dev, IGMP_Unsolicited_Report_Interval);
+#endif
 	}
 	__in_dev_put(in_dev);
 }
@@ -745,13 +853,18 @@ static void igmp_ifc_event(struct in_device *in_dev)
 {
 	if (IGMP_V1_SEEN(in_dev) || IGMP_V2_SEEN(in_dev))
 		return;
+#ifdef CONFIG_ATP_IGMP_CONTROL_REPORT_NUM
+	in_dev->mr_ifc_count = g_lIgmpReportCount;
+#else
 	in_dev->mr_ifc_count = in_dev->mr_qrv ? in_dev->mr_qrv :
 		IGMP_Unsolicited_Report_Count;
+#endif
 	igmp_ifc_start_timer(in_dev, 1);
 }
 
 
-static void igmp_timer_expire(unsigned long data)
+/* BEGIN: Added , 2010/7/10   PN:xxxxxx*/
+static void igmp_timer_v1v2leaveexpire(unsigned long data)
 {
 	struct ip_mc_list *im=(struct ip_mc_list *)data;
 	struct in_device *in_dev = im->interface;
@@ -761,11 +874,61 @@ static void igmp_timer_expire(unsigned long data)
 
 	if (im->unsolicit_count) {
 		im->unsolicit_count--;
+		igmp_start_leave_timer(im, g_lIgmpReportInterval);
+	}
+    else
+    {
+        im->reporter = 1;
+	    spin_unlock(&im->lock);
+        ip_ma_put(im);
+        return;
+    }
+    
+	im->reporter = 1;
+	spin_unlock(&im->lock);
+
+	if (IGMP_V1_SEEN(in_dev))
+		igmp_send_report(in_dev, im, IGMP_HOST_LEAVE_MESSAGE);
+	else if (IGMP_V2_SEEN(in_dev))
+		igmp_send_report(in_dev, im, IGMP_HOST_LEAVE_MESSAGE);
+	else
+		igmp_send_report(in_dev, im, IGMPV3_HOST_MEMBERSHIP_REPORT);
+
+	ip_ma_put(im);
+}
+/* END:   Added , 2010/7/10 */
+
+static void igmp_timer_expire(unsigned long data)
+{
+	struct ip_mc_list *im=(struct ip_mc_list *)data;
+	struct in_device *in_dev = im->interface;
+
+	spin_lock(&im->lock);
+	im->tm_running = 0;
+#ifdef CONFIG_SUPPORT_ATP
+	if (im->unsolicit_count) {
+		im->unsolicit_count--;
+		igmp_start_timer(im, g_lIgmpReportInterval);
+	}
+/* BEGIN: Added , 2010/7/10 when im->unsolicit_count == 0,don't send packet */
+    else
+    {
+        im->reporter = 1;
+	    spin_unlock(&im->lock);
+        ip_ma_put(im);
+        return;
+    }
+/* END:   Added , 2010/7/10 */
+	im->reporter = 1;
+	spin_unlock(&im->lock);
+#else
+	if (im->unsolicit_count) {
+		im->unsolicit_count--;
 		igmp_start_timer(im, IGMP_Unsolicited_Report_Interval);
 	}
 	im->reporter = 1;
 	spin_unlock(&im->lock);
-
+#endif
 	if (IGMP_V1_SEEN(in_dev))
 		igmp_send_report(in_dev, im, IGMP_HOST_MEMBERSHIP_REPORT);
 	else if (IGMP_V2_SEEN(in_dev))
@@ -1061,6 +1224,7 @@ static void ip_mc_filter_del(struct in_device *in_dev, __be32 addr)
 static void igmpv3_add_delrec(struct in_device *in_dev, struct ip_mc_list *im)
 {
 	struct ip_mc_list *pmc;
+	int isSsm;
 
 	/* this is an "ip_mc_list" for convenience; only the fields below
 	 * are actually used. In particular, the refcnt and users are not
@@ -1075,8 +1239,24 @@ static void igmpv3_add_delrec(struct in_device *in_dev, struct ip_mc_list *im)
 	pmc->interface = im->interface;
 	in_dev_hold(in_dev);
 	pmc->multiaddr = im->multiaddr;
+#ifdef CONFIG_SUPPORT_ATP
+	isSsm = ip_mc_is_ssm(pmc->multiaddr);
+    /*如果是ssm模式，不发模式变化的报文，modify for HOMEGW-15189/RFC4604 : SSM模式下只能发type 1/5/6报文*/
+	if (isSsm) {
+		pmc->crcount = 0;
+	} else {
+#ifdef CONFIG_ATP_IGMP_CONTROL_REPORT_NUM
+		pmc->crcount = g_lIgmpReportCount;
+#else
+		pmc->crcount = in_dev->mr_qrv ? in_dev->mr_qrv :
+			IGMP_Unsolicited_Report_Count;
+#endif
+	}
+
+#else
 	pmc->crcount = in_dev->mr_qrv ? in_dev->mr_qrv :
 		IGMP_Unsolicited_Report_Count;
+#endif
 	pmc->sfmode = im->sfmode;
 	if (pmc->sfmode == MCAST_INCLUDE) {
 		struct ip_sf_list *psf;
@@ -1084,8 +1264,13 @@ static void igmpv3_add_delrec(struct in_device *in_dev, struct ip_mc_list *im)
 		pmc->tomb = im->tomb;
 		pmc->sources = im->sources;
 		im->tomb = im->sources = NULL;
+		/*如果是ssm模式，只发源记录改变的报文，modify for HOMEGW-15189/RFC4604 : SSM模式下只能发type 1/5/6报文*/
 		for (psf=pmc->sources; psf; psf=psf->sf_next)
+#ifdef CONFIG_ATP_IGMP_CONTROL_REPORT_NUM
+			psf->sf_crcount = g_lIgmpReportCount;
+#else
 			psf->sf_crcount = pmc->crcount;
+#endif
 	}
 	spin_unlock_bh(&im->lock);
 
@@ -1190,7 +1375,13 @@ static void igmp_group_dropped(struct ip_mc_list *im)
 			return;
 		if (IGMP_V2_SEEN(in_dev)) {
 			if (reporter)
+#ifdef CONFIG_SUPPORT_ATP
+                im->unsolicit_count = g_lIgmpReportCount;
+                im->crcount         = g_lIgmpReportCount;
+                igmp_start_leave_timer(im, IGMP_Initial_Report_Delay);
+#else
 				igmp_send_report(in_dev, im, IGMP_HOST_LEAVE_MESSAGE);
+#endif
 			return;
 		}
 		/* IGMPv3 */
@@ -1204,6 +1395,7 @@ static void igmp_group_dropped(struct ip_mc_list *im)
 static void igmp_group_added(struct ip_mc_list *im)
 {
 	struct in_device *in_dev = im->interface;
+	int isSsm = 0;
 
 	if (im->loaded == 0) {
 		im->loaded = 1;
@@ -1223,14 +1415,34 @@ static void igmp_group_added(struct ip_mc_list *im)
 		return;
 	if (IGMP_V1_SEEN(in_dev) || IGMP_V2_SEEN(in_dev)) {
 		spin_lock_bh(&im->lock);
+        /* BEGIN: Added , 2010/7/10 For BT IGMP V2 send report. */
+#ifdef CONFIG_SUPPORT_ATP
+        im->unsolicit_count = g_lIgmpReportCount;
+        im->crcount         = g_lIgmpReportCount;
+#endif
+        /* END:   Added , 2010/7/10 */
 		igmp_start_timer(im, IGMP_Initial_Report_Delay);
 		spin_unlock_bh(&im->lock);
 		return;
 	}
 	/* else, v3 */
-
+#ifdef CONFIG_SUPPORT_ATP
+	isSsm = ip_mc_is_ssm(im->multiaddr);
+	/*如果是ssm模式，不发模式变化的报文，modify for HOMEGW-15189/RFC4604 : SSM模式下只能发type 1/5/6报文*/
+	if (isSsm) {
+		im->crcount = 0;
+	} else {
+#ifdef CONFIG_ATP_IGMP_CONTROL_REPORT_NUM
+		im->crcount = g_lIgmpReportCount;
+#else
+		im->crcount = in_dev->mr_qrv ? in_dev->mr_qrv :
+			IGMP_Unsolicited_Report_Count;
+#endif
+	}
+#else
 	im->crcount = in_dev->mr_qrv ? in_dev->mr_qrv :
 		IGMP_Unsolicited_Report_Count;
+#endif
 	igmp_ifc_event(in_dev);
 #endif
 }
@@ -1277,7 +1489,14 @@ void ip_mc_inc_group(struct in_device *in_dev, __be32 addr)
 	spin_lock_init(&im->lock);
 #ifdef CONFIG_IP_MULTICAST
 	setup_timer(&im->timer, &igmp_timer_expire, (unsigned long)im);
+#ifdef CONFIG_SUPPORT_ATP
+	setup_timer(&im->timer1, &igmp_timer_v1v2leaveexpire, (unsigned long)im);
+	/* BEGIN: Added , 2010/7/1 For BT igmp send num .*/
+	im->unsolicit_count = g_lIgmpReportCount;
+	/* END:   Added , 2010/7/1 */
+#else
 	im->unsolicit_count = IGMP_Unsolicited_Report_Count;
+#endif
 #endif
 
 	im->next_rcu = in_dev->mc_list;
@@ -1416,7 +1635,11 @@ void ip_mc_init_dev(struct in_device *in_dev)
 	in_dev->mc_count     = 0;
 	setup_timer(&in_dev->mr_ifc_timer, igmp_ifc_timer_expire,
 			(unsigned long)in_dev);
+#ifdef CONFIG_ATP_IGMP_CONTROL_REPORT_NUM
+	in_dev->mr_qrv = g_lIgmpReportCount;
+#else
 	in_dev->mr_qrv = IGMP_Unsolicited_Report_Count;
+#endif
 #endif
 
 	spin_lock_init(&in_dev->mc_tomb_lock);
@@ -1531,8 +1754,12 @@ static int ip_mc_del1_src(struct ip_mc_list *pmc, int sfmode,
 #ifdef CONFIG_IP_MULTICAST
 		if (psf->sf_oldin &&
 		    !IGMP_V1_SEEN(in_dev) && !IGMP_V2_SEEN(in_dev)) {
+#ifdef CONFIG_ATP_IGMP_CONTROL_REPORT_NUM
+			psf->sf_crcount = g_lIgmpReportCount;
+#else
 			psf->sf_crcount = in_dev->mr_qrv ? in_dev->mr_qrv :
 				IGMP_Unsolicited_Report_Count;
+#endif
 			psf->sf_next = pmc->tomb;
 			pmc->tomb = psf;
 			rv = 1;
@@ -1552,7 +1779,7 @@ static int ip_mc_del_src(struct in_device *in_dev, __be32 *pmca, int sfmode,
 {
 	struct ip_mc_list *pmc;
 	int	changerec = 0;
-	int	i, err;
+	int	i, err, isSsm;
 
 	if (!in_dev)
 		return -ENODEV;
@@ -1566,6 +1793,9 @@ static int ip_mc_del_src(struct in_device *in_dev, __be32 *pmca, int sfmode,
 		rcu_read_unlock();
 		return -ESRCH;
 	}
+#ifdef CONFIG_SUPPORT_ATP
+	isSsm = ip_mc_is_ssm(pmc->multiaddr);
+#endif
 	spin_lock_bh(&pmc->lock);
 	rcu_read_unlock();
 #ifdef CONFIG_IP_MULTICAST
@@ -1595,11 +1825,40 @@ static int ip_mc_del_src(struct in_device *in_dev, __be32 *pmca, int sfmode,
 		/* filter mode change */
 		pmc->sfmode = MCAST_INCLUDE;
 #ifdef CONFIG_IP_MULTICAST
+#ifdef CONFIG_SUPPORT_ATP
+		/*如果是ssm模式，不发模式变化的报文，modify for HOMEGW-15189/RFC4604 : SSM模式下只能发type 1/5/6报文*/
+		if (isSsm) {
+			pmc->crcount = 0;
+		} else {
+#ifdef CONFIG_ATP_IGMP_CONTROL_REPORT_NUM
+			pmc->crcount = g_lIgmpReportCount;
+#else
+			pmc->crcount = in_dev->mr_qrv ? in_dev->mr_qrv :
+				IGMP_Unsolicited_Report_Count;
+#endif
+		}
+#else
 		pmc->crcount = in_dev->mr_qrv ? in_dev->mr_qrv :
 			IGMP_Unsolicited_Report_Count;
+#endif
 		in_dev->mr_ifc_count = pmc->crcount;
-		for (psf=pmc->sources; psf; psf = psf->sf_next)
+		/*如果是ssm模式，只发源记录改变的报文，modify for HOMEGW-15189/RFC4604 : SSM模式下只能发type 1/5/6报文*/
+		for (psf=pmc->sources; psf; psf = psf->sf_next) {
+#ifdef CONFIG_SUPPORT_ATP
+			if (isSsm) {
+#ifdef CONFIG_ATP_IGMP_CONTROL_REPORT_NUM
+				psf->sf_crcount = g_lIgmpReportCount;
+#else
+				psf->sf_crcount = in_dev->mr_qrv ? in_dev->mr_qrv :
+					IGMP_Unsolicited_Report_Count;
+#endif
+			} else {
+				psf->sf_crcount = 0;
+			}
+		}
+#else
 			psf->sf_crcount = 0;
+#endif
 		igmp_ifc_event(pmc->interface);
 	} else if (sf_setstate(pmc) || changerec) {
 		igmp_ifc_event(pmc->interface);
@@ -1724,7 +1983,7 @@ static int ip_mc_add_src(struct in_device *in_dev, __be32 *pmca, int sfmode,
 {
 	struct ip_mc_list *pmc;
 	int	isexclude;
-	int	i, err;
+	int	i, err, isSsm;
 
 	if (!in_dev)
 		return -ENODEV;
@@ -1738,6 +1997,9 @@ static int ip_mc_add_src(struct in_device *in_dev, __be32 *pmca, int sfmode,
 		rcu_read_unlock();
 		return -ESRCH;
 	}
+#ifdef CONFIG_SUPPORT_ATP
+	isSsm = ip_mc_is_ssm(pmc->multiaddr); 
+#endif
 	spin_lock_bh(&pmc->lock);
 	rcu_read_unlock();
 
@@ -1774,11 +2036,46 @@ static int ip_mc_add_src(struct in_device *in_dev, __be32 *pmca, int sfmode,
 #ifdef CONFIG_IP_MULTICAST
 		/* else no filters; keep old mode for reports */
 
+#ifdef CONFIG_SUPPORT_ATP
+		int old_crcount = 0;
+		int sf_crcount = 0;
+
+		pmc->crcount = in_dev->mr_qrv ? in_dev->mr_qrv :
+#ifdef CONFIG_ATP_IGMP_CONTROL_REPORT_NUM
+			g_lIgmpReportCount;
+#else
+			IGMP_Unsolicited_Report_Count;
+#endif
+
+		old_crcount = pmc->crcount;
+		/*如果是ssm模式，不发模式变化的报文，modify for HOMEGW-15189/RFC4604 : SSM模式下只能发type 1/5/6报文*/
+		if (isSsm)
+		{
+		    pmc->crcount = 0;
+		}
+
+#ifdef CONFIG_ATP_IGMP_CONTROL_REPORT_NUM
+		in_dev->mr_ifc_count = g_lIgmpReportCount;
+		sf_crcount = g_lIgmpReportCount;
+#else
+		in_dev->mr_ifc_count = old_crcount;
+		sf_crcount = old_crcount;
+#endif
+		/*如果是ssm模式，只发源记录改变的报文，modify for HOMEGW-15189/RFC4604 : SSM模式下只能发type 1/5/6报文*/
+		for (psf=pmc->sources; psf; psf = psf->sf_next) {
+			if (isSsm) {
+				psf->sf_crcount = sf_crcount;
+			} else {
+				psf->sf_crcount = 0;
+			}
+		}
+#else
 		pmc->crcount = in_dev->mr_qrv ? in_dev->mr_qrv :
 			IGMP_Unsolicited_Report_Count;
 		in_dev->mr_ifc_count = pmc->crcount;
 		for (psf=pmc->sources; psf; psf = psf->sf_next)
 			psf->sf_crcount = 0;
+#endif
 		igmp_ifc_event(in_dev);
 	} else if (sf_setstate(pmc)) {
 		igmp_ifc_event(in_dev);
@@ -2695,6 +2992,9 @@ static struct pernet_operations igmp_net_ops = {
 
 int __init igmp_mc_proc_init(void)
 {
+#ifdef CONFIG_IGMP_SSM
+    ip_group_list_init();//modify for HOMEGW-15189/RFC4604 : SSM模式下只能发type 1/5/6报文*/
+#endif
 	return register_pernet_subsys(&igmp_net_ops);
 }
 #endif

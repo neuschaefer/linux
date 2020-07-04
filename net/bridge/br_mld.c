@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
 *    Copyright (c) 2012 Broadcom Corporation
 *    All Rights Reserved
 *
@@ -216,6 +220,12 @@ void br_mld_mc_fdb_del_entry(struct net_bridge *br,
 		br_mld_wl_del_entry(br, mld_fdb);
 #if defined(CONFIG_BLOG) 
 		br_mcast_blog_release(BR_MCAST_PROTO_MLD, (void *)mld_fdb);
+#endif
+#ifdef CONFIG_ATP_BRCM
+		if (mld_fdb->from_dev)
+		{
+			dev_put(mld_fdb->from_dev);
+		}
 #endif
 		kmem_cache_free(br_mld_mc_fdb_cache, mld_fdb);
 }
@@ -485,6 +495,9 @@ int br_mld_mc_fdb_add(struct net_device *from_dev,
 	mc_fdb->wan_tci = 0;
 	mc_fdb->num_tags = 0;
 	mc_fdb->from_dev = from_dev;
+#ifdef CONFIG_ATP_BRCM
+	dev_hold(mc_fdb->from_dev);
+#endif
 	mc_fdb->type = wan_ops;
 #if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
 	mc_fdb->root = 1;
@@ -504,6 +517,12 @@ int br_mld_mc_fdb_add(struct net_device *from_dev,
 	if(ret < 0)
 	{
 		hlist_del(&mc_fdb->hlist);
+#ifdef CONFIG_ATP_BRCM
+		if (mc_fdb->from_dev)
+		{
+			dev_put(mc_fdb->from_dev);
+		}
+#endif
 		kmem_cache_free(br_mld_mc_fdb_cache, mc_fdb);
 		kmem_cache_free(br_mld_mc_rep_cache, rep_entry);
 		spin_unlock_bh(&br->mld_mcl_lock);
@@ -882,6 +901,9 @@ struct net_br_mld_mc_fdb_entry *br_mld_mc_fdb_copy(struct net_bridge *br,
 		{
 			head = &br->mld_mc_hash[br_mld_mc_fdb_hash(&mld_fdb->grp)];
 			hlist_add_head(&new_mld_fdb->hlist, head);
+#ifdef CONFIG_ATP_BRCM
+			dev_hold(new_mld_fdb->from_dev);
+#endif
 	}
 		else
 		{

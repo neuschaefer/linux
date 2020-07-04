@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * xfrm_state.c
  *
  * Changes:
@@ -351,6 +355,14 @@ static void xfrm_state_gc_destroy(struct xfrm_state *x)
 {
 	tasklet_hrtimer_cancel(&x->mtimer);
 	del_timer_sync(&x->rtimer);
+
+#ifdef CONFIG_XFRM_IDLE_TIME
+    if (x->lft.idle_time_seconds)
+    {
+        del_timer_sync(&x->idletimer);
+    }
+#endif
+
 	kfree(x->aalg);
 	kfree(x->ealg);
 	kfree(x->calg);
@@ -408,6 +420,17 @@ static enum hrtimer_restart xfrm_timer_handler(struct hrtimer * me)
 	int err = 0;
 
 	spin_lock(&x->lock);
+	/* start of  当SA idle之后尽早删除内核的SA，这样做可能存在风险，考虑
+	 * 的情况就是如果报文一直都是对方在发送给本方，但是本方并不做出任何应答的情况，不过
+	 * 这种情况下的话，应该是不会走到这里来的。
+	 */
+#if defined(CONFIG_SUPPORT_ATP) && defined(CONFIG_XFRM_IDLE_TIME)
+    if (x->ucFlag & IDLE_TIMEOUT_FLAG)
+    {
+        goto expired;
+    }
+#endif
+/* End of  当SA idle之后尽早删除内核的SA */
 	if (x->km.state == XFRM_STATE_DEAD)
 		goto out;
 	if (x->km.state == XFRM_STATE_EXPIRED)
@@ -480,6 +503,10 @@ out:
 
 static void xfrm_replay_timer_handler(unsigned long data);
 
+#ifdef CONFIG_XFRM_IDLE_TIME
+static void xfrm_idle_timer_handler(unsigned long data);
+#endif
+
 struct xfrm_state *xfrm_state_alloc(struct net *net)
 {
 	struct xfrm_state *x;
@@ -497,6 +524,12 @@ struct xfrm_state *xfrm_state_alloc(struct net *net)
 		tasklet_hrtimer_init(&x->mtimer, xfrm_timer_handler, CLOCK_REALTIME, HRTIMER_MODE_ABS);
 		setup_timer(&x->rtimer, xfrm_replay_timer_handler,
 				(unsigned long)x);
+
+#ifdef CONFIG_XFRM_IDLE_TIME
+        setup_timer(&x->idletimer, xfrm_idle_timer_handler,
+                (unsigned long)x);
+#endif
+
 		x->curlft.add_time = get_seconds();
 		x->lft.soft_byte_limit = XFRM_INF;
 		x->lft.soft_packet_limit = XFRM_INF;
@@ -953,6 +986,19 @@ static void __xfrm_state_insert(struct xfrm_state *x)
 	if (x->replay_maxage)
 		mod_timer(&x->rtimer, jiffies + x->replay_maxage);
 
+#ifdef CONFIG_XFRM_IDLE_TIME
+    if (x->lft.idle_time_seconds)
+    {
+        mod_timer(&x->idletimer, 
+            jiffies + HZ * (unsigned long)x->lft.idle_time_seconds);
+    }
+    else
+    {
+        del_timer(&x->idletimer);
+        //mod_timer(&x->idletimer, jiffies + ULONG_MAX);
+    }
+#endif
+
 	wake_up(&net->xfrm.km_waitq);
 
 	net->xfrm.state_num++;
@@ -1110,6 +1156,10 @@ int xfrm_state_add(struct xfrm_state *x)
 	__xfrm_state_insert(x);
 	err = 0;
 
+#ifdef CONFIG_SUPPORT_ATP
+    rt_cache_flush(xs_net(x), 0);
+#endif
+
 out:
 	spin_unlock_bh(&xfrm_state_lock);
 
@@ -1126,6 +1176,59 @@ out:
 EXPORT_SYMBOL(xfrm_state_add);
 
 #ifdef CONFIG_XFRM_MIGRATE
+
+#ifdef CONFIG_SUPPORT_ATP
+/* 使用本函数需要调用的函数来保证 XFRM_STATE_ACQ == x->km.state */
+void xfrm_migrate_del_acq_state_link(struct net *net, struct xfrm_state *x)
+{
+    if (!net || !x)
+    {
+        return ;
+    }
+    
+    spin_lock(&xfrm_state_lock);
+    list_del(&x->km.all);
+    hlist_del(&x->bydst);
+    hlist_del(&x->bysrc);
+    if (x->id.spi)
+        hlist_del(&x->byspi);
+    net->xfrm.state_num--;
+    spin_unlock(&xfrm_state_lock);
+}
+EXPORT_SYMBOL(xfrm_migrate_del_acq_state_link);
+
+/* 使用本函数需要调用的函数来保证 XFRM_STATE_ACQ == x->km.state */
+void xfrm_migrate_add_acq_link(struct net *net, struct xfrm_state *x)
+{
+	unsigned int h;
+    unsigned short family = x->props.family;
+    
+    if (!net || !x)
+    {
+        return ;
+    }
+
+    list_add(&x->km.all, &net->xfrm.state_all);
+    
+    h = xfrm_dst_hash(net, &x->id.daddr, &x->props.saddr,
+              x->props.reqid, x->props.family);
+    hlist_add_head(&x->bydst, net->xfrm.state_bydst+h);
+    
+    h = xfrm_src_hash(net, &x->id.daddr, &x->props.saddr, family);
+    hlist_add_head(&x->bysrc, net->xfrm.state_bysrc+h);
+    
+    if (x->id.spi) {
+        h = xfrm_spi_hash(net, &x->id.daddr, x->id.spi, x->id.proto, family);
+        hlist_add_head(&x->byspi, net->xfrm.state_byspi+h);
+    }
+    
+    net->xfrm.state_num++;
+    xfrm_hash_grow_check(net, x->bydst.next != NULL);
+}
+EXPORT_SYMBOL(xfrm_migrate_add_acq_link);
+
+#endif
+
 static struct xfrm_state *xfrm_state_clone(struct xfrm_state *orig, int *errp)
 {
 	struct net *net = xs_net(orig);
@@ -1256,22 +1359,47 @@ struct xfrm_state * xfrm_state_migrate(struct xfrm_state *x,
 	struct xfrm_state *xc;
 	int err;
 
+#ifdef CONFIG_SUPPORT_ATP
+    if (XFRM_STATE_ACQ != x->km.state)
+    {
+        xc = xfrm_state_clone(x, &err);
+        if (!xc)
+        {
+            return NULL;
+        }
+    }
+    else
+    {
+        xc = x;
+    }
+#else
 	xc = xfrm_state_clone(x, &err);
 	if (!xc)
 		return NULL;
 
+#endif
 	memcpy(&xc->id.daddr, &m->new_daddr, sizeof(xc->id.daddr));
 	memcpy(&xc->props.saddr, &m->new_saddr, sizeof(xc->props.saddr));
-
-	/* add state */
-	if (!xfrm_addr_cmp(&x->id.daddr, &m->new_daddr, m->new_family)) {
-		/* a care is needed when the destination address of the
-		   state is to be updated as it is a part of triplet */
-		xfrm_state_insert(xc);
-	} else {
-		if ((err = xfrm_state_add(xc)) < 0)
-			goto error;
-	}
+#ifdef CONFIG_SUPPORT_ATP
+    if (XFRM_STATE_ACQ == x->km.state)
+    {
+        return xc;
+    }
+    else
+    {
+#endif
+    	/* add state */
+    	if (!xfrm_addr_cmp(&x->id.daddr, &m->new_daddr, m->new_family)) {
+    		/* a care is needed when the destination address of the
+    		   state is to be updated as it is a part of triplet */
+    		xfrm_state_insert(xc);
+    	} else {
+    		if ((err = xfrm_state_add(xc)) < 0)
+    			goto error;
+    	}
+#ifdef CONFIG_SUPPORT_ATP
+    }
+#endif
 
 	return xc;
 error:
@@ -1307,6 +1435,10 @@ int xfrm_state_update(struct xfrm_state *x)
 		x = NULL;
 	}
 	err = 0;
+
+#ifdef CONFIG_SUPPORT_ATP
+    rt_cache_flush(xs_net(x), 0);
+#endif
 
 out:
 	spin_unlock_bh(&xfrm_state_lock);
@@ -1354,8 +1486,14 @@ EXPORT_SYMBOL(xfrm_state_update);
 
 int xfrm_state_check_expire(struct xfrm_state *x)
 {
+/* start of    Homehub B018问题，Blackdns配置为IP方式，配置idletime时长为60s，实际测试超时时长在45-48秒，不准确  */
+#if 0
 	if (!x->curlft.use_time)
 		x->curlft.use_time = get_seconds();
+#else
+	x->curlft.use_time = get_seconds();
+#endif
+/* end of    Homehub B018问题，Blackdns配置为IP方式，配置idletime时长为60s，实际测试超时时长在45-48秒，不准确  */
 
 	if (x->km.state != XFRM_STATE_VALID)
 		return -EINVAL;
@@ -1634,6 +1772,128 @@ static void xfrm_replay_timer_handler(unsigned long data)
 	spin_unlock(&x->lock);
 }
 
+#ifdef CONFIG_XFRM_IDLE_TIME
+static void xfrm_idle_timer_handler(unsigned long data)
+{
+	struct xfrm_state *x = (struct xfrm_state*)data;
+    struct xfrm_state *pstOther = NULL;
+    struct km_event c;
+	unsigned long now = get_seconds();
+    unsigned long left = 0;
+    unsigned long left2 = 0;
+    unsigned long max = 0;
+    unsigned long idle = 0;
+    unsigned long ulResetTime = 0;
+
+    if (!x || (XFRM_STATE_VALID != x->km.state))
+    {
+        return ;
+    }
+
+    //xfrm_state_idle_clear(x);
+
+	/* start of  2010-08-25 如果该SA已经idle timeout了，那么下次idle timeout时删除 */
+    if (x->ucFlag & IDLE_TIMEOUT_FLAG)
+    {
+        xfrm_state_delete(x);
+        return ;
+    }
+	/* end of  2010-08-25 如果该SA已经 idle timeout了，那么下次timeout就删除 */
+    
+	xfrm_state_hold(x);
+
+    if (!x->lft.idle_time_seconds)
+    {
+        idle = ULONG_MAX;
+        goto mod;
+    }
+
+    idle = (unsigned long)x->lft.idle_time_seconds;
+
+/* start of  当SA idle之后尽早删除内核的SA */
+    ulResetTime = idle >> 1;
+/* End of  当SA idle之后尽早删除内核的SA */
+
+    pstOther = xfrm_state_lookup_byaddr(xs_net(x), &x->props.saddr,
+						  &x->id.daddr,
+						  x->id.proto, x->props.family);
+
+    if (!pstOther || (XFRM_STATE_VALID != pstOther->km.state))
+    {
+        goto mod;
+    }
+
+/* start of   Homehub B018问题，Blackdns配置为IP方式，配置idletime时长为60s，实际测试超时时长在45-48秒，不准确  */
+#if 0
+	if (!x->curlft.use_time)
+		x->curlft.use_time = get_seconds();
+    
+	if (!pstOther->curlft.use_time)
+		pstOther->curlft.use_time = get_seconds();
+#endif
+    //COLOR_DEBUG("now: %lu, x[%llu], other:[%llu]\r\n", 
+        //now, x->curlft.use_time, pstOther->curlft.use_time);
+/* end of   Homehub B018问题，Blackdns配置为IP方式，配置idletime时长为60s，实际测试超时时长在45-48秒，不准确  */
+
+    left = now - x->curlft.use_time;
+    left2 = now - pstOther->curlft.use_time; 
+
+    /* 两个 SA 都idle timeout 了才发送消息给用户态 */
+    if ((left < idle) || (left2 < idle))
+    {
+        max = left2 > left? (idle - left) : (idle - left2);
+        idle = max;
+        goto mod;
+    }
+
+    //COLOR_DEBUG("sa %08x and sa %08x idle timeout\r\n", x->id.spi, pstOther->id.spi);
+
+    // TODO: send message to userspace
+    memset(&c, 0, sizeof(c));
+    c.event = XFRM_MSG_SA_IDLE;
+    c.seq = 0;
+    c.pid = 0;    
+	km_state_notify(x, &c);
+
+	/* start of  如果该SA idle timeout了，那么下次idle timeout就删除 */
+    x->ucFlag |= IDLE_TIMEOUT_FLAG;
+    pstOther->ucFlag |= IDLE_TIMEOUT_FLAG;
+	/* end of  如果该SA idle timeout了，那么下次idle timeout就删除之 */
+
+    spin_lock(&pstOther->lock);
+    mod_timer(&pstOther->idletimer, jiffies + HZ * idle);
+	/* start of  当SA idle之后尽早删除内核的SA */
+    if (pstOther->ucFlag & IDLE_TIMEOUT_FLAG)
+    {
+        tasklet_hrtimer_start(&pstOther->mtimer, 
+            ktime_set(ulResetTime, 0), HRTIMER_MODE_REL);
+    }
+	/* End of  当SA idle之后尽早删除内核的SA */
+    spin_unlock(&pstOther->lock);
+
+mod:
+    spin_lock(&x->lock);
+    mod_timer(&x->idletimer, jiffies + HZ * idle);
+	/* start of  当SA idle之后尽早删除内核的SA */
+    if (x->ucFlag & IDLE_TIMEOUT_FLAG)
+    {
+        tasklet_hrtimer_start(&x->mtimer, 
+            ktime_set(ulResetTime, 0), HRTIMER_MODE_REL);
+    }
+	/* End of  当SA idle之后尽早删除内核的SA */
+    spin_unlock(&x->lock);
+
+out:
+/* start of  当SA idle之后尽早删除内核的SA */
+    if (pstOther)
+    {
+        xfrm_state_put(pstOther);
+    }
+/* End of  当SA idle之后尽早删除内核的SA */
+	xfrm_state_put(x);
+    return ;
+}
+#endif
 static LIST_HEAD(xfrm_km_list);
 static DEFINE_RWLOCK(xfrm_km_lock);
 

@@ -1,3 +1,7 @@
+/*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
 #ifndef __LINUX_IF_PACKET_H
 #define __LINUX_IF_PACKET_H
 
@@ -50,6 +54,7 @@ struct sockaddr_ll {
 #define PACKET_TX_TIMESTAMP		16
 #define PACKET_TIMESTAMP		17
 #define PACKET_FANOUT			18
+#define PACKET_IN_DEVICE		19    /*ATP add*/
 
 #define PACKET_FANOUT_HASH		0
 #define PACKET_FANOUT_LB		1

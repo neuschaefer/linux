@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * Silicon Laboratories CP210x USB to RS232 serial adaptor driver
  *
  * Copyright (C) 2005 Craig Shelley (craig@microtron.org.uk)
@@ -23,7 +27,12 @@
 #include <linux/usb.h>
 #include <linux/uaccess.h>
 #include <linux/usb/serial.h>
+#include "atpconfig.h"
 
+#ifdef SUPPORT_ATP_FTDILIST_CONFIG
+#include <linux/fs.h>   
+#include <linux/uaccess.h>  
+#endif
 /*
  * Version Information
  */
@@ -54,7 +63,23 @@ static void cp210x_dtr_rts(struct usb_serial_port *p, int on);
 
 static bool debug;
 
+#ifdef SUPPORT_ATP_FTDILIST_CONFIG
+static __u16 vendor = 0x10C4;
+static __u16 product;
+
+typedef struct tag_cp210x_usb_device_list
+{
+    struct tag_cp210x_usb_device_list             *pstNext;
+    unsigned int ulVID;
+    unsigned int ulPID;
+}ATP_CP210X_USB_DEVICE_LIST;
+#endif
+
+#ifdef SUPPORT_ATP_FTDILIST_CONFIG
+static struct usb_device_id id_table[] = {
+#else
 static const struct usb_device_id id_table[] = {
+#endif
 	{ USB_DEVICE(0x045B, 0x0053) }, /* Renesas RX610 RX-Stick */
 	{ USB_DEVICE(0x0471, 0x066A) }, /* AKTAKOM ACE-1001 cable */
 	{ USB_DEVICE(0x0489, 0xE000) }, /* Pirelli Broadband S.p.A, DP-L10 SIP/GSM Mobile */
@@ -159,6 +184,159 @@ static const struct usb_device_id id_table[] = {
 	{ USB_DEVICE(0x3195, 0xF280) }, /* Link Instruments MSO-28 */
 	{ USB_DEVICE(0x3195, 0xF281) }, /* Link Instruments MSO-28 */
 	{ USB_DEVICE(0x413C, 0x9500) }, /* DW700 GPS USB interface */
+#ifdef SUPPORT_ATP_FTDILIST_CONFIG	
+    { }, /*0*/
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },/*100*/
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },/*110*/
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },/*120*/
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },/*130*/
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },/*140*/
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },
+    { },/*150*/
+	{ },/* Optional parameter entry */    
+#endif  
 	{ } /* Terminating Entry */
 };
 
@@ -903,7 +1081,86 @@ static void cp210x_release(struct usb_serial *serial)
 	}
 }
 
+#ifdef SUPPORT_ATP_FTDILIST_CONFIG
+static int read_cp210x_usb_list_from_user(void)
+{
+    int table_size = sizeof(id_table)/sizeof(struct usb_device_id);
+    struct file *fp;  
+    mm_segment_t fs;  
+    loff_t pos;  
+    ATP_CP210X_USB_DEVICE_LIST stCp210xUsbDevice;
+    int i;
+
+    memset((void *)&stCp210xUsbDevice, 0, sizeof(ATP_CP210X_USB_DEVICE_LIST));
+    printk("the size of id_table is %d\n", table_size);
+
+	for (i = 0; id_table[i].idVendor; i++)
+    {
+        ;//find empty  
+    }   
+    
+    fp = filp_open("/var/cp210xDevList", O_RDONLY, 0644);  
+    if (IS_ERR(fp)) 
+    {  
+        printk("open cp210x list file error\n");  
+        return -1;  
+    }  
+
+    fs = get_fs();  
+    set_fs(KERNEL_DS);  
+    pos = 0;  
+    while(sizeof(ATP_CP210X_USB_DEVICE_LIST) == vfs_read(fp, &stCp210xUsbDevice, sizeof(ATP_CP210X_USB_DEVICE_LIST), &pos))
+    {
+        if ((i < table_size) && (stCp210xUsbDevice.ulVID >= 0) && (stCp210xUsbDevice.ulVID <= 0xFFFF) 
+            && (stCp210xUsbDevice.ulPID >= 0) && (stCp210xUsbDevice.ulPID <= 0xFFFF))
+        {
+        	id_table[i].match_flags = USB_DEVICE_ID_MATCH_DEVICE;
+        	id_table[i].idVendor = stCp210xUsbDevice.ulVID;
+        	id_table[i].idProduct = stCp210xUsbDevice.ulPID;
+            printk("idVendor: 0x%04x idProduct: 0x%04x\n", id_table[i].idVendor, id_table[i].idProduct);
+        	i++;
+        }
+        
+    }
+    printk("the size of used table is %d\n", i);
+    filp_close(fp, NULL);  
+    set_fs(fs);
+    
+    return 0;  
+}
+
+static int __init cp210x_init(void) 
+{
+    int retval;
+
+	dbg("%s", __func__);
+	if(vendor > 0 && product > 0) {
+		/* Add user specified VID/PID to reserved element of table. */
+		int i;
+		for (i = 0; id_table[i].idVendor; i++)
+			;
+		id_table[i].match_flags = USB_DEVICE_ID_MATCH_DEVICE;
+		id_table[i].idVendor = vendor;
+		id_table[i].idProduct = product;
+	}
+    read_cp210x_usb_list_from_user();
+	retval = usb_serial_register_drivers(&cp210x_driver, serial_drivers); 
+	if (0 == retval)
+		printk(KERN_INFO KBUILD_MODNAME ": " DRIVER_VERSION ":"DRIVER_DESC "\n");
+	return retval;
+}
+
+static void __exit cp210x_exit(void) 
+{
+    dbg("%s", __func__);
+	usb_serial_deregister_drivers(&cp210x_driver, serial_drivers);
+}
+
+module_init(cp210x_init); 
+module_exit(cp210x_exit);
+#else
 module_usb_serial_driver(cp210x_driver, serial_drivers);
+#endif
 
 MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_VERSION(DRIVER_VERSION);

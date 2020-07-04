@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *	Linux INET6 implementation
  *	FIB front-end.
  *
@@ -914,8 +918,32 @@ void ip6_route_input(struct sk_buff *skb)
 	fl6.flowi6_iif  = skb->dev->ifindex;
 	fl6.flowi6_mark = skb->mark;
 	fl6.flowi6_proto = iph->nexthdr;
-	fl6.daddr = iph->daddr;
-	fl6.saddr = iph->saddr;
+    /*START ADD:  FOR 处理IPV6 非对齐访问 2014-01-24*/
+#ifdef CONFIG_ATP_BRCM
+    //fl6.daddr = iph->daddr;
+    fl6.daddr.s6_addr16[0] = iph->daddr.s6_addr16[0];
+    fl6.daddr.s6_addr16[1] = iph->daddr.s6_addr16[1];
+    fl6.daddr.s6_addr16[2] = iph->daddr.s6_addr16[2];
+    fl6.daddr.s6_addr16[3] = iph->daddr.s6_addr16[3];
+    fl6.daddr.s6_addr16[4] = iph->daddr.s6_addr16[4];
+    fl6.daddr.s6_addr16[5] = iph->daddr.s6_addr16[5];
+    fl6.daddr.s6_addr16[6] = iph->daddr.s6_addr16[6];
+    fl6.daddr.s6_addr16[7] = iph->daddr.s6_addr16[7];
+    
+    //fl6.saddr = iph->saddr;
+    fl6.saddr.s6_addr16[0] = iph->saddr.s6_addr16[0];
+    fl6.saddr.s6_addr16[1] = iph->saddr.s6_addr16[1];
+    fl6.saddr.s6_addr16[2] = iph->saddr.s6_addr16[2];
+    fl6.saddr.s6_addr16[3] = iph->saddr.s6_addr16[3];
+    fl6.saddr.s6_addr16[4] = iph->saddr.s6_addr16[4];
+    fl6.saddr.s6_addr16[5] = iph->saddr.s6_addr16[5];
+    fl6.saddr.s6_addr16[6] = iph->saddr.s6_addr16[6];
+    fl6.saddr.s6_addr16[7] = iph->saddr.s6_addr16[7];
+#else
+    fl6.daddr = iph->daddr;
+    fl6.saddr = iph->saddr;
+#endif	
+    /*END ADD:  FOR 处理IPV6 非对齐访问 2014-01-24*/
 	memcpy(&fl6.flowlabel, iph, sizeof(__be32));
 	fl6.flowlabel &= IPV6_FLOWINFO_MASK;
 #else
@@ -1401,8 +1429,12 @@ int ip6_route_add(struct fib6_config *cfg)
 			   some exceptions. --ANK
 			 */
 			err = -EINVAL;
+#ifdef CONFIG_SUPPORT_ATP
+            if (gwa_type & (IPV6_ADDR_MULTICAST | IPV6_ADDR_LOOPBACK | IPV6_ADDR_ANY))
+#else
 			if (!(gwa_type & IPV6_ADDR_UNICAST))
-				goto out;
+#endif
+                goto out;
 
 			grt = rt6_lookup(net, gw_addr, NULL, cfg->fc_ifindex, 1);
 

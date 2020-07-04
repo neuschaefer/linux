@@ -1,3 +1,7 @@
+/*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
 #include <linux/mutex.h>
 #include <linux/socket.h>
 #include <linux/skbuff.h>
@@ -125,6 +129,11 @@ static int __sock_diag_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 
 	if (nlmsg_len(nlh) < sizeof(*req))
 		return -EINVAL;
+
+	/*CVE-2013-1763 sync add from higher kernel version start*/
+	if (req->sdiag_family >= AF_MAX)
+		return -EINVAL;
+	/*CVE-2013-1763 sync add from higher kernel version end*/
 
 	hndl = sock_diag_lock_handler(req->sdiag_family);
 	if (hndl == NULL)

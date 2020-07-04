@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *	Types and definitions for AF_INET6 
  *	Linux INET6 implementation 
  *
@@ -84,6 +88,17 @@ struct in6_flowlabel_req {
 	__u32	__flr_pad;
 	/* Options in format of IPV6_PKTOPTIONS */
 };
+
+/*bridge local link interface configuarable*/
+#ifdef CONFIG_IFCID_CFG
+struct bridge_ifcid_set_msg_st
+{
+    struct in6_addr stIPv6AddrIfc;
+    int lBridgeKey;
+    unsigned int ulIfcIdMode; 
+};
+#define LAN_LINKLOCAL_INTERFACE_ID_INIT      77
+#endif
 
 #define IPV6_FL_A_GET	0
 #define IPV6_FL_A_PUT	1
@@ -272,6 +287,12 @@ struct in6_flowlabel_req {
 #define IPV6_RECVORIGDSTADDR    IPV6_ORIGDSTADDR
 #define IPV6_TRANSPARENT        75
 #define IPV6_UNICAST_IF         76
+
+/* start of 2010-01-29 支持接收skb的mark */
+#define IPV6_ORIGINDEV         (97)
+#define IPV6_RECVNFMARK        (98)
+#define IPV6_NFMARK            (99)
+/* end of 2010-01-29 支持接收skb的mark */
 
 /*
  * Multicast Routing:

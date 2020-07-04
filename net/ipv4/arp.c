@@ -1,3 +1,7 @@
+/*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
 /* linux/net/ipv4/arp.c
  *
  * Copyright (C) 1994 by Florian  La Roche
@@ -116,6 +120,13 @@
 #include <linux/uaccess.h>
 
 #include <linux/netfilter_arp.h>
+
+#ifdef CONFIG_ATP_COMMON
+#ifdef CONFIG_ARP_REPLY_TO_ANY_ADDR
+extern int arp_is_need_reply(struct net_device *dev, __be32 sip, __be32 tip);
+#endif
+extern int arp_need_learn_from_request(struct sk_buff *skb);
+#endif
 
 /*
  *	Interface to generic neighbour cache.
@@ -384,7 +395,7 @@ static void arp_solicit(struct neighbour *neigh, struct sk_buff *skb)
 		read_unlock_bh(&neigh->lock);
 }
 
-static int arp_ignore(struct in_device *in_dev, __be32 sip, __be32 tip)
+int arp_ignore(struct in_device *in_dev, __be32 sip, __be32 tip)
 {
 	int scope;
 
@@ -849,6 +860,11 @@ static int arp_process(struct sk_buff *skb)
 			if (!dont_send && IN_DEV_ARPFILTER(in_dev))
 				dont_send = arp_filter(sip, tip, dev);
 			if (!dont_send) {
+				if (!arp_need_learn_from_request(skb)) {
+					arp_send(ARPOP_REPLY, ETH_P_ARP, sip, dev, tip, sha, dev->dev_addr, sha);
+					goto out;
+				}
+
 				n = neigh_event_ns(&arp_tbl, sha, &sip, dev);
 				if (n) {
 					arp_send(ARPOP_REPLY, ETH_P_ARP, sip,
@@ -883,6 +899,15 @@ static int arp_process(struct sk_buff *skb)
 			}
 		}
 	}
+	/*START ADD:Huawei 2013-1-3 FOR 应答子网地址和子网广播地址发出的arp请求*/
+#ifdef CONFIG_ARP_REPLY_TO_ANY_ADDR
+	else if (arp->ar_op == htons(ARPOP_REQUEST) &&
+		arp_is_need_reply(skb->dev, sip, tip))
+	{
+		arp_send(ARPOP_REPLY, ETH_P_ARP, sip, dev, tip, sha, dev->dev_addr, sha);
+	}
+#endif
+	/*END ADD:Huawei 2013-1-3 FOR 应答子网地址和子网广播地址发出的arp请求*/
 
 	/* Update our ARP tables */
 

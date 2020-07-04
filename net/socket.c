@@ -104,6 +104,7 @@
 #include <linux/route.h>
 #include <linux/sockios.h>
 #include <linux/atalk.h>
+#include <linux/atphooks.h>
 
 static int sock_no_open(struct inode *irrelevant, struct file *dontcare);
 static ssize_t sock_aio_read(struct kiocb *iocb, const struct iovec *iov,
@@ -956,6 +957,19 @@ void vlan_ioctl_set(int (*hook) (struct net *, void __user *))
 }
 EXPORT_SYMBOL(vlan_ioctl_set);
 
+#if defined(CONFIG_SMUX)
+static DEFINE_MUTEX(smux_ioctl_mutex);
+static int (*smux_ioctl_hook) (void __user *arg);
+
+void smux_ioctl_set(int (*hook) (void __user *))
+{
+	mutex_lock(&smux_ioctl_mutex);
+	smux_ioctl_hook = hook;
+	mutex_unlock(&smux_ioctl_mutex);
+}
+
+EXPORT_SYMBOL(smux_ioctl_set);
+#endif
 static DEFINE_MUTEX(dlci_ioctl_mutex);
 static int (*dlci_ioctl_hook) (unsigned int, void __user *);
 
@@ -990,8 +1004,27 @@ static long sock_do_ioctl(struct net *net, struct socket *sock,
  *	what to do with it - that's up to the protocol still.
  */
 
+
+/*Start of modified by Huawei@20100823 for dscpcount*/
+
+typedef struct{
+    unsigned int ulkrnlenable;
+    unsigned int dscpvalue;
+    unsigned int statisticvalue;
+}DSCP_COUNT_KRNLINFO_ST;
+
+#define DSCP_DISABLE         (0)
+#define DSCP_ENABLE          (1)
+
+/*end of modified by Huawei@20100823 for dscpcount*/
+
+
 static long sock_ioctl(struct file *file, unsigned cmd, unsigned long arg)
 {
+#if defined(CONFIG_DSCP_QOS)
+	struct ifreq ifr;
+#endif
+
 	struct socket *sock;
 	struct sock *sk;
 	void __user *argp = (void __user *)arg;
@@ -1046,6 +1079,17 @@ static long sock_ioctl(struct file *file, unsigned cmd, unsigned long arg)
 				err = vlan_ioctl_hook(net, argp);
 			mutex_unlock(&vlan_ioctl_mutex);
 			break;
+#if defined(CONFIG_SMUX)
+		case SIOCSIFSMUX:
+			err = -ENOPKG;
+			if(!smux_ioctl_hook)
+				request_module("smux");
+			mutex_lock(&smux_ioctl_mutex);
+			if(smux_ioctl_hook)
+				err = smux_ioctl_hook(argp);
+			mutex_unlock(&smux_ioctl_mutex);
+			break;
+#endif /* CONFIG_MIPS_BRCM */
 		case SIOCADDDLCI:
 		case SIOCDELDLCI:
 			err = -ENOPKG;
@@ -1057,6 +1101,44 @@ static long sock_ioctl(struct file *file, unsigned cmd, unsigned long arg)
 				err = dlci_ioctl_hook(cmd, argp);
 			mutex_unlock(&dlci_ioctl_mutex);
 			break;
+		/* Start of modified by Huawei for dscpcount 2012-03-22 */
+#if defined(CONFIG_DSCP_QOS)
+	        case SIOQOSDSCPCOUNT:  
+	        {    
+	            DSCP_COUNT_KRNLINFO_ST   sttmpinfo ;
+	            DSCP_COUNT_KRNLINFO_ST* stdci = NULL; 
+	            int dcimark = 0;
+	            if(NULL == argp)
+	            {
+	              printk("send info point is null,get krnl stat info fail!");
+	              break;
+	            }
+	            if (copy_from_user(&ifr, argp, sizeof(struct ifreq)))
+	            {
+	              return -EFAULT;
+	            }
+	            stdci = (DSCP_COUNT_KRNLINFO_ST *)ifr.ifr_data;
+	            if (DSCP_DISABLE == stdci->ulkrnlenable)
+	            {
+	               //printk("\n set disable to dscp!\n");
+	               blog_setdscpswitch(DSCP_DISABLE);
+	            }
+	            else
+	            {             
+	              blog_setdscpswitch(DSCP_ENABLE);
+	              sttmpinfo.dscpvalue = stdci->dscpvalue;        
+	              sttmpinfo.statisticvalue = blog_getdscpstatisticdata(stdci->dscpvalue);
+	              if (copy_to_user((void*)stdci, (void*)&sttmpinfo, sizeof(DSCP_COUNT_KRNLINFO_ST))) 
+	              {
+	                  printk("copy to user failed!");
+	                  return -EFAULT;
+	              }
+	            }
+	            err = 0;
+	            break;
+	        }
+#endif
+        /* End of modified by Huawei for dscpcount 2012-03-22 */
 		default:
 			err = sock_do_ioctl(net, sock, cmd, arg);
 			break;
@@ -1775,8 +1857,13 @@ SYSCALL_DEFINE6(recvfrom, int, fd, void __user *, ubuf, size_t, size,
 	msg.msg_iov = &iov;
 	iov.iov_len = size;
 	iov.iov_base = ubuf;
-	msg.msg_name = (struct sockaddr *)&address;
-	msg.msg_namelen = sizeof(address);
+	/*<  Huawei 20151102 begin*/
+    //CVE-2013-7270
+    /* Save some cycles and don't copy the address if not needed */
+    msg.msg_name = addr ? (struct sockaddr *)&address : NULL;
+    /* We assume all kernel code knows the size of sockaddr_storage */
+    msg.msg_namelen = 0;
+	/*  Huawei 20151102 end>*/
 	if (sock->file->f_flags & O_NONBLOCK)
 		flags |= MSG_DONTWAIT;
 	err = sock_recvmsg(sock, &msg, size, flags);
@@ -2141,9 +2228,11 @@ static int __sys_recvmsg(struct socket *sock, struct msghdr __user *msg,
 
 	uaddr = (__force void __user *)msg_sys->msg_name;
 	uaddr_len = COMPAT_NAMELEN(msg);
-	if (MSG_CMSG_COMPAT & flags) {
+	/*<  Huawei 20151102 begin*/
+	//CVE-2013-7270
+	if (MSG_CMSG_COMPAT & flags)
 		err = verify_compat_iovec(msg_sys, iov, &addr, VERIFY_WRITE);
-	} else
+	else
 		err = verify_iovec(msg_sys, iov, &addr, VERIFY_WRITE);
 	if (err < 0)
 		goto out_freeiov;
@@ -2151,6 +2240,9 @@ static int __sys_recvmsg(struct socket *sock, struct msghdr __user *msg,
 
 	cmsg_ptr = (unsigned long)msg_sys->msg_control;
 	msg_sys->msg_flags = flags & (MSG_CMSG_CLOEXEC|MSG_CMSG_COMPAT);
+    /* We assume all kernel code knows the size of sockaddr_storage */
+    msg_sys->msg_namelen = 0;
+	/*  Huawei 20151102 end>*/
 
 	if (sock->file->f_flags & O_NONBLOCK)
 		flags |= MSG_DONTWAIT;
@@ -2561,6 +2653,10 @@ static int __init sock_init(void)
 	netfilter_init();
 #endif
 
+#ifdef CONFIG_ATP_COMMON
+	atphooks_init();
+#endif
+
 #ifdef CONFIG_NETWORK_PHY_TIMESTAMPING
 	skb_timestamping_init();
 #endif
@@ -2657,7 +2753,10 @@ static int dev_ifconf(struct net *net, struct compat_ifconf __user *uifc32)
 
 	if (copy_from_user(&ifc32, uifc32, sizeof(struct compat_ifconf)))
 		return -EFAULT;
-
+    /*<  Huawei 20151102 begin*/
+    //CVE-2012-6539
+    memset(&ifc, 0, sizeof(ifc));
+    /*  Huawei 20151102 end>*/
 	if (ifc32.ifcbuf == 0) {
 		ifc32.ifc_len = 0;
 		ifc.ifc_len = 0;

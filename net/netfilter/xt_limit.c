@@ -1,3 +1,7 @@
+/*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
 /* (C) 1999 Jérôme de Vivie <devivie@info.enserb.u-bordeaux.fr>
  * (C) 1999 Hervé Eychenne <eychenne@info.enserb.u-bordeaux.fr>
  *
@@ -116,8 +120,7 @@ static int limit_mt_check(const struct xt_mtchk_param *par)
 	if (priv == NULL)
 		return -ENOMEM;
 
-	/* For SMP, we only want to use one set of state. */
-	r->master = priv;
+	/*modify for limit bug  */
 	if (r->cost == 0) {
 		/* User avg in seconds * XT_LIMIT_SCALE: convert to jiffies *
 		   128. */
@@ -125,7 +128,15 @@ static int limit_mt_check(const struct xt_mtchk_param *par)
 		priv->credit = user2credits(r->avg * r->burst); /* Credits full. */
 		r->credit_cap = user2credits(r->avg * r->burst); /* Credits full. */
 		r->cost = user2credits(r->avg);
+	} else if (r->master){
+		priv->prev = r->master->prev;
+		priv->credit = r->master->credit;
 	}
+
+	/* For SMP, we only want to use one set of state. */
+	r->master = priv;
+	/*modify end for limit bug  */
+
 	return 0;
 }
 

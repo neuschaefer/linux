@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *  linux/arch/arm/kernel/bios32.c
  *
  *  PCI bios-type initialisation for PCI machines
@@ -292,6 +296,25 @@ static inline int pdev_bad_for_parity(struct pci_dev *dev)
 		 dev->device == PCI_DEVICE_ID_ITE_8152));
 
 }
+#if (defined CONFIG_HSAN)
+static void pbus_assign_bus_resources(struct pci_bus *bus, struct pci_sys_data *root)
+{
+	struct pci_dev *dev = bus->self;
+    struct pci_host_bridge_window *window, *tmp;
+	
+	if (!dev) {
+		/*
+		 * Assign root bus resources.
+		 */
+		list_for_each_entry_safe(window, tmp, &root->resources, list) {
+            if (IORESOURCE_IO == window->res->flags)
+                bus->resource[0] = window->res;
+            if (IORESOURCE_MEM == window->res->flags)
+                bus->resource[1] = window->res;
+        }
+	}
+}
+#endif
 
 /*
  * pcibios_fixup_bus - Called after each bus is probed,
@@ -301,7 +324,11 @@ void pcibios_fixup_bus(struct pci_bus *bus)
 {
 	struct pci_dev *dev;
 	u16 features = PCI_COMMAND_SERR | PCI_COMMAND_PARITY | PCI_COMMAND_FAST_BACK;
+#if (defined CONFIG_HSAN)
+    struct pci_sys_data *root = bus->sysdata;
 
+    pbus_assign_bus_resources(bus, root);
+#endif
 	/*
 	 * Walk the devices on this bus, working out what we can
 	 * and can't support.

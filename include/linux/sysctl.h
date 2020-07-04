@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * sysctl.h: General linux system control interface
  *
  * Begun 24 March 1995, Stephen Tweedie
@@ -156,6 +160,7 @@ enum
 #if defined(CONFIG_BCM_KF_PRINTK_INT_ENABLED) && defined(CONFIG_BCM_PRINTK_INT_ENABLED)
 	KERN_PRINTK_WITH_INTERRUPTS_ENABLED=77, /* int: print with interrupts enabled */
 #endif
+	KERN_LOCAL_TIME_OFFSET=78, /*ATP add, int: local time and utc time offset in seconds*/
 };
 
 
@@ -278,6 +283,15 @@ enum
 	NET_CORE_AEVENT_ETIME=20,
 	NET_CORE_AEVENT_RSEQTH=21,
 	NET_CORE_WARNINGS=22,
+    NET_CORE_WLAN_DNS =23,    /* ATP add */
+    NET_CORE_DEFAULTDOMAIN =24,    /* ATP add */
+#ifdef CONFIG_ATP_HYBRID_GREACCEL
+    NET_CORE_HISI_SW_FLG=25,
+#endif
+#ifdef CONFIG_ATP_SKB_LIMIT
+	NET_CORE_SKB_MAX_NUM = 26,
+	NET_CORE_SKB_NUM = 27,
+#endif
 };
 
 /* /proc/sys/net/ethernet */
@@ -428,6 +442,26 @@ enum
 	NET_TCP_ALLOWED_CONG_CONTROL=123,
 	NET_TCP_MAX_SSTHRESH=124,
 	NET_TCP_FRTO_RESPONSE=125,
+	/* ATP add start */
+	NET_IPV4_IGMP_SEND_REPORT_NUM=126,
+	NET_IPV4_IGMP_SEND_REPORT_INTERVAL=127,
+/* BEGIN: Added , 2010/8/5 For port scan */
+	NET_IPV4_UDP_PORT_SCAN=128,
+/* END:   Added , 2010/8/5 */
+	NET_IPV4_IPFRAG_COUNT_THRESH=129,  /* add ipfrag count */
+	NET_IPV4_IGMP_RCV_QUERY = 134,
+	NET_IPV4_IGMP_SND_REPORT = 135,
+#ifdef CONFIG_ATP_HYBRID_REORDER
+    NET_IPV4_IPGRE_QUEUE_TIMEOUT = 136,
+    NET_IPV4_IPGER_QLEN_MAX = 137,
+    NET_IPV4_IPGER_BADSEQ_INTERVAL = 138,
+    NET_IPV4_IPGER_KEEPSEQ_ENABLE = 139,
+    NET_IPV4_IPGER_SKB_TIMEOUT = 140,    
+#endif
+#ifdef CONFIG_ATP_ROUTE_BALANCE
+    NET_IPV4_ROUTEBALANCE_STAT_INTERVAL = 141,
+#endif
+	/* ATP add end */
 };
 
 enum {
@@ -517,6 +551,58 @@ enum
  	NET_IPV4_NF_CONNTRACK_SCTP_TIMEOUT_SHUTDOWN_ACK_SENT=26,
 	NET_IPV4_NF_CONNTRACK_COUNT=27,
 	NET_IPV4_NF_CONNTRACK_CHECKSUM=28,
+#ifdef CONFIG_ATP_CONNTRACK_CLEAN
+	NET_IPV4_NF_CONNTRACK_CLEAN=29,
+	NET_IPV4_NF_CLEAN_DNS=29,
+#endif
+/* start of add by  2009-04-15 to support alg switch */
+#ifdef CONFIG_NF_CONNTRACK_H323
+    NET_IPV4_NF_ALG_H323_SWITCH = 50,
+#endif
+#ifdef CONFIG_NF_CONNTRACK_RTSP
+    NET_IPV4_NF_ALG_RTSP_SWITCH = 51,
+#endif
+#ifdef CONFIG_NF_CONNTRACK_PPTP
+    NET_IPV4_NF_ALG_PPTP_SWITCH = 52,
+#endif
+#ifdef CONFIG_NF_CONNTRACK_IPSEC
+    NET_IPV4_NF_ALG_IPSEC_SWITCH = 53,
+#endif
+#if defined(CONFIG_NF_CONNTRACK_SIP) || defined(CONFIG_NF_CONNTRACK_SIP_MODULE)
+    NET_IPV4_NF_ALG_SIP_SWITCH = 54,
+#endif
+#if defined(CONFIG_IMQ) || defined(CONFIG_IMQ_MODULE)
+    NET_IPV4_NF_QOS_SWITCH = 55,
+#endif
+/* end of add by  2009-04-15 to support alg switch */
+/*start added by  for HG658B_STC LAN-WAN自动桥绑定,2011-12-19*/
+#if defined(CONFIG_NF_CONNTRACK_BR_AUTOBIND)    
+    NET_IPV4_NF_BR_AUTOBIND=60,
+#endif
+/*end added by  for HG658B_STC LAN-WAN自动桥绑定,2011-12-19*/
+
+#if defined(CONFIG_IMQ) || defined(CONFIG_IMQ_MODULE)
+    NET_IPV4_NF_DOWNQOS_SWITCH = 61,
+#endif
+
+#ifdef CONFIG_DPI_PARSE
+    NET_IPV4_NF_SMARTQOS_SWITCH = 62, 
+#endif
+
+	/*控制内核log速率的变量*/
+#ifdef CONFIG_FIREWALL_LOG
+	NET_IPV4_NF_FIREWALL_LOG_SWITCH = 56,
+#endif
+#ifdef CONFIG_NF_CONNTRACK_FTP	
+	NET_IPV4_NF_ALG_FTP_SWITCH = 57,
+#endif	
+
+/* Add  for per-flow bonding @ 2013-07-23 */
+#ifdef  CONFIG_ARCH_SD56XX
+    NET_IPV4_NF_DSL_THRESHOLD = 62,
+    NET_IPV4_NF_DSL_THRESHOLD_FLAG = 63,
+#endif
+/* Add end */
 };
  
 /* /proc/sys/net/ipv6 */
@@ -531,6 +617,9 @@ enum {
 	NET_IPV6_IP6FRAG_TIME=23,
 	NET_IPV6_IP6FRAG_SECRET_INTERVAL=24,
 	NET_IPV6_MLD_MAX_MSF=25,
+	/* BEGIN: Added , 2013/7/18 For port scan */
+	NET_IPV6_UDP_PORT_SCAN=26,
+	/* END:   Added , 2013/7/18 */
 };
 
 enum {
@@ -571,6 +660,9 @@ enum {
 	NET_IPV6_ACCEPT_RA_RT_INFO_MAX_PLEN=22,
 	NET_IPV6_PROXY_NDP=23,
 	NET_IPV6_ACCEPT_SOURCE_ROUTE=25,
+#ifdef CONFIG_SUPPORT_ATP_IPV6_ENABLE
+     NET_IPV6_ENABLE = 29,
+#endif
 	__NET_IPV6_MAX
 };
 

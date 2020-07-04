@@ -1,3 +1,7 @@
+/*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
 /* Connection state tracking for netfilter.  This is separated from,
    but required by, the NAT layer; it can also be used by an iptables
    extension. */
@@ -10,7 +14,6 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
-
 #include <linux/types.h>
 #include <linux/netfilter.h>
 #include <linux/module.h>
@@ -57,11 +60,42 @@
 #include <net/netfilter/nf_nat.h>
 #include <net/netfilter/nf_nat_core.h>
 
+#ifdef CONFIG_NF_CONNTRACK_PRI
+#include <linux/netfilter/nf_conntrack_pri.h>
+#endif
+
+#include <linux/atphooks.h>
+
+#include <linux/ip.h>
+#ifdef CONFIG_ATP_HYBRID
+#include <net/dsfield.h>
+#include <linux/netfilter/xt_dscp.h>
+#endif
+
+/*start of ，连接跟踪信息清空。by  2009-10-25*/
+#ifdef CONFIG_ATP_CONNTRACK_CLEAN
+static void nf_conntrack_user_cleanup(struct net *net);
+
+int nf_conntrack_clean __read_mostly;
+EXPORT_SYMBOL_GPL(nf_conntrack_clean);
+#endif
+/*end of ，连接跟踪信息清空。by  2009-10-25*/
+
 #if defined(CONFIG_BCM_KF_RUNNER)
 #if defined(CONFIG_BCM_RDPA) || defined(CONFIG_BCM_RDPA_MODULE)
 #include <net/bl_ops.h>
 #endif /* CONFIG_BCM_RUNNER */
 #endif /* CONFIG_BCM_KF_RUNNER */
+
+/* Add  for per-flow bonding @ 2013-07-23 */
+#ifdef CONFIG_HSAN
+extern int dsl_threshold_flag;
+void (*nf_bonding_dfe_hook)(void);
+/* Add  for per-flow bonding @ 2013-07-23 */
+EXPORT_SYMBOL_GPL(nf_bonding_dfe_hook);
+/* Add end */
+#endif
+/* Add end */
 
 
 #define NF_CONNTRACK_VERSION	"0.5.0"
@@ -70,6 +104,31 @@ int (*nfnetlink_parse_nat_setup_hook)(struct nf_conn *ct,
 				      enum nf_nat_manip_type manip,
 				      const struct nlattr *attr) __read_mostly;
 EXPORT_SYMBOL_GPL(nfnetlink_parse_nat_setup_hook);
+
+int (*nf_ct_reserved_hook)(struct nf_conn *ct) __read_mostly;
+
+int (*nf_ct_high_pri_hook)(struct net *net, const struct nf_conntrack_tuple *orig) __read_mostly;
+
+int (*nf_ct_del_used_by_pri_hook)(struct net *net);
+
+#ifdef CONFIG_ATP_HYBRID_GREACCEL
+hi_nf_conntrack_death_hook pf_hi_nf_conntrack_death_hook;
+unsigned int hi_nf_conntrack_register_death_hook(hi_nf_conntrack_death_hook hook)
+{
+    pf_hi_nf_conntrack_death_hook = hook;
+    return 0;
+}
+unsigned int hi_nf_conntrack_unregister_death_hook()
+{
+    pf_hi_nf_conntrack_death_hook = NULL;
+    return 0;
+}
+
+EXPORT_SYMBOL(hi_nf_conntrack_register_death_hook);
+EXPORT_SYMBOL(hi_nf_conntrack_unregister_death_hook);
+#endif
+
+
 
 DEFINE_SPINLOCK(nf_conntrack_lock);
 EXPORT_SYMBOL_GPL(nf_conntrack_lock);
@@ -90,6 +149,20 @@ EXPORT_SYMBOL_GPL(nf_conntrack_hash_rnd);
 /* bugfix for lost connection */
 LIST_HEAD(lo_safe_list);
 LIST_HEAD(hi_safe_list);
+#endif
+
+#if (defined CONFIG_HSAN)
+/* RFC4008 */
+static unsigned int HI_RES_LINK_ACT_NAT_TCP_DEF_IDLE_TIMEOUT = 86400 *HZ;  /* 5 DAYS */
+static unsigned int HI_RES_LINK_ACT_NAT_UDP_DEF_IDLE_TIMEOUT = 300 *HZ;    /* 300 seconds */
+
+static unsigned int HI_RES_LINK_ACT_NAT_GENERIC_DEF_IDLE_TIMEOUT = 600 *HZ;/* 600 seconds */
+#endif
+
+#ifdef CONFIG_DPI_PARSE
+void (*ct_destory_flow)(struct nf_conn *ct) = NULL;
+EXPORT_SYMBOL(ct_destory_flow);
+extern void *  g_pvMulInsHandle;
 #endif
 
 static u32 hash_conntrack_raw(const struct nf_conntrack_tuple *tuple, u16 zone)
@@ -198,7 +271,7 @@ nf_ct_invert_tuple(struct nf_conntrack_tuple *inverse,
 }
 EXPORT_SYMBOL_GPL(nf_ct_invert_tuple);
 
-static void
+void
 clean_from_lists(struct nf_conn *ct)
 {
 	pr_debug("clean_from_lists(%p)\n", ct);
@@ -208,6 +281,7 @@ clean_from_lists(struct nf_conn *ct)
 	/* Destroy all pending expectations */
 	nf_ct_remove_expectations(ct);
 }
+EXPORT_SYMBOL_GPL(clean_from_lists);
 
 #if defined(CONFIG_BCM_KF_DPI) && defined(CONFIG_BRCM_DPI)
 static inline void evict_ctk_update( struct nf_conn *ct )
@@ -271,7 +345,7 @@ static inline void evict_ctk_update( struct nf_conn *ct )
 #endif
 
 #if defined(CONFIG_BCM_KF_NETFILTER)
-static void death_by_timeout(unsigned long ul_conntrack);
+void death_by_timeout(unsigned long ul_conntrack);
 #endif
 #if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BCM_KF_NETFILTER) && defined(CONFIG_BLOG)
 static void blog_death_by_timeout(unsigned long ul_conntrack);
@@ -286,9 +360,8 @@ destroy_conntrack(struct nf_conntrack *nfct)
 
 
 #if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
-	pr_debug("%s(%p) blog keys[0x%08x,0x%08x]\n", __func__,
-		ct, ct->blog_key[IP_CT_DIR_ORIGINAL],
-		ct->blog_key[IP_CT_DIR_REPLY]);
+	pr_debug("destroy_conntrack(%p) blog keys[0x%08x,0x%08x]\n",
+		ct, ct->blog_key[IP_CT_DIR_ORIGINAL], ct->blog_key[IP_CT_DIR_REPLY]);
 
 
 	/* Conntrack going away, notify blog client */
@@ -364,7 +437,15 @@ destroy_conntrack(struct nf_conntrack *nfct)
 	if (ct->master)
 #if defined(CONFIG_BCM_KF_NETFILTER)
 	{
+	    /* start  conntrack lead to rcu pending */
+#ifdef CONFIG_ATP_BRCM	
+	    spin_lock_bh(&nf_conntrack_lock);
+#endif
 		list_del(&ct->derived_list);
+#ifdef CONFIG_ATP_BRCM
+        spin_unlock_bh(&nf_conntrack_lock);
+#endif
+        /* end  conntrack lead to rcu pending */
 #endif
 		nf_ct_put(ct->master);
 #if defined(CONFIG_BCM_KF_NETFILTER)
@@ -440,16 +521,36 @@ void nf_ct_insert_dying_list(struct nf_conn *ct)
 }
 EXPORT_SYMBOL_GPL(nf_ct_insert_dying_list);
 
-static void death_by_timeout(unsigned long ul_conntrack)
+void death_by_timeout(unsigned long ul_conntrack)
 {
 	struct nf_conn *ct = (void *)ul_conntrack;
 	struct nf_conn_tstamp *tstamp;
+
+#if (defined CONFIG_HSAN)
+ 	spin_lock_bh(&nf_conntrack_lock);
+    if(NULL != ct)
+    {
+        ct->h_link[0] = 0;
+        ct->h_link[1] = 0;
+    }
+    spin_unlock_bh(&nf_conntrack_lock);
+#endif
 
 #if defined(CONFIG_BCM_KF_RUNNER)
 #if defined(CONFIG_BCM_RDPA) || defined(CONFIG_BCM_RDPA_MODULE)
 	BL_OPS_CR(net_netfilter_nf_conntrack_core_death_by_timeout(ct));
 #endif /* CONFIG_BCM_RUNNER */
 #endif /* CONFIG_BCM_KF_RUNNER */
+
+#ifdef CONFIG_ATP_HYBRID_GREACCEL
+    if (pf_hi_nf_conntrack_death_hook != NULL)
+    {
+        if (pf_hi_nf_conntrack_death_hook(ct, HI_NF_NORMAL_DEATH_HOOK) == 1)
+        {
+            printk("bug: should return 0");
+        }
+    }
+#endif
 
 
 #if defined(CONFIG_BCM_KF_DPI) && defined(CONFIG_BRCM_DPI)
@@ -470,6 +571,7 @@ static void death_by_timeout(unsigned long ul_conntrack)
 	nf_ct_delete_from_lists(ct);
 	nf_ct_put(ct);
 }
+EXPORT_SYMBOL_GPL(death_by_timeout);
 
 #if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BCM_KF_NETFILTER) && defined(CONFIG_BLOG)
 void __nf_ct_time(struct nf_conn *ct, BlogCtTime_t *ct_time_p)
@@ -509,6 +611,18 @@ void __nf_ct_time(struct nf_conn *ct, BlogCtTime_t *ct_time_p)
 static void blog_death_by_timeout(unsigned long ul_conntrack)
 {
 	struct nf_conn *ct = (void *)ul_conntrack;
+
+#ifdef CONFIG_ATP_HYBRID_GREACCEL
+    if (pf_hi_nf_conntrack_death_hook != NULL)
+    {
+        if (pf_hi_nf_conntrack_death_hook(ct, HI_NF_TIMEOUT_DEATH_HOOK) == 1)
+        {
+            ct->timeout.expires = jiffies + 10 * HZ;
+            add_timer(&ct->timeout);
+            return;
+        }
+    }
+#endif
 
     if (ct->blog_key[BLOG_PARAM1_DIR_ORIG] != BLOG_KEY_NONE || 
 		ct->blog_key[BLOG_PARAM1_DIR_REPLY] != BLOG_KEY_NONE) {
@@ -858,6 +972,11 @@ static int regardless_drop(struct net *net, struct sk_buff *skb)
 	if (!list_empty(&lo_safe_list)) {
 		list_for_each(tmp, &lo_safe_list) {
 			ct = container_of(tmp, struct nf_conn, safe_list);
+			/*高优先连接(RTSP)不被删除*/
+			if (nf_ct_reserved_hook && nf_ct_reserved_hook(ct)) {
+				ct = NULL;
+				continue;
+			}
 			if (unlikely(!atomic_inc_not_zero(&ct->ct_general.use)))
 				ct = NULL;
 
@@ -869,6 +988,11 @@ static int regardless_drop(struct net *net, struct sk_buff *skb)
 	if (!ct && (blog_iq(skb) == IQOS_PRIO_HIGH) ) {
 		list_for_each(tmp, &hi_safe_list) {
 			ct = container_of(tmp, struct nf_conn, safe_list);
+			/*高优先连接(RTSP)不被删除*/
+			if (nf_ct_reserved_hook && nf_ct_reserved_hook(ct)) {
+				ct = NULL;
+				continue;
+			}
 			if (unlikely(!atomic_inc_not_zero(&ct->ct_general.use)))
 				ct = NULL;
 
@@ -884,11 +1008,9 @@ static int regardless_drop(struct net *net, struct sk_buff *skb)
 
 	if (del_timer(&ct->timeout)) {
 		death_by_timeout((unsigned long)ct);
-		if (test_bit(IPS_DYING_BIT, &ct->status)) {
-			dropped = 1;
-			NF_CT_STAT_INC_ATOMIC(net, early_drop);
-		} 
-	}
+		dropped = 1;
+		NF_CT_STAT_INC_ATOMIC(net, early_drop);
+	} 
 	/*else{
 	* this happens when the ct at safelist head is removed from the timer list 
 	* but not yet freed due to ct->ct_general.use > 1. This ct will be freed when its
@@ -914,11 +1036,18 @@ static noinline int early_drop(struct net *net, unsigned int hash)
 	unsigned int i, cnt = 0;
 	int dropped = 0;
 
+    unsigned int uiHash = hash;
+
 	rcu_read_lock();
 	for (i = 0; i < net->ct.htable_size; i++) {
 		hlist_nulls_for_each_entry_rcu(h, n, &net->ct.hash[hash],
 					 hnnode) {
 			tmp = nf_ct_tuplehash_to_ctrack(h);
+			/*高优先连接(RTSP)不被删除*/
+			if (nf_ct_reserved_hook && nf_ct_reserved_hook(tmp)) {
+				cnt++;
+				continue;
+			}
 			if (!test_bit(IPS_ASSURED_BIT, &tmp->status))
 				ct = tmp;
 			cnt++;
@@ -937,6 +1066,29 @@ static noinline int early_drop(struct net *net, unsigned int hash)
 
 		hash = (hash + 1) % net->ct.htable_size;
 	}
+
+    if (!ct)
+    {
+        cnt = 0;
+        for (i = 0; i < net->ct.htable_size; i++) {
+            hlist_nulls_for_each_entry_rcu(h, n, &net->ct.hash[uiHash],
+                         hnnode) {
+                ct = nf_ct_tuplehash_to_ctrack(h);
+				/*高优先连接(RTSP)不被删除*/
+				if (nf_ct_reserved_hook && nf_ct_reserved_hook(ct)) {
+					ct = NULL;
+					cnt++;
+					continue;
+				}
+                cnt++;
+            }
+            if (ct && unlikely(!atomic_inc_not_zero(&ct->ct_general.use)))
+                ct = NULL;
+            if (ct || cnt >= NF_CT_EVICTION_RANGE)
+                break;
+            uiHash = (uiHash + 1) % net->ct.htable_size;
+        }
+    }
 	rcu_read_unlock();
 
 	if (!ct)
@@ -1003,23 +1155,48 @@ __nf_conntrack_alloc(struct net *net, u16 zone,
 #if defined(CONFIG_BCM_KF_NETFILTER)
         /* Sorry, we have to kick LRU out regardlessly. */
 		if (!regardless_drop(net, skb)) {
+			/*高优先连接(RTSP)要确保新建成功*/
+			if (nf_ct_high_pri_hook && nf_ct_high_pri_hook(net, orig))
+			{
+				if (nf_ct_del_used_by_pri_hook)
+				{
+					nf_ct_del_used_by_pri_hook(net);
+				}
+			}
+			else
+			{
 				atomic_dec(&net->ct.count);
-			if (net_ratelimit())
-			printk(KERN_WARNING
-				"nf_conntrack: table full, dropping"
-				" packet.\n");
-			return ERR_PTR(-ENOMEM);
+				if (net_ratelimit())
+				{
+					printk(KERN_WARNING
+						"nf_conntrack: table full, dropping"
+						" packet.\n");
+				}
+				return ERR_PTR(-ENOMEM);
+			}
 		}
 #else       
 
 		if (!early_drop(net, hash_bucket(hash, net))) {
-			atomic_dec(&net->ct.count);
-			if (net_ratelimit())
-				printk(KERN_WARNING
-						"nf_conntrack: table full, dropping"
-						" packet.\n");
-				return ERR_PTR(-ENOMEM);
+				/*高优先连接(RTSP)要确保新建成功*/
+				if (nf_ct_high_pri_hook && nf_ct_high_pri_hook(net, orig))
+				{
+					if (nf_ct_del_used_by_pri_hook)
+					{
+						nf_ct_del_used_by_pri_hook(net);
+					}
+				}
+				else
+				{
+					atomic_dec(&net->ct.count);
+					if (net_ratelimit())
+						printk(KERN_WARNING
+							"nf_conntrack: table full, dropping"
+							" packet.\n");
+					return ERR_PTR(-ENOMEM);
+				}
 			}
+		//}
 #endif
 	}
 
@@ -1052,11 +1229,6 @@ __nf_conntrack_alloc(struct net *net, u16 zone,
 	   in the area being memset to 0 */
 	ct->master = 0;
 	ct->status = 0;
-#endif
-#if defined(CONFIG_BCM_KF_NETFILTER) && (defined(CONFIG_NF_DYNDSCP) || defined(CONFIG_NF_DYNDSCP_MODULE))
-	ct->dyndscp.status = 0;
-	ct->dyndscp.dscp[0] = 0;
-	ct->dyndscp.dscp[1] = 0;
 #endif
 
 #if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
@@ -1124,7 +1296,14 @@ __nf_conntrack_alloc(struct net *net, u16 zone,
 	 * changes to lookup keys must be done before setting refcnt to 1
 	 */
 	smp_wmb();
+#if (defined CONFIG_HSAN)
+    ct->h_link[0] = 0;
+    ct->h_link[1] = 0;
+#endif
 	atomic_set(&ct->ct_general.use, 1);
+#ifdef CONFIG_ATP_ROUTE_BALANCE
+	ct->nh_sel = ROUTE_BALANCE_DEFAULT_NH;
+#endif
 	return ct;
 
 #ifdef CONFIG_NF_CONNTRACK_ZONES
@@ -1159,6 +1338,13 @@ void nf_conntrack_free(struct nf_conn *ct)
 {
 	struct net *net = nf_ct_net(ct);
 
+#if (defined CONFIG_HSAN)
+    if(NULL != ct)
+    {
+        ct->h_link[0] = 0;
+        ct->h_link[1] = 0;
+    }
+#endif
 #if defined(CONFIG_BCM_KF_RUNNER)
 #if defined(CONFIG_BCM_RDPA) || defined(CONFIG_BCM_RDPA_MODULE)
 	BL_OPS(net_netfilter_nf_conntrack_core_nf_conntrack_free(ct));
@@ -1170,6 +1356,13 @@ void nf_conntrack_free(struct nf_conn *ct)
 	spin_lock_bh(&nf_conntrack_lock);
 	list_del(&ct->safe_list);
 	spin_unlock_bh(&nf_conntrack_lock);
+#endif
+
+#ifdef CONFIG_DPI_PARSE
+    if(ct_destory_flow)
+    {
+        ct_destory_flow(ct);
+    }
 #endif
 
 	nf_ct_ext_destroy(ct);
@@ -1197,7 +1390,9 @@ init_conntrack(struct net *net, struct nf_conn *tmpl,
 	u16 zone = tmpl ? nf_ct_zone(tmpl) : NF_CT_DEFAULT_ZONE;
 	struct nf_conn_timeout *timeout_ext;
 	unsigned int *timeouts;
-
+#ifdef CONFIG_ATP_HYBRID    
+    u_int8_t dscp = 0;
+#endif
 	if (!nf_ct_invert_tuple(&repl_tuple, tuple, l3proto, l4proto)) {
 		pr_debug("Can't invert tuple.\n");
 		return NULL;
@@ -1273,10 +1468,22 @@ init_conntrack(struct net *net, struct nf_conn *tmpl,
 		nf_conntrack_get(&ct->master->ct_general);
 		NF_CT_STAT_INC(net, expect_new);
 	} else {
+        /* Add  for per-flow bonding @ 2013-07-23 */
+#ifdef CONFIG_HSAN
+        if (nf_bonding_dfe_hook)
+        {
+            nf_bonding_dfe_hook();
+        }
+        if (dsl_threshold_flag)
+        {
+            skb->mark |= 0x800000;
+        }
+#endif    
+        /* Add end */
 		__nf_ct_try_assign_helper(ct, tmpl, GFP_ATOMIC);
 		NF_CT_STAT_INC(net, new);
 	}
-
+	
 	/* Overload tuple linked list to put us in unconfirmed list. */
 	hlist_nulls_add_head_rcu(&ct->tuplehash[IP_CT_DIR_ORIGINAL].hnnode,
 		       &net->ct.unconfirmed);
@@ -1288,6 +1495,11 @@ init_conntrack(struct net *net, struct nf_conn *tmpl,
 			exp->expectfn(ct, exp);
 		nf_ct_expect_put(exp);
 	}
+
+#ifdef CONFIG_NF_CONNTRACK_MARK
+    /* 连接跟踪的mark之前没有使用，现在用来记录报文的nfmark值 */
+    ct->mark = skb->mark;
+#endif
 
 	return &ct->tuplehash[IP_CT_DIR_ORIGINAL];
 }
@@ -1309,6 +1521,8 @@ resolve_normal_ct(struct net *net, struct nf_conn *tmpl,
 	struct nf_conn *ct;
 	u16 zone = tmpl ? nf_ct_zone(tmpl) : NF_CT_DEFAULT_ZONE;
 	u32 hash;
+
+    ATP_HOOK_VOID(ATP_CT_BEFOREINIT, net, NULL, NULL);
 
 	if (!nf_ct_get_tuple(skb, skb_network_offset(skb),
 			     dataoff, l3num, protonum, &tuple, l3proto,
@@ -1352,10 +1566,26 @@ resolve_normal_ct(struct net *net, struct nf_conn *tmpl,
 	}
 	skb->nfct = &ct->ct_general;
 	skb->nfctinfo = *ctinfo;
+
+#ifdef CONFIG_NF_CONNTRACK_PRI
+	/*skb和ct关联后，值ALG data mark*/
+	if (nf_pri_is_alg_skb(skb))
+	{
+		nf_pri_set_alg_mark(skb);
+	}
+#endif
+
 #if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
 	{
 		struct nf_conn_help * help = nfct_help(ct);
 
+		/*BRCM 方案skb是否不走加速，当前只有L2TP设置skip_blog*/
+#if (defined(CONFIG_PPPOL2TP) && defined(CONFIG_L2TP_FAST_FORWARD)) || defined(CONFIG_PPTP_TUNNEL)
+		if (skb->skip_blog)
+		{
+			clear_bit(IPS_BLOG_BIT, &ct->status);
+		}
+#endif
 		if ( (help != (struct nf_conn_help *)NULL) &&
 			 (help->helper != (struct nf_conntrack_helper *)NULL) &&
 			 (help->helper->name && strcmp(help->helper->name, "BCM-NAT")) )
@@ -1597,12 +1827,18 @@ void __nf_ct_refresh_acct(struct nf_conn *ct,
 		 * If that interval is large - it is possible that a connection getting high traffic 
 		 * may be seen as LRU by conntrack. 
 		 */
-		spin_lock_bh(&nf_conntrack_lock);
+		/* start  conntrack lead to rcu pending */ 
+#ifdef CONFIG_ATP_BRCM		 
+        spin_lock_bh(&nf_conntrack_lock);
+#endif
 		if (ct->iq_prio == IQOS_PRIO_HIGH)
 			list_move_tail(&ct->safe_list, &hi_safe_list);
 		else
 			list_move_tail(&ct->safe_list, &lo_safe_list);
-		spin_unlock_bh(&nf_conntrack_lock);
+#ifdef CONFIG_ATP_BRCM        
+        spin_unlock_bh(&nf_conntrack_lock);
+#endif
+        /* end  conntrack lead to rcu pending */
 	}
 #endif
 acct:
@@ -1615,6 +1851,10 @@ acct:
 			atomic64_add(skb->len, &acct[CTINFO2DIR(ctinfo)].bytes);
 		}
 	}
+
+#if (defined CONFIG_HSAN)
+    ct->packets++;
+#endif
 }
 EXPORT_SYMBOL_GPL(__nf_ct_refresh_acct);
 
@@ -1790,6 +2030,8 @@ static int kill_report(struct nf_conn *i, void *data)
 
 static int kill_all(struct nf_conn *i, void *data)
 {
+	ATP_HOOK_WITH_RETURN(ATP_CT_KILL_ALL, i, data, NULL);
+
 	return 1;
 }
 
@@ -1913,6 +2155,56 @@ void nf_conntrack_cleanup(struct net *net)
 		nf_conntrack_cleanup_init_net();
 	}
 }
+
+#ifdef CONFIG_ATP_HYBRID
+/******************************************************************************
+  函数名称  : ipgre_need_redo_snat
+  功能描述  : 检查是否需要重新做SNAT
+  输入参数  : 
+              1.  *skb:当前要发送的包
+              2.  *dev:要检查的接口(gre1/gre2/ppp)
+              3.  src_addr:当前包的源地址
+  调用函数  : 
+  被调函数  : 
+  输出参数  : 无
+  返 回 值  : 无
+
+  修改历史      :
+   1.日    期   : 2014-1-18
+     修改内容   : 完成初稿
+
+******************************************************************************/
+int nf_ct_need_redo_snat(struct sk_buff *skb, struct net_device *dev, __be32 src_addr)
+{
+    struct in_device *indev = NULL;
+    int need_redo_snat = 1;
+
+    if ((NULL == dev) || (NULL == skb->nfct))
+    {
+        return 0;
+    }
+
+    indev = in_dev_get(dev);
+    if (NULL == indev)
+    {
+        return 0;
+    }
+
+    for_ifa(indev)
+    {
+        if (src_addr == ifa->ifa_local)
+        {
+            need_redo_snat = 0;
+            break;
+        }
+    }
+    endfor_ifa(indev);
+
+    in_dev_put(indev);
+
+    return need_redo_snat;
+}
+#endif
 
 void *nf_ct_alloc_hashtable(unsigned int *sizep, int nulls)
 {
@@ -2180,3 +2472,128 @@ out_net:
 out_init_net:
 	return ret;
 }
+
+#if (defined CONFIG_HSAN)
+int  link_spin_lock_bh(void)
+{
+    spin_lock_bh(&nf_conntrack_lock);
+    return 0;
+}
+EXPORT_SYMBOL(link_spin_lock_bh);
+
+int  link_spin_unlock_bh(void)
+{
+    spin_unlock_bh(&nf_conntrack_lock);
+    return 0;
+}
+EXPORT_SYMBOL(link_spin_unlock_bh);
+
+int  res_link_refresh_ct (struct nf_conn * pst_ct)
+{
+    u_int8_t ui_protonum;
+    u_int32_t ui_jiffies;
+    u_int32_t ui_newtime;
+
+    if(NULL != pst_ct)
+    {
+        /* pst_ct is deleted */
+        if ((0 == pst_ct->h_link[0]) && (0 == pst_ct->h_link[1]))
+        {
+            return 0;
+        }  
+        
+        /* Only update if this is not a fixed timeout */
+        if (test_bit(IPS_FIXED_TIMEOUT_BIT, &pst_ct->status))
+        {
+            return 0;
+        }   
+
+        /* If not in hash table, timer will not be active yet */
+        if (!nf_ct_is_confirmed(pst_ct))
+        {
+            return 0;
+        }
+        
+        if((pst_ct->timeout.data != (unsigned long)pst_ct)
+            || nf_ct_is_dying(pst_ct))
+        {
+            return 0;
+        }
+    
+        ui_protonum = pst_ct->tuplehash[IP_CT_DIR_ORIGINAL].tuple.dst.protonum;
+		
+        if ( ui_protonum == IPPROTO_TCP )
+        {
+            if (pst_ct->proto.tcp.state != TCP_CONNTRACK_ESTABLISHED)
+            {
+                /*
+                Conntrack CLOSED TCP connection entries can have large timeout, when :
+                1.	Accelerator overflows (i.e. full)
+                2.	somehow  *only* one leg of connection is accelerated 
+                3.	TCP-RST is received on non-accelerated flow (i.e. conntrack will mark the connection as CLOSED)
+                4.	Accelerated leg of connection received some packets - triggering accelerator to refresh the connection in conntrack with large 
+timeout.
+                */
+                return 0; /* Only set timeout in established state */
+            }
+            ui_jiffies = HI_RES_LINK_ACT_NAT_TCP_DEF_IDLE_TIMEOUT;
+        }
+        else if ( ui_protonum == IPPROTO_UDP )
+            ui_jiffies = HI_RES_LINK_ACT_NAT_UDP_DEF_IDLE_TIMEOUT;
+        else
+            ui_jiffies = HI_RES_LINK_ACT_NAT_GENERIC_DEF_IDLE_TIMEOUT;
+		       
+        ui_newtime = jiffies + ui_jiffies;
+
+        /* Only update the timeout if the new timeout is at least
+        HZ jiffies from the old timeout. Need del_timer for race
+        avoidance (may already be dying). */
+        if (ui_newtime - pst_ct->timeout.expires >= HZ
+		    && del_timer(&pst_ct->timeout)) {
+            pst_ct->timeout.expires = ui_newtime;
+            add_timer(&pst_ct->timeout);
+        }	
+    }
+    return 0;
+}
+EXPORT_SYMBOL(res_link_refresh_ct); 
+
+
+int hi_nf_ct_get_packets(struct nf_conn *ct, u_int32_t mode, u_int32_t packets)
+{
+    if (NULL == ct)
+    {
+        return 1;
+    }
+
+    if (1 == mode) //?￥???????ù?ê
+    {
+        if (0 == ct->time_bf)
+        {
+            ct->time_bf = jiffies;
+            ct->packets_bf = ct->packets;
+        }
+            
+        if(time_after(jiffies, ct->time_bf + HZ))
+        {
+            if((ct->packets - ct->packets_bf) > packets)
+            {
+                return 0;
+            }
+            ct->time_bf = jiffies;
+            ct->packets_bf = ct->packets;
+        }
+    }
+    else if (2 == mode) //?￥??±¨??×üêy
+    {
+        if (ct->packets > packets)
+        {
+            return 0;
+        }
+    }
+        
+    return 1;
+
+}
+EXPORT_SYMBOL(hi_nf_ct_get_packets); 
+#endif

@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * tracing clocks
  *
  *  Copyright (C) 2009 Red Hat, Inc., Ingo Molnar <mingo@redhat.com>
@@ -68,7 +72,7 @@ u64 notrace trace_clock(void)
  * Used by plugins that need globally coherent timestamps.
  */
 
-#if defined(CONFIG_BCM_KF_TRACE_CUSTOM)
+#if defined(CONFIG_BCM_KF_TRACE_CUSTOM)&&defined(CONFIG_MIPS_BRCM)
 #include <linux/bcm_tstamp.h>
 static u64 bcm_tstamp_rollover_base[NR_CPUS];
 static u32 bcm_tstamp_last[NR_CPUS];
@@ -86,7 +90,7 @@ static struct {
 
 u64 notrace trace_clock_global(void)
 {
-#if defined(CONFIG_BCM_KF_TRACE_CUSTOM)
+#if defined(CONFIG_BCM_KF_TRACE_CUSTOM)&&defined(CONFIG_MIPS_BRCM)
 	u64 ns;
 	u32 tstamp = bcm_tstamp_read();
 	int cpuid = smp_processor_id();

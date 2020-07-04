@@ -1,3 +1,7 @@
+/*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
 #ifndef __LINUX_USB_H
 #define __LINUX_USB_H
 
@@ -684,7 +688,27 @@ static inline int usb_make_path(struct usb_device *dev, char *buf, size_t size)
 		(USB_DEVICE_ID_MATCH_INT_CLASS | \
 		USB_DEVICE_ID_MATCH_INT_SUBCLASS | \
 		USB_DEVICE_ID_MATCH_INT_PROTOCOL)
+/*<  通过接入顺序来判断usb设备begin*/
+#define USB_DEVICE_ID_MATCH_HUAWEI  (USB_DEVICE_ID_MATCH_INT_SEQUENCE | USB_DEVICE_ID_MATCH_VENDOR)
 
+#define USB_DEVICE_MATCH_HUAWEI_NDIS(intseq,vend,prod) \
+    .match_flags = USB_DEVICE_ID_MATCH_HUAWEI, \
+    .idVendor = (vend), \
+    .bInterfaceSequence = (intseq),\
+    .idProduct = (prod)
+
+#define USB_DEVICE_MATCH_HUAWEI(intseq,vend) \
+    .match_flags = USB_DEVICE_ID_MATCH_HUAWEI, \
+    .idVendor = (vend), \
+    .bInterfaceSequence = (intseq)
+/*  end>*/
+
+/*ATP add*/
+#define USB_DEVICE_ID_MATCH_DEV_INT_INFO_HUAWEIOPTION \
+		(USB_DEVICE_ID_MATCH_VENDOR | \
+		USB_DEVICE_ID_MATCH_INT_CLASS | \
+		USB_DEVICE_ID_MATCH_INT_SUBCLASS | \
+		USB_DEVICE_ID_MATCH_INT_PROTOCOL)
 /**
  * USB_DEVICE - macro used to describe a specific usb device
  * @vend: the 16 bit USB Vendor ID
@@ -697,6 +721,22 @@ static inline int usb_make_path(struct usb_device *dev, char *buf, size_t size)
 	.match_flags = USB_DEVICE_ID_MATCH_DEVICE, \
 	.idVendor = (vend), \
 	.idProduct = (prod)
+/* BEGIN: Added by Huawei, 2009/11/10   PN:  HwDataCard */
+#define DATACARD_KIND_INFO_LEN	64
+#define DATACARD_FAC_INFO_LEN	64
+#define DATACARD_KIND_PORT_LEN	512
+#define USER_AT_PID_LEN	128
+#ifdef CONFIG_USB_DEVICE_TYPE_DISPLAY
+#define USB_DEVICE_TYPE_LEN	128
+#endif
+#define USB_DEVICE_AND_INTERFACE_INFO(vend,prod,cl,sc,pr) \
+				.match_flags = USB_DEVICE_ID_MATCH_INT_INFO |USB_DEVICE_ID_MATCH_DEVICE, \
+				.idVendor = (vend), \
+				.idProduct = (prod), \
+				.bInterfaceClass = (cl), \
+				.bInterfaceSubClass = (sc), \
+				.bInterfaceProtocol = (pr)
+/* END:   Added by Huawei, 2009/11/10 */
 /**
  * USB_DEVICE_VER - describe a specific usb device with a version range
  * @vend: the 16 bit USB Vendor ID
@@ -759,6 +799,39 @@ static inline int usb_make_path(struct usb_device *dev, char *buf, size_t size)
 	.bInterfaceClass = (cl), \
 	.bInterfaceSubClass = (sc), \
 	.bInterfaceProtocol = (pr)
+
+
+/* 2010-12-13:W45260 兼容支持Jungo/ 高通两种方案数据卡的串口的USB interface 定义
+E352s Jungo 数据卡
+        09 02 BC 00 05 01 00 80 FA (configuration)
+MDM 09 04 00 00 03 02 02 FF 00  (interface:Interface class 02,sub interface class 02,protocol FF,与Microsoft's pet nonstandard Ethernet-over-USB protocols 冲突)
+            05 24 00 10 01 
+            04 24 02 03 
+            05 24 01 00 00
+            05 24 06 00 00 
+            07 05 8F 03 40 00 05 (endpoint)
+            07 05 8E 02 00 02 20 (endpoint)
+            07 05 0F 02 00 02 20 (endpoint)
+DIAG    ....
+PCUI    ....
+
+E1756 高通数据卡
+        09 02 83 00 05 01 01 E0 FA  (configuration)
+MDM 09 04 00 00 03 FF FF FF 00   (interface:Interface class FF,sub interface class FF,protocol FF)
+            07 05 81 03 40 00 05 (endpoint)
+            07 05 82 02 00 02 20 (endpoint)
+            07 05 01 02 00 02 20 (endpoint)
+DIAG    ....
+PCUI     ....
+*/
+
+#define USB_INTERFACE_INFO_HUAWEIOPTION(vend,cl,sc,pr) \
+	.match_flags = USB_DEVICE_ID_MATCH_DEV_INT_INFO_HUAWEIOPTION, .idVendor = (vend),.bInterfaceClass = (cl), \
+	.bInterfaceSubClass = (sc), .bInterfaceProtocol = (pr)
+	
+
+/* ----------------------------------------------------------------------- */
+
 
 /**
  * USB_DEVICE_AND_INTERFACE_INFO - describe a specific usb device with a class of usb interfaces
@@ -1588,6 +1661,17 @@ void usb_sg_wait(struct usb_sg_request *io);
 #define usb_pipecontrol(pipe)	(usb_pipetype((pipe)) == PIPE_CONTROL)
 #define usb_pipebulk(pipe)	(usb_pipetype((pipe)) == PIPE_BULK)
 
+#ifdef CONFIG_ATP_USB_ADAPTOR
+/* The D0/D1 toggle bits ... USE WITH CAUTION (they're almost hcd-internal) */
+#define usb_gettoggle(dev, ep, out) (((dev)->toggle[out] >> (ep)) & 1)
+#define	usb_dotoggle(dev, ep, out)  ((dev)->toggle[out] ^= (1 << (ep)))
+#define usb_settoggle(dev, ep, out, bit) \
+		((dev)->toggle[out] = ((dev)->toggle[out] & ~(1 << (ep))) | \
+		 ((bit) << (ep)))
+
+#define usb_endpoint_running(dev, ep, out) ((dev)->halted[out] &= ~(1 << (ep)))
+#define usb_endpoint_halted(dev, ep, out) ((dev)->halted[out] & (1 << (ep)))
+#endif
 static inline unsigned int __create_pipe(struct usb_device *dev,
 		unsigned int endpoint)
 {

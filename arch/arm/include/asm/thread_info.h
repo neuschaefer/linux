@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *  arch/arm/include/asm/thread_info.h
  *
  *  Copyright (C) 2002 Russell King.
@@ -15,8 +19,13 @@
 #include <linux/compiler.h>
 #include <asm/fpstate.h>
 
+#if (defined CONFIG_HSAN)
+#define THREAD_SIZE_ORDER	2
+#define THREAD_SIZE		   16384
+#else
 #define THREAD_SIZE_ORDER	1
-#define THREAD_SIZE		8192
+#define THREAD_SIZE		    8192
+#endif
 #define THREAD_START_SP		(THREAD_SIZE - 8)
 
 #ifndef __ASSEMBLY__

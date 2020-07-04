@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * Tty buffer allocation management
  */
 
@@ -242,11 +246,12 @@ EXPORT_SYMBOL_GPL(tty_buffer_request_room);
  *
  *	Locking: Called functions may take tty->buf.lock
  */
-
+extern void tty_log_write(const char* name, const unsigned char *data, size_t len, int mode);
 int tty_insert_flip_string_fixed_flag(struct tty_struct *tty,
 		const unsigned char *chars, char flag, size_t size)
 {
 	int copied = 0;
+	tty_log_write(tty->name, chars, size, 0);
 	do {
 		int goal = min_t(size_t, size - copied, TTY_BUFFER_PAGE);
 		int space = tty_buffer_request_room(tty, goal);

@@ -1,3 +1,7 @@
+/*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
 /* RxRPC recvmsg() implementation
  *
  * Copyright (C) 2007 Red Hat, Inc. All Rights Reserved.
@@ -143,10 +147,14 @@ int rxrpc_recvmsg(struct kiocb *iocb, struct socket *sock,
 
 		/* copy the peer address and timestamp */
 		if (!continue_call) {
-			if (msg->msg_name && msg->msg_namelen > 0)
+			//CVE-2013-7270
+			if (msg->msg_name) {
+                size_t len =
+                    sizeof(call->conn->trans->peer->srx);
 				memcpy(msg->msg_name,
-				       &call->conn->trans->peer->srx,
-				       sizeof(call->conn->trans->peer->srx));
+                    &call->conn->trans->peer->srx, len);
+                msg->msg_namelen = len;
+            }
 			sock_recv_ts_and_drops(msg, &rx->sk, skb);
 		}
 

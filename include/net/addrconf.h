@@ -1,3 +1,7 @@
+/*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
 #ifndef _ADDRCONF_H
 #define _ADDRCONF_H
 
@@ -14,6 +18,13 @@
 #define ADDR_CHECK_FREQUENCY		(120*HZ)
 
 #define IPV6_MAX_ADDRESSES		16
+
+/*BEGIN: add for ipv6 by DH */
+#ifdef CONFIG_SUPPORT_ATP_IPV6_ENABLE
+#define IPV6_DISABLE        (0)
+#define IPV6_ENABLE         (1)
+#endif
+/*END: add for ipv6 by DH */
 
 #include <linux/in.h>
 #include <linux/in6.h>
@@ -154,6 +165,10 @@ extern int ipv6_is_mld(struct sk_buff *skb, int nexthdr);
 extern void addrconf_prefix_rcv(struct net_device *dev,
 				u8 *opt, int len, bool sllao);
 
+extern bool ipv6_chk_same_addr(struct net *net, const struct in6_addr *addr,
+			       struct net_device *dev);
+extern void ipv6_ifa_notify(int event, struct inet6_ifaddr *ifp);
+
 /*
  *	anycast prototypes (anycast.c)
  */
@@ -255,7 +270,18 @@ static inline void addrconf_addr_solict_mult(const struct in6_addr *addr,
 
 static inline int ipv6_addr_is_multicast(const struct in6_addr *addr)
 {
-	return (addr->s6_addr32[0] & htonl(0xFF000000)) == htonl(0xFF000000);
+    /*START ADD:  FOR 处理IPV6 非对齐访问 2014-01-24*/
+#ifdef CONFIG_ATP_BRCM
+    struct in6_addr ip6addr;
+    
+    ip6addr.s6_addr16[0] = addr->s6_addr16[0];
+    ip6addr.s6_addr16[1] = addr->s6_addr16[1];
+    
+    return (ip6addr.s6_addr32[0] & htonl(0xFF000000)) == htonl(0xFF000000);
+#else
+    return (addr->s6_addr32[0] & htonl(0xFF000000)) == htonl(0xFF000000);
+#endif
+    /*END ADD:  FOR 处理IPV6 非对齐访问 2014-01-24*/
 }
 
 static inline int ipv6_addr_is_ll_all_nodes(const struct in6_addr *addr)

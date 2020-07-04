@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * New driver for Marvell Yukon 2 chipset.
  * Based on earlier sk98lin, and skge driver.
  *
@@ -1981,8 +1985,12 @@ static netdev_tx_t sky2_xmit_frame(struct sk_buff *skb,
 
 	sky2->tx_prod = slot;
 
+#if (defined CONFIG_HSAN)	
+    // 屏蔽关闭发包中断;防止大流量状态停止发包
+#else
 	if (tx_avail(sky2) <= MAX_SKB_TX_LE)
 		netif_stop_queue(dev);
+#endif	
 
 	netdev_sent_queue(dev, skb->len);
 	sky2_put_idx(hw, txqaddr[sky2->port], sky2->tx_prod);
@@ -2651,6 +2659,17 @@ static inline void sky2_tx_done(struct net_device *dev, u16 last)
 	}
 }
 
+#if (defined CONFIG_HSAN)	
+typedef int (*hi_cfe_acc_rx)(struct sk_buff *pst_skb, struct net_device *pst_dev);
+static void *g_pst_acc_rx_callback = NULL; 
+int sky2_recv_reg(void *pv_dev_recv)
+{
+    g_pst_acc_rx_callback = pv_dev_recv;
+    return 0;        
+}
+EXPORT_SYMBOL(sky2_recv_reg);
+#endif	
+
 static inline void sky2_skb_rx(const struct sky2_port *sky2,
 			       struct sk_buff *skb)
 {
@@ -2771,9 +2790,20 @@ static int sky2_status_intr(struct sky2_hw *hw, int to_do, u16 idx)
 				else
 					skb->ip_summed = CHECKSUM_NONE;
 			}
-
+#if (defined CONFIG_HSAN)	
+           if ( NULL != g_pst_acc_rx_callback )
+           {
+               ((hi_cfe_acc_rx)g_pst_acc_rx_callback)(skb,dev);
+           }
+           else
+           {
+    			skb->protocol = eth_type_trans(skb, dev);
+    			sky2_skb_rx(sky2, skb);
+           }
+#else
 			skb->protocol = eth_type_trans(skb, dev);
 			sky2_skb_rx(sky2, skb);
+#endif	
 
 			/* Stop after net poll weight */
 			if (++work_done >= to_do)
@@ -4732,7 +4762,11 @@ static __devinit struct net_device *sky2_init_netdev(struct sky2_hw *hw,
 						     int highmem, int wol)
 {
 	struct sky2_port *sky2;
-	struct net_device *dev = alloc_etherdev(sizeof(*sky2));
+#if (defined CONFIG_HSAN)	
+	struct net_device *dev = alloc_netdev_mq(sizeof(*sky2), "marvell%d", ether_setup, 1);
+#else
+	struct net_device *dev = alloc_etherdev(sizeof(*sky2));	
+#endif	
 
 	if (!dev)
 		return NULL;

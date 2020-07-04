@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *  linux/fs/exec.c
  *
  *  Copyright (C) 1991, 1992  Linus Torvalds
@@ -64,6 +68,7 @@
 #include <trace/events/task.h>
 #include "internal.h"
 
+#include "kcmsmonitorapi.h"
 #include <trace/events/sched.h>
 
 int core_uses_pid;
@@ -1207,8 +1212,23 @@ void free_bprm(struct linux_binprm *bprm)
 		mutex_unlock(&current->signal->cred_guard_mutex);
 		abort_creds(bprm->cred);
 	}
+	/* If a binfmt changed the interp, free it. */
+	if (bprm->interp != bprm->filename)
+		kfree(bprm->interp);
 	kfree(bprm);
 }
+
+int bprm_change_interp(char *interp, struct linux_binprm *bprm)
+{
+	/* If a binfmt changed the interp, free it first. */
+	if (bprm->interp != bprm->filename)
+		kfree(bprm->interp);
+	bprm->interp = kstrdup(interp, GFP_KERNEL);
+	if (!bprm->interp)
+		return -ENOMEM;
+	return 0;
+}
+EXPORT_SYMBOL(bprm_change_interp);
 
 /*
  * install the new credentials for this executable
@@ -1955,6 +1975,10 @@ static void coredump_finish(struct mm_struct *mm)
 		curr->task = NULL;
 		wake_up_process(task);
 	}
+
+    printk(KERN_WARNING "======= coredump has been finished, we will send netlink msg to cms===============\n");
+    /*新产生coredump文件，通知cms清除旧coredump，以限制coredump文件夹大小*/
+    syswatch_nl_send(ATP_MSG_MONITOR_EVT_COREDUMP_FINISH, NULL, 0);
 
 	mm->core_state = NULL;
 }

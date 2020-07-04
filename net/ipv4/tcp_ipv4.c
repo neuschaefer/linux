@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * INET		An implementation of the TCP/IP protocol suite for the LINUX
  *		operating system.  INET is implemented using the  BSD Socket
  *		interface as the means of communication with the user level.
@@ -1757,7 +1761,13 @@ no_tcp_socket:
 	if (skb->len < (th->doff << 2) || tcp_checksum_complete(skb)) {
 bad_packet:
 		TCP_INC_STATS_BH(net, TCP_MIB_INERRS);
-	} else {
+	}
+#ifdef CONFIG_SUPPORT_ATP	
+    else if (!sysctl_port_scan)
+#else
+	else
+#endif		
+    {
 		tcp_v4_send_reset(NULL, skb);
 	}
 

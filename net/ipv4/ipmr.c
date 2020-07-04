@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *	IP multicast routing support for mrouted 3.6/3.8
  *
  *		(c) 1995 Alan Cox, <alan@lxorguk.ukuu.org.uk>
@@ -97,6 +101,9 @@ struct ipmr_rule {
 struct ipmr_result {
 	struct mr_table		*mrt;
 };
+#ifdef CONFIG_ATP_COMMON
+static int ipmr_find_vif(struct mr_table *mrt, struct net_device *dev);
+#endif
 
 /* Big lock, protecting vif table, mrt cache and mroute socket state.
  * Note that the changes are semaphored via rtnl_lock.
@@ -835,6 +842,41 @@ static struct mfc_cache *ipmr_cache_find(struct mr_table *mrt,
 			return c;
 	}
 	return NULL;
+}
+#endif
+
+#ifdef CONFIG_SUPPORT_ATP
+static struct mfc_cache *ipmr_cache_find2(struct mr_table *mrt,
+    __be32 origin, __be32 mcastgrp, struct net_device *pstDev)
+{
+    int mr_ifindex = -1;
+    int line = MFC_HASH(mcastgrp, origin);
+    struct mfc_cache *c = NULL;
+
+    if (!pstDev)
+    {
+        return NULL;
+    }
+
+    /*START MODIFY:Huawei 2012-11-20 FOR igmp proxy无法组播，返回非法cache引发cpu 0*/
+    mr_ifindex = ipmr_find_vif(mrt,pstDev);
+    list_for_each_entry(c, &mrt->mfc_cache_array[line], list) {
+        if (c->mfc_origin==origin 
+                && c->mfc_mcastgrp==mcastgrp
+                && mr_ifindex == c->mfc_parent)
+            return c;
+    }
+
+    /*list_for_each_entry 不会返回空指针，找到后return*/
+    line = MFC_HASH(mcastgrp, htonl(0x00000000));
+    list_for_each_entry(c, &mrt->mfc_cache_array[line], list){
+        if (c->mfc_mcastgrp == mcastgrp
+                && mr_ifindex == c->mfc_parent)
+            return c;
+    }
+
+    return NULL;
+    /*END MODIFY:Huawei 2012-11-20 FOR igmp proxy无法组播，返回非法cache引发cpu 0*/
 }
 #endif
 
@@ -1716,6 +1758,17 @@ static void ipmr_queue_xmit(struct net *net, struct mr_table *mrt,
 
 	IPCB(skb)->flags |= IPSKB_FORWARDED;
 
+    //for igmp data mark
+#ifdef CONFIG_DPI_PARSE
+    skb->mark &= 0xfffffff0;
+    skb->mark |= NFMARK_IGMP_DATA;
+    
+    //for igmp data packets
+    skb->mark &= 0xffff0fff;
+    skb->mark |= 0x3000;
+    
+#endif
+
 	/*
 	 * RFC1584 teaches, that DVMRP/PIM router must deliver packets locally
 	 * not only before forwarding, but after forwarding on all output
@@ -1909,7 +1962,9 @@ int ip_mr_input(struct sk_buff *skb)
 		    }
 	}
 
-#if defined(CONFIG_BCM_KF_IGMP)
+#if defined(CONFIG_SUPPORT_ATP)
+	cache = ipmr_cache_find2(mrt, ip_hdr(skb)->saddr, ip_hdr(skb)->daddr, skb->dev);
+#elif defined(CONFIG_BCM_KF_IGMP)
 	/* mroute should not apply to IGMP traffic
 	   in addition it does not make sense for TCP protocol to be used
 	   for multicast so just check for UDP */
@@ -2144,7 +2199,9 @@ int ipmr_get_route(struct net *net, struct sk_buff *skb,
 
 	rcu_read_lock();
 
-#if defined(CONFIG_BCM_KF_IGMP)
+#if defined(CONFIG_SUPPORT_ATP)
+	cache = ipmr_cache_find2(mrt, saddr, daddr, skb->dev);
+#elif defined(CONFIG_BCM_KF_IGMP)
 	/* mroute should not apply to IGMP traffic
 	   in addition it does not make sense for TCP protocol to be used
 	   for multicast so just check for UDP */

@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * L2TP core.
  *
  * Copyright (c) 2008,2009,2010 Katalix Systems Ltd
@@ -1075,6 +1079,15 @@ int l2tp_xmit_skb(struct l2tp_session *session, struct sk_buff *skb, int hdr_len
 	skb_dst_set(skb, dst_clone(__sk_dst_check(sk, 0)));
 
 	inet = inet_sk(sk);
+    
+#ifdef CONFIG_ATP_COMMON
+    /* BEGIN: add for FON: l2tp隧道内的ppp包无法发送 */ 
+    /* 隧道配置的对端ip地址没有赋值给sock，现在添加进去 */    
+    inet->inet_daddr = session->tunnel_addr.addr.sin_addr.s_addr;
+    inet->inet_dport  = session->tunnel_addr.addr.sin_port;       
+    /* END: add for FON: l2tp隧道内的ppp包无法发送 */ 
+#endif
+
 	fl = &inet->cork.fl;
 	switch (tunnel->encap) {
 	case L2TP_ENCAPTYPE_UDP:
@@ -1251,13 +1264,21 @@ static void l2tp_tunnel_free(struct l2tp_tunnel *tunnel)
 	       "%s: free...\n", tunnel->name);
 
 	/* Remove from tunnel list */
+    /* BEGIN: add for FON: 隧道断开时，内核cpu0 */ 
 	spin_lock_bh(&pn->l2tp_tunnel_list_lock);
 	list_del_rcu(&tunnel->list);
+#ifdef CONFIG_ATP_COMMON     
+    kfree_rcu(tunnel, rcu);
+#endif
 	spin_unlock_bh(&pn->l2tp_tunnel_list_lock);
+#ifndef CONFIG_ATP_COMMON
 	synchronize_rcu();
-
+#endif
+    /* END: add for FON: 隧道断开时，内核cpu0 */ 
 	atomic_dec(&l2tp_tunnel_count);
+#ifndef CONFIG_ATP_COMMON
 	kfree(tunnel);
+#endif
 }
 
 /* Create a socket for the tunnel, if one isn't set up by
@@ -1424,6 +1445,7 @@ int l2tp_tunnel_create(struct net *net, int fd, int version, u32 tunnel_id, u32 
 		/* Mark socket as an encapsulation socket. See net/ipv4/udp.c */
 		udp_sk(sk)->encap_type = UDP_ENCAP_L2TPINUDP;
 		udp_sk(sk)->encap_rcv = l2tp_udp_encap_recv;
+		sk->sk_no_check = UDP_CSUM_NOXMIT;
 	}
 
 	sk->sk_user_data = tunnel;

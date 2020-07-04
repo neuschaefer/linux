@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *	Linux ethernet bridge
  *
  *	Authors:
@@ -220,8 +224,7 @@ struct net_bridge_port
 
 static inline struct net_bridge_port *br_port_get_rcu(const struct net_device *dev)
 {
-	struct net_bridge_port *port = rcu_dereference(dev->rx_handler_data);
-	return br_port_exists(dev) ? port : NULL;
+	return rcu_dereference(dev->rx_handler_data);;
 }
 
 static inline struct net_bridge_port *br_port_get_rtnl(struct net_device *dev)

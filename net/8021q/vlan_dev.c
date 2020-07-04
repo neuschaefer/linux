@@ -1,3 +1,7 @@
+/*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
 /* -*- linux-c -*-
  * INET		802.1Q VLAN
  *		Ethernet-type device handling.
@@ -90,6 +94,19 @@ vlan_dev_get_egress_qos_mask(struct net_device *dev, struct sk_buff *skb)
 		}
 		mp = mp->next;
 	}
+
+/* start 代码检视:去掉宏控制，成为通用处理 */
+/*start of : vdsl上行时WAN侧报文没有打上802.1p的标记 */
+/*end of : vdsl上行时WAN侧报文没有打上802.1p的标记 */
+    int ntp = 0; //xy vlan_dev_priv(dev)->nfmark_to_priority;    
+    unsigned short vlan_qos;        
+    if ((ntp >= 0) && (ntp <= 7))     
+    {        
+        vlan_qos = (ntp <<13) & 0xe000;        
+        return vlan_qos;    
+    }
+/* start 代码检视:去掉宏控制，成为通用处理 */
+
 	return 0;
 }
 
@@ -162,6 +179,30 @@ static netdev_tx_t vlan_dev_hard_start_xmit(struct sk_buff *skb,
 		u16 vlan_tci;
 		vlan_tci = vlan_dev_priv(dev)->vlan_id;
 		vlan_tci |= vlan_dev_get_egress_qos_mask(dev, skb);
+        /* 802.1p remark */
+        /*Start of modified for qos function 2012-1-6*/
+#if defined(CONFIG_IMQ)
+        /* mark -----|-----|-------|------|-------|-----|------|------  */
+        /* START OF Add:  2011-05-21 FOR 移植BCM Eth上行的QoS */
+        /* START Modify  20110708 把原来的为hhb3写的else分支去掉，使得与通用代码一致 */
+        /* BCM Eth qos     lan |dscp |default|  wmm |      |802.1p|policer|queue */
+        /* IMQ QOS |802.1p|queue|policer */
+        if (skb->mark & 0x10)        
+        {            
+            vlan_tci = ((vlan_tci & 0x1fff) | ((skb->mark & 0xe0) << 8));        
+        }
+        /* END Modify  20110708 把原来的为hhb3写的else分支去掉，使得与通用代码一致 */
+        /* END OF Add: 2011-05-21 */
+
+    	if (__constant_htons(ETH_P_PPP_SES) == skb->protocol) 
+    	{
+            /* PPP_LCP = 0xc021 802.1p mark 7 */
+    	    if ((0xc0 == skb->data[20]) && (0x21 == skb->data[21]))
+            {
+                vlan_tci = ((vlan_tci & 0x1fff) | (0xe000));
+            }
+    	}        
+#endif
 		skb = __vlan_hwaccel_put_tag(skb, vlan_tci);
 	}
 

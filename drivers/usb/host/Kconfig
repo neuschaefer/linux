@@ -20,6 +20,7 @@ config USB_C67X00_HCD
 config USB_XHCI_HCD
 	tristate "xHCI HCD (USB 3.0) support (EXPERIMENTAL)"
 	depends on USB && USB_ARCH_HAS_XHCI && EXPERIMENTAL
+	select USB_XHCI_PLATFORM
 	---help---
 	  The eXtensible Host Controller Interface (xHCI) is standard for USB 3.0
 	  "SuperSpeed" host controller hardware.
@@ -28,7 +29,7 @@ config USB_XHCI_HCD
 	  module will be called xhci-hcd.
 
 config USB_XHCI_PLATFORM
-	tristate "xHCI platform support"
+	tristate
 	depends on USB_XHCI_HCD
 
 config USB_XHCI_HCD_DEBUGGING

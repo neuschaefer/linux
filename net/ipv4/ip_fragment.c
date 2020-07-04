@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * INET		An implementation of the TCP/IP protocol suite for the LINUX
  *		operating system.  INET is implemented using the  BSD Socket
  *		interface as the means of communication with the user level.
@@ -120,6 +124,15 @@ int ip_frag_nqueues(struct net *net)
 	return net->ipv4.frags.nqueues;
 }
 
+#ifdef CONFIG_ATP_COMMON
+/* start add ipfrag count */
+int ip_frag_nipcnt(struct net *net)
+{
+	return atomic_read(&net->ipv4.frags.ipfrag_count);
+}
+/* end add ipfrag count */
+#endif
+
 int ip_frag_mem(struct net *net)
 {
 	return atomic_read(&net->ipv4.frags.mem);
@@ -165,6 +178,10 @@ static int ip4_frag_match(struct inet_frag_queue *q, void *a)
 static void frag_kfree_skb(struct netns_frags *nf, struct sk_buff *skb)
 {
 	atomic_sub(skb->truesize, &nf->mem);
+#ifdef CONFIG_ATP_COMMON
+	atomic_sub(1, &nf->ipfrag_count); /* add ipfrag count */
+#endif
+
 	kfree_skb(skb);
 }
 
@@ -516,16 +533,18 @@ found:
 	qp->q.meat += skb->len;
 	qp->ecn |= ecn;
 	atomic_add(skb->truesize, &qp->q.net->mem);
+#ifdef CONFIG_ATP_COMMON
+	atomic_add(1, &qp->q.net->ipfrag_count); /* add ipfrag count */
+#endif
+    
 	if (offset == 0)
 		qp->q.last_in |= INET_FRAG_FIRST_IN;
 
 	if (qp->q.last_in == (INET_FRAG_FIRST_IN | INET_FRAG_LAST_IN) &&
 	    qp->q.meat == qp->q.len)
 		return ip_frag_reasm(qp, prev, dev);
-
-	write_lock(&ip4_frags.lock);
-	list_move_tail(&qp->q.lru_list, &qp->q.net->lru_list);
-	write_unlock(&ip4_frags.lock);
+    //CVE-2014-0100
+    inet_frag_lru_move(&qp->q);
 	return -EINPROGRESS;
 
 err:
@@ -609,6 +628,9 @@ static int ip_frag_reasm(struct ipq *qp, struct sk_buff *prev,
 		clone->csum = 0;
 		clone->ip_summed = head->ip_summed;
 		atomic_add(clone->truesize, &qp->q.net->mem);
+#ifdef CONFIG_ATP_COMMON
+		atomic_add(1, &qp->q.net->ipfrag_count);  /* add ipfrag count */
+#endif
 	}
 
 	skb_shinfo(head)->frag_list = head->next;
@@ -622,9 +644,17 @@ static int ip_frag_reasm(struct ipq *qp, struct sk_buff *prev,
 		else if (head->ip_summed == CHECKSUM_COMPLETE)
 			head->csum = csum_add(head->csum, fp->csum);
 		head->truesize += fp->truesize;
+#ifdef CONFIG_ATP_COMMON
+		/* 3.4此处进行了优化,for循环之后减掉的head->truesize是包含所有分片的总长度
+		  * 每个分片计算长度时减掉分片个数，for循环之后再为head分片包减1
+		  */
+		atomic_sub(1, &qp->q.net->ipfrag_count);
+#endif
 	}
 	atomic_sub(head->truesize, &qp->q.net->mem);
-
+#ifdef CONFIG_ATP_COMMON
+    atomic_sub(1, &qp->q.net->ipfrag_count); /* add ipfrag count */
+#endif
 	head->next = NULL;
 	head->dev = dev;
 	head->tstamp = qp->q.stamp;
@@ -661,8 +691,18 @@ int ip_defrag(struct sk_buff *skb, u32 user)
 	IP_INC_STATS_BH(net, IPSTATS_MIB_REASMREQDS);
 
 	/* Start by cleaning up the memory. */
+#ifdef CONFIG_ATP_COMMON
+    /* start add ipfrag count */
+    if ((atomic_read(&net->ipv4.frags.mem) > net->ipv4.frags.high_thresh)
+       || (atomic_read(&net->ipv4.frags.ipfrag_count) > net->ipv4.frags.ipfrag_count_thresh))
+    {
+        ip_evictor(net);
+    }   
+	/* end add ipfrag count */
+#else
 	if (atomic_read(&net->ipv4.frags.mem) > net->ipv4.frags.high_thresh)
 		ip_evictor(net);
+#endif
 
 	/* Lookup (or create) queue header */
 	if ((qp = ip_find(net, ip_hdr(skb), user)) != NULL) {
@@ -744,6 +784,17 @@ static struct ctl_table ip4_frags_ns_ctl_table[] = {
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec_jiffies,
 	},
+#ifdef CONFIG_ATP_COMMON
+	/* start add ipfrag count */
+	{
+		.procname	= "ipfrag_count_thresh",
+		.data		= &init_net.ipv4.frags.ipfrag_count_thresh,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec
+	},	
+	/* end add ipfrag count */
+#endif
 	{ }
 };
 
@@ -780,6 +831,9 @@ static int __net_init ip4_frags_ns_ctl_register(struct net *net)
 		table[0].data = &net->ipv4.frags.high_thresh;
 		table[1].data = &net->ipv4.frags.low_thresh;
 		table[2].data = &net->ipv4.frags.timeout;
+#ifdef CONFIG_ATP_COMMON
+		table[3].data = &net->ipv4.frags.ipfrag_count_thresh; /* add ipfrag count */
+#endif
 	}
 
 	hdr = register_net_sysctl_table(net, net_ipv4_ctl_path, table);
@@ -834,6 +888,9 @@ static int __net_init ipv4_frags_init_net(struct net *net)
 	 */
 	net->ipv4.frags.high_thresh = 256 * 1024;
 	net->ipv4.frags.low_thresh = 192 * 1024;
+#ifdef CONFIG_ATP_COMMON
+	net->ipv4.frags.ipfrag_count_thresh = 150;  /* add ipfrag count */
+#endif
 	/*
 	 * Important NOTE! Fragment queue must be destroyed before MSL expires.
 	 * RFC791 is wrong proposing to prolongate timer each fragment arrival

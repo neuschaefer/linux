@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * INET		An implementation of the TCP/IP protocol suite for the LINUX
  *		operating system.  INET is implemented using the  BSD Socket
  *		interface as the means of communication with the user level.
@@ -145,6 +149,12 @@
 #include <net/xfrm.h>
 #include <linux/mroute.h>
 #include <linux/netlink.h>
+
+#ifdef CONFIG_ATP_HYBRID
+#include <net/netfilter/nf_conntrack.h>
+#endif
+
+#include <linux/atphooks.h>
 
 /*
  *	Process Router Attention IP option (RFC 2113)
@@ -319,14 +329,28 @@ static int ip_rcv_finish(struct sk_buff *skb)
 {
 	const struct iphdr *iph = ip_hdr(skb);
 	struct rtable *rt;
+#ifdef CONFIG_ATP_HYBRID
+    __be32 saddr = iph->saddr;
+
+    /*Bypass切换到Bonding状态，根据连接跟踪让旧的数据流量走源IP策略路由，保持和原来一致 */
+    struct nf_conn *ct = (struct nf_conn *)skb->nfct;    
+    if (ct && (skb->mark & PPP_TRIGER_MARK)) {
+        saddr = ct->tuplehash[IP_CT_DIR_REPLY].tuple.dst.u3.ip;
+    }
+#endif
 
 	/*
 	 *	Initialise the virtual path cache for the packet. It describes
 	 *	how the packet travels inside Linux networking.
 	 */
 	if (skb_dst(skb) == NULL) {
+#ifdef CONFIG_ATP_HYBRID
+		int err = ip_route_input_noref(skb, iph->daddr, saddr,
+					       iph->tos, skb->dev);
+#else
 		int err = ip_route_input_noref(skb, iph->daddr, iph->saddr,
 					       iph->tos, skb->dev);
+#endif
 		if (unlikely(err)) {
 			if (err == -EHOSTUNREACH)
 				IP_INC_STATS_BH(dev_net(skb->dev),
@@ -381,6 +405,7 @@ int ip_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt, 
 	__u8 iph_ihl, iph_version;
 #endif
 
+	ATP_HOOK_VOID(ATP_IP_BF_RCV, skb, NULL, NULL);
 
 	/* When the interface is in promisc. mode, drop all the crap
 	 * that it receives, do not try to analyse it.

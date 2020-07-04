@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * xfrm_policy.c
  *
  * Changes:
@@ -1787,6 +1791,17 @@ struct dst_entry *xfrm_lookup(struct net *net, struct dst_entry *dst_orig,
 	u8 dir = policy_to_flow_dir(XFRM_POLICY_OUT);
 	int i, err, num_pols, num_xfrms = 0, drop_pols = 0;
 
+	/* Start of  2010-07-31 红区使用DHCP Relay的时候会导致广播报文无法发送到LAN侧 */
+#ifdef CONFIG_SUPPORT_ATP
+    if (sk 
+        && (AF_INET == sk->sk_family)
+        && (htonl(INADDR_BROADCAST) == fl->u.ip4.daddr))
+    {
+        return 0;
+    }
+#endif
+/* End of  2010-07-31 红区使用DHCP Relay的时候会导致广播报文无法发送到LAN侧 */
+
 restart:
 	dst = NULL;
 	xdst = NULL;
@@ -2934,6 +2949,71 @@ static int xfrm_migrate_check(const struct xfrm_migrate *m, int num_migrate)
 
 	return 0;
 }
+#ifdef CONFIG_SUPPORT_ATP
+static void xfrm_reset_timer(struct net *net, struct xfrm_state **states, int n)
+{
+	int i;
+	for (i = 0; i < n; i++)
+	{
+        if (XFRM_STATE_ACQ == states[i]->km.state)
+        {
+            /* 注意，这里非常依赖于xfrm_state_find 中设置定时器的地方，也依赖于xfrm_timer_handler的实现 */
+			states[i]->lft.hard_add_expires_seconds = net->xfrm.sysctl_acq_expires;
+            tasklet_hrtimer_start(&states[i]->mtimer, 
+                ktime_set(net->xfrm.sysctl_acq_expires, 0), HRTIMER_MODE_REL);
+        }
+	}
+}
+
+static void xfrm_acq_reinsert(struct xfrm_state **states, int num)
+{
+    struct net *pstNet = NULL;
+    struct xfrm_state *x = NULL;
+    int i = 0;
+    pstNet = xs_net(x);
+
+    for (i = 0; i < num; i++)
+    {
+        x = states[i];
+        if (XFRM_STATE_ACQ == x->km.state)
+        {
+            xfrm_migrate_del_acq_state_link(pstNet, x);
+            xfrm_migrate_add_acq_link(pstNet, x);
+        }
+    }
+
+    return ;
+}
+
+struct xfrm_acq_restore
+{
+    struct xfrm_state *x;
+    struct xfrm_migrate *xm;
+};
+void xfrm_restore_migrate(struct xfrm_acq_restore *pacqs, int num)
+{
+    int i = 0;
+    if (!num || !pacqs)
+    {
+        return ;
+    }
+    
+    for (i = 0; i < num; i++)
+    {
+        if (!pacqs[i].x || !pacqs[i].xm)
+        {
+            continue;
+        }
+        
+        memcpy(&pacqs[i].x->id.daddr, 
+            &pacqs[i].xm->old_daddr, sizeof(pacqs[i].x->id.daddr));
+        memcpy(&pacqs[i].x->props.saddr, 
+            &pacqs[i].xm->old_saddr, sizeof(pacqs[i].x->props.saddr));
+    }
+
+    return ;
+}
+#endif
 
 int xfrm_migrate(const struct xfrm_selector *sel, u8 dir, u8 type,
 		 struct xfrm_migrate *m, int num_migrate,
@@ -2946,6 +3026,10 @@ int xfrm_migrate(const struct xfrm_selector *sel, u8 dir, u8 type,
 	struct xfrm_state *x_new[XFRM_MAX_DEPTH];
 	struct xfrm_migrate *mp;
 
+#ifdef CONFIG_SUPPORT_ATP
+    struct xfrm_acq_restore x_acq[XFRM_MAX_DEPTH];
+    int acq_num = 0;
+#endif
 	if ((err = xfrm_migrate_check(m, num_migrate)) < 0)
 		goto out;
 
@@ -2963,10 +3047,24 @@ int xfrm_migrate(const struct xfrm_selector *sel, u8 dir, u8 type,
 			if ((xc = xfrm_state_migrate(x, mp))) {
 				x_new[nx_new] = xc;
 				nx_new++;
-			} else {
+#ifdef CONFIG_SUPPORT_ATP
+                /* 因为我们目前对于ACQ的SA使用的就是同一个结构体，因此这种情况下我们就需要能够在遇到错误的时候还原
+                       * 注意，需要逆掉xfrm_state_migrate()函数中的内容
+                       */
+                if (XFRM_STATE_ACQ == x->km.state)
+                {
+                    x_acq[acq_num].x = x;
+                    x_acq[acq_num].xm = mp;
+                    acq_num++;
+                }
+#endif
+			}
+#ifndef CONFIG_SUPPORT_ATP
+            else {
 				err = -ENODATA;
 				goto restore_state;
 			}
+#endif
 		}
 	}
 
@@ -2977,8 +3075,17 @@ int xfrm_migrate(const struct xfrm_selector *sel, u8 dir, u8 type,
 	/* Stage 4 - delete old state(s) */
 	if (nx_cur) {
 		xfrm_states_put(x_cur, nx_cur);
+#ifdef CONFIG_SUPPORT_ATP
+        xfrm_states_delete2(x_cur, nx_cur);
+#else
 		xfrm_states_delete(x_cur, nx_cur);
+#endif
 	}
+
+#ifdef CONFIG_SUPPORT_ATP
+    xfrm_reset_timer(xp_net(pol), x_new, nx_new);
+    xfrm_acq_reinsert(x_cur, nx_cur);
+#endif
 
 	/* Stage 5 - announce */
 	km_migrate(sel, dir, type, m, num_migrate, k);
@@ -2995,8 +3102,14 @@ restore_state:
 	if (nx_cur)
 		xfrm_states_put(x_cur, nx_cur);
 	if (nx_new)
-		xfrm_states_delete(x_new, nx_new);
-
+	{
+#ifdef CONFIG_SUPPORT_ATP
+        xfrm_states_delete2(x_new, nx_new);
+        xfrm_restore_migrate(x_acq, acq_num);
+#else
+        xfrm_states_delete(x_new, nx_new);
+#endif
+	}
 	return err;
 }
 EXPORT_SYMBOL(xfrm_migrate);

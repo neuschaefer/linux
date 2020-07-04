@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * IPv6 fragment reassembly for connection tracking
  *
  * Copyright (C)2004 USAGI/WIDE Project
@@ -316,9 +320,8 @@ found:
 		fq->nhoffset = nhoff;
 		fq->q.last_in |= INET_FRAG_FIRST_IN;
 	}
-	write_lock(&nf_frags.lock);
-	list_move_tail(&fq->q.lru_list, &nf_init_frags.lru_list);
-	write_unlock(&nf_frags.lock);
+    //CVE-2014-0100
+    inet_frag_lru_move(&fq->q);
 	return 0;
 
 discard_fq:

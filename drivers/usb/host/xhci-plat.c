@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * xhci-plat.c - xHCI host controller driver platform Bus Glue.
  *
  * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com
@@ -91,6 +95,9 @@ static int xhci_plat_probe(struct platform_device *pdev)
 	int			ret;
 	int			irq;
 
+#if (defined CONFIG_HSAN)
+	struct hiusb_plat_data *platdata;
+#endif
 	if (usb_disabled())
 		return -ENODEV;
 
@@ -124,6 +131,17 @@ static int xhci_plat_probe(struct platform_device *pdev)
 		ret = -EFAULT;
 		goto release_mem_region;
 	}
+
+#if (defined CONFIG_HSAN)
+	platdata = dev_get_platdata(&pdev->dev);
+	if (platdata && platdata->start_hcd)
+		platdata->start_hcd(hcd->regs);
+	else {
+		dev_dbg(&pdev->dev, "error no host reset fuction\n");
+		ret = -EFAULT;
+		goto release_mem_region;
+	}
+#endif
 
 	ret = usb_add_hcd(hcd, irq, IRQF_SHARED);
 	if (ret)
@@ -159,7 +177,10 @@ dealloc_usb2_hcd:
 
 unmap_registers:
 	iounmap(hcd->regs);
-
+#if (defined CONFIG_HSAN)
+	if (platdata->stop_hcd)
+		platdata->stop_hcd();
+#endif
 release_mem_region:
 	release_mem_region(hcd->rsrc_start, hcd->rsrc_len);
 
@@ -174,6 +195,10 @@ static int xhci_plat_remove(struct platform_device *dev)
 	struct usb_hcd	*hcd = platform_get_drvdata(dev);
 	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
 
+#if (defined CONFIG_HSAN)
+    struct hiusb_plat_data *platdata = dev_get_platdata(&dev->dev);
+#endif
+
 	usb_remove_hcd(xhci->shared_hcd);
 	usb_put_hcd(xhci->shared_hcd);
 
@@ -181,6 +206,10 @@ static int xhci_plat_remove(struct platform_device *dev)
 	iounmap(hcd->regs);
 	usb_put_hcd(hcd);
 	kfree(xhci);
+#if (defined CONFIG_HSAN)
+	if (platdata->stop_hcd)
+		platdata->stop_hcd();
+#endif
 
 	return 0;
 }

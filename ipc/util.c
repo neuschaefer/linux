@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * linux/ipc/util.c
  * Copyright (C) 1992 Krishna Balasubramanian
  *
@@ -263,6 +267,10 @@ int ipc_addid(struct ipc_ids* ids, struct kern_ipc_perm* new, int size)
 	new->deleted = 0;
 	rcu_read_lock();
 	spin_lock(&new->lock);
+    //CVE-2015-7613
+	current_euid_egid(&euid, &egid);
+	new->cuid = new->uid = euid;
+	new->gid = new->cgid = egid;
 
 	err = idr_get_new(&ids->ipcs_idr, new, &id);
 	if (err) {
@@ -272,10 +280,11 @@ int ipc_addid(struct ipc_ids* ids, struct kern_ipc_perm* new, int size)
 	}
 
 	ids->in_use++;
-
-	current_euid_egid(&euid, &egid);
-	new->cuid = new->uid = euid;
-	new->gid = new->cgid = egid;
+    
+    //CVE-2015-7613
+	//current_euid_egid(&euid, &egid);
+	//new->cuid = new->uid = euid;
+	//new->gid = new->cgid = egid;
 
 	new->seq = ids->seq++;
 	if(ids->seq > ids->seq_max)

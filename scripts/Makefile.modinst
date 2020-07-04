@@ -23,11 +23,11 @@ quiet_cmd_modules_install = INSTALL $@
 INSTALL_MOD_DIR ?= extra
 ext-mod-dir = $(INSTALL_MOD_DIR)$(subst $(patsubst %/,%,$(KBUILD_EXTMOD)),,$(@D))
 
-ifndef BCM_KF # defined(CONFIG_BCM_KF_MODINST_DIR)
-modinst_dir = $(if $(KBUILD_EXTMOD),$(ext-mod-dir),kernel/$(@D))
-else # BCM_KF #CONFIG_BCM_KF_MODINST_DIR
+#ifndef BCM_KF # defined(CONFIG_BCM_KF_MODINST_DIR)
+#modinst_dir = $(if $(KBUILD_EXTMOD),$(ext-mod-dir),kernel/$(@D))
+#else # BCM_KF #CONFIG_BCM_KF_MODINST_DIR
 modinst_dir = $(if $(filter ../% /%,$@),extra/,kernel/$(@D))
-endif # BCM_KF #CONFIG_BCM_KF_MODINST_DIR
+#endif # BCM_KF #CONFIG_BCM_KF_MODINST_DIR
 
 
 $(modules):

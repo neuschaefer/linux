@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * usblp.c
  *
  * Copyright (c) 1999 Michael Gee	<michael@linuxspecific.com>
@@ -59,6 +63,9 @@
 #undef DEBUG
 #include <linux/usb.h>
 #include <linux/ratelimit.h>
+
+#include "msg/kcmsmonitormsgtypes.h"
+#include <linux/proc_fs.h>
 
 /*
  * Version Information
@@ -127,6 +134,35 @@ MFG:HEWLETT-PACKARD;MDL:DESKJET 970C;CMD:MLC,PCL,PML;CLASS:PRINTER;DESCRIPTION:H
  * need a status buffer that is allocated via kmalloc(), not on stack
  */
 #define STATUS_BUF_SIZE		8
+
+
+
+
+
+
+#define SHORT_STRLEN    32
+#define STRLEN 128
+#define MAX_DISKS      4    /*定义同时挂载打印机的最大数目，留以后扩展*/
+
+
+struct proc_dir_entry *proc_printermedium = NULL;
+
+struct usb_printerinfo{
+    char diskname[SHORT_STRLEN];  /*disk name , printer not use*/
+    char vendor[STRLEN];     /*vendor name of the usb device*/
+    char model[STRLEN];    /*usb id*/
+    char serial[STRLEN];     /*usb type*/
+    char connectiontype[SHORT_STRLEN]; /*USB1.1,USB2.0,...*/
+    int  scsihostid ;
+    int  isvalid;
+    sector_t	capacity;
+} *usbprinterinfos;
+struct usb_printerinfo *printerinfos = NULL;
+
+/*get a free member*/
+static int attacheddisks = 0;
+
+
 
 /*
  * Locks down the locking order:
@@ -247,6 +283,296 @@ static DEFINE_MUTEX(usblp_mutex);	/* locks the existence of usblp's */
 /*
  * Functions for usblp control messages.
  */
+
+
+static 	struct usb_printerinfo * get_freediskslot()
+{
+    int i = 0;
+
+	if(attacheddisks < MAX_DISKS)
+	{
+            for(i=0;i<MAX_DISKS;i++)
+            {
+                if(0 == ((struct usb_printerinfo *)printerinfos+i)->isvalid)
+    			{
+    			    break;
+                    }
+            }	
+	}
+
+	if(i < MAX_DISKS)
+	{
+        	attacheddisks ++;
+        	return ((struct usb_printerinfo *)printerinfos+i);	
+	}
+    return NULL;
+}
+
+static char * replacespace(char *buf)
+{
+    int i = 0;
+    int len = strlen(buf);
+
+	if(len >= STRLEN)
+	{
+	    len = STRLEN -1;
+	}	
+
+	for(i = 0;i < len;i++)
+	{
+	    if(buf[i] == ' ')
+	    {
+	        buf[i] = '_';
+	    }
+	}
+
+	return buf;
+}
+
+
+
+
+
+char szProcUserIppVendor[128];
+char szUsbPrinerDevInfo[512];
+
+static int proc_user_ipp_wr (struct file *file,
+                             const char *buffer,
+                             unsigned long count,
+                             void *data)
+{
+    /*no need write operation*/
+
+   return count;
+}
+int proc_user_ipp_rd(char *buf, char **start, off_t offset,
+                   int count, int *eof, void *data)
+{
+    int len = 0;
+    len += sprintf (buf + len, "%s",szProcUserIppVendor);
+    return len;
+}
+
+static int proc_user_printer_wr (struct file *file,
+                             const char *buffer,
+                             unsigned long count,
+                             void *data)
+{
+   strcpy(szUsbPrinerDevInfo, buffer);
+   return count;
+}
+
+
+int proc_user_printer_rd(char *buf, char **start, off_t offset,
+                   int count, int *eof, void *data)
+{
+    int len = 0;
+
+    len += sprintf (buf + len, "%s",szUsbPrinerDevInfo);
+    return len;
+}
+
+static void proc_user_ipp_create(void)
+{
+    struct proc_dir_entry* proc_ipp = NULL;
+    proc_ipp = create_proc_entry("proc_user_ipp", S_IFREG | S_IRUSR , NULL ); 
+    proc_ipp->write_proc = (read_proc_t *)proc_user_ipp_wr;
+    proc_ipp->read_proc = (write_proc_t *)proc_user_ipp_rd;
+
+    struct proc_dir_entry* proc_printerdev = NULL;
+
+    proc_printerdev = create_proc_entry("proc_user_printer", S_IFREG | S_IRUSR , NULL ); 
+    proc_printerdev->write_proc = (read_proc_t *)proc_user_printer_wr;
+    proc_printerdev->read_proc = (write_proc_t *)proc_user_printer_rd;
+	
+}
+static void proc_user_ipp_remove(void)
+{
+    remove_proc_entry("proc_user_ipp", NULL /* parent dir */);
+
+    remove_proc_entry("proc_user_printer", NULL /* parent dir */);
+}
+
+
+
+static int proc_user_printermedium_wr (struct file *file,
+                             const char *buffer,
+                             unsigned long count,
+                             void *data)
+{
+   return count;
+}
+
+static int proc_user_printermedium_rd (char *page, char **start, off_t off, int count, 
+								int *eof, void *data)
+{
+    int i = 0;
+    int len = 0;
+    struct usb_printerinfo *disk = NULL;
+    
+    len += sprintf (page + len, "%s","Diskname Vendor       ID       Type   ConnectionType \r\n");
+
+    for(i = 0;i < MAX_DISKS;i++)
+    {
+        if(1 == ((struct usb_printerinfo *)printerinfos+i)->isvalid)
+        {
+            disk = ((struct usb_printerinfo *)printerinfos+i);
+            disk->diskname[10] = '\0';		
+            len += sprintf (page + len, "%-8s ", replacespace(disk->diskname));
+
+            disk->vendor[15] = '\0';
+            len += sprintf (page + len, "%-12s ", replacespace(disk->vendor));
+
+            disk->model[15] = '\0';
+            len += sprintf (page + len, "%-8s ",replacespace(disk->model));
+
+            len += sprintf (page + len, "%-6s ",replacespace(disk->serial));				
+            len += sprintf (page + len, "%-13s ", replacespace(disk->connectiontype));
+            
+            len += sprintf (page + len, "%s","\n");            
+        }
+    }
+    return len;
+}
+
+static void proc_user_printermedium_create(void)
+{
+    proc_printermedium = create_proc_entry("proc_usb_printer", S_IFREG | S_IRUSR , NULL ); 
+    proc_printermedium->write_proc = (write_proc_t *)proc_user_printermedium_wr;
+    proc_printermedium->read_proc = (read_proc_t *)proc_user_printermedium_rd;
+
+    /*initialize physicalmidum devs structure*/
+    printerinfos = kmalloc(sizeof(struct usb_printerinfo)*MAX_DISKS, GFP_KERNEL);
+    if (!printerinfos) 
+    {
+        return  ;
+    } 
+    memset(printerinfos,0,sizeof(struct usb_printerinfo)*MAX_DISKS);
+}
+
+static void proc_user_printermedium_remove(void)
+{
+	/* no problem if it was not registered */
+	remove_proc_entry("proc_usb_printer", NULL /* parent dir */);
+	proc_printermedium = NULL;
+}
+
+
+
+static void atp_usblp_clear_proc(void)
+{
+    int n = 0;
+    
+    memset(szProcUserIppVendor, 0, sizeof(szProcUserIppVendor));
+    memset(szUsbPrinerDevInfo, 0, sizeof(szUsbPrinerDevInfo)); 
+
+    for (n = 0; n < MAX_DISKS; n++)
+    {
+
+        ((struct usb_printerinfo*)printerinfos + n)->isvalid = 0;
+        attacheddisks--;
+        if ( attacheddisks < 0)
+        {
+            attacheddisks = 0;
+        }
+    }
+
+
+}
+
+
+static void atp_usblp_get_proc(struct usb_interface *intf, struct usblp *usblp)
+{
+    char    mode[12] = {0};
+    char    speed[12] = {0};
+    int giVendor;
+    int giProduct;
+    int i = 0;
+    struct usb_printerinfo *disk = NULL;
+
+    static char acAtpDeviceMFG[512] = "";
+    static char acAtpDeviceMDL[512] = "";
+    char * pAtpDeviceId = NULL;
+    char * pAtpTmp = NULL;
+
+    struct usb_device *dev = NULL;
+
+    dev = interface_to_usbdev (intf);
+
+    //end add by zhouyu 20101029 支持hub方式同时访问打印机及USB存储设备
+    disk = get_freediskslot();
+     if(!disk)
+     {
+         goto next;
+     }
+
+     giVendor = le16_to_cpu(dev->descriptor.idVendor);
+     giProduct = le16_to_cpu(dev->descriptor.idProduct);
+     
+      if(USB_SPEED_HIGH == dev->speed)
+             snprintf(speed,11,"USB2.0");
+      else 
+             snprintf(speed,11,"USB1.1");
+      
+     sprintf(mode , "%04x%04x",giVendor,giProduct);
+     sprintf(disk->diskname , "%s" , "printer");
+
+     if (NULL != dev->manufacturer)
+     {
+         sprintf(disk->vendor , "%s" , dev->manufacturer);
+     }  
+     
+     sprintf(disk->model , "%s" , mode);
+     sprintf(disk ->serial , "%d" , intf->cur_altsetting->desc.bInterfaceClass);
+     sprintf(disk->connectiontype , "%s" , speed);
+     
+     disk->isvalid = 1;
+
+next: 
+    pAtpDeviceId = &usblp->device_id_string[2];
+
+    memset(acAtpDeviceMFG, 0, sizeof(acAtpDeviceMFG));
+    memset(acAtpDeviceMDL, 0, sizeof(acAtpDeviceMDL));
+    if( strlen( pAtpDeviceId ) > 0 )
+    {
+        pAtpTmp = strstr( pAtpDeviceId, "MFG:" );
+        if( pAtpTmp != NULL )
+        {
+            snprintf( acAtpDeviceMFG, sizeof( acAtpDeviceMFG ), "%s", ( pAtpTmp + strlen( "MFG:" ) ) );
+
+            pAtpTmp = strstr( acAtpDeviceMFG, ";" );
+            if( pAtpTmp != NULL )
+            {
+                *pAtpTmp = '\0';
+            }
+        }
+
+        pAtpTmp = strstr( pAtpDeviceId, "MDL:" );
+        if( pAtpTmp != NULL )
+        {
+            snprintf( acAtpDeviceMDL, sizeof( acAtpDeviceMDL ), "%s", ( pAtpTmp + strlen( "MDL:" ) ) );
+
+            pAtpTmp = strstr( acAtpDeviceMDL, ";" );
+            if( pAtpTmp != NULL )
+            {
+                *pAtpTmp = '\0';
+            }
+        }
+
+    }
+
+    memset( szProcUserIppVendor, 0, sizeof( szProcUserIppVendor ) );
+    snprintf( szProcUserIppVendor, sizeof( szProcUserIppVendor ), "Vendor:%s\n", ( strlen( acAtpDeviceMFG ) > 0 ? acAtpDeviceMFG : "Unknown" ) );
+
+    memset( szUsbPrinerDevInfo, 0, sizeof( szUsbPrinerDevInfo ) );
+    snprintf( szUsbPrinerDevInfo, sizeof( szUsbPrinerDevInfo ), "Manufacturer:%s\nModelName:%s\nModelNumber:%d\n",
+        ( strlen( acAtpDeviceMFG ) > 0 ? acAtpDeviceMFG : "Unknown" ),
+        ( strlen( acAtpDeviceMDL ) > 0 ? acAtpDeviceMDL : "Unknown" ),
+        usblp->dev->descriptor.idProduct );
+
+}
+
+
 
 static int usblp_ctrl_msg(struct usblp *usblp, int request, int type, int dir, int recip, int value, void *buf, int len)
 {
@@ -1173,6 +1499,13 @@ static int usblp_probe(struct usb_interface *intf,
 		le16_to_cpu(usblp->dev->descriptor.idVendor),
 		le16_to_cpu(usblp->dev->descriptor.idProduct));
 
+    /* Get Printer Information We Need For Userspace */
+    atp_usblp_get_proc(intf, usblp);
+
+    /* Notify Userspace */
+    ATP_Netlink_SendToUserspace(ATP_MSG_MONITOR_EVT_IPP_START, NULL, 0);
+
+    
 	return 0;
 
 abort_intfdata:
@@ -1363,6 +1696,10 @@ static void usblp_disconnect(struct usb_interface *intf)
 	if (!usblp->used)
 		usblp_cleanup(usblp);
 	mutex_unlock(&usblp_mutex);
+
+    atp_usblp_clear_proc();
+
+    ATP_Netlink_SendToUserspace(ATP_MSG_MONITOR_EVT_IPP_STOP, NULL, 0);
 }
 
 static int usblp_suspend(struct usb_interface *intf, pm_message_t message)
@@ -1412,7 +1749,30 @@ static struct usb_driver usblp_driver = {
 	.supports_autosuspend =	1,
 };
 
-module_usb_driver(usblp_driver);
+/* 
+* Replace Marco for adding proc filesystem 
+* module_usb_driver(usblp_driver);
+*/
+
+static int __init usblp_init(void)
+{
+	printk("make proc for printers \r\n");
+    proc_user_ipp_create();
+    proc_user_printermedium_create();
+
+    return usb_register(&usblp_driver);
+}
+
+static void __exit usblp_exit(void)
+{
+    proc_user_ipp_remove();
+    proc_user_printermedium_remove();
+
+	usb_deregister(&usblp_driver);
+}
+
+module_init(usblp_init);
+module_exit(usblp_exit);
 
 MODULE_AUTHOR(DRIVER_AUTHOR);
 MODULE_DESCRIPTION(DRIVER_DESC);

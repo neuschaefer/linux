@@ -388,3 +388,7 @@ source "net/ceph/Kconfig"
 source "net/nfc/Kconfig"
 
 endif   # if NET
+
+config SMUX
+	tristate "Implementation index for RFC2684 Services"
+	default n

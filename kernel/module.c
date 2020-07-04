@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
    Copyright (C) 2002 Richard Henderson
    Copyright (C) 2001 Rusty Russell, 2002, 2010 Rusty Russell IBM.
 
@@ -59,6 +63,13 @@
 #include <linux/pfn.h>
 #include <linux/bsearch.h>
 
+#ifdef CONFIG_HIMEM_DUMPFILE
+extern int hw_ssp_set_dump_info(const char *fmt, ...);
+#endif
+
+#ifdef CONFIG_CRASH_DUMPFILE
+#include "atpcrash.h"
+#endif
 #define CREATE_TRACE_POINTS
 #include <trace/events/module.h>
 
@@ -3596,12 +3607,26 @@ void print_modules(void)
 	char buf[8];
 
 	printk(KERN_DEFAULT "Modules linked in:");
+#ifdef CONFIG_CRASH_DUMPFILE
+    ATP_KRNL_CRASH_AppendInfo("Modules linked in:\n");
+#endif
+
+#ifdef CONFIG_HIMEM_DUMPFILE
+    hw_ssp_set_dump_info("Modules linked in:\n");
+#endif
 	/* Most callers should already have preempt disabled, but make sure */
 	preempt_disable();
 	list_for_each_entry_rcu(mod, &modules, list)
 #if defined(CONFIG_BCM_KF_EXTRA_DEBUG) 
 	{
 		printk(" %s%s", mod->name, module_flags(mod, buf));
+#ifdef CONFIG_CRASH_DUMPFILE		
+		ATP_KRNL_CRASH_AppendInfo(" %s%s", mod->name, module_flags(mod, buf));
+#endif
+
+#ifdef CONFIG_HIMEM_DUMPFILE
+    hw_ssp_set_dump_info(" %s%s", mod->name, module_flags(mod, buf));
+#endif
 		printk(" init_addr(%p - %p), core_addr(%p - %p)\n",
 			mod->module_init,
 			mod->module_init+mod->init_text_size,
@@ -3613,8 +3638,26 @@ void print_modules(void)
 #endif
 	preempt_enable();
 	if (last_unloaded_module[0])
+	{
 		printk(" [last unloaded: %s]", last_unloaded_module);
+#ifdef CONFIG_CRASH_DUMPFILE		
+		ATP_KRNL_CRASH_AppendInfo(" [last unloaded: %s]", last_unloaded_module);
+#endif
+
+#ifdef CONFIG_HIMEM_DUMPFILE
+              hw_ssp_set_dump_info(" [last unloaded: %s]", last_unloaded_module);
+#endif
+	}
 	printk("\n");
+#ifdef CONFIG_CRASH_DUMPFILE	
+	ATP_KRNL_CRASH_AppendInfo("\n");
+	//ATP_Krnl_Crash_RegWriteFlash(g_acWriteCrashBuf);	
+#endif	
+
+#ifdef CONFIG_HIMEM_DUMPFILE
+        hw_ssp_set_dump_info("\n");
+#endif
+
 }
 
 #ifdef CONFIG_MODVERSIONS

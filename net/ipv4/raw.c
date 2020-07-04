@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * INET		An implementation of the TCP/IP protocol suite for the LINUX
  *		operating system.  INET is implemented using the  BSD Socket
  *		interface as the means of communication with the user level.
@@ -161,6 +165,32 @@ static int raw_v4_input(struct sk_buff *skb, const struct iphdr *iph, int hash)
 	struct hlist_head *head;
 	int delivered = 0;
 	struct net *net;
+
+#ifdef CONFIG_ATP_HYBRID
+    u8     *h;
+    __be16 gre_proto;
+    
+    /* 
+       收到IPG_GRE的数据包只接收GRE控制报文gre_proto=0x0101; 如果gre_proto=0x1234，       
+       说明是DHCP报文，这里修改成IP协议 
+    */
+    do {
+        if (iph && (IPPROTO_GRE == iph->protocol))    
+        {
+            h = skb->data;
+        	gre_proto = *(__be16 *)(h + 2);
+            if (htons(ETH_P_IPGRE_CTL) == gre_proto)
+            {
+                break;
+            }
+            else
+            {
+                return delivered;
+            }
+        }
+    }
+    while (0);
+#endif
 
 	read_lock(&raw_v4_hashinfo.lock);
 	head = &raw_v4_hashinfo.ht[hash];
@@ -349,6 +379,10 @@ static int raw_send_hdrinc(struct sock *sk, struct flowi4 *fl4,
 
 	skb->priority = sk->sk_priority;
 	skb->mark = sk->sk_mark;
+#if defined(CONFIG_IMQ)
+	/* if qos enable, all packet to IMQ */
+    skb->mark |= QOS_DEFAULT_MARK;
+#endif
 	skb_dst_set(skb, &rt->dst);
 	*rtp = NULL;
 
@@ -389,6 +423,14 @@ static int raw_send_hdrinc(struct sock *sk, struct flowi4 *fl4,
 	if (iph->protocol == IPPROTO_ICMP)
 		icmp_out_count(net, ((struct icmphdr *)
 			skb_transport_header(skb))->type);
+
+#if defined(CONFIG_ATP_HYBRID)
+    /* 把gre控制报文放到最高优先级队列中 */
+    if (IPPROTO_GRE == iph->protocol)
+    {
+        skb->mark |= 0x7;
+    }
+#endif
 
 	err = NF_HOOK(NFPROTO_IPV4, NF_INET_LOCAL_OUT, skb, NULL,
 		      rt->dst.dev, dst_output);
@@ -685,9 +727,9 @@ static int raw_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 
 	if (flags & MSG_OOB)
 		goto out;
-
-	if (addr_len)
-		*addr_len = sizeof(*sin);
+	//CVE-2013-7263
+	//if (addr_len)
+	//	*addr_len = sizeof(*sin);
 
 	if (flags & MSG_ERRQUEUE) {
 		err = ip_recv_error(sk, msg, len);
@@ -716,6 +758,9 @@ static int raw_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 		sin->sin_addr.s_addr = ip_hdr(skb)->saddr;
 		sin->sin_port = 0;
 		memset(&sin->sin_zero, 0, sizeof(sin->sin_zero));
+		//CVE-2013-7263
+		if (addr_len)
+			*addr_len = sizeof(*sin);
 	}
 	if (inet->cmsg_flags)
 		ip_cmsg_recv(msg, skb);

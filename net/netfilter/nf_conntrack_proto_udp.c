@@ -1,3 +1,7 @@
+/*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
 /* (C) 1999-2001 Paul `Rusty' Russell
  * (C) 2002-2004 Netfilter Core Team <coreteam@netfilter.org>
  *
@@ -36,7 +40,11 @@ enum udp_conntrack {
 };
 
 static unsigned int udp_timeouts[UDP_CT_MAX] = {
+#ifdef CONFIG_SUPPORT_ATP
+	[UDP_CT_UNREPLIED]	= 150*HZ,	/*xBox upnp测试,session policy test UDP维持时间修改为150*/
+#else
 	[UDP_CT_UNREPLIED]	= 30*HZ,
+#endif
 	[UDP_CT_REPLIED]	= 180*HZ,
 };
 
@@ -325,3 +333,20 @@ struct nf_conntrack_l4proto nf_conntrack_l4proto_udp6 __read_mostly =
 #endif
 };
 EXPORT_SYMBOL_GPL(nf_conntrack_l4proto_udp6);
+
+#ifdef CONFIG_ATP_HYBRID_GREACCEL
+void nf_ct_refresh_udp(struct nf_conn *ct,
+					enum ip_conntrack_info ctinfo,
+					const struct sk_buff *skb)
+{
+	if ((NULL == ct) || (NULL == skb))
+	{
+		return;
+	}
+
+	nf_ct_refresh_acct(ct, ctinfo, skb, udp_timeouts[UDP_CT_UNREPLIED]);
+	return;
+}
+EXPORT_SYMBOL(nf_ct_refresh_udp);
+#endif
+

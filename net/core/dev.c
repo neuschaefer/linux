@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * 	NET3	Protocol independent device support routines.
  *
  *		This program is free software; you can redistribute it and/or
@@ -97,6 +101,11 @@
 #include <net/net_namespace.h>
 #include <net/sock.h>
 #include <linux/rtnetlink.h>
+/* Start of viewed  for qos function 2012-1-6 */
+#if defined(CONFIG_IMQ) || defined(CONFIG_IMQ_MODULE)
+#include <linux/imq.h>
+#endif
+/* End of viewed  for qos function 2012-1-6 */
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 #include <linux/stat.h>
@@ -130,6 +139,7 @@
 #include <trace/events/net.h>
 #include <trace/events/skb.h>
 #include <linux/pci.h>
+#include <linux/version.h>
 #include <linux/inetdevice.h>
 #include <linux/cpu_rmap.h>
 #include <linux/net_tstamp.h>
@@ -138,6 +148,8 @@
 #if defined(CONFIG_BCM_KF_IGMP)
 #include <linux/mroute.h>
 #endif
+
+#include <linux/atphooks.h>
 
 #include "net-sysfs.h"
 #if defined(CONFIG_BCM_KF_BALOO) && defined(BCM_BALOO)
@@ -150,6 +162,36 @@
 #include "skb_defines.h"
 #endif
 
+#include "bhal.h"
+
+#include "atp_interface.h"
+
+#include <net/netfilter/nf_conntrack.h>
+#include <net/netfilter/nf_conntrack_l3proto.h>
+#include <net/netfilter/nf_conntrack_l4proto.h>
+#include <net/netfilter/nf_conntrack_expect.h>
+#include <net/netfilter/nf_conntrack_helper.h>
+#include <net/netfilter/nf_conntrack_core.h>
+
+
+#ifdef CONFIG_ATP_HYBRID_GREACCEL
+#include <linux/if_pppox.h>
+#include <linux/ppp_defs.h>
+#include "ipgre_reorder.h"
+#endif
+
+#ifdef CONFIG_ATP_COMMON
+extern int atp_dev_ioctl(unsigned int cmd, struct ifreq *ifr);
+extern int skb_to_downlinkqos(struct sk_buff *skb,struct net_device *dev);
+#endif
+
+#include "atpconfig.h"
+#if (defined(CONFIG_SMUX))
+extern int smux_pkt_recv(   struct sk_buff *skb, 
+                            struct net_device *dev,
+                            struct net_device *rdev);
+
+#endif
 /* Instead of increasing this, you should create a hash table. */
 #define MAX_GRO_SKBS 8
 
@@ -192,6 +234,22 @@ static struct list_head ptype_base[PTYPE_HASH_SIZE] __read_mostly;
 
 static struct list_head ptype_all __read_mostly;	/* Taps */
 
+
+#ifdef CONFIG_ATP_HYBRID_GREACCEL
+void (*accel_show_seq_show_hook)(struct seq_file *seq) = NULL;
+void (*accel_flush_seq_show_hook)(struct seq_file *seq) = NULL;
+unsigned int (*kernel_accel_recv_hook)(struct sk_buff *skb, struct net_device *dev) = NULL;
+unsigned int hisi_sw_accel_flag __read_mostly = 1;
+void (*kernel_get_bcm_vlan_real_dev_hook)(struct net_device *vlan_dev, struct net_device **real_dev) = NULL;
+
+
+EXPORT_SYMBOL(accel_show_seq_show_hook);
+EXPORT_SYMBOL(accel_flush_seq_show_hook);
+EXPORT_SYMBOL(kernel_accel_recv_hook);
+EXPORT_SYMBOL(hisi_sw_accel_flag);
+EXPORT_SYMBOL(kernel_get_bcm_vlan_real_dev_hook);
+#endif
+
 /*
  * The @dev_base_head list is protected by @dev_base_lock and the rtnl
  * semaphore.
@@ -214,11 +272,15 @@ static struct list_head ptype_all __read_mostly;	/* Taps */
 DEFINE_RWLOCK(dev_base_lock);
 EXPORT_SYMBOL(dev_base_lock);
 
-#if defined(CONFIG_BCM_KF_P8021AG) && (defined(CONFIG_BCM_P8021AG) || defined(CONFIG_BCM_P8021AG_MODULE))
+#if defined(CONFIG_BCM_KF_P8021AG) && (defined(CONFIG_BCM_P8021AG) || defined(CONFIG_BCM_P8021AG_MODULE)) || defined(CONFIG_HW_COMMON_8021AG)
 int (*p8021ag_hook)(struct sk_buff *skb);
 EXPORT_SYMBOL(p8021ag_hook);
 #endif
 
+#if defined(SUPPORT_ATP_HARDWARE_DIAGNOSE) 
+extern atomic_t g_HwDiagLswLoopbackEnable;
+extern int HwDiagRecivePacket(struct sk_buff *skb);
+#endif
 
 static inline void dev_base_seq_inc(struct net *net)
 {
@@ -411,6 +473,8 @@ int netdev_path_remove(struct net_device *dev)
         return -EBUSY;
     }
 
+	if (netdev_path_next_dev(dev) == NULL) 
+        return 0;
     netdev_path_next_dev(dev)->path.refcount--;
 
     netdev_path_next_dev(dev) = NULL;
@@ -2402,6 +2466,8 @@ int dev_hard_start_xmit(struct sk_buff *skb, struct net_device *dev,
 	int rc = NETDEV_TX_OK;
 	unsigned int skb_len;
 
+	ATP_HOOK(ATP_DEV_XMIT, skb, dev, NULL, 0);
+
 	if (likely(!skb->next)) {
 		netdev_features_t features;
 
@@ -2412,7 +2478,13 @@ int dev_hard_start_xmit(struct sk_buff *skb, struct net_device *dev,
 		if (dev->priv_flags & IFF_XMIT_DST_RELEASE)
 			skb_dst_drop(skb);
 
-		if (!list_empty(&ptype_all))
+		/* Start of viewed  for qos function 2012-1-6 */
+		if (!list_empty(&ptype_all)
+#if defined(CONFIG_IMQ) || defined(CONFIG_IMQ_MODULE)
+		    && !(skb->imq_flags & IMQ_F_ENQUEUE)
+#endif
+		    )
+		/* End of viewed  for qos function 2012-1-6 */
 			dev_queue_xmit_nit(skb, dev);
 
 		features = netif_skb_features(skb);
@@ -2619,7 +2691,7 @@ static inline int get_xps_queue(struct net_device *dev, struct sk_buff *skb)
 #endif
 }
 
-static struct netdev_queue *dev_pick_tx(struct net_device *dev,
+struct netdev_queue *dev_pick_tx(struct net_device *dev,
 					struct sk_buff *skb)
 {
 	int queue_index;
@@ -2655,6 +2727,7 @@ static struct netdev_queue *dev_pick_tx(struct net_device *dev,
 	skb_set_queue_mapping(skb, queue_index);
 	return netdev_get_tx_queue(dev, queue_index);
 }
+EXPORT_SYMBOL(dev_pick_tx);
 
 static inline int __dev_xmit_skb(struct sk_buff *skb, struct Qdisc *q,
 				 struct net_device *dev,
@@ -2765,6 +2838,16 @@ int dev_queue_xmit(struct sk_buff *skb)
 	struct netdev_queue *txq;
 	struct Qdisc *q;
 	int rc = -ENOMEM;
+	int ret = 0;
+
+	ATP_HOOK(ATP_DEV_PRE_XMIT, skb, dev, NULL, 0);
+
+    /*qos解耦后移到ATP_HOOK中*/
+#ifdef CONFIG_ATP_COMMON
+	ret = skb_to_downlinkqos(skb,dev);
+	if(1 == ret)
+		return 0;
+#endif
 
 	/* Disable soft irqs for various locks below. Also
 	 * stops preemption for RCU.
@@ -2849,7 +2932,95 @@ out:
 }
 EXPORT_SYMBOL(dev_queue_xmit);
 
+int dev_queue_xmit_copy(struct sk_buff *skb)
+{
+	struct net_device *dev = skb->dev;
+	struct netdev_queue *txq;
+	struct Qdisc *q;
+	int rc = -ENOMEM;
 
+	/* Disable soft irqs for various locks below. Also
+	 * stops preemption for RCU.
+	 */
+	rcu_read_lock_bh();
+
+	skb_update_prio(skb);
+
+	txq = dev_pick_tx(dev, skb);
+	q = rcu_dereference_bh(txq->qdisc);
+
+#ifdef CONFIG_NET_CLS_ACT
+	skb->tc_verd = SET_TC_AT(skb->tc_verd, AT_EGRESS);
+#endif
+	trace_net_dev_queue(skb);
+	if (q->enqueue) {
+		rc = __dev_xmit_skb(skb, q, dev, txq);
+#if defined(CONFIG_BCM_KF_BALOO) && defined(CONFIG_BALOO_NET_SUPPORT)
+            BALOOKLVL(3, balook1(BALOO_NET_SKBSEND_EVT, (int)q->enqueue));
+#endif
+		goto out;
+	}
+
+	/* The device has no queue. Common case for software devices:
+	   loopback, all the sorts of tunnels...
+
+	   Really, it is unlikely that netif_tx_lock protection is necessary
+	   here.  (f.e. loopback and IP tunnels are clean ignoring statistics
+	   counters.)
+	   However, it is possible, that they rely on protection
+	   made by us here.
+
+	   Check this and shot the lock. It is not prone from deadlocks.
+	   Either shot noqueue qdisc, it is even simpler 8)
+	 */
+	if (dev->flags & IFF_UP) {
+		int cpu = smp_processor_id(); /* ok because BHs are off */
+
+		if (txq->xmit_lock_owner != cpu) {
+
+			if (__this_cpu_read(xmit_recursion) > RECURSION_LIMIT)
+				goto recursion_alert;
+
+			HARD_TX_LOCK(dev, txq, cpu);
+
+			if (!netif_xmit_stopped(txq)) {
+				__this_cpu_inc(xmit_recursion);
+#if defined(CONFIG_BCM_KF_BALOO) && defined(CONFIG_BALOO_NET_SUPPORT)
+                BALOOKLVL(3, balook1(BALOO_NET_SKBSEND_EVT,
+                                     (int)dev->hard_start_xmit));
+#endif
+				rc = dev_hard_start_xmit(skb, dev, txq);
+				__this_cpu_dec(xmit_recursion);
+				if (dev_xmit_complete(rc)) {
+					HARD_TX_UNLOCK(dev, txq);
+					goto out;
+				}
+			}
+			HARD_TX_UNLOCK(dev, txq);
+			if (net_ratelimit())
+				pr_crit("Virtual device %s asks to queue packet!\n",
+					dev->name);
+		} else {
+			/* Recursion is detected! It is possible,
+			 * unfortunately
+			 */
+recursion_alert:
+			if (net_ratelimit())
+				pr_crit("Dead loop on virtual device %s, fix it urgently!\n",
+					dev->name);
+		}
+	}
+
+	rc = -ENETDOWN;
+	rcu_read_unlock_bh();
+
+	kfree_skb(skb);
+	return rc;
+out:
+	rcu_read_unlock_bh();
+	return rc;
+}
+EXPORT_SYMBOL(dev_queue_xmit_copy);
 /*=======================================================================
 			Receiver routines
   =======================================================================*/
@@ -3243,6 +3414,60 @@ int netif_rx(struct sk_buff *skb)
 }
 EXPORT_SYMBOL(netif_rx);
 
+#ifdef CONFIG_ATP_BRCM
+int netif_rx_cpu(struct sk_buff *skb, int cpu)
+{
+	int ret;
+
+	/* if netpoll wants it, pretend we never saw it */
+	if (netpoll_rx(skb))
+#if defined(CONFIG_BCM_KF_BALOO) && defined(CONFIG_BALOO_NET_SUPPORT)
+	{
+		balook2(BALOO_NET_RX_DROP_EVT, (int)skb, (int)skb->dev);
+		return NET_RX_DROP;
+	}
+#else
+		return NET_RX_DROP;
+#endif
+
+	net_timestamp_check(netdev_tstamp_prequeue, skb);
+
+#if defined(CONFIG_BCM_KF_WANDEV)
+	/*mark IFFWAN flag in skb based on dev->priv_flags */
+	if(skb->dev)
+	{
+		unsigned int mark = skb->mark;
+		skb->mark |= SKBMARK_SET_IFFWAN_MARK(mark, ((skb->dev->priv_flags & IFF_WANDEV) ? 1:0));
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG_FEATURE)
+		if ( skb->blog_p )
+			skb->blog_p->isWan = (skb->dev->priv_flags & IFF_WANDEV) ? 1 : 0;
+#endif /* defined(CONFIG_BLOG_FEATURE) */
+	}
+#endif /* CONFIG_BCM_KF_WANDEV */
+	trace_netif_rx(skb);
+#ifdef CONFIG_RPS
+	if (static_key_false(&rps_needed)) {
+		struct rps_dev_flow voidflow, *rflow = &voidflow;
+		migrate_disable();
+		rcu_read_lock();
+		ret = enqueue_to_backlog(skb, cpu, &rflow->last_qtail);
+		rcu_read_unlock();
+		migrate_enable();
+	} else
+#endif
+	{
+		unsigned int qtail;
+		ret = enqueue_to_backlog(skb, cpu, &qtail);
+	}
+#if defined(CONFIG_BCM_KF_BALOO) && defined(CONFIG_BALOO_NET_SUPPORT)
+	if (ret == NET_RX_DROP)
+		balook2(BALOO_NET_RX_DROP_EVT, (int)skb, (int)skb->dev);
+#endif
+
+	return ret;
+}
+EXPORT_SYMBOL(netif_rx_cpu);
+#endif
 int netif_rx_ni(struct sk_buff *skb)
 {
 	int err;
@@ -3382,7 +3607,7 @@ static int ing_filter(struct sk_buff *skb, struct netdev_queue *rxq)
 	skb->tc_verd = SET_TC_AT(skb->tc_verd, AT_INGRESS);
 
 	q = rxq->qdisc;
-	if (q != &noop_qdisc) {
+	if (q != &noop_qdisc && q != NULL) {/* 修改组播过程中插拔ADSL线导致内核异常问题. */
 		spin_lock(qdisc_lock(q));
 		if (likely(!test_bit(__QDISC_STATE_DEACTIVATED, &q->state)))
 			result = qdisc_enqueue_root(skb, q);
@@ -3473,6 +3698,219 @@ void netdev_rx_handler_unregister(struct net_device *dev)
 }
 EXPORT_SYMBOL_GPL(netdev_rx_handler_unregister);
 
+
+#ifdef CONFIG_ATP_HYBRID
+int is_gre_packet(struct sk_buff *skb)
+{
+    if (ETH_P_IP == skb->protocol)
+    {
+        if (IPPROTO_GRE == ip_hdr(skb)->protocol)
+        {
+            return 1;
+        }
+    }
+    else if (ETH_P_IPV6 == skb->protocol)
+    {
+        if (IPPROTO_GRE == ipv6_hdr(skb)->nexthdr)
+        {
+            return 1;
+        }
+    }
+    return 0;
+}
+#endif
+
+#ifdef CONFIG_ATP_HYBRID_GREACCEL
+#define HYBRID_ACCELED        0
+#define HYBRID_NOT_ACCELED    1
+extern unsigned int (*kernel_accel_recv_hook)(struct sk_buff *skb, struct net_device *dev);
+extern int ipgre_rcv(struct sk_buff *skb);
+#if 0  /*open after ipv6 ready*/
+extern int ip6gre_rcv(struct sk_buff *skb);
+#endif
+
+static inline int gre_kernel_accel(struct sk_buff *skb)
+{
+    unsigned int ulRet = 0;
+    if (kernel_accel_recv_hook)
+    {
+        skb_push(skb, ETH_HLEN);
+        ulRet = kernel_accel_recv_hook(skb, skb->dev);
+        {
+            if (0 == ulRet)
+            {
+                return HYBRID_ACCELED;
+            }
+        }
+        skb_pull(skb, ETH_HLEN);
+    }
+    return HYBRID_NOT_ACCELED;
+}
+
+static inline int gre_kernel_accel_ipv6(struct sk_buff *skb, int data_offset)
+{
+#if 0  /*open after ipv6 ready*/
+    u8     *h;
+    __be16 gre_proto;
+    struct ipv6hdr *pst_ipv6hdr = NULL;
+
+    pst_ipv6hdr = (struct ipv6hdr*)(skb->data + data_offset);
+    if (IPPROTO_GRE == pst_ipv6hdr->nexthdr)
+    {
+        __skb_pull(skb, data_offset);
+     	skb_reset_network_header(skb);
+    	skb_reset_mac_len(skb);
+        h = skb->data + sizeof(struct ipv6hdr);
+        gre_proto = *(__be16 *)(h + 2);
+        
+        if ((htons(ETH_P_IP) == gre_proto)
+            || (htons(ETH_P_IPV6) == gre_proto))
+        {
+    	    __skb_pull(skb, sizeof(struct ipv6hdr));
+     	    skb_reset_transport_header(skb);
+            ip6gre_rcv(skb);
+            return HYBRID_ACCELED;
+        }
+        skb_push(skb, data_offset);
+    }
+#endif
+    return HYBRID_NOT_ACCELED;
+}
+static inline int gre_kernel_accel_ipv4(struct sk_buff *skb, int data_offset)
+{
+    u8     *h;
+    __be16 gre_proto;
+    struct iphdr *pst_ipv4hdr = NULL;
+    pst_ipv4hdr = (struct iphdr*)(skb->data + data_offset);
+
+    /* 分片报文不加速 */
+    if (pst_ipv4hdr->frag_off & htons(IP_MF|IP_OFFSET))
+    {
+        return HYBRID_NOT_ACCELED;
+    }
+    if (IPPROTO_GRE == pst_ipv4hdr->protocol)
+    {
+        __skb_pull(skb, data_offset);
+     	skb_reset_network_header(skb);
+    	skb_reset_mac_len(skb);
+
+        h = skb->data + ip_hdrlen(skb);
+    	gre_proto = *(__be16 *)(h + 2);
+        if ((htons(ETH_P_IP) == gre_proto)
+            || (htons(ETH_P_IPV6) == gre_proto))
+        {
+    	    __skb_pull(skb, ip_hdrlen(skb));
+     	    skb_reset_transport_header(skb);
+            ipgre_rcv(skb);
+            return HYBRID_ACCELED;
+        }
+        skb_push(skb, data_offset);
+    }
+    return HYBRID_NOT_ACCELED;
+}
+
+static inline int gre_kernel_accel_ppp(struct sk_buff *skb, int data_offset)
+{
+    int ret = HYBRID_NOT_ACCELED;
+    unsigned short *ppp_proto;
+    ppp_proto = (unsigned short*)(skb->data + data_offset + sizeof(struct pppoe_hdr));
+
+    data_offset += sizeof(struct pppoe_hdr) + 2;
+    switch (ntohs(*ppp_proto))
+    {
+        case PPP_IP:
+        {
+            return gre_kernel_accel_ipv4(skb, data_offset);
+        }
+        case PPP_IPV6:
+        {
+            return gre_kernel_accel_ipv6(skb, data_offset);
+        }
+        default:
+            break;            
+    }
+    
+    return ret;
+}
+
+static inline int gre_kernel_accel_vlan(struct sk_buff *skb)
+{
+    int ret = HYBRID_NOT_ACCELED;
+    struct vlan_hdr *vlanhdr;
+
+    vlanhdr = (struct vlan_hdr *)skb->data;
+    switch (ntohs(vlanhdr->h_vlan_encapsulated_proto))
+    {
+        case ETH_P_IP:
+        {
+            return gre_kernel_accel_ipv4(skb, VLAN_HLEN);
+        }
+        case ETH_P_IPV6:
+        {
+            return gre_kernel_accel_ipv6(skb, VLAN_HLEN);
+        }
+        case ETH_P_PPP_SES:
+        {
+            return gre_kernel_accel_ppp(skb, VLAN_HLEN);
+        }
+        default:
+            break;            
+    }
+
+    return ret;
+}
+
+
+static inline int gre_kernel_accel_recv(struct sk_buff *skb)
+{
+    if (0 == hisi_sw_accel_flag)
+    {
+        return HYBRID_NOT_ACCELED;
+    }
+
+    if (IS_LAN_DEV(skb->dev->name))
+    {
+        /* lan pkt accel to gre interface */
+        return gre_kernel_accel(skb);
+    }
+    
+    if (IPPROTO_GRE == IPGRE_SKB_CB(skb)->ipgre_proto)
+    {
+        /* 更新skb_iif，否则加速接口选择错误 */
+        skb->skb_iif = skb->dev->ifindex;  
+        /*  gre header removed, accel pkt to lan, using hisi accel */
+        return gre_kernel_accel(skb);
+    }
+    else
+    {
+        /* gre packet from ppp or rmnet0, accel to gre_rcv */
+        switch (ntohs(skb->protocol))
+        {
+            case ETH_P_IP:
+            {
+                return gre_kernel_accel_ipv4(skb, 0);
+            }
+            case ETH_P_IPV6:
+            {
+                return gre_kernel_accel_ipv6(skb, 0);
+            }
+            case ETH_P_8021Q:
+            {
+                return gre_kernel_accel_vlan(skb);
+            }
+            case ETH_P_PPP_SES:
+            {
+                return gre_kernel_accel_ppp(skb, 0);
+            }
+            default:
+                break;
+        }
+    }
+    
+    return HYBRID_NOT_ACCELED;
+}
+#endif
+
 static int __netif_receive_skb(struct sk_buff *skb)
 {
 	struct packet_type *ptype, *pt_prev;
@@ -3483,14 +3921,30 @@ static int __netif_receive_skb(struct sk_buff *skb)
 	int ret = NET_RX_DROP;
 	__be16 type;
 
-
 	net_timestamp_check(!netdev_tstamp_prequeue, skb);
+	ATP_HOOK(ATP_DEV_RCV, skb, NULL, NULL, NET_RX_SUCCESS);
+#if defined(SUPPORT_ATP_HARDWARE_DIAGNOSE)
+	if(1 == atomic_read(&g_HwDiagLswLoopbackEnable))
+	{
+		if(0 == HwDiagRecivePacket(skb))
+		{
+			return NET_RX_SUCCESS;
+		}
+	}
+#endif
 
 	trace_netif_receive_skb(skb);
 
 	/* if we've gotten here through NAPI, check netpoll */
 	if (netpoll_receive_skb(skb))
 		return NET_RX_DROP;
+
+#ifdef CONFIG_ATP_HYBRID_GREACCEL
+    if (HYBRID_ACCELED == gre_kernel_accel_recv(skb))
+    {
+        return NET_RX_SUCCESS;
+    }
+#endif
 
 #if defined(CONFIG_BCM_KF_WANDEV)
 	/*mark IFFWAN flag in skb based on dev->priv_flags */
@@ -3525,9 +3979,16 @@ static int __netif_receive_skb(struct sk_buff *skb)
 
 #if defined(CONFIG_BCM_KF_VLAN) && (defined(CONFIG_BCM_VLAN) || defined(CONFIG_BCM_VLAN_MODULE))
 #if defined(CONFIG_BCM_TMS_MODULE)
+#ifdef CONFIG_SUPPORT_ATP
+	if (skb->protocol == htons(ETH_P_8021AG)) {
+         goto skip_vlanctl;
+   }
+#else
 	if (skb->protocol == htons(ETH_P_8021AG) || skb->protocol == htons(ETH_P_8023AH)) {
          goto skip_vlanctl;
    }
+   
+#endif   
 	else if (skb->protocol == htons(ETH_P_8021Q)) {
 		struct vlan_hdr *vh = (struct vlan_hdr *)skb->data;
 	   if (vh->h_vlan_encapsulated_proto == htons(ETH_P_8021AG)) {
@@ -3669,6 +4130,23 @@ out:
 	return ret;
 }
 
+#if (defined CONFIG_HSAN)
+typedef int (*netif_voip_hook)(struct sk_buff *skb,struct net_device *dev);
+
+static netif_voip_hook g_netif_voip_hook;
+
+void netif_reg_voip_hook(netif_voip_hook hook)
+{
+    g_netif_voip_hook = hook;
+}
+
+void netif_unreg_voip_hook(void)
+{
+    g_netif_voip_hook = NULL;
+}
+EXPORT_SYMBOL(netif_reg_voip_hook);
+EXPORT_SYMBOL(netif_unreg_voip_hook);
+#endif
 /**
  *	netif_receive_skb - process receive buffer from network
  *	@skb: buffer to process
@@ -3686,6 +4164,20 @@ out:
  */
 int netif_receive_skb(struct sk_buff *skb)
 {
+
+#if (defined CONFIG_HSAN)
+    if (g_netif_voip_hook)
+    {
+        int ret;
+        ret = g_netif_voip_hook(skb, skb->dev);
+        if (ret == NET_XMIT_SUCCESS)
+        {
+            kfree_skb(skb);
+            return 0;
+        }
+    }
+#endif
+	
 	net_timestamp_check(netdev_tstamp_prequeue, skb);
 
 	if (skb_defer_rx_timestamp(skb))
@@ -4620,6 +5112,32 @@ static int devextstats_seq_show(struct seq_file *seq, void *v)
 }
 #endif
 
+#ifdef CONFIG_ATP_HYBRID_GREACCEL
+static int accel_show_seq_show(struct seq_file *seq, void *v)
+{
+    if (v == SEQ_START_TOKEN)
+    {
+        seq_printf(seq, "%s %d\n", __FUNCTION__, __LINE__);
+        if (accel_show_seq_show_hook)
+        {
+            accel_show_seq_show_hook(seq);
+        }
+    }
+	return 0;
+}
+static int accel_flush_seq_show(struct seq_file *seq, void *v)
+{
+    if (v == SEQ_START_TOKEN)
+    {
+        seq_printf(seq, "%s %d accel flush\n", __FUNCTION__, __LINE__);
+        if (accel_flush_seq_show_hook)
+        {
+            accel_flush_seq_show_hook(seq);
+        }
+    }
+	return 0;
+}
+#endif
 static struct softnet_data *softnet_get_online(loff_t *pos)
 {
 	struct softnet_data *sd = NULL;
@@ -4676,6 +5194,21 @@ static const struct seq_operations devextstats_seq_ops = {
 };
 #endif
 
+#ifdef CONFIG_ATP_HYBRID_GREACCEL
+static const struct seq_operations accel_show_seq_ops = {
+	.start = dev_seq_start,
+	.next  = dev_seq_next,
+	.stop  = dev_seq_stop,
+	.show  = accel_show_seq_show,
+};
+
+static const struct seq_operations accel_flush_seq_ops = {
+	.start = dev_seq_start,
+	.next  = dev_seq_next,
+	.stop  = dev_seq_stop,
+	.show  = accel_flush_seq_show,
+};
+#endif
 static int dev_seq_open(struct inode *inode, struct file *file)
 {
 	return seq_open_net(inode, file, &dev_seq_ops,
@@ -4686,6 +5219,19 @@ static int dev_seq_open(struct inode *inode, struct file *file)
 static int devextstats_seq_open(struct inode *inode, struct file *file)
 {
 	return seq_open_net(inode, file, &devextstats_seq_ops,
+			    sizeof(struct seq_net_private));
+}
+#endif
+
+#ifdef CONFIG_ATP_HYBRID_GREACCEL
+static int accel_show_seq_open(struct inode *inode, struct file *file)
+{
+	return seq_open_net(inode, file, &accel_show_seq_ops,
+			    sizeof(struct seq_net_private));
+}
+static int accel_flush_seq_open(struct inode *inode, struct file *file)
+{
+	return seq_open_net(inode, file, &accel_flush_seq_ops,
 			    sizeof(struct seq_net_private));
 }
 #endif
@@ -4708,6 +5254,22 @@ static const struct file_operations devextstats_seq_fops = {
 };
 #endif
 
+#ifdef CONFIG_ATP_HYBRID_GREACCEL
+static const struct file_operations accel_show_seq_fops = {
+	.owner	 = THIS_MODULE,
+	.open    = accel_show_seq_open,
+	.read    = seq_read,
+	.llseek  = seq_lseek,
+	.release = seq_release_net,
+};
+static const struct file_operations accel_flush_seq_fops = {
+	.owner	 = THIS_MODULE,
+	.open    = accel_flush_seq_open,
+	.read    = seq_read,
+	.llseek  = seq_lseek,
+	.release = seq_release_net,
+};
+#endif
 
 static const struct seq_operations softnet_seq_ops = {
 	.start = softnet_seq_start,
@@ -4854,10 +5416,22 @@ static int __net_init dev_proc_net_init(struct net *net)
 		goto out_extstats;
 #endif        
         
+#ifdef CONFIG_ATP_HYBRID_GREACCEL
+	if (!proc_net_fops_create(net, "accel_show", S_IRUGO, &accel_show_seq_fops))
+		goto out_accelipv4;
+	if (!proc_net_fops_create(net, "accel_flush", S_IRUGO, &accel_flush_seq_fops))
+		goto out_accel_flush;    
+#endif 
 	rc = 0;
 out:
 	return rc;
     
+#ifdef CONFIG_ATP_HYBRID_GREACCEL    
+out_accelipv4:
+	proc_net_remove(net, "accel_show");
+out_accel_flush:
+    proc_net_remove(net, "accel_flush");
+#endif
 #if defined(CONFIG_BCM_KF_EXTSTATS) && defined(CONFIG_BLOG)
 out_extstats:
 	proc_net_remove(net, "dev_extstats");
@@ -5162,7 +5736,7 @@ int __dev_change_flags(struct net_device *dev, unsigned int flags)
 			       IFF_DYNAMIC | IFF_MULTICAST | IFF_PORTSEL |
 			       IFF_AUTOMEDIA)) |
 		     (dev->flags & (IFF_UP | IFF_VOLATILE | IFF_PROMISC |
-				    IFF_ALLMULTI));
+				    IFF_ALLMULTI | IFF_ALLOWPASS));
 
 	/*
 	 *	Load in the correct multicast list now the flags have changed.
@@ -5546,7 +6120,8 @@ static int dev_ifsioc(struct net *net, struct ifreq *ifr, unsigned int cmd)
 		    cmd == SIOCBRADDIF ||
 		    cmd == SIOCBRDELIF ||
 		    cmd == SIOCSHWTSTAMP ||
-		    cmd == SIOCWANDEV) {
+		    cmd == SIOCWANDEV ||
+		    cmd == SIOQOSDSCPCOUNT) {
 			err = -EOPNOTSUPP;
 			if (ops->ndo_do_ioctl) {
 				if (netif_device_present(dev))
@@ -5713,11 +6288,15 @@ int dev_ioctl(struct net *net, unsigned int cmd, void __user *arg)
 		/* fall through */
 	case SIOCBONDSLAVEINFOQUERY:
 	case SIOCBONDINFOQUERY:
+	case SIOQOSDSCPCOUNT:           
 		dev_load(net, ifr.ifr_name);
 		rtnl_lock();
 		ret = dev_ifsioc(net, &ifr, cmd);
 		rtnl_unlock();
 		return ret;
+    case SIOCETHWLMIRROR:
+        ATP_HOOK_VOID(ATP_DEV_MIRROR, &ifr, NULL, NULL);
+        return 0;
 
 	case SIOCGIFMEM:
 		/* Get the per device memory space. We can add this but
@@ -5732,6 +6311,13 @@ int dev_ioctl(struct net *net, unsigned int cmd, void __user *arg)
 	 *	Unknown or private ioctl.
 	 */
 	default:
+#ifdef CONFIG_ATP_COMMON
+		/*ATP扩展的dev ioctl处理*/
+		if (0 == atp_dev_ioctl(cmd, &ifr)) {
+			/*cmd已被ATP注册的ioctl处理了*/
+			return 0;
+		}
+#endif
 		if (cmd == SIOCWANDEV ||
 #if defined(CONFIG_BCM_KF_NETFILTER)
 		    cmd == SIOCCIFSTATS ||

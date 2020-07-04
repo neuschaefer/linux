@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * net/key/af_key.c	An implementation of PF_KEYv2 sockets.
  *
  *		This program is free software; you can redistribute it and/or
@@ -847,6 +851,11 @@ static struct sk_buff *__pfkey_xfrm_state2msg(const struct xfrm_state *x,
 		lifetime->sadb_lifetime_exttype = SADB_EXT_LIFETIME_HARD;
 		lifetime->sadb_lifetime_allocations =  _X2KEY(x->lft.hard_packet_limit);
 		lifetime->sadb_lifetime_bytes = _X2KEY(x->lft.hard_byte_limit);
+
+        /*  只支持配置精确到 KB */
+#ifdef CONFIG_SUPPORT_ATP
+        lifetime->sadb_lifetime_bytes == 0? 0 : x->lft.hard_byte_limit/1024;
+#endif
 		lifetime->sadb_lifetime_addtime = x->lft.hard_add_expires_seconds;
 		lifetime->sadb_lifetime_usetime = x->lft.hard_use_expires_seconds;
 	}
@@ -859,6 +868,10 @@ static struct sk_buff *__pfkey_xfrm_state2msg(const struct xfrm_state *x,
 		lifetime->sadb_lifetime_exttype = SADB_EXT_LIFETIME_SOFT;
 		lifetime->sadb_lifetime_allocations =  _X2KEY(x->lft.soft_packet_limit);
 		lifetime->sadb_lifetime_bytes = _X2KEY(x->lft.soft_byte_limit);
+		/*  只支持配置精确到 KB */
+#ifdef CONFIG_SUPPORT_ATP
+		lifetime->sadb_lifetime_bytes == 0? 0 : (x->lft.soft_byte_limit)/1024;
+#endif
 		lifetime->sadb_lifetime_addtime = x->lft.soft_add_expires_seconds;
 		lifetime->sadb_lifetime_usetime = x->lft.soft_use_expires_seconds;
 	}
@@ -1026,6 +1039,14 @@ static inline struct sk_buff *pfkey_xfrm_state2msg_expire(const struct xfrm_stat
 	return __pfkey_xfrm_state2msg(x, 0, hsc);
 }
 
+#ifdef CONFIG_XFRM_IDLE_TIME
+static inline struct sk_buff *pfkey_xfrm_state2msg_idle(struct xfrm_state *x,
+							  int hsc)
+{
+	return __pfkey_xfrm_state2msg(x, 0, hsc);
+}
+#endif
+
 static struct xfrm_state * pfkey_msg2xfrm_state(struct net *net,
 						const struct sadb_msg *hdr,
 						void * const *ext_hdrs)
@@ -1109,6 +1130,12 @@ static struct xfrm_state * pfkey_msg2xfrm_state(struct net *net,
 	if (lifetime != NULL) {
 		x->lft.hard_packet_limit = _KEY2X(lifetime->sadb_lifetime_allocations);
 		x->lft.hard_byte_limit = _KEY2X(lifetime->sadb_lifetime_bytes);
+        /*  只支持配置精确到 KB */
+#ifdef CONFIG_SUPPORT_ATP
+        x->lft.hard_byte_limit 
+            == XFRM_INF? XFRM_INF:(lifetime->sadb_lifetime_bytes * 1024);
+#endif
+
 		x->lft.hard_add_expires_seconds = lifetime->sadb_lifetime_addtime;
 		x->lft.hard_use_expires_seconds = lifetime->sadb_lifetime_usetime;
 	}
@@ -1116,10 +1143,22 @@ static struct xfrm_state * pfkey_msg2xfrm_state(struct net *net,
 	if (lifetime != NULL) {
 		x->lft.soft_packet_limit = _KEY2X(lifetime->sadb_lifetime_allocations);
 		x->lft.soft_byte_limit = _KEY2X(lifetime->sadb_lifetime_bytes);
+        /*  只支持配置精确到 KB */
+#ifdef CONFIG_SUPPORT_ATP
+        x->lft.soft_byte_limit 
+            == XFRM_INF? XFRM_INF:(lifetime->sadb_lifetime_bytes * 1024);
+#endif
+
 		x->lft.soft_add_expires_seconds = lifetime->sadb_lifetime_addtime;
 		x->lft.soft_use_expires_seconds = lifetime->sadb_lifetime_usetime;
 	}
 
+#ifdef CONFIG_XFRM_IDLE_TIME
+    lifetime = (struct sadb_lifetime*) ext_hdrs[SADB_EXT_LIFETIME_IDLE-1];
+    if (lifetime != NULL) {
+        x->lft.idle_time_seconds = lifetime->sadb_lifetime_usetime;
+    }
+#endif
 	sec_ctx = ext_hdrs[SADB_X_EXT_SEC_CTX - 1];
 	if (sec_ctx != NULL) {
 		struct xfrm_user_sec_ctx *uctx = pfkey_sadb2xfrm_user_sec_ctx(sec_ctx);
@@ -1383,8 +1422,21 @@ static int pfkey_acquire(struct sock *sk, struct sk_buff *skb, const struct sadb
 
 	spin_lock_bh(&x->lock);
 	if (x->km.state == XFRM_STATE_ACQ) {
-		x->km.state = XFRM_STATE_ERROR;
-		wake_up(&net->xfrm.km_waitq);
+	 /* start of Blackdns 将IP地址加入黑名单后周期不准确  */     
+#ifdef CONFIG_SUPPORT_ATP
+        if (!net->xfrm.sysctl_larval_drop)
+        {
+#endif
+            x->km.state = XFRM_STATE_ERROR;
+            wake_up(&net->xfrm.km_waitq);
+#ifdef CONFIG_SUPPORT_ATP
+        }
+        else
+        {
+            __xfrm_state_delete(x);
+        }
+#endif
+/* End of Blackdns 将IP地址加入黑名单后周期不准确  */       
 	}
 	spin_unlock_bh(&x->lock);
 	xfrm_state_put(x);
@@ -1421,6 +1473,10 @@ static inline int event2keytype(int event)
 		return SADB_UPDATE;
 	case XFRM_MSG_EXPIRE:
 		return SADB_EXPIRE;
+#ifdef CONFIG_XFRM_IDLE_TIME
+    case XFRM_MSG_SA_IDLE:
+        return SADB_X_SAIDLE_TIMEOUT;
+#endif
 	default:
 		pr_err("pfkey: Unknown SA event %d\n", event);
 		break;
@@ -1705,7 +1761,8 @@ static int key_notify_sa_flush(const struct km_event *c)
 	hdr->sadb_msg_version = PF_KEY_V2;
 	hdr->sadb_msg_errno = (uint8_t) 0;
 	hdr->sadb_msg_len = (sizeof(struct sadb_msg) / sizeof(uint64_t));
-
+    //CVE-2013-2234
+    hdr->sadb_msg_reserved = 0;
 	pfkey_broadcast(skb, GFP_ATOMIC, BROADCAST_ALL, NULL, c->net);
 
 	return 0;
@@ -2038,6 +2095,10 @@ static int pfkey_xfrm_policy2msg(struct sk_buff *skb, const struct xfrm_policy *
 	lifetime->sadb_lifetime_exttype = SADB_EXT_LIFETIME_HARD;
 	lifetime->sadb_lifetime_allocations =  _X2KEY(xp->lft.hard_packet_limit);
 	lifetime->sadb_lifetime_bytes = _X2KEY(xp->lft.hard_byte_limit);
+    /*  只支持配置精确到 KB */
+#ifdef CONFIG_SUPPORT_ATP
+    lifetime->sadb_lifetime_bytes == 0? 0 : (xp->lft.hard_byte_limit)/1024;
+#endif
 	lifetime->sadb_lifetime_addtime = xp->lft.hard_add_expires_seconds;
 	lifetime->sadb_lifetime_usetime = xp->lft.hard_use_expires_seconds;
 	/* soft time */
@@ -2048,6 +2109,11 @@ static int pfkey_xfrm_policy2msg(struct sk_buff *skb, const struct xfrm_policy *
 	lifetime->sadb_lifetime_exttype = SADB_EXT_LIFETIME_SOFT;
 	lifetime->sadb_lifetime_allocations =  _X2KEY(xp->lft.soft_packet_limit);
 	lifetime->sadb_lifetime_bytes = _X2KEY(xp->lft.soft_byte_limit);
+
+        /*  只支持配置精确到 KB */
+#ifdef CONFIG_SUPPORT_ATP
+    lifetime->sadb_lifetime_bytes == 0? 0 : (xp->lft.soft_byte_limit)/1024;
+#endif
 	lifetime->sadb_lifetime_addtime = xp->lft.soft_add_expires_seconds;
 	lifetime->sadb_lifetime_usetime = xp->lft.soft_use_expires_seconds;
 	/* current time */
@@ -2242,12 +2308,22 @@ static int pfkey_spdadd(struct sock *sk, struct sk_buff *skb, const struct sadb_
 	if ((lifetime = ext_hdrs[SADB_EXT_LIFETIME_HARD-1]) != NULL) {
 		xp->lft.hard_packet_limit = _KEY2X(lifetime->sadb_lifetime_allocations);
 		xp->lft.hard_byte_limit = _KEY2X(lifetime->sadb_lifetime_bytes);
+            /*  只支持配置精确到 KB */
+#ifdef CONFIG_SUPPORT_ATP
+        xp->lft.hard_byte_limit 
+            == XFRM_INF? XFRM_INF : (lifetime->sadb_lifetime_bytes) * 1024;
+#endif
 		xp->lft.hard_add_expires_seconds = lifetime->sadb_lifetime_addtime;
 		xp->lft.hard_use_expires_seconds = lifetime->sadb_lifetime_usetime;
 	}
 	if ((lifetime = ext_hdrs[SADB_EXT_LIFETIME_SOFT-1]) != NULL) {
 		xp->lft.soft_packet_limit = _KEY2X(lifetime->sadb_lifetime_allocations);
 		xp->lft.soft_byte_limit = _KEY2X(lifetime->sadb_lifetime_bytes);
+    /*  只支持配置精确到 KB */
+#ifdef CONFIG_SUPPORT_ATP
+        xp->lft.soft_byte_limit 
+            == XFRM_INF? XFRM_INF : (lifetime->sadb_lifetime_bytes) * 1024;
+#endif
 		xp->lft.soft_add_expires_seconds = lifetime->sadb_lifetime_addtime;
 		xp->lft.soft_use_expires_seconds = lifetime->sadb_lifetime_usetime;
 	}
@@ -2693,7 +2769,11 @@ static int key_notify_policy_flush(const struct km_event *c)
 	hdr->sadb_msg_pid = c->pid;
 	hdr->sadb_msg_version = PF_KEY_V2;
 	hdr->sadb_msg_errno = (uint8_t) 0;
+    //CVE-2013-2237
+    hdr->sadb_msg_satype = SADB_SATYPE_UNSPEC;
 	hdr->sadb_msg_len = (sizeof(struct sadb_msg) / sizeof(uint64_t));
+    //CVE-2013-2234
+    hdr->sadb_msg_reserved = 0;
 	pfkey_broadcast(skb_out, GFP_ATOMIC, BROADCAST_ALL, NULL, c->net);
 	return 0;
 
@@ -2974,6 +3054,38 @@ static int key_notify_sa_expire(struct xfrm_state *x, const struct km_event *c)
 	return 0;
 }
 
+#ifdef CONFIG_XFRM_IDLE_TIME
+static int key_notify_sa_idle(struct xfrm_state *x, struct km_event *c)
+{
+	struct sk_buff *out_skb;
+	struct sadb_msg *out_hdr;
+	int hard;
+	int hsc;
+
+	hard = c->data.hard;
+	if (hard)
+		hsc = 2;
+	else
+		hsc = 1;
+
+	out_skb = pfkey_xfrm_state2msg_idle(x, hsc);
+	if (IS_ERR(out_skb))
+		return PTR_ERR(out_skb);
+
+	out_hdr = (struct sadb_msg *) out_skb->data;
+	out_hdr->sadb_msg_version = PF_KEY_V2;
+	out_hdr->sadb_msg_type = event2keytype(c->event);
+	out_hdr->sadb_msg_satype = pfkey_proto2satype(x->id.proto);
+	out_hdr->sadb_msg_errno = 0;
+	out_hdr->sadb_msg_reserved = 0;
+	out_hdr->sadb_msg_seq = 0;
+	out_hdr->sadb_msg_pid = 0;
+
+	pfkey_broadcast(out_skb, GFP_ATOMIC, BROADCAST_REGISTERED, NULL, xs_net(x));
+	return 0;
+}
+
+#endif
 static int pfkey_send_notify(struct xfrm_state *x, const struct km_event *c)
 {
 	struct net *net = x ? xs_net(x) : c->net;
@@ -2993,6 +3105,10 @@ static int pfkey_send_notify(struct xfrm_state *x, const struct km_event *c)
 		return key_notify_sa_flush(c);
 	case XFRM_MSG_NEWAE: /* not yet supported */
 		break;
+#ifdef CONFIG_XFRM_IDLE_TIME
+    case XFRM_MSG_SA_IDLE:
+        return key_notify_sa_idle(x, c);
+#endif
 	default:
 		pr_err("pfkey: Unknown SA event %d\n", c->event);
 		break;
@@ -3599,8 +3715,8 @@ static int pfkey_recvmsg(struct kiocb *kiocb,
 	err = -EINVAL;
 	if (flags & ~(MSG_PEEK|MSG_DONTWAIT|MSG_TRUNC|MSG_CMSG_COMPAT))
 		goto out;
-
-	msg->msg_namelen = 0;
+	//CVE-2013-7270
+	//msg->msg_namelen = 0;
 	skb = skb_recv_datagram(sk, flags, flags & MSG_DONTWAIT, &err);
 	if (skb == NULL)
 		goto out;

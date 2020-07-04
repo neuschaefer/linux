@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *  linux/fs/file_table.c
  *
  *  Copyright (C) 1991, 1992  Linus Torvalds
@@ -34,8 +38,10 @@ struct files_stat_struct files_stat = {
 	.max_files = NR_FILE
 };
 
-DECLARE_LGLOCK(files_lglock);
-DEFINE_LGLOCK(files_lglock);
+//CVE-2014-8172
+//DECLARE_LGLOCK(files_lglock);
+//DEFINE_LGLOCK(files_lglock);
+
 
 /* SLAB cache for file structures */
 static struct kmem_cache *filp_cachep __read_mostly;
@@ -129,7 +135,8 @@ struct file *get_empty_filp(void)
 	if (security_file_alloc(f))
 		goto fail_sec;
 
-	INIT_LIST_HEAD(&f->f_u.fu_list);
+    //CVE-2014-8172
+	//INIT_LIST_HEAD(&f->f_u.fu_list);
 	atomic_long_set(&f->f_count, 1);
 	rwlock_init(&f->f_owner.lock);
 	spin_lock_init(&f->f_lock);
@@ -252,7 +259,8 @@ static void __fput(struct file *file)
 	}
 	fops_put(file->f_op);
 	put_pid(file->f_owner.pid);
-	file_sb_list_del(file);
+    //CVE-2014-8172
+	//file_sb_list_del(file);
 	if ((file->f_mode & (FMODE_READ | FMODE_WRITE)) == FMODE_READ)
 		i_readcount_dec(inode);
 	if (file->f_mode & FMODE_WRITE)
@@ -382,11 +390,14 @@ void put_filp(struct file *file)
 {
 	if (atomic_long_dec_and_test(&file->f_count)) {
 		security_file_free(file);
-		file_sb_list_del(file);
+        //CVE-2014-8172
+		//file_sb_list_del(file);
 		file_free(file);
 	}
 }
 
+//CVE-2014-8172
+#if 0
 static inline int file_list_cpu(struct file *file)
 {
 #ifdef CONFIG_SMP
@@ -509,6 +520,8 @@ retry:
 	} while_file_list_for_each_entry;
 	lg_global_unlock(files_lglock);
 }
+#endif
+
 
 void __init files_init(unsigned long mempages)
 { 
@@ -525,6 +538,7 @@ void __init files_init(unsigned long mempages)
 	n = (mempages * (PAGE_SIZE / 1024)) / 10;
 	files_stat.max_files = max_t(unsigned long, n, NR_FILE);
 	files_defer_init();
-	lg_lock_init(files_lglock);
+    //CVE-2014-8172
+	//lg_lock_init(files_lglock);
 	percpu_counter_init(&nr_files, 0);
 } 

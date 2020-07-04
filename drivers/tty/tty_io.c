@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *  Copyright (C) 1991, 1992  Linus Torvalds
  */
 
@@ -104,7 +108,9 @@
 
 #include <linux/kmod.h>
 #include <linux/nsproxy.h>
-
+#if defined(CONFIG_BUILD_ATP_MLOG)
+#include "mlog_lib.h"
+#endif
 #undef TTY_DEBUG_HANGUP
 
 #define TTY_PARANOIA_CHECK 1
@@ -974,8 +980,7 @@ static ssize_t tty_read(struct file *file, char __user *buf, size_t count,
 	else
 		i = -EIO;
 	tty_ldisc_deref(ld);
-	if (i > 0)
-		inode->i_atime = current_fs_time(inode->i_sb);
+	
 	return i;
 }
 
@@ -998,6 +1003,157 @@ int tty_write_lock(struct tty_struct *tty, int ndelay)
 	return 0;
 }
 
+#if defined(CONFIG_BUILD_ATP_MLOG)
+#define MLOG_TTY_NAME_SIZE  (128)
+char mlog_tty_name[MLOG_TTY_NAME_SIZE+1] = {0};
+EXPORT_SYMBOL(mlog_tty_name);
+
+int g_iTTYInCount;
+EXPORT_SYMBOL(g_iTTYInCount);
+
+int g_iTTYOutCount;
+EXPORT_SYMBOL(g_iTTYOutCount);
+
+#define TTY_LOG_LENTH   (1024*1024)
+#define TTY_LOG_ITEM    (32)
+#define TTY_LOG_HEAD    (3)
+#define TTY_LOG_DATA    (TTY_LOG_ITEM-TTY_LOG_HEAD)
+#define MAXITEM_TTY_LOG (TTY_LOG_LENTH/TTY_LOG_ITEM)
+
+unsigned char g_acTtyLog[MAXITEM_TTY_LOG][TTY_LOG_ITEM];
+EXPORT_SYMBOL(g_acTtyLog);
+
+int g_iWriteTtyLog=0;
+EXPORT_SYMBOL(g_iWriteTtyLog);
+
+int g_iStartTtyLog=0;
+EXPORT_SYMBOL(g_iStartTtyLog);
+
+int g_iLenthTtyLog=0;
+EXPORT_SYMBOL(g_iLenthTtyLog);
+
+void mlog_set_tty_name(const char *name)
+{
+	g_iTTYInCount = 0;
+	g_iTTYOutCount = 0;
+    snprintf(mlog_tty_name, MLOG_TTY_NAME_SIZE, "%s", name);
+}
+EXPORT_SYMBOL(mlog_set_tty_name);
+char *mlog_get_tty_name(void)
+{
+    return mlog_tty_name;
+}
+EXPORT_SYMBOL(mlog_get_tty_name);
+#endif
+
+void tty_log_write(const char* name, const unsigned char *data, size_t len, int mode)
+{
+    static int s_isLoop = 0;
+    int i = 0;
+
+    if (0 == strcmp(name, mlog_tty_name))
+    {
+        size_t logLen = (len>TTY_LOG_DATA)?TTY_LOG_DATA:len;
+        unsigned short second = jiffies_to_msecs(jiffies)/1000%10000;
+
+        if (mode)
+            g_acTtyLog[g_iWriteTtyLog][0] = logLen & 0x1f;
+        else
+            g_acTtyLog[g_iWriteTtyLog][0] = logLen & 0x1f | 0x80;
+        
+        g_acTtyLog[g_iWriteTtyLog][1] = (second>>8) & 0xff;
+        g_acTtyLog[g_iWriteTtyLog][2] = second & 0xff;
+        
+        for (i = 0; i < logLen; i++)
+        {
+            g_acTtyLog[g_iWriteTtyLog][i+TTY_LOG_HEAD] = data[i];
+        }
+        
+        g_iWriteTtyLog++;
+        if (g_iWriteTtyLog >= MAXITEM_TTY_LOG)
+        {
+            g_iWriteTtyLog = 0;
+            g_iStartTtyLog = MAXITEM_TTY_LOG-1;
+            s_isLoop = 1;
+        }
+        else if (s_isLoop)
+        {
+            g_iStartTtyLog = g_iWriteTtyLog + 1;
+            if (g_iStartTtyLog >= MAXITEM_TTY_LOG)
+                g_iStartTtyLog = 0;
+        }
+        
+        if (g_iLenthTtyLog < MAXITEM_TTY_LOG)
+            g_iLenthTtyLog++;
+    }
+}
+EXPORT_SYMBOL(tty_log_write);
+
+void mlog_tty_write(const char* name, const unsigned char *data, size_t len, int mode)
+{
+#if defined(CONFIG_BUILD_ATP_MLOG)
+#define MLOG_STRING_SIZE    (16)    /* 一次写入16个字符 */
+#define HEX_2_ASCII_STRING  "0123456789ABCDEF"
+    int i = 0;
+    char *logbuf = NULL;
+    /* 默认配置下不执行，打开特定的功能才执行 */
+    if (0
+#if defined (CONFIG_BUILD_COMPONENT_SILICON_ZIBEE_CHIP)
+        || ((0<strlen(name)) && (0<strlen(mlog_tty_name)) && (0==strcmp(name, mlog_tty_name)))
+#endif
+        )
+    {
+        if (mode)
+        	g_iTTYOutCount += len;
+		else
+        	g_iTTYInCount += len;
+        logbuf = kmalloc((MLOG_STRING_SIZE+1)*3, GFP_ATOMIC);
+        if (NULL == logbuf)
+        {
+            return ;
+        }
+            
+        memset(logbuf, 0, (MLOG_STRING_SIZE+1)*3);
+        for (i=0; i<len; )
+        {
+            /* 每个字符写入一次log，一次写入mlog有最大字符限制 */
+            logbuf[3*(i&0xf)] = HEX_2_ASCII_STRING[data[i]>>4];
+            logbuf[3*(i&0xf)+1] = HEX_2_ASCII_STRING[data[i]&0xf];
+            logbuf[3*(i&0xf)+2] = ' ';  
+            i++;
+            if (0 == (i&0xf))
+            {
+                if (mode)
+                {
+                    mlog_print(name, mlog_lv_info, "out:%s", logbuf); 
+                }
+                else
+                {
+                    mlog_print(name, mlog_lv_info, "in:%s", logbuf);
+                }
+                memset(logbuf, 0, (MLOG_STRING_SIZE+1)*3);
+            }
+        }
+
+        /* 没有发完的数据最后发送 */        
+        if (i&0xf)
+        {
+            if (mode)
+            {
+                mlog_print(name, mlog_lv_info, "out:%s", logbuf); 
+            }
+            else
+            {
+                mlog_print(name, mlog_lv_info, "in:%s", logbuf);
+            }
+        }
+              
+        kfree(logbuf);
+    }
+#endif    
+}
+EXPORT_SYMBOL(mlog_tty_write);
+
 /*
  * Split writes up in sane blocksizes to avoid
  * denial-of-service type attacks
@@ -1011,7 +1167,6 @@ static inline ssize_t do_tty_write(
 {
 	ssize_t ret, written = 0;
 	unsigned int chunk;
-
 	ret = tty_write_lock(tty, file->f_flags & O_NDELAY);
 	if (ret < 0)
 		return ret;
@@ -1066,6 +1221,7 @@ static inline ssize_t do_tty_write(
 		ret = write(tty, file, tty->write_buf, size);
 		if (ret <= 0)
 			break;
+        tty_log_write(tty->name, tty->write_buf, ret, 1);
 		written += ret;
 		buf += ret;
 		count -= ret;
@@ -1076,11 +1232,8 @@ static inline ssize_t do_tty_write(
 			break;
 		cond_resched();
 	}
-	if (written) {
-		struct inode *inode = file->f_path.dentry->d_inode;
-		inode->i_mtime = current_fs_time(inode->i_sb);
+	if (written)
 		ret = written;
-	}
 out:
 	tty_write_unlock(tty);
 	return ret;
@@ -1170,7 +1323,8 @@ ssize_t redirected_tty_write(struct file *file, const char __user *buf,
 
 	if (p) {
 		ssize_t res;
-		res = vfs_write(p, buf, count, &p->f_pos);
+		// setconsole support
+		res = tty_write(p, buf, count, &p->f_pos);
 		fput(p);
 		return res;
 	}

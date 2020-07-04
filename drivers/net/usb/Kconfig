@@ -95,6 +95,12 @@ config USB_RTL8150
 	  To compile this driver as a module, choose M here: the
 	  module will be called rtl8150.
 
+config USB_QMITTY
+	tristate "Qualcomm QMI Interface -- TTY Driver"
+	default y
+	---help---
+	  This option supports Qualcomm QMI Message.
+	  If User enabled this option, the QMI Feature should enabled on modem side.
 config USB_USBNET
 	tristate "Multi-purpose USB Networking Framework"
 	select NET_CORE
@@ -130,6 +136,11 @@ config USB_USBNET
 	  To compile this driver as a module, choose M here: the
 	  module will be called usbnet.
 
+config USB_NET_RMNET_ETHERNET
+	tristate "Rmnet_ethernet of USB driver"
+	depends on USB_USBNET
+	---help---
+ 	  Choose this option if you're using a USBNET.
 config USB_NET_AX8817X
 	tristate "ASIX AX88xxx Based USB 2.0 Ethernet Adapters"
 	depends on USB_USBNET
@@ -217,6 +228,18 @@ config USB_NET_CDC_NCM
 	    * ST-Ericsson M570 HSPA+ Mobile Broadband Modem (reference design)
 	    * ST-Ericsson M343 HSPA Mobile Broadband Modem (reference design)
 	    * Ericsson F5521gw Mobile Broadband Module
+	    
+config USB_NET_HW_CDC_DRIVER
+    tristate "HUAWEI USB CDC ETH devices"
+	depends on EXPERIMENTAL
+	default y
+	help
+	  Choose this option .
+	  These cards support downlink speeds of 7.2Mbps or greater.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called cdc eth.
+
 
 config USB_NET_DM9601
 	tristate "Davicom DM9601 based USB 1.1 10/100 ethernet devices"

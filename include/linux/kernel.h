@@ -1,3 +1,7 @@
+/*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
 #ifndef _LINUX_KERNEL_H
 #define _LINUX_KERNEL_H
 
@@ -553,6 +557,19 @@ ftrace_vprintk(const char *fmt, va_list ap)
 static inline void ftrace_dump(enum ftrace_dump_mode oops_dump_mode) { }
 #endif /* CONFIG_TRACING */
 
+#ifdef CONFIG_SUPPORT_ATP
+/*
+ *      Display an IP address in readable format.
+ */
+
+#define NIPQUAD(addr) \
+	((unsigned char *)&addr)[0], \
+	((unsigned char *)&addr)[1], \
+	((unsigned char *)&addr)[2], \
+	((unsigned char *)&addr)[3]
+#define NIPQUAD_FMT "%u.%u.%u.%u"
+#endif
+
 /*
  * min()/max()/clamp() macros that also do
  * strict type-checking.. See the
@@ -709,6 +726,20 @@ static inline void ftrace_dump(enum ftrace_dump_mode oops_dump_mode) { }
 
 extern int do_sysinfo(struct sysinfo *info);
 
+#ifdef CONFIG_SUPPORT_ATP
+/* for code composition*/
+#undef DESC
+#define DESC(x) 1
+
+extern void color_printk(const char *, int, unsigned long, char *args, ...);
+#define CUSTOM_DEBUG
+#ifdef CUSTOM_DEBUG
+#define COLOR_DEBUG(args...)  color_printk(__func__, __LINE__, _RET_IP_, ## args)
+#else
+#define COLOR_DEBUG(format, str...)
+#endif
+
+#endif /* CONFIG_SUPPORT_ATP */
 #endif /* __KERNEL__ */
 
 #endif

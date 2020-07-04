@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * LED Class Core
  *
  * Copyright 2005-2006 Openedhand Ltd.
@@ -10,7 +14,6 @@
  * published by the Free Software Foundation.
  *
  */
-
 #include <linux/kernel.h>
 #include <linux/list.h>
 #include <linux/module.h>
@@ -30,6 +33,7 @@ static void led_stop_software_blink(struct led_classdev *led_cdev)
 	del_timer_sync(&led_cdev->blink_timer);
 	led_cdev->blink_delay_on = 0;
 	led_cdev->blink_delay_off = 0;
+	led_cdev->blink_delay_current = 0;
 }
 
 static void led_set_software_blink(struct led_classdev *led_cdev,
@@ -77,11 +81,11 @@ void led_blink_set(struct led_classdev *led_cdev,
 	if (led_cdev->blink_set &&
 	    !led_cdev->blink_set(led_cdev, delay_on, delay_off))
 		return;
-
+#if 0
 	/* blink with 1 Hz as default if nothing specified */
 	if (!*delay_on && !*delay_off)
 		*delay_on = *delay_off = 500;
-
+#endif
 	led_set_software_blink(led_cdev, *delay_on, *delay_off);
 }
 EXPORT_SYMBOL(led_blink_set);

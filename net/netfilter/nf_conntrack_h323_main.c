@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * H.323 connection tracking helper
  *
  * Copyright (c) 2006 Jing Min Zhao <zhaojingmin@users.sourceforge.net>
@@ -32,6 +36,9 @@
 #include <net/netfilter/nf_conntrack_helper.h>
 #include <net/netfilter/nf_conntrack_zones.h>
 #include <linux/netfilter/nf_conntrack_h323.h>
+#ifdef CONFIG_ATP_COMMON
+#include <net/tcp.h>
+#endif
 #if defined(CONFIG_BCM_KF_NETFILTER)
 #include <linux/iqos.h>
 #endif
@@ -72,6 +79,7 @@ int (*set_ras_addr_hook) (struct sk_buff *skb,
 			  enum ip_conntrack_info ctinfo,
 			  unsigned char **data,
 			  TransportAddress *taddr, int count) __read_mostly;
+#ifndef CONFIG_ATP_COMMON
 int (*nat_rtp_rtcp_hook) (struct sk_buff *skb,
 			  struct nf_conn *ct,
 			  enum ip_conntrack_info ctinfo,
@@ -80,6 +88,17 @@ int (*nat_rtp_rtcp_hook) (struct sk_buff *skb,
 			  __be16 port, __be16 rtp_port,
 			  struct nf_conntrack_expect *rtp_exp,
 			  struct nf_conntrack_expect *rtcp_exp) __read_mostly;
+#else
+int (*nat_rtp_rtcp_hook) (struct sk_buff *skb,
+			  struct nf_conn *ct,
+			  enum ip_conntrack_info ctinfo,
+			  unsigned char **data, int dataoff,
+			  H245_TransportAddress *taddr,
+			  __be16 port, __be16 rtp_port,
+			  struct nf_conntrack_expect *rtp_exp,
+			  struct nf_conntrack_expect *rtcp_exp,
+			  unsigned int mediatype) __read_mostly;
+#endif
 int (*nat_t120_hook) (struct sk_buff *skb,
 		      struct nf_conn *ct,
 		      enum ip_conntrack_info ctinfo,
@@ -197,8 +216,13 @@ static int get_tpkt_data(struct sk_buff *skb, unsigned int protoff,
 			return 0;
 		}
 
+
+#ifndef CONFIG_ATP_COMMON
 		pr_debug("nf_ct_h323: incomplete TPKT (fragmented?)\n");
 		goto clear_out;
+#else
+		pr_debug("nf_ct_h323: fragmented TPKT, but don't clear it\n");
+#endif
 	}
 
 	/* This is the encapsulated data */
@@ -217,9 +241,16 @@ static int get_tpkt_data(struct sk_buff *skb, unsigned int protoff,
 }
 
 /****************************************************************************/
+
+#ifndef CONFIG_ATP_COMMON
 static int get_h245_addr(struct nf_conn *ct, const unsigned char *data,
 			 H245_TransportAddress *taddr,
 			 union nf_inet_addr *addr, __be16 *port)
+#else
+static int get_h245_addr(struct sk_buff *skb, struct nf_conn *ct, unsigned char *data,
+			 H245_TransportAddress *taddr,
+			 union nf_inet_addr *addr, __be16 *port)
+#endif
 {
 	const unsigned char *p;
 	int len;
@@ -243,19 +274,40 @@ static int get_h245_addr(struct nf_conn *ct, const unsigned char *data,
 	default:
 		return 0;
 	}
-
+#ifdef CONFIG_ATP_COMMON
+	if (((p + len) - (skb)->data) > (skb)->len)
+	{
+		pr_debug("Get address error, packet has been fragemented");
+		return 0;
+	}
+#endif
 	memcpy(addr, p, len);
 	memset((void *)addr + len, 0, sizeof(*addr) - len);
+#ifdef CONFIG_ATP_COMMON
+	if (((p + len + sizeof(__be16)) - (skb)->data) > (skb)->len)
+	{
+	    pr_debug("Get port error, packet has been fragemented");
+	    *port = htons(0);
+	    return 0;
+	}
+#endif
 	memcpy(port, p + len, sizeof(__be16));
 
 	return 1;
 }
 
 /****************************************************************************/
+#ifndef CONFIG_ATP_COMMON
 static int expect_rtp_rtcp(struct sk_buff *skb, struct nf_conn *ct,
 			   enum ip_conntrack_info ctinfo,
 			   unsigned char **data, int dataoff,
 			   H245_TransportAddress *taddr)
+#else
+static int expect_rtp_rtcp(struct sk_buff *skb, struct nf_conn *ct,
+			   enum ip_conntrack_info ctinfo,
+			   unsigned char **data, int dataoff,
+			   H245_TransportAddress *taddr, unsigned int mediatype)
+#endif
 {
 	int dir = CTINFO2DIR(ctinfo);
 	int ret = 0;
@@ -266,34 +318,65 @@ static int expect_rtp_rtcp(struct sk_buff *skb, struct nf_conn *ct,
 	struct nf_conntrack_expect *rtcp_exp;
 	typeof(nat_rtp_rtcp_hook) nat_rtp_rtcp;
 
-	/* Read RTP or RTCP address */
+	/* Read RTP or RTCP address 如果报文中的地址与数据包的源地址一致，直接返回 */
+#ifndef CONFIG_ATP_COMMON
 	if (!get_h245_addr(ct, *data, taddr, &addr, &port) ||
 	    memcmp(&addr, &ct->tuplehash[dir].tuple.src.u3, sizeof(addr)) ||
 	    port == 0)
 		return 0;
+#else
 
+	if (!get_h245_addr(skb, ct, *data, taddr, &addr, &port) ||
+	     !memcmp(&addr, &ct->tuplehash[!dir].tuple.dst.u3, sizeof(addr)) ||
+	    port == 0)
+
+	{
+		pr_debug("src[%u.%u.%u.%u] to [%u.%u.%u.%u] mediaaddr [%u.%u.%u.%u] no need to create exp ",
+			NIPQUAD(ct->tuplehash[dir].tuple.src.u3.ip), 
+			NIPQUAD(ct->tuplehash[dir].tuple.dst.u3.ip),
+			NIPQUAD(addr.ip));
+		return 0;
+	}
+#endif
 	/* RTP port is even */
 	port &= htons(~1);
 	rtp_port = port;
+#ifndef CONFIG_ATP_COMMON
 	rtcp_port = htons(ntohs(port) + 1);
+#else
+	rtcp_port = htons(port + 1);
+#endif
+
 
 	/* Create expect for RTP */
 	if ((rtp_exp = nf_ct_expect_alloc(ct)) == NULL)
 		return -1;
+/* Start of  H323通话一段时间没有图像显示 */
 	nf_ct_expect_init(rtp_exp, NF_CT_EXPECT_CLASS_DEFAULT, nf_ct_l3num(ct),
+#ifdef CONFIG_ATP_COMMON
+			  NULL, //&ct->tuplehash[!dir].tuple.src.u3,
+#else
 			  &ct->tuplehash[!dir].tuple.src.u3,
+#endif
 			  &ct->tuplehash[!dir].tuple.dst.u3,
 			  IPPROTO_UDP, NULL, &rtp_port);
+/* End of  H323通话一段时间没有图像显示 */
 
 	/* Create expect for RTCP */
 	if ((rtcp_exp = nf_ct_expect_alloc(ct)) == NULL) {
 		nf_ct_expect_put(rtp_exp);
 		return -1;
 	}
+/* Start of  H323通话一段时间没有图像显示 */
 	nf_ct_expect_init(rtcp_exp, NF_CT_EXPECT_CLASS_DEFAULT, nf_ct_l3num(ct),
+#ifdef CONFIG_ATP_COMMON
+			  NULL, //&ct->tuplehash[!dir].tuple.src.u3,
+#else
 			  &ct->tuplehash[!dir].tuple.src.u3,
+#endif
 			  &ct->tuplehash[!dir].tuple.dst.u3,
 			  IPPROTO_UDP, NULL, &rtcp_port);
+/* End of  H323通话一段时间没有图像显示 */
 
 	if (memcmp(&ct->tuplehash[dir].tuple.src.u3,
 		   &ct->tuplehash[!dir].tuple.dst.u3,
@@ -301,8 +384,13 @@ static int expect_rtp_rtcp(struct sk_buff *skb, struct nf_conn *ct,
 		   (nat_rtp_rtcp = rcu_dereference(nat_rtp_rtcp_hook)) &&
 		   ct->status & IPS_NAT_MASK) {
 		/* NAT needed */
+#ifndef CONFIG_ATP_COMMON
 		ret = nat_rtp_rtcp(skb, ct, ctinfo, data, dataoff,
 				   taddr, port, rtp_port, rtp_exp, rtcp_exp);
+#else
+		ret = nat_rtp_rtcp(skb, ct, ctinfo, data, dataoff,
+				   taddr, port, rtp_port, rtp_exp, rtcp_exp, mediatype);
+#endif
 	} else {		/* Conntrack only */
 		if (nf_ct_expect_related(rtp_exp) == 0) {
 			if (nf_ct_expect_related(rtcp_exp) == 0) {
@@ -344,9 +432,16 @@ static int expect_t120(struct sk_buff *skb,
 	typeof(nat_t120_hook) nat_t120;
 
 	/* Read T.120 address */
+#ifndef CONFIG_ATP_COMMON
 	if (!get_h245_addr(ct, *data, taddr, &addr, &port) ||
 	    memcmp(&addr, &ct->tuplehash[dir].tuple.src.u3, sizeof(addr)) ||
 	    port == 0)
+#else
+	if (!get_h245_addr(skb, ct, *data, taddr, &addr, &port) ||
+		memcmp(&addr, &ct->tuplehash[dir].tuple.src.u3, sizeof(addr)) ||
+		port == 0)
+#endif
+
 		return 0;
 
 	/* Create expect for T.120 connections */
@@ -394,8 +489,13 @@ static int process_h245_channel(struct sk_buff *skb,
 
 	if (channel->options & eH2250LogicalChannelParameters_mediaChannel) {
 		/* RTP */
+#ifndef CONFIG_ATP_COMMON
 		ret = expect_rtp_rtcp(skb, ct, ctinfo, data, dataoff,
 				      &channel->mediaChannel);
+#else
+		ret = expect_rtp_rtcp(skb, ct, ctinfo, data, dataoff,
+				      &channel->mediaChannel, MEDIA_CHANNEL);
+#endif
 		if (ret < 0)
 			return -1;
 	}
@@ -403,8 +503,13 @@ static int process_h245_channel(struct sk_buff *skb,
 	if (channel->
 	    options & eH2250LogicalChannelParameters_mediaControlChannel) {
 		/* RTCP */
+#ifndef CONFIG_ATP_COMMON
 		ret = expect_rtp_rtcp(skb, ct, ctinfo, data, dataoff,
 				      &channel->mediaControlChannel);
+#else
+		ret = expect_rtp_rtcp(skb, ct, ctinfo, data, dataoff,
+				      &channel->mediaControlChannel, MEDIA_CONTROL_CHANNEL);
+#endif
 		if (ret < 0)
 			return -1;
 	}
@@ -509,8 +614,13 @@ static int process_olca(struct sk_buff *skb, struct nf_conn *ct,
 		if (ack->options &
 		    eH2250LogicalChannelAckParameters_mediaChannel) {
 			/* RTP */
+#ifndef CONFIG_ATP_COMMON
 			ret = expect_rtp_rtcp(skb, ct, ctinfo, data, dataoff,
 					      &ack->mediaChannel);
+#else
+			ret = expect_rtp_rtcp(skb, ct, ctinfo, data, dataoff,
+					      &ack->mediaChannel, MEDIA_CHANNEL);
+#endif
 			if (ret < 0)
 				return -1;
 		}
@@ -518,8 +628,13 @@ static int process_olca(struct sk_buff *skb, struct nf_conn *ct,
 		if (ack->options &
 		    eH2250LogicalChannelAckParameters_mediaControlChannel) {
 			/* RTCP */
+#ifndef CONFIG_ATP_COMMON
 			ret = expect_rtp_rtcp(skb, ct, ctinfo, data, dataoff,
 					      &ack->mediaControlChannel);
+#else
+			ret = expect_rtp_rtcp(skb, ct, ctinfo, data, dataoff,
+					      &ack->mediaControlChannel, MEDIA_CONTROL_CHANNEL);
+#endif
 			if (ret < 0)
 				return -1;
 		}
@@ -600,16 +715,26 @@ static int h245_help(struct sk_buff *skb, unsigned int protoff,
 		ret = DecodeMultimediaSystemControlMessage(data, datalen,
 							   &mscm);
 		if (ret < 0) {
+#ifndef CONFIG_ATP_COMMON
 			pr_debug("nf_ct_h245: decoding error: %s\n",
 				 ret == H323_ERROR_BOUND ?
 				 "out of bound" : "out of range");
 			/* We don't drop when decoding error */
 			break;
+#else
+            pr_debug("nf_ct_h245: decoding error: %s\n",
+                   ret == H323_ERROR_BOUND ?
+                   "out of bound" : "out of range");
+#endif
 		}
 
 		/* Process H.245 signal */
 		if (process_h245(skb, ct, ctinfo, &data, dataoff, &mscm) < 0)
+#ifndef CONFIG_ATP_COMMON
 			goto drop;
+#else
+			pr_debug("process_h245 error, but don't drop it");
+#endif
 	}
 
 	spin_unlock_bh(&nf_h323_lock);
@@ -683,18 +808,31 @@ static int expect_h245(struct sk_buff *skb, struct nf_conn *ct,
 	typeof(nat_h245_hook) nat_h245;
 
 	/* Read h245Address */
+#ifndef CONFIG_ATP_COMMON
 	if (!get_h225_addr(ct, *data, taddr, &addr, &port) ||
 	    memcmp(&addr, &ct->tuplehash[dir].tuple.src.u3, sizeof(addr)) ||
 	    port == 0)
+#else
+	if (!get_h225_addr(ct, *data, taddr, &addr, &port) ||
+	    port == 0)
+#endif
 		return 0;
 
 	/* Create expect for h245 connection */
 	if ((exp = nf_ct_expect_alloc(ct)) == NULL)
 		return -1;
+#ifndef CONFIG_ATP_COMMON
 	nf_ct_expect_init(exp, NF_CT_EXPECT_CLASS_DEFAULT, nf_ct_l3num(ct),
 			  &ct->tuplehash[!dir].tuple.src.u3,
 			  &ct->tuplehash[!dir].tuple.dst.u3,
 			  IPPROTO_TCP, NULL, &port);
+#else
+	nf_ct_expect_init(exp, NF_CT_EXPECT_CLASS_DEFAULT, nf_ct_l3num(ct),
+            NULL,
+            &ct->tuplehash[!dir].tuple.dst.u3,
+            IPPROTO_TCP, NULL, &port);
+#endif
+
 	exp->helper = &nf_conntrack_helper_h245;
 
 	if (memcmp(&ct->tuplehash[dir].tuple.src.u3,
@@ -706,6 +844,13 @@ static int expect_h245(struct sk_buff *skb, struct nf_conn *ct,
 		ret = nat_h245(skb, ct, ctinfo, data, dataoff, taddr,
 			       port, exp);
 	} else {		/* Conntrack only */
+#ifdef CONFIG_ATP_COMMON
+        nf_ct_expect_init(exp, NF_CT_EXPECT_CLASS_DEFAULT, nf_ct_l3num(ct),
+                    &ct->tuplehash[!dir].tuple.src.u3,
+                    &addr,
+                    IPPROTO_TCP, NULL, &port);
+        exp->helper = &nf_conntrack_helper_h245;
+#endif
 		if (nf_ct_expect_related(exp) == 0) {
 			pr_debug("nf_ct_q931: expect H.245 ");
 			nf_ct_dump_tuple(&exp->tuple);
@@ -1007,7 +1152,33 @@ static int process_alerting(struct sk_buff *skb, struct nf_conn *ct,
 	return 0;
 }
 
+#ifdef CONFIG_ATP_COMMON
 /****************************************************************************/
+static int process_information(struct sk_buff *skb,
+			       struct nf_conn *ct,
+			       enum ip_conntrack_info ctinfo,
+			       unsigned char **data, int dataoff,
+			       Information_UUIE *info)
+{
+	int ret;
+	int i;
+
+	pr_debug("nf_ct_q931: Information\n");
+
+	if (info->options & eInformation_UUIE_fastStart) {
+		for (i = 0; i < info->fastStart.count; i++) {
+			ret = process_olc(skb, ct, ctinfo, data, dataoff,
+					  &info->fastStart.item[i]);
+			if (ret < 0)
+				return -1;
+		}
+	}
+
+	return 0;
+}
+
+/****************************************************************************/
+#endif
 static int process_facility(struct sk_buff *skb, struct nf_conn *ct,
 			    enum ip_conntrack_info ctinfo,
 			    unsigned char **data, int dataoff,
@@ -1103,6 +1274,13 @@ static int process_q931(struct sk_buff *skb, struct nf_conn *ct,
 		ret = process_alerting(skb, ct, ctinfo, data, dataoff,
 				       &pdu->h323_message_body.alerting);
 		break;
+#ifdef CONFIG_ATP_COMMON
+	case eH323_UU_PDU_h323_message_body_information:
+		ret = process_information(skb, ct, ctinfo, data, dataoff,
+					  &pdu->h323_message_body.
+					  information);
+		break;
+#endif
 	case eH323_UU_PDU_h323_message_body_facility:
 		ret = process_facility(skb, ct, ctinfo, data, dataoff,
 				       &pdu->h323_message_body.facility);
@@ -1132,6 +1310,10 @@ static int process_q931(struct sk_buff *skb, struct nf_conn *ct,
 	return 0;
 }
 
+#ifdef CONFIG_ATP_COMMON
+extern int tcpmss_modify_packet(struct sk_buff *skb);
+#endif
+
 /****************************************************************************/
 static int q931_help(struct sk_buff *skb, unsigned int protoff,
 		     struct nf_conn *ct, enum ip_conntrack_info ctinfo)
@@ -1145,7 +1327,14 @@ static int q931_help(struct sk_buff *skb, unsigned int protoff,
 	/* Until there's been traffic both ways, don't look in packets. */
 	if (ctinfo != IP_CT_ESTABLISHED && ctinfo != IP_CT_ESTABLISHED_REPLY)
 		return NF_ACCEPT;
-
+#ifdef CONFIG_ATP_COMMON
+    /* start of  在此修改TCP MSS 大小 */
+    if (ctinfo == (IP_CT_ESTABLISHED + IP_CT_IS_REPLY))
+    {
+        tcpmss_modify_packet(skb);        
+    }
+    /* end of  在此修改TCP MSS 大小 */
+#endif
 	pr_debug("nf_ct_q931: skblen = %u\n", skb->len);
 
 	spin_lock_bh(&nf_h323_lock);
@@ -1159,16 +1348,26 @@ static int q931_help(struct sk_buff *skb, unsigned int protoff,
 		/* Decode Q.931 signal */
 		ret = DecodeQ931(data, datalen, &q931);
 		if (ret < 0) {
+#ifndef CONFIG_ATP_COMMON
 			pr_debug("nf_ct_q931: decoding error: %s\n",
 				 ret == H323_ERROR_BOUND ?
 				 "out of bound" : "out of range");
 			/* We don't drop when decoding error */
 			break;
+#else
+            pr_debug("nf_ct_q931: decoding error: %s\n",
+				       ret == H323_ERROR_BOUND ?
+				       "out of bound" : "out of range");
+#endif
 		}
 
 		/* Process Q.931 signal */
 		if (process_q931(skb, ct, ctinfo, &data, dataoff, &q931) < 0)
+#ifndef CONFIG_ATP_COMMON
 			goto drop;
+#else
+            pr_debug("notice: process_q931 error");
+#endif
 	}
 
 	spin_unlock_bh(&nf_h323_lock);

@@ -1,3 +1,7 @@
+/*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
 #if defined(CONFIG_BCM_KF_NBUFF)
 
 /*
@@ -581,8 +585,13 @@ FkBuff_t * fkb_unshare(FkBuff_t * fkb_p)
             memcpy(fkbM_p->data, fkb_p->data, fkb_p->len);
 
             dirty_p = _to_dptr_from_kptr_(fkb_p->data  + fkb_p->len);
+#ifndef CONFIG_SUPPORT_ATP /* Mirror For mirror call trace  */
             if ( fkb_p->master_p->dirty_p < dirty_p )
                 fkb_p->master_p->dirty_p = dirty_p;
+#else
+            if ( fkb_p->dirty_p < dirty_p )
+                fkb_p->dirty_p = dirty_p;
+#endif
 
             fkb_dec_ref(fkb_p->master_p); /* decrement masters user count */
             fkb_dbg(1, "cloned fkb_p with multiple ref master");

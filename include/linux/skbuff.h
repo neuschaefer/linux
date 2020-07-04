@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *	Definitions for the 'struct sk_buff' memory handlers.
  *
  *	Authors:
@@ -35,14 +39,29 @@
 #endif
 
 #include <linux/hrtimer.h>
+#if defined(CONFIG_IMQ) || defined(CONFIG_IMQ_MODULE)
+#include <linux/imq.h>
+#endif
 #include <linux/dma-mapping.h>
 #include <linux/netdev_features.h>
+
+#include "atp_interface.h"
 
 /* Don't change this without changing skb_csum_unnecessary! */
 #define CHECKSUM_NONE 0
 #define CHECKSUM_UNNECESSARY 1
 #define CHECKSUM_COMPLETE 2
 #define CHECKSUM_PARTIAL 3
+
+/* Start of added  for conntrack clean with gateway service 2012-6-18 */
+#define CONNTRACK_AVOID_SERVICE  0x8
+#define PPP_TRIGER_MARK    0x200000
+#define NFMARK_SIP      0xa
+#define NFMARK_RTP      0xb
+#define NFMARK_RTCP     0xc
+#define NFMARK_TR069_CONTRACK   0xd
+#define NFMARK_IGMP_DATA   0xe
+/* End of added  for conntrack clean with gateway service 2012-6-18 */
 
 #define SKB_DATA_ALIGN(X)	(((X) + (SMP_CACHE_BYTES - 1)) & \
 				 ~(SMP_CACHE_BYTES - 1))
@@ -547,8 +566,12 @@ struct sk_buff {
 	 */
 	char			cb[48] __aligned(8);
 
+#if (defined CONFIG_HSAN)
+	char            hi_cb[64]; 
+#endif
+
 	unsigned long		_skb_refdst;
-#ifdef CONFIG_XFRM
+#if defined(CONFIG_XFRM) || defined(CONFIG_HSAN)
 	struct	sec_path	*sp;
 #endif
 #if defined(CONFIG_BCM_KF_NBUFF)
@@ -589,6 +612,9 @@ struct sk_buff {
 	void			(*destructor)(struct sk_buff *skb);
 #if defined(CONFIG_NF_CONNTRACK) || defined(CONFIG_NF_CONNTRACK_MODULE)
 	struct nf_conntrack	*nfct;
+#if (defined CONFIG_HSAN)
+	struct nf_conntrack	*nfct_gre;
+#endif	
 #endif
 #ifdef NET_SKBUFF_NF_DEFRAG_NEEDED
 	struct sk_buff		*nfct_reasm;
@@ -609,13 +635,15 @@ struct sk_buff {
 
 	__u16			vlan_tci;
 
-#ifdef CONFIG_NET_SCHED
+#if defined(CONFIG_NET_SCHED) || defined(CONFIG_HSAN)
 	__u16			tc_index;	/* traffic control index */
 #ifdef CONFIG_NET_CLS_ACT
 	__u16			tc_verd;	/* traffic control verdict */
 #endif
 #endif
-
+#if defined(CONFIG_HSAN)
+	int			iif;
+#endif
 	__u16			queue_mapping;
 #endif /* CONFIG_BCM_KF_NBUFF */
 	kmemcheck_bitfield_begin(flags2);
@@ -644,6 +672,9 @@ struct sk_buff {
 #ifdef CONFIG_NETWORK_SECMARK
 	__u32			secmark;
 #endif
+#if defined(CONFIG_HSAN)
+	__u32			accelmark;
+#endif
 #if defined(CONFIG_BCM_KF_NBUFF)
 #else
 	union {
@@ -652,6 +683,12 @@ struct sk_buff {
 		__u32		avail_size;
 	};
 #endif /* CONFIG_BCM_KF_NBUFF */
+
+	/*ATP add start, these members should be moved to atp_skb_ext*/
+	struct net_device	*lanindev;
+	__u8			imq_flags:5;//IMQ_F_BITS;
+	void  *atp_skb_ext;
+	/*ATP add end*/
 
 #if defined(CONFIG_BCM_KF_NBUFF)
 #if defined(CONFIG_BCM_KF_VLAN) && (defined(CONFIG_BCM_VLAN) || defined(CONFIG_BCM_VLAN_MODULE))
@@ -708,6 +745,16 @@ struct sk_buff {
 	unsigned int		truesize;
 	atomic_t		users;
 #endif /* CONFIG_BCM_KF_NBUFF */
+	/*ATP add start, these members should be moved to atp_skb_ext*/
+#if defined(CONFIG_BLOG) && ((defined(CONFIG_PPPOL2TP) && defined(CONFIG_L2TP_FAST_FORWARD)) || defined(CONFIG_PPTP_TUNNEL))
+	/*????¡À¡§??¨º?¡¤?¡Á??¨®?¨´, ??¨¨?0D¨¨¨°a¡Á??¨®?¨´*/
+	unsigned int		skip_blog;
+#endif
+#ifdef CONFIG_ATP_HYBRID_GREACCEL
+    __u32           accelmark;
+    char            hi_cb[48];
+#endif
+	/*ATP add end*/
 };
 
 #ifdef __KERNEL__
@@ -769,6 +816,8 @@ static inline struct rtable *skb_rtable(const struct sk_buff *skb)
 {
 	return (struct rtable *)skb_dst(skb);
 }
+
+#define ATP_LOG_SIZE 1024    /*ATP add*/
 
 extern void kfree_skb(struct sk_buff *skb);
 extern void consume_skb(struct sk_buff *skb);
@@ -2718,6 +2767,9 @@ static inline void __nf_copy(struct sk_buff *dst, const struct sk_buff *src)
 #ifdef NET_SKBUFF_NF_DEFRAG_NEEDED
 	dst->nfct_reasm = src->nfct_reasm;
 	nf_conntrack_get_reasm(src->nfct_reasm);
+#endif
+#if defined(CONFIG_IMQ) || defined(CONFIG_IMQ_MODULE)
+	dst->imq_flags = src->imq_flags;
 #endif
 #ifdef CONFIG_BRIDGE_NETFILTER
 	dst->nf_bridge  = src->nf_bridge;

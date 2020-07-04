@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *	NET3:	Implementation of the ICMP protocol layer.
  *
  *		Alan Cox, <alan@lxorguk.ukuu.org.uk>
@@ -97,9 +101,19 @@
 #include <net/xfrm.h>
 #include <net/inet_common.h>
 
+#ifdef CONFIG_FIREWALL_LOG
+#include "atplogdef.h"
+#include "msg/kcmsmonitormsgtypes.h"
+#endif
+
 /*
  *	Build xmit assembly blocks
  */
+
+#ifdef CONFIG_HSAN	
+int (*hisi_hw_ip_filter)(unsigned int *saddr,unsigned int ip_type)=NULL;
+EXPORT_SYMBOL(hisi_hw_ip_filter);
+#endif
 
 struct icmp_bxm {
 	struct sk_buff *skb;
@@ -216,6 +230,9 @@ static inline struct sock *icmp_xmit_lock(struct net *net)
 
 	sk = icmp_sk(net);
 
+	spin_lock(&sk->sk_lock.slock);
+
+#if 0 /* in double cpu may case icmp reply lose*/
 	if (unlikely(!spin_trylock(&sk->sk_lock.slock))) {
 		/* This can happen if the output path signals a
 		 * dst_link_failure() for an outgoing ICMP packet.
@@ -223,6 +240,7 @@ static inline struct sock *icmp_xmit_lock(struct net *net)
 		local_bh_enable();
 		return NULL;
 	}
+#endif
 	return sk;
 }
 
@@ -993,6 +1011,10 @@ int icmp_rcv(struct sk_buff *skb)
 	struct rtable *rt = skb_rtable(skb);
 	struct net *net = dev_net(rt->dst.dev);
 
+#ifdef CONFIG_FIREWALL_LOG
+	u_int8_t *pszLogBuf = NULL;
+#endif
+
 	if (!xfrm4_policy_check(NULL, XFRM_POLICY_IN, skb)) {
 		struct sec_path *sp = skb_sec_path(skb);
 		int nh;
@@ -1056,6 +1078,25 @@ int icmp_rcv(struct sk_buff *skb)
 		if ((icmph->type == ICMP_ECHO ||
 		     icmph->type == ICMP_TIMESTAMP) &&
 		    net->ipv4.sysctl_icmp_echo_ignore_broadcasts) {
+		    /* ·ÀSmurf¹¥»÷ */
+#ifdef CONFIG_FIREWALL_LOG
+			pszLogBuf = (u_int8_t *)kmalloc(ATP_LOG_LENGTH_128, GFP_ATOMIC);
+            if (NULL != pszLogBuf)
+            {
+	            memset(pszLogBuf, 0, ATP_LOG_LENGTH_128);
+	            snprintf(pszLogBuf, ATP_LOG_LENGTH_128, "Prevent Smurf attack, icmp broadcast packet from "NIPQUAD_FMT".\n", 
+	                NIPQUAD(ip_hdr(skb)->saddr));
+	            syswatch_sendLog(ATP_LOG_TYPE_FIREWALL, ATP_LOG_LEVEL_WARNING, 0, pszLogBuf);
+#ifdef CONFIG_HSAN			
+            if(hisi_hw_ip_filter)
+            {
+                printk ("=======[Hisi Hardware Firewall %s]=======\n",pszLogBuf);
+                hisi_hw_ip_filter(&(ip_hdr(skb)->saddr),HI_ADDR_TYPE_IPV4);
+            }
+#endif 			
+                kfree(pszLogBuf);
+            }
+#endif
 			goto error;
 		}
 		if (icmph->type != ICMP_ECHO &&

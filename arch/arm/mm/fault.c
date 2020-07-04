@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *  linux/arch/arm/mm/fault.c
  *
  *  Copyright (C) 1995  Linus Torvalds
@@ -125,6 +129,19 @@ void show_pte(struct mm_struct *mm, unsigned long addr)
 { }
 #endif					/* CONFIG_MMU */
 
+typedef void (*arch_fault_callback)(void);
+
+arch_fault_callback g_pv_arch_fault_callback = NULL;
+
+void arch_fault_reg(arch_fault_callback pv_callback)
+{
+    printk("REGISTER g_pv_arch_fault_callback.\n");
+
+    g_pv_arch_fault_callback = pv_callback;
+}
+
+EXPORT_SYMBOL(arch_fault_reg);
+
 /*
  * Oops.  The kernel tried to access some page that wasn't present.
  */
@@ -142,6 +159,12 @@ __do_kernel_fault(struct mm_struct *mm, unsigned long addr, unsigned int fsr,
 	 * No handler, we'll have to terminate things with extreme prejudice.
 	 */
 	bust_spinlocks(1);
+
+	if (NULL != g_pv_arch_fault_callback) 
+	{
+		g_pv_arch_fault_callback();
+	}
+	
 	printk(KERN_ALERT
 		"Unable to handle kernel %s at virtual address %08lx\n",
 		(addr < PAGE_SIZE) ? "NULL pointer dereference" :

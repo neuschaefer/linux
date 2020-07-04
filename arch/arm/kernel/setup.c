@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *  linux/arch/arm/kernel/setup.c
  *
  *  Copyright (C) 1995-2001 Russell King
@@ -765,6 +769,20 @@ static int __init parse_tag_rdpsize(const struct tag *tag)
 
 __tagtable(ATAG_RDPSIZE, parse_tag_rdpsize);
 #endif /* (CONFIG_BCM_KF_ARM_BCM963XX) */
+
+#if (defined CONFIG_HSAN)
+char g_ac_flash_info[2048];
+char *g_pc_flash_info;
+
+static int __init parse_tag_flash(const struct tag *tag)
+{
+    memcpy(g_ac_flash_info, tag->u.st_flash_info.ac_flash_info, 2048);
+    g_pc_flash_info = &g_ac_flash_info[0];
+    
+    return 0;
+}
+__tagtable(ATAG_FLASH, parse_tag_flash);
+#endif
 /*
  * Scan the tag table for this tag, and call its parse function.
  * The tag table is built by the linker from all the __tagtable

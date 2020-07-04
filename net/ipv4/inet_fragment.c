@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * inet fragments management
  *
  *		This program is free software; you can redistribute it and/or
@@ -73,8 +77,13 @@ EXPORT_SYMBOL(inet_frags_init);
 void inet_frags_init_net(struct netns_frags *nf)
 {
 	nf->nqueues = 0;
+#ifdef CONFIG_ATP_COMMON
+    atomic_set(&nf->ipfrag_count, 0); /* add ipfrag count */
+#endif
 	atomic_set(&nf->mem, 0);
 	INIT_LIST_HEAD(&nf->lru_list);
+    //CVE-2014-0100
+    spin_lock_init(&nf->lru_lock);
 }
 EXPORT_SYMBOL(inet_frags_init_net);
 
@@ -98,9 +107,10 @@ static inline void fq_unlink(struct inet_frag_queue *fq, struct inet_frags *f)
 {
 	write_lock(&f->lock);
 	hlist_del(&fq->list);
-	list_del(&fq->lru_list);
 	fq->net->nqueues--;
 	write_unlock(&f->lock);
+    //CVE-2014-0100
+    inet_frag_lru_del(fq);
 }
 
 void inet_frag_kill(struct inet_frag_queue *fq, struct inet_frags *f)
@@ -123,6 +133,10 @@ static inline void frag_kfree_skb(struct netns_frags *nf, struct inet_frags *f,
 		*work -= skb->truesize;
 
 	atomic_sub(skb->truesize, &nf->mem);
+#ifdef CONFIG_ATP_COMMON
+	atomic_sub(1, &nf->ipfrag_count); /* add ipfrag count */
+#endif
+    
 	if (f->skb_free)
 		f->skb_free(skb);
 	kfree_skb(skb);
@@ -163,18 +177,34 @@ int inet_frag_evictor(struct netns_frags *nf, struct inet_frags *f)
 	struct inet_frag_queue *q;
 	int work, evicted = 0;
 
-	work = atomic_read(&nf->mem) - nf->low_thresh;
+#ifdef CONFIG_ATP_COMMON
+    /* start add ipfrag count */
+    if ((atomic_read(&nf->ipfrag_count) > nf->ipfrag_count_thresh)
+        && (atomic_read(&nf->mem) > (IPFRAG_PACKET_TRRUSIZE_MIN * nf->ipfrag_count_thresh))
+        && (nf->low_thresh > (IPFRAG_PACKET_TRRUSIZE_MIN * nf->ipfrag_count_thresh)))
+    {
+    	work = atomic_read(&nf->mem) - (IPFRAG_PACKET_TRRUSIZE_MIN * nf->ipfrag_count_thresh);
+    }
+    else
+#endif
+    {
+	    work = atomic_read(&nf->mem) - nf->low_thresh;
+    }
+    /* end add ipfrag count */
+
 	while (work > 0) {
-		read_lock(&f->lock);
+        //CVE-2014-0100
+		spin_lock(&nf->lru_lock);
+        
 		if (list_empty(&nf->lru_list)) {
-			read_unlock(&f->lock);
+			spin_unlock(&nf->lru_lock);
 			break;
 		}
 
 		q = list_first_entry(&nf->lru_list,
 				struct inet_frag_queue, lru_list);
 		atomic_inc(&q->refcnt);
-		read_unlock(&f->lock);
+		spin_unlock(&nf->lru_lock);
 
 		spin_lock(&q->lock);
 		if (!(q->last_in & INET_FRAG_COMPLETE))
@@ -228,9 +258,10 @@ static struct inet_frag_queue *inet_frag_intern(struct netns_frags *nf,
 
 	atomic_inc(&qp->refcnt);
 	hlist_add_head(&qp->list, &f->hash[hash]);
-	list_add_tail(&qp->lru_list, &nf->lru_list);
 	nf->nqueues++;
 	write_unlock(&f->lock);
+    //CVE-2014-0100
+    inet_frag_lru_add(nf, qp);
 	return qp;
 }
 

@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *	Spanning tree protocol; generic parts
  *	Linux ethernet bridge
  *
@@ -356,6 +360,10 @@ void br_become_designated_port(struct net_bridge_port *p)
 
 
 /* called under bridge lock */
+#ifdef CONFIG_BCM_EXT_SWITCH
+/*Added for support 257*/
+int port_stp_flag = 0;
+#endif
 static void br_make_blocking(struct net_bridge_port *p)
 {
 	if (p->state != BR_STATE_DISABLED &&
@@ -369,6 +377,9 @@ static void br_make_blocking(struct net_bridge_port *p)
 		br_ifinfo_notify(RTM_NEWLINK, p);
 
 		del_timer(&p->forward_delay_timer);
+#ifdef CONFIG_BCM_EXT_SWITCH
+        port_stp_flag |= (1<<('5' - p->dev->name[5]));
+#endif
 	}
 }
 
@@ -426,11 +437,14 @@ void br_port_state_selection(struct net_bridge *br)
 		if (p->state == BR_STATE_FORWARDING)
 			++liveports;
 	}
-
+    /* start  IPv6¶ª°ü */
+#ifndef CONFIG_SUPPORT_ATP
 	if (liveports == 0)
 		netif_carrier_off(br->dev);
 	else
 		netif_carrier_on(br->dev);
+#endif   
+    /* end  IPv6¶ª°ü */
 }
 
 /* called under bridge lock */

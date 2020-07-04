@@ -1,3 +1,7 @@
+/*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
 
 /* (C) 1999-2001 Paul `Rusty' Russell
  * (C) 2002-2004 Netfilter Core Team <coreteam@netfilter.org>
@@ -209,6 +213,68 @@ static struct nf_hook_ops ipv4_conntrack_ops[] __read_mostly = {
 static int log_invalid_proto_min = 0;
 static int log_invalid_proto_max = 255;
 
+/* start of add  2009-04-15 to support alg switch */
+#ifdef CONFIG_NF_CONNTRACK_RTSP
+int alg_rtsp_enable = 1;
+EXPORT_SYMBOL_GPL(alg_rtsp_enable);
+#endif
+
+#ifdef CONFIG_NF_CONNTRACK_PPTP
+int alg_pptp_enable = 1;
+EXPORT_SYMBOL_GPL(alg_pptp_enable);
+#endif
+
+#ifdef CONFIG_NF_CONNTRACK_H323
+int alg_h323_enable = 1;
+EXPORT_SYMBOL_GPL(alg_h323_enable);
+#endif
+
+#if defined(CONFIG_NF_CONNTRACK_SIP) || defined(CONFIG_NF_CONNTRACK_SIP_MODULE)
+int alg_sip_enable = 1;
+EXPORT_SYMBOL_GPL(alg_sip_enable);
+#endif
+
+#ifdef CONFIG_NF_CONNTRACK_IPSEC
+int alg_ipsec_enable = 1;
+EXPORT_SYMBOL_GPL(alg_ipsec_enable);
+#endif
+
+#ifdef CONFIG_NF_CONNTRACK_FTP
+int alg_ftp_enable = 1;
+EXPORT_SYMBOL_GPL(alg_ftp_enable);
+#endif
+
+#if defined(CONFIG_IMQ) || defined(CONFIG_IMQ_MODULE)
+int qos_enable = 0;
+EXPORT_SYMBOL(qos_enable);
+#endif
+
+#if defined(CONFIG_IMQ) || defined(CONFIG_IMQ_MODULE)
+int downqos_enable = 0;
+EXPORT_SYMBOL(downqos_enable);
+#endif
+
+#ifdef CONFIG_DPI_PARSE
+int smartqos_enable = 0;
+EXPORT_SYMBOL(smartqos_enable);
+#endif
+
+/* end of add  2009-04-15 to support alg switch */
+
+#ifdef CONFIG_FIREWALL_LOG
+volatile int log_limit = 0;
+EXPORT_SYMBOL(log_limit);
+#endif
+
+/* Add  for per-flow bonding @ 2013-07-23 */
+#ifdef CONFIG_HSAN
+unsigned int dsl_threshold = 0xFFFFFFFF;
+EXPORT_SYMBOL(dsl_threshold);
+unsigned int dsl_threshold_flag = 0;
+EXPORT_SYMBOL(dsl_threshold_flag);
+#endif
+/* Add end */
+
 static ctl_table ip_ct_sysctl_table[] = {
 	{
 		.procname	= "ip_conntrack_max",
@@ -247,6 +313,134 @@ static ctl_table ip_ct_sysctl_table[] = {
 		.extra1		= &log_invalid_proto_min,
 		.extra2		= &log_invalid_proto_max,
 	},
+#ifdef CONFIG_ATP_CONNTRACK_CLEAN
+	{
+		.procname	= "ip_ct_clean",
+		.data		= &nf_conntrack_clean,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+	{
+		.procname	= "ip_conntrack_dns",
+		.data		= &nf_conntrack_clean,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+#endif
+/* start of add  2009-04-15 to support alg switch */
+#ifdef CONFIG_NF_CONNTRACK_H323
+        {
+            .procname   = "alg_h323_switch",
+            .data       = &alg_h323_enable,
+            .maxlen     = sizeof(int),
+            .mode       = 0644,
+            .proc_handler   = &proc_dointvec,
+        }, 
+#endif
+#ifdef CONFIG_NF_CONNTRACK_RTSP
+        {
+            .procname   = "alg_rtsp_switch",
+            .data       = &alg_rtsp_enable,
+            .maxlen     = sizeof(int),
+            .mode       = 0644,
+            .proc_handler   = &proc_dointvec,
+        }, 
+#endif
+#if defined(CONFIG_NF_CONNTRACK_SIP) || defined(CONFIG_NF_CONNTRACK_SIP_MODULE)
+        {
+            .procname   = "alg_sip_switch",
+            .data       = &alg_sip_enable,
+            .maxlen     = sizeof(int),
+            .mode       = 0644,
+            .proc_handler   = &proc_dointvec,
+        }, 
+#endif
+#ifdef CONFIG_NF_CONNTRACK_PPTP
+        {
+            .procname   = "alg_pptp_switch",
+            .data       = &alg_pptp_enable,
+            .maxlen     = sizeof(int),
+            .mode       = 0644,
+            .proc_handler   = &proc_dointvec,
+        }, 
+#endif
+#ifdef CONFIG_NF_CONNTRACK_IPSEC
+        {
+            .procname   = "alg_ipsec_switch",
+            .data       = &alg_ipsec_enable,
+            .maxlen     = sizeof(int),
+            .mode       = 0644,
+            .proc_handler   = &proc_dointvec,
+        }, 
+#endif
+#ifdef CONFIG_NF_CONNTRACK_FTP
+        {
+            .procname   = "alg_ftp_switch",
+            .data       = &alg_ftp_enable,
+            .maxlen     = sizeof(int),
+            .mode       = 0644,
+            .proc_handler   = &proc_dointvec,
+        }, 
+#endif
+/* end of add 2009-04-15 to support alg switch */
+#if defined(CONFIG_IMQ) || defined(CONFIG_IMQ_MODULE)
+        {
+            .procname   = "qos_enable",
+            .data       = &qos_enable,
+            .maxlen     = sizeof(int),
+            .mode       = 0644,
+            .proc_handler   = &proc_dointvec,
+        }, 
+#endif
+		/*使用应用态写文件的方式控制内核写log的速率*/
+#ifdef CONFIG_FIREWALL_LOG
+        {
+            .procname   = "log_limit",
+            .data       = &log_limit,
+            .maxlen     = sizeof(int),
+            .mode       = 0644,
+            .proc_handler   = &proc_dointvec,
+        },
+#endif
+#if defined(CONFIG_IMQ) || defined(CONFIG_IMQ_MODULE)
+        {
+            .procname   = "downqos_enable",
+            .data       = &downqos_enable,
+            .maxlen     = sizeof(int),
+            .mode       = 0644,
+            .proc_handler   = &proc_dointvec,
+        }, 
+#endif
+
+/* Add  for per-flow bonding @ 2013-07-23 */
+#ifdef  CONFIG_HSAN
+        {
+            .procname   = "dsl_threshold",
+            .data       = &dsl_threshold,
+            .maxlen     = sizeof(int),
+            .mode       = 0644,
+            .proc_handler   = &proc_dointvec,
+        }, 
+        {
+            .procname   = "dsl_threshold_flag",
+            .data       = &dsl_threshold_flag,
+            .maxlen     = sizeof(int),
+            .mode       = 0444,
+            .proc_handler   = &proc_dointvec,
+        },        
+#endif
+/* Add end */
+#ifdef CONFIG_DPI_PARSE
+            {
+                .procname   = "smartqos_enable",
+                .data       = &smartqos_enable,
+                .maxlen     = sizeof(int),
+                .mode       = 0644,
+                .proc_handler   = &proc_dointvec,
+            }, 
+#endif
 	{ }
 };
 #endif /* CONFIG_SYSCTL && CONFIG_NF_CONNTRACK_PROC_COMPAT */

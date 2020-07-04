@@ -1,3 +1,7 @@
+/*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
 #include <linux/stat.h>
 #include <linux/sysctl.h>
 #include "../fs/xfs/xfs_sysctl.h"
@@ -195,6 +199,9 @@ static const struct bin_table bin_net_core_table[] = {
 	{ CTL_INT,	NET_CORE_AEVENT_ETIME,	"xfrm_aevent_etime" },
 	{ CTL_INT,	NET_CORE_AEVENT_RSEQTH,	"xfrm_aevent_rseqth" },
 	{ CTL_INT,	NET_CORE_WARNINGS,	"warnings" },
+#ifdef CONFIG_ATP_HYBRID_GREACCEL
+	{ CTL_INT,	NET_CORE_HISI_SW_FLG,	"hisi_sw_accel_flag" },
+#endif
 	{},
 };
 
@@ -364,6 +371,15 @@ static const struct bin_table bin_net_ipv4_table[] = {
 	{ CTL_INT,	NET_IPV4_LOCAL_PORT_RANGE,		"ip_local_port_range" },
 	{ CTL_INT,	NET_IPV4_IGMP_MAX_MEMBERSHIPS,		"igmp_max_memberships" },
 	{ CTL_INT,	NET_IPV4_IGMP_MAX_MSF,			"igmp_max_msf" },
+    { CTL_INT,  NET_IPV4_IGMP_SEND_REPORT_NUM,	 "igmp_send_report_num" },
+    { CTL_INT,  NET_IPV4_IGMP_SEND_REPORT_INTERVAL,"igmp_send_report_interval" },
+#ifdef CONFIG_ATP_HYBRID_REORDER
+	{ CTL_INT,  NET_IPV4_IPGRE_QUEUE_TIMEOUT,	 "ipgre_queue_timeout" },
+	{ CTL_INT,  NET_IPV4_IPGER_QLEN_MAX,	     "ipgre_qlen_max" },
+	{ CTL_INT,  NET_IPV4_IPGER_BADSEQ_INTERVAL,	 "ipgre_badseq_interval" },
+	{ CTL_INT,  NET_IPV4_IPGER_KEEPSEQ_ENABLE,	 "ipgre_keepseq_enable" },
+	{ CTL_INT,  NET_IPV4_IPGER_SKB_TIMEOUT,	     "ipgre_skb_timeout" },	
+#endif
 	{ CTL_INT,	NET_IPV4_INET_PEER_THRESHOLD,		"inet_peer_threshold" },
 	{ CTL_INT,	NET_IPV4_INET_PEER_MINTTL,		"inet_peer_minttl" },
 	{ CTL_INT,	NET_IPV4_INET_PEER_MAXTTL,		"inet_peer_maxttl" },

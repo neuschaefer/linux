@@ -1,3 +1,7 @@
+/*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
 /* Masquerade.  Simple mapping which alters range to a local IP address
    (depending on route). */
 
@@ -165,6 +169,14 @@ static inline struct nf_conntrack_expect *find_fullcone_exp(struct nf_conn *ct)
 
 	return exp;
 }
+
+#ifdef CONFIG_ATP_CONNAT_ACCEL
+int nf_ct_is_connat_help(struct nf_conntrack_helper *helper)
+{
+    return (&nf_conntrack_helper_bcm_nat == helper);
+}
+EXPORT_SYMBOL(nf_ct_is_connat_help);
+#endif
 #endif /* CONFIG_KF_NETFILTER */
 
 /* FIXME: Multiple targets. --RR */
@@ -182,6 +194,21 @@ static int masquerade_tg_check(const struct xt_tgchk_param *par)
 	}
 	return 0;
 }
+
+#ifdef CONFIG_ATP_BRCM
+static int find_ct(__be32 ip, __be16 port, const struct nf_conn *ct)
+{
+	struct nf_conntrack_tuple tuple;
+
+	memcpy(&tuple, &ct->tuplehash[IP_CT_DIR_REPLY].tuple, sizeof(struct nf_conntrack_tuple));
+	tuple.dst.u.udp.port = port;
+	tuple.dst.u3.ip = ip;
+	tuple.src.l3num = AF_INET;
+	tuple.dst.protonum = IPPROTO_UDP;
+
+	return nf_conntrack_tuple_taken(&tuple, ct);
+}
+#endif
 
 static unsigned int
 masquerade_tg(struct sk_buff *skb, const struct xt_action_param *par)
@@ -219,9 +246,15 @@ masquerade_tg(struct sk_buff *skb, const struct xt_action_param *par)
 	nat->masq_index = par->out->ifindex;
 
 #if defined(CONFIG_BCM_KF_NETFILTER)
+#ifdef CONFIG_ATP_BRCM
+	/*这里默认fullcone 的标记min_ip为1，不去判断*/
+	if ((nfct_help(ct) == NULL || nfct_help(ct)->helper == NULL)
+		&& nf_ct_protonum(ct) == IPPROTO_UDP) {
+#else
 	if (mr->range[0].min_ip != 0 /* nat_mode == full cone */
 	    && (nfct_help(ct) == NULL || nfct_help(ct)->helper == NULL)
 	    && nf_ct_protonum(ct) == IPPROTO_UDP) {
+#endif
 		unsigned int ret;
 		u_int16_t minport;
 		u_int16_t maxport;
@@ -247,7 +280,12 @@ masquerade_tg(struct sk_buff *skb, const struct xt_action_param *par)
 				htons(65535) : mr->range[0].max.all;
 			for (newport = ntohs(minport),tmpport = ntohs(maxport); 
 			     newport <= tmpport; newport++) {
-			     	if (!find_exp(newsrc, htons(newport), ct)) {
+					if (!find_exp(newsrc, htons(newport), ct)
+						/*端口如果被其他ct占用，也不可使用*/
+#ifdef CONFIG_ATP_BRCM
+						&& !find_ct(newsrc, htons(newport), ct)
+#endif
+						) {
 					pr_debug("bcm_nat: new mapped port = "
 					       	 "%hu\n", newport);
 					minport = maxport = htons(newport);
@@ -258,9 +296,9 @@ masquerade_tg(struct sk_buff *skb, const struct xt_action_param *par)
 		spin_unlock_bh(&nf_conntrack_lock);
 
 		/*
-		newrange = ((struct nf_nat_range)
-			{ mr->range[0].flags | IP_NAT_RANGE_MAP_IPS |
-			  IP_NAT_RANGE_PROTO_SPECIFIED, newsrc, newsrc,
+		newrange = ((struct nf_nat_ipv4_range)
+			{ mr->range[0].flags | NF_NAT_RANGE_MAP_IPS |
+			  NF_NAT_RANGE_PROTO_SPECIFIED, newsrc, newsrc,
 		  	  mr->range[0].min, mr->range[0].max });
 		*/
 		newrange.flags = mr->range[0].flags | NF_NAT_RANGE_MAP_IPS |
@@ -293,6 +331,34 @@ masquerade_tg(struct sk_buff *skb, const struct xt_action_param *par)
 	return nf_nat_setup_info(ct, &newrange, NF_NAT_MANIP_SRC);
 }
 
+
+static int device_cmp_with_master(struct nf_conn *ct, void *ifindex)
+{
+	struct nf_conn_nat *nat = NULL;
+	struct nf_conn *ct_master = NULL;
+
+	if (NULL == ct)
+	{
+		return 0;
+	}
+
+	ct_master = master_ct(ct);
+	if (NULL == ct_master)
+	{
+		return 0;
+	}
+
+	nat = nfct_nat(ct_master);
+
+	if (NULL == nat)
+	{
+		return 0;
+	}
+
+	return (nat->masq_index == (int)(long)ifindex);
+}
+
+
 static int
 device_cmp(struct nf_conn *i, void *ifindex)
 {
@@ -301,7 +367,7 @@ device_cmp(struct nf_conn *i, void *ifindex)
 	if (!nat)
 		return 0;
 
-	return nat->masq_index == (int)(long)ifindex;
+	return (nat->masq_index == (int)(long)ifindex) || device_cmp_with_master(i, ifindex);
 }
 
 static int masq_device_event(struct notifier_block *this,
@@ -341,7 +407,7 @@ static struct notifier_block masq_inet_notifier = {
 };
 
 static struct xt_target masquerade_tg_reg __read_mostly = {
-	.name		= "MASQUERADE",
+	.name		= "CONE_NAT",
 	.family		= NFPROTO_IPV4,
 	.target		= masquerade_tg,
 	.targetsize	= sizeof(struct nf_nat_ipv4_multi_range_compat),

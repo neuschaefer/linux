@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *	xt_time
  *	Copyright © CC Computer Consultants GmbH, 2007
  *
@@ -59,7 +63,9 @@ static const u_int16_t days_since_epoch[] = {
 	/* 1979 - 1970 */
 	3287, 2922, 2557, 2191, 1826, 1461, 1096, 730, 365, 0,
 };
-
+#ifdef CONFIG_SUPPORT_ATP
+extern int sysctl_localtime_offset;
+#endif
 static inline bool is_leap(unsigned int y)
 {
 	return y % 4 == 0 && (y % 100 != 0 || y % 400 == 0);
@@ -157,7 +163,11 @@ time_mt(const struct sk_buff *skb, struct xt_action_param *par)
 	unsigned int packet_time;
 	struct xtm current_time;
 	s64 stamp;
+#ifdef CONFIG_SUPPORT_ATP
+    struct timeval tv;
 
+	do_gettimeofday(&tv);
+#endif	
 	/*
 	 * We cannot use get_seconds() instead of __net_timestamp() here.
 	 * Suppose you have two rules:
@@ -173,10 +183,16 @@ time_mt(const struct sk_buff *skb, struct xt_action_param *par)
 	stamp = ktime_to_ns(skb->tstamp);
 	stamp = div_s64(stamp, NSEC_PER_SEC);
 
-	if (info->flags & XT_TIME_LOCAL_TZ)
+	if (info->flags & XT_TIME_LOCAL_TZ) {   
 		/* Adjust for local timezone */
+#ifdef CONFIG_SUPPORT_ATP		
+		/* BEGIN: Added , 2010/5/10 time sync */		
+		stamp = tv.tv_sec + sysctl_localtime_offset;
+		/* END:   Added , 2010/5/10 */
+#else
 		stamp -= 60 * sys_tz.tz_minuteswest;
-
+#endif		
+        }
 	/*
 	 * xt_time will match when _all_ of the following hold:
 	 *   - 'now' is in the global time range date_start..date_end

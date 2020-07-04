@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * Copyright (C) 2005 David Brownell
  *
  * This program is free software; you can redistribute it and/or modify
@@ -537,8 +541,14 @@ struct spi_transfer {
     u8  unit_size;
     u8  addr_len;
     u8  addr_offset;
+#if (defined CONFIG_ATP_USB_ADAPTOR)	
+    /*  added to support lengths greater then the controller supports */
+    u8      unitSize;
+    u8      addrOffset;
+    u8      addrLen;
+    u8      hdrLen;
+#endif   
 #endif
-
 
 	struct list_head transfer_list;
 };

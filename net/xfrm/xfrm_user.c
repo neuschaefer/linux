@@ -1,3 +1,7 @@
+/*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
 /* xfrm_user.c: User interface to configure xfrm engine.
  *
  * Copyright (C) 2002 David S. Miller (davem@redhat.com)
@@ -123,9 +127,22 @@ static inline int verify_replay(struct xfrm_usersa_info *p,
 				struct nlattr **attrs)
 {
 	struct nlattr *rt = attrs[XFRMA_REPLAY_ESN_VAL];
+    //CVE-2012-6536
+    struct xfrm_replay_state_esn *rs;
 
-	if ((p->flags & XFRM_STATE_ESN) && !rt)
-		return -EINVAL;
+    if (p->flags & XFRM_STATE_ESN) {
+        if (!rt)
+            return -EINVAL;
+        
+        rs = nla_data(rt);
+
+        if (rs->bmp_len > XFRMA_REPLAY_ESN_MAX / sizeof(rs->bmp[0]) / 8)
+            return -EINVAL;
+
+        if (nla_len(rt) < xfrm_replay_state_esn_len(rs) &&
+            nla_len(rt) != sizeof(*rs))
+                return -EINVAL;
+    }
 
 	if (!rt)
 		return 0;
@@ -370,14 +387,16 @@ static inline int xfrm_replay_verify_len(struct xfrm_replay_state_esn *replay_es
 					 struct nlattr *rp)
 {
 	struct xfrm_replay_state_esn *up;
+    //CVE-2012-6536
+    int ulen;
 
 	if (!replay_esn || !rp)
 		return 0;
 
 	up = nla_data(rp);
+    ulen = xfrm_replay_state_esn_len(up);
 
-	if (xfrm_replay_state_esn_len(replay_esn) !=
-			xfrm_replay_state_esn_len(up))
+	if (nla_len(rp) < ulen || xfrm_replay_state_esn_len(replay_esn) != ulen)	
 		return -EINVAL;
 
 	return 0;
@@ -388,22 +407,27 @@ static int xfrm_alloc_replay_state_esn(struct xfrm_replay_state_esn **replay_esn
 				       struct nlattr *rta)
 {
 	struct xfrm_replay_state_esn *p, *pp, *up;
+    //CVE-2012-6536
+    int klen, ulen;
 
 	if (!rta)
 		return 0;
 
 	up = nla_data(rta);
+    klen = xfrm_replay_state_esn_len(up);
+    ulen = nla_len(rta) >= klen ? klen : sizeof(*up);
 
-	p = kmemdup(up, xfrm_replay_state_esn_len(up), GFP_KERNEL);
+	p = kzalloc(klen, GFP_KERNEL);
 	if (!p)
 		return -ENOMEM;
 
-	pp = kmemdup(up, xfrm_replay_state_esn_len(up), GFP_KERNEL);
+	pp = kzalloc(klen, GFP_KERNEL);
 	if (!pp) {
 		kfree(p);
 		return -ENOMEM;
 	}
-
+    memcpy(p, up, ulen);
+    memcpy(pp, up, ulen);
 	*replay_esn = p;
 	*preplay_esn = pp;
 
@@ -689,6 +713,8 @@ out:
 
 static void copy_to_user_state(struct xfrm_state *x, struct xfrm_usersa_info *p)
 {
+    //CVE-2012-6537
+    memset(p, 0, sizeof(*p));
 	memcpy(&p->id, &x->id, sizeof(p->id));
 	memcpy(&p->sel, &x->sel, sizeof(p->sel));
 	memcpy(&p->lft, &x->lft, sizeof(p->lft));
@@ -742,7 +768,8 @@ static int copy_to_user_auth(struct xfrm_algo_auth *auth, struct sk_buff *skb)
 		return -EMSGSIZE;
 
 	algo = nla_data(nla);
-	strcpy(algo->alg_name, auth->alg_name);
+    //CVE-2012-6538
+	strncpy(algo->alg_name, auth->alg_name, sizeof(algo->alg_name));
 	memcpy(algo->alg_key, auth->alg_key, (auth->alg_key_len + 7) / 8);
 	algo->alg_key_len = auth->alg_key_len;
 
@@ -2501,6 +2528,64 @@ nla_put_failure:
 	return -1;
 }
 
+#ifdef CONFIG_XFRM_IDLE_TIME
+static int xfrm_notify_sa_idle(struct xfrm_state *x, struct km_event *c)
+{
+	struct net *net = xs_net(x);
+	struct xfrm_usersa_info *p;
+	struct xfrm_usersa_id *id;
+	struct nlmsghdr *nlh;
+	struct sk_buff *skb;
+	int len = xfrm_sa_len(x);
+	int headlen;
+
+	headlen = sizeof(*p);
+	if (c->event == XFRM_MSG_DELSA) {
+		len += nla_total_size(headlen);
+		headlen = sizeof(*id);
+	}
+	len += NLMSG_ALIGN(headlen);
+
+	skb = nlmsg_new(len, GFP_ATOMIC);
+	if (skb == NULL)
+		return -ENOMEM;
+
+	nlh = nlmsg_put(skb, c->pid, c->seq, c->event, headlen, 0);
+	if (nlh == NULL)
+		goto nla_put_failure;
+
+	p = nlmsg_data(nlh);
+	if (c->event == XFRM_MSG_DELSA) {
+		struct nlattr *attr;
+
+		id = nlmsg_data(nlh);
+		memcpy(&id->daddr, &x->id.daddr, sizeof(id->daddr));
+		id->spi = x->id.spi;
+		id->family = x->props.family;
+		id->proto = x->id.proto;
+
+		attr = nla_reserve(skb, XFRMA_SA, sizeof(*p));
+		if (attr == NULL)
+			goto nla_put_failure;
+
+		p = nla_data(attr);
+	}
+
+	if (copy_to_user_state_extra(x, p, skb))
+		goto nla_put_failure;
+
+	nlmsg_end(skb, nlh);
+
+	return nlmsg_multicast(net->xfrm.nlsk, skb, 0, XFRMNLGRP_SA, GFP_ATOMIC);
+
+nla_put_failure:
+	/* Somebody screwed up with xfrm_sa_len! */
+	WARN_ON(1);
+	kfree_skb(skb);
+	return -1;
+}
+
+#endif
 static int xfrm_send_state_notify(struct xfrm_state *x, const struct km_event *c)
 {
 
@@ -2515,6 +2600,10 @@ static int xfrm_send_state_notify(struct xfrm_state *x, const struct km_event *c
 		return xfrm_notify_sa(x, c);
 	case XFRM_MSG_FLUSHSA:
 		return xfrm_notify_sa_flush(c);
+#ifdef CONFIG_XFRM_IDLE_TIME
+    case XFRM_MSG_SA_IDLE:
+        return xfrm_notify_sa_idle(x, c);
+#endif
 	default:
 		printk(KERN_NOTICE "xfrm_user: Unknown SA event %d\n",
 		       c->event);

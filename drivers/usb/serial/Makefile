@@ -12,6 +12,7 @@ usbserial-$(CONFIG_USB_SERIAL_CONSOLE)	+= console.o
 usbserial-$(CONFIG_USB_EZUSB)		+= ezusb.o
 
 obj-$(CONFIG_USB_SERIAL_AIRCABLE)		+= aircable.o
+obj-$(CONFIG_USB_SERIAL_XR21V1410)		+= xr_usb_serial/xr_usb_serial_common.o
 obj-$(CONFIG_USB_SERIAL_ARK3116)		+= ark3116.o
 obj-$(CONFIG_USB_SERIAL_BELKIN)			+= belkin_sa.o
 obj-$(CONFIG_USB_SERIAL_CH341)			+= ch341.o

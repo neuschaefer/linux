@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * NETLINK      Kernel-user communication protocol.
  *
  * 		Authors:	Alan Cox <alan@lxorguk.ukuu.org.uk>
@@ -1428,8 +1432,8 @@ static int netlink_recvmsg(struct kiocb *kiocb, struct socket *sock,
 			data_skb = skb_shinfo(skb)->frag_list;
 	}
 #endif
-
-	msg->msg_namelen = 0;
+	//CVE-2013-7270
+	//msg->msg_namelen = 0;
 
 	copied = data_skb->len;
 	if (len < copied) {

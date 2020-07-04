@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *	PCI Bus Services, see include/linux/pci.h for further explanation.
  *
  *	Copyright 1993 -- 1997 Drew Eckhardt, Frederic Potter,
@@ -601,7 +605,11 @@ static int pci_raw_set_power_state(struct pci_dev *dev, pci_power_t state)
 			need_restore = true;
 		/* Fall-through: force to D0 */
 	default:
+#if (defined CONFIG_HSAN)
+		pmcsr = ~0x3;
+#else
 		pmcsr = 0;
+#endif	//#if (defined CONFIG_HSAN)
 		break;
 	}
 

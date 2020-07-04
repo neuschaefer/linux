@@ -78,3 +78,10 @@ config NET_KEY_MIGRATE
 
 	  If unsure, say N.
 
+config XFRM_IDLE_TIME
+	bool "XFRM_IDLE_TIME"
+	depends on NET_KEY && XFRM
+	---help---
+	  Support SA idle time.
+
+	  If unsure, say N.

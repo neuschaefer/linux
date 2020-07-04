@@ -1,3 +1,7 @@
+/*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
 /* PF_KEY user interface, this is defined by rfc2367 so
  * do not make arbitrary modifications or else this header
  * file will not be compliant.
@@ -261,7 +265,8 @@ struct sadb_x_kmaddress {
 #define SADB_X_SPDDELETE2	22
 #define SADB_X_NAT_T_NEW_MAPPING	23
 #define SADB_X_MIGRATE		24
-#define SADB_MAX		24
+#define SADB_X_SAIDLE_TIMEOUT   25          /* 事件: 内核向用户态报告该SA idle timeout */
+#define SADB_MAX		        25
 
 /* Security Association flags */
 #define SADB_SAFLAGS_PFS	1
@@ -358,7 +363,8 @@ struct sadb_x_kmaddress {
 #define SADB_X_EXT_SEC_CTX		24
 /* Used with MIGRATE to pass @ to IKE for negotiation */
 #define SADB_X_EXT_KMADDRESS		25
-#define SADB_EXT_MAX			25
+#define SADB_EXT_LIFETIME_IDLE	    26    /*ATP add*/
+#define SADB_EXT_MAX			    26
 
 /* Identity Extension values */
 #define SADB_IDENTTYPE_RESERVED	0

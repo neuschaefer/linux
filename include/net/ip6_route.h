@@ -1,9 +1,16 @@
+/*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
 #ifndef _NET_IP6_ROUTE_H
 #define _NET_IP6_ROUTE_H
 
 #define IP6_RT_PRIO_USER	1024
 #define IP6_RT_PRIO_ADDRCONF	256
 
+/*start 当添加BR0的优先级时，提高优先级为1，保证BR0下设备的优先*/
+#define IP6_RT_PRIO_ATP_CONF	1
+/*end 当添加BR0的优先级时，提高优先级为1，保证BR0下设备的优先*/
 struct route_info {
 	__u8			type;
 	__u8			length;

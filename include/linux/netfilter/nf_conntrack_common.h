@@ -1,3 +1,7 @@
+/*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
 #ifndef _NF_CONNTRACK_COMMON_H
 #define _NF_CONNTRACK_COMMON_H
 /* Connection state tracking for netfilter.  This is separated from,
@@ -88,6 +92,12 @@ enum ip_conntrack_status {
     /* Conntrack eligible for Blogging */
     IPS_BLOG_BIT = 13,
     IPS_BLOG = (1 << IPS_BLOG_BIT),
+#endif
+
+#ifdef CONFIG_NF_CONNTRACK_PRI
+    /* 根据优先级删除标记 */
+    IPS_DELETE_BIT = 14,
+    IPS_DELETE = (1 << IPS_DELETE_BIT),
 #endif
 };
 

@@ -1,3 +1,7 @@
+/*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
 #include <linux/skbuff.h>
 #include <linux/export.h>
 #include <linux/ip.h>
@@ -35,8 +39,10 @@ again:
 		struct iphdr _iph;
 ip:
 		iph = skb_header_pointer(skb, nhoff, sizeof(_iph), &_iph);
-		if (!iph)
+		/*CVE-2013-4348 sync modify from higher kernel version start*/
+		if (!iph || iph->ihl < 5)
 			return false;
+		/*CVE-2013-4348 sync modify from higher kernel version end*/
 
 		if (ip_is_fragment(iph))
 			ip_proto = 0;

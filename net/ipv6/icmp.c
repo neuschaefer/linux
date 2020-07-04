@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *	Internet Control Message Protocol (ICMPv6)
  *	Linux INET6 implementation
  *
@@ -66,6 +70,10 @@
 #include <net/inet_common.h>
 
 #include <asm/uaccess.h>
+
+#if CONFIG_ATP_COMMON
+extern int atp_ipv6_icmp_checkpacket(void* pvskb, void* saddr, void* daddr, void* hdr);
+#endif  
 
 /*
  *	The ICMP socket(s). This is the most convenient way to flow control
@@ -404,6 +412,9 @@ void icmpv6_send(struct sk_buff *skb, u8 type, u8 code, __u32 info)
 
 	if ((addr_type & IPV6_ADDR_MULTICAST || skb->pkt_type != PACKET_HOST)) {
 		if (type != ICMPV6_PKT_TOOBIG &&
+#ifdef CONFIG_ATP_COMMON
+            !(addr_type & IPV6_ADDR_SITELOCAL) &&
+#endif
 		    !(type == ICMPV6_PARAMPROB &&
 		      code == ICMPV6_UNK_OPTION &&
 		      (opt_unrec(skb, info))))
@@ -417,8 +428,9 @@ void icmpv6_send(struct sk_buff *skb, u8 type, u8 code, __u32 info)
 	/*
 	 *	Source addr check
 	 */
-
+#ifndef CONFIG_ATP_COMMON
 	if (addr_type & IPV6_ADDR_LINKLOCAL)
+#endif	
 		iif = skb->dev->ifindex;
 
 	/*
@@ -658,6 +670,7 @@ static int icmpv6_rcv(struct sk_buff *skb)
 	const struct ipv6hdr *orig_hdr;
 	struct icmp6hdr *hdr;
 	u8 type;
+    int ret = 0;
 
 	if (!xfrm6_policy_check(NULL, XFRM_POLICY_IN, skb)) {
 		struct sec_path *sp = skb_sec_path(skb);
@@ -775,7 +788,22 @@ static int icmpv6_rcv(struct sk_buff *skb)
 	case NDISC_NEIGHBOUR_SOLICITATION:
 	case NDISC_NEIGHBOUR_ADVERTISEMENT:
 	case NDISC_REDIRECT:
-		ndisc_rcv(skb);
+#if CONFIG_ATP_COMMON
+#if defined(CONFIG_MIPS_BCM963XX) && defined(CONFIG_BCM_KF_UNALIGNED_EXCEPTION)
+    ret = atp_ipv6_icmp_checkpacket((void *)skb, (void *)&saddr, (void *)&daddr, (void *)hdr);
+#else
+    ret = atp_ipv6_icmp_checkpacket((void *)skb, (void *)saddr, (void *)daddr, (void *)hdr);
+#endif
+        
+        if (0 == ret)
+        {
+            break;
+        }else if (-1 == ret)
+        {
+            goto discard_it;
+        }
+#endif        
+        ndisc_rcv(skb);
 		break;
 
 	case ICMPV6_MGM_QUERY:

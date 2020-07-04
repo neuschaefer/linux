@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
 *    Copyright (c) 2012 Broadcom Corporation
 *    All Rights Reserved
 * 
@@ -204,6 +208,9 @@ void br_mcast_handle_netdevice_events(struct net_device *ndev, unsigned long eve
         case NETDEV_DOWN:
         case NETDEV_GOING_DOWN:
         case NETDEV_CHANGE:
+#ifdef CONFIG_ATP_BRCM
+        case NETDEV_UNREGISTER:
+#endif
             rcu_read_lock();
             for_each_netdev_rcu(&init_net, brDev) {
                 br = netdev_priv(brDev);
@@ -349,7 +356,7 @@ static void br_mcast_blog_process_wan(blogRule_t *rule_p,
 			memset(&ruleAction, 0, sizeof(blogRuleAction_t));
 			ruleAction.cmd = BLOG_RULE_CMD_SET_MAC_DA;
 			if(igmp_fdb)
-				br_mcast_ipv4_to_eth(igmp_fdb->txGrp.s_addr, ruleAction.macAddr);
+				br_mcast_ipv4_to_eth(igmp_fdb->grp.s_addr, ruleAction.macAddr);
 #if defined(CONFIG_BCM_KF_MLD) && defined(CONFIG_BR_MLD_SNOOP)
 			else
 				br_mcast_ipv6_to_eth(mld_fdb->grp.s6_addr, ruleAction.macAddr);
@@ -372,7 +379,7 @@ static void br_mcast_blog_process_wan(blogRule_t *rule_p,
 		memset(&ruleAction, 0, sizeof(blogRuleAction_t));
 		ruleAction.cmd = BLOG_RULE_CMD_SET_MAC_DA;
 		if(igmp_fdb)
-			br_mcast_ipv4_to_eth(igmp_fdb->txGrp.s_addr, ruleAction.macAddr);
+			br_mcast_ipv4_to_eth(igmp_fdb->grp.s_addr, ruleAction.macAddr);
 #if defined(CONFIG_BCM_KF_MLD) && defined(CONFIG_BR_MLD_SNOOP)
 		else
 			br_mcast_ipv6_to_eth(mld_fdb->grp.s6_addr, ruleAction.macAddr);
@@ -390,6 +397,33 @@ static void br_mcast_blog_process_wan(blogRule_t *rule_p,
 		memset(&ruleAction, 0, sizeof(blogRuleAction_t));
 		ruleAction.cmd = BLOG_RULE_CMD_DECR_TTL;
 		blog_rule_add_action(rule_p, &ruleAction);
+#ifdef CONFIG_ATP_COMMON
+        /*check if BLOG_RULE_CMD_SET_MAC_DA already set or not*/
+        {
+            int i;
+            int rule_found = 0;
+            for(i=0;i<rule_p->actionCount;i++)
+            {
+                if(rule_p->action[i].cmd == BLOG_RULE_CMD_SET_MAC_DA)
+                {
+                    rule_found = 1;
+                    break;
+                }
+            }
+            if(rule_found == 0)
+            {
+                memset(&ruleAction, 0, sizeof(blogRuleAction_t));
+                ruleAction.cmd = BLOG_RULE_CMD_SET_MAC_DA;
+                if(igmp_fdb)
+                    br_mcast_ipv4_to_eth(igmp_fdb->grp.s_addr, ruleAction.macAddr);
+#if defined(CONFIG_BCM_KF_MLD) && defined(CONFIG_BR_MLD_SNOOP)
+                else
+                    br_mcast_ipv6_to_eth(mld_fdb->grp.s6_addr, ruleAction.macAddr);
+#endif
+                blog_rule_add_action(rule_p, &ruleAction);                                                       
+            }
+        }
+#endif
 	}
 }
 
@@ -940,14 +974,13 @@ int br_mcast_blog_process(struct net_bridge *br,
 #endif      
 	{
 		blog_p->rx.tuple.saddr = igmp_fdb->src_entry.src.s_addr;
-		blog_p->rx.tuple.daddr = igmp_fdb->rxGrp.s_addr;
+		blog_p->rx.tuple.daddr = igmp_fdb->grp.s_addr;
 		blog_p->tx.tuple.saddr = igmp_fdb->src_entry.src.s_addr;
-		blog_p->tx.tuple.daddr = igmp_fdb->txGrp.s_addr;
-		blog_p->rx.tuple.port.dest = 0;
-		if (igmp_fdb->excludePort != -1) {
-			blog_p->rx.tuple.port.dest = igmp_fdb->excludePort;
+		if (igmp_fdb->destGrp.s_addr != 0) {
+			blog_p->tx.tuple.daddr = igmp_fdb->destGrp.s_addr;
+		} else {
+			blog_p->tx.tuple.daddr = igmp_fdb->grp.s_addr;
 		}
-		blog_p->rtp_seq_chk = igmp_fdb->enRtpSeqCheck;
 		blog_p->rx.info.bmap.PLD_IPv4 = 1;
 		blog_p->tx.info.bmap.PLD_IPv4 = 1;
 	}

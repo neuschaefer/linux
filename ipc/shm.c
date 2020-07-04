@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * linux/ipc/shm.c
  * Copyright (C) 1992, 1993 Krishna Balasubramanian
  *	 Many improvements/fixes by Bruno Haible.
@@ -187,15 +191,19 @@ static void shm_open(struct vm_area_struct *vma)
  */
 static void shm_destroy(struct ipc_namespace *ns, struct shmid_kernel *shp)
 {
+	struct file *shm_file;
+
+	shm_file = shp->shm_file;
+	shp->shm_file = NULL;
 	ns->shm_tot -= (shp->shm_segsz + PAGE_SIZE - 1) >> PAGE_SHIFT;
 	shm_rmid(ns, shp);
 	shm_unlock(shp);
-	if (!is_file_hugepages(shp->shm_file))
-		shmem_lock(shp->shm_file, 0, shp->mlock_user);
+	if (!is_file_hugepages(shm_file))
+		shmem_lock(shm_file, 0, shp->mlock_user);
 	else if (shp->mlock_user)
-		user_shm_unlock(shp->shm_file->f_path.dentry->d_inode->i_size,
+		user_shm_unlock(shm_file->f_path.dentry->d_inode->i_size,
 						shp->mlock_user);
-	fput (shp->shm_file);
+	fput(shm_file);
 	security_shm_free(shp);
 	ipc_rcu_putref(shp);
 }
@@ -497,12 +505,14 @@ static int newseg(struct ipc_namespace *ns, struct ipc_params *params)
 	error = PTR_ERR(file);
 	if (IS_ERR(file))
 		goto no_file;
-
+//CVE-2015-7613
+#if 0
 	id = ipc_addid(&shm_ids(ns), &shp->shm_perm, ns->shm_ctlmni);
 	if (id < 0) {
 		error = id;
 		goto no_id;
 	}
+#endif
 
 	shp->shm_cprid = task_tgid_vnr(current);
 	shp->shm_lprid = 0;
@@ -512,6 +522,15 @@ static int newseg(struct ipc_namespace *ns, struct ipc_params *params)
 	shp->shm_nattch = 0;
 	shp->shm_file = file;
 	shp->shm_creator = current;
+
+    //CVE-2015-7613
+    id = ipc_addid(&shm_ids(ns), &shp->shm_perm, ns->shm_ctlmni);
+    if (id < 0) {
+        error = id;
+        goto no_id;
+    }
+
+    
 	/*
 	 * shmid gets reported as "inode#" in /proc/pid/maps.
 	 * proc-ps tools use this. Changing this will break them.
@@ -895,6 +914,13 @@ SYSCALL_DEFINE3(shmctl, int, shmid, int, cmd, struct shmid_ds __user *, buf)
 			goto out_unlock;
 
 		shm_file = shp->shm_file;
+
+		/* check if shm_destroy() is tearing down shp */
+		if (shm_file == NULL) {
+			err = -EIDRM;
+			goto out_unlock;
+		}
+
 		if (is_file_hugepages(shm_file))
 			goto out_unlock;
 
@@ -1010,6 +1036,12 @@ long do_shmat(int shmid, char __user *shmaddr, int shmflg, ulong *raddr)
 	err = security_shm_shmat(shp, shmaddr, shmflg);
 	if (err)
 		goto out_unlock;
+
+	/* check if shm_destroy() is tearing down shp */
+	if (shp->shm_file == NULL) {
+		err = -EIDRM;
+		goto out_unlock;
+	}
 
 	path = shp->shm_file->f_path;
 	path_get(&path);

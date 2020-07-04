@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * INET		An implementation of the TCP/IP protocol suite for the LINUX
  *		operating system.  INET is implemented using the  BSD Socket
  *		interface as the means of communication with the user level.
@@ -83,6 +87,11 @@
 #define ETH_P_TIPC	0x88CA		/* TIPC 			*/
 #define ETH_P_8021AH	0x88E7          /* 802.1ah Backbone Service Tag */
 #define ETH_P_1588	0x88F7		/* IEEE 1588 Timesync */
+
+/*ATP add*/
+#define ETH_P_8021AG	0x8902		/* 802.1ag Connectivity Fault Mgmt */
+#define	ETH_P_8023AH	0x8809      /* 802.3ah Ethernet OAM */
+
 #define ETH_P_FCOE	0x8906		/* Fibre Channel over Ethernet  */
 #define ETH_P_TDLS	0x890D          /* TDLS */
 #define ETH_P_FIP	0x8914		/* FCoE Initialization Protocol */
@@ -97,6 +106,10 @@
 #endif
 #if defined(CONFIG_BCM_KF_VLAN)
 #define	ETH_P_8023AH	0x8809      /* 802.3ah Ethernet OAM */
+#endif
+
+#ifdef CONFIG_ATP_HYBRID
+#define ETH_P_IPGRE_CTL	    0x0101		/* ipgre proto control */
 #endif
 
 /*

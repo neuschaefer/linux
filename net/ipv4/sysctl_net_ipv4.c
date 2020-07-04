@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * sysctl_net_ipv4.c: sysctl interface to net IPV4 subsystem.
  *
  * Begun April 1, 1996, Mike Shaver.
@@ -25,6 +29,13 @@
 #include <net/inet_frag.h>
 #include <net/ping.h>
 #include <net/tcp_memcontrol.h>
+#ifdef CONFIG_ATP_HYBRID_REORDER
+#include "ipgre_reorder.h"
+#endif
+
+#ifdef CONFIG_ATP_ROUTE_BALANCE
+extern int g_route_balance_stat_interval;
+#endif
 
 static int zero;
 static int tcp_retr1_max = 255;
@@ -32,10 +43,19 @@ static int ip_local_port_range_min[] = { 1, 1 };
 static int ip_local_port_range_max[] = { 65535, 65535 };
 static int tcp_adv_win_scale_min = -31;
 static int tcp_adv_win_scale_max = 31;
+
+/*Modify  CVE-2019-11479 20190925 */
+static int tcp_min_snd_mss_min = TCP_MIN_SND_MSS;
+static int tcp_min_snd_mss_max = 65535;
 static int ip_ttl_min = 1;
 static int ip_ttl_max = 255;
 static int ip_ping_group_range_min[] = { 0, 0 };
 static int ip_ping_group_range_max[] = { GID_T_MAX, GID_T_MAX };
+
+/* BEGIN: Added , 2013/7/19 For port scan.*/
+int sysctl_port_scan __read_mostly = 1;
+EXPORT_SYMBOL(sysctl_port_scan);
+/* END:   Added , 2013/7/19 */
 
 /* Update system visible IP port range */
 static void set_local_port_range(int range[2])
@@ -45,6 +65,25 @@ static void set_local_port_range(int range[2])
 	sysctl_local_ports.range[1] = range[1];
 	write_sequnlock(&sysctl_local_ports.lock);
 }
+
+#ifdef CONFIG_ATP_HYBRID_REORDER
+extern void (*ipgre_reorder_set_enable_hook)(void);
+
+static int proc_ipgre_reorder_set_enable(ctl_table *ctl,
+						 int write,
+						 void __user *buffer, size_t *lenp,
+						 loff_t *ppos)
+{
+	int ret;
+
+	ret = proc_dointvec(ctl, write, buffer, lenp, ppos);
+    if (write && (0 == ret))
+    {
+        ipgre_reorder_set_enable_hook();
+    }
+	return ret;
+}
+#endif
 
 /* Validate changes from /proc interface. */
 static int ipv4_local_port_range(ctl_table *table, int write,
@@ -358,6 +397,15 @@ static struct ctl_table ipv4_table[] = {
 		.proc_handler	= proc_dointvec
 	},
 #endif
+/* BEGIN: Added , 2010/8/5 For port scan */
+    {
+		.procname	= "port_scan",
+		.data		= &sysctl_port_scan,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec
+	},
+/* END:   Added , 2010/8/5 */
 	{
 		.procname	= "tcp_tw_recycle",
 		.data		= &tcp_death_row.sysctl_tw_recycle,
@@ -421,6 +469,24 @@ static struct ctl_table ipv4_table[] = {
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec
 	},
+#ifdef CONFIG_IP_MULTICAST
+/* BEGIN: Added , 2010/7/1 For BT control igmp remotly, send number and interval .*/
+	{
+		.procname	= "igmp_send_report_num",
+		.data		= &g_lIgmpReportCount,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec
+	},
+	{
+		.procname	= "igmp_send_report_interval",
+		.data		= &g_lIgmpReportInterval,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec
+	},
+/* END:   Added , 2010/7/1 */
+#endif
 	{
 		.procname	= "inet_peer_threshold",
 		.data		= &inet_peer_threshold,
@@ -576,12 +642,22 @@ static struct ctl_table ipv4_table[] = {
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec,
 	},
+	/*Modify  CVE-2019-11479 20190925 */
 	{
 		.procname	= "tcp_base_mss",
 		.data		= &sysctl_tcp_base_mss,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec,
+	},
+	{
+		.procname	= "tcp_min_snd_mss",
+		.data		= &sysctl_tcp_min_snd_mss,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec_minmax,
+		.extra1		= &tcp_min_snd_mss_min,
+		.extra2		= &tcp_min_snd_mss_max,
 	},
 	{
 		.procname	= "tcp_workaround_signed_windows",
@@ -683,6 +759,15 @@ static struct ctl_table ipv4_table[] = {
 		.mode		= 0644,
 		.proc_handler	= proc_doulongvec_minmax,
 	},
+#ifdef CONFIG_ATP_PORT_SCAN
+    {
+		.procname	= "port_scan",
+		.data		= &sysctl_port_scan,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec
+	},
+#endif
 	{
 		.procname	= "udp_rmem_min",
 		.data		= &sysctl_udp_rmem_min,
@@ -699,6 +784,56 @@ static struct ctl_table ipv4_table[] = {
 		.proc_handler	= proc_dointvec_minmax,
 		.extra1		= &zero
 	},
+#ifdef CONFIG_ATP_HYBRID_REORDER
+    {
+        .procname   = "ipgre_queue_timeout",
+        .data       = &sysctl_ipgre_queue_timeout,
+        .maxlen     = sizeof(int),
+        .mode       = 0644,
+        .proc_handler   = &proc_dointvec
+    },
+    {
+        .procname   = "ipgre_qlen_max",
+        .data       = &sysctl_ipgre_qlen_max,
+        .maxlen     = sizeof(int),
+        .mode       = 0644,
+        .proc_handler   = &proc_dointvec
+    },
+    {
+        .procname   = "ipgre_badseq_interval",
+        .data       = &sysctl_ipgre_badseq_interval,
+        .maxlen     = sizeof(int),
+        .mode       = 0644,
+        .proc_handler   = &proc_dointvec
+    },  
+    {
+        .procname   = "ipgre_keepseq_enable",
+        .data       = &sysctl_ipgre_keepseq_enable,
+        .maxlen     = sizeof(int),
+        .mode       = 0644,
+#ifdef CONFIG_ATP_HYBRID_REORDER		
+        .proc_handler   = &proc_ipgre_reorder_set_enable
+#else
+        .proc_handler   = &proc_dointvec
+#endif
+    },  
+    {
+        .procname   = "ipgre_skb_timeout",
+        .data       = &sysctl_ipgre_skb_timeout,
+        .maxlen     = sizeof(int),
+        .mode       = 0644,
+        .proc_handler   = &proc_dointvec
+    },     
+#endif
+#ifdef CONFIG_ATP_ROUTE_BALANCE
+        {
+            .procname   = "route_balance_stat_interval",
+            .data       = &g_route_balance_stat_interval,
+            .maxlen     = sizeof(int),
+            .mode       = 0644,
+            .proc_handler   = &proc_dointvec
+        },
+#endif
 	{ }
 };
 

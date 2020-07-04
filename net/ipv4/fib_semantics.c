@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * INET		An implementation of the TCP/IP protocol suite for the LINUX
  *		operating system.  INET is implemented using the  BSD Socket
  *		interface as the means of communication with the user level.
@@ -45,6 +49,22 @@
 
 #include "fib_lookup.h"
 
+#ifdef CONFIG_ATP_ROUTE_BALANCE
+#define ROUTE_BALANCE_STAT_INTERVAL  10  /*统计间隔，单位秒*/
+
+/*多路径路由信息*/
+struct fib_info *g_multi_gateway_fi = NULL;
+EXPORT_SYMBOL(g_multi_gateway_fi);
+
+/*路由算法hook*/
+int (*route_balance_select)(const struct flowi *flp, struct fib_result *res) = NULL;
+EXPORT_SYMBOL(route_balance_select);
+
+/*route balance接口流量统计间隔*/
+int g_route_balance_stat_interval = ROUTE_BALANCE_STAT_INTERVAL;
+EXPORT_SYMBOL(g_route_balance_stat_interval);
+#endif
+
 static DEFINE_SPINLOCK(fib_info_lock);
 static struct hlist_head *fib_info_hash;
 static struct hlist_head *fib_info_laddrhash;
@@ -57,7 +77,12 @@ static struct hlist_head fib_info_devhash[DEVINDEX_HASHSIZE];
 
 #ifdef CONFIG_IP_ROUTE_MULTIPATH
 
+#ifndef CONFIG_ATP_ROUTE_BALANCE
 static DEFINE_SPINLOCK(fib_multipath_lock);
+#else
+DEFINE_SPINLOCK(fib_multipath_lock);
+EXPORT_SYMBOL(fib_multipath_lock);
+#endif
 
 #define for_nexthops(fi) {						\
 	int nhsel; const struct fib_nh *nh;				\
@@ -874,6 +899,12 @@ link_it:
 		ofi->fib_treeref++;
 		return ofi;
 	}
+#if defined(CONFIG_ATP_ROUTE_BALANCE) && defined(CONFIG_IP_ROUTE_MULTIPATH)
+	if (cfg->fc_mp) {
+		atomic_inc(&fi->fib_clntref);
+		rcu_assign_pointer(g_multi_gateway_fi, fi);
+	}
+#endif
 
 	fi->fib_treeref++;
 	atomic_inc(&fi->fib_clntref);
@@ -1202,7 +1233,20 @@ void fib_select_multipath(struct fib_result *res)
 {
 	struct fib_info *fi = res->fi;
 	int w;
+#ifdef CONFIG_ATP_ROUTE_BALANCE
+	int ret = 0;
 
+	/*ATP route balance 流程*/
+	if (route_balance_select) {
+		spin_lock_bh(&fib_multipath_lock);
+		ret = route_balance_select(flp, res);
+		spin_unlock_bh(&fib_multipath_lock);
+		/*route balance成功则结束查找，否则继续*/
+		if (0 == ret) {
+			return;
+		}
+	}
+#endif
 	spin_lock_bh(&fib_multipath_lock);
 	if (fi->fib_power <= 0) {
 		int power = 0;

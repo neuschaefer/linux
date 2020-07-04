@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * Copyright © 1999-2010 David Woodhouse <dwmw2@infradead.org>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -37,6 +41,15 @@
 #include <linux/mtd/map.h>
 
 #include <asm/uaccess.h>
+#include "atpconfig.h"
+
+/*<Start:   monitor flash opteration>*/
+#ifdef SUPPORT_ATP_FLASH_MONITOR
+#include "bhal.h"
+extern hi_nand_operate_info g_flash_operation_info;
+#endif
+/*<End:   monitor flash opteration>*/
+
 
 static DEFINE_MUTEX(mtd_mutex);
 
@@ -99,6 +112,15 @@ static int mtdchar_open(struct inode *inode, struct file *file)
 
 	mutex_lock(&mtd_mutex);
 	mtd = get_mtd_device(NULL, devnum);
+/*<Start:   monitor flash opteration>*/
+#ifdef SUPPORT_ATP_FLASH_MONITOR
+	if(strcmp(mtd->name,"all") == 0)
+	{
+		g_flash_operation_info.lock = HI_NAND_READONLY_UNLOCK;
+		printk("Only read erea write unlock!\r\n");
+	}
+#endif
+/*<Start:   monitor flash opteration>*/
 
 	if (IS_ERR(mtd)) {
 		ret = PTR_ERR(mtd);
@@ -162,6 +184,15 @@ static int mtdchar_close(struct inode *inode, struct file *file)
 	/* Only sync if opened RW */
 	if ((file->f_mode & FMODE_WRITE))
 		mtd_sync(mtd);
+/*<Start:   monitor flash opteration>*/
+#ifdef SUPPORT_ATP_FLASH_MONITOR    
+	if(strcmp(mtd->name,"all") == 0)
+	{
+		g_flash_operation_info.lock = HI_NAND_READONLY_LOCK;
+		printk("Only read erea write lock!\r\n");
+	}
+#endif
+/*<Start:   monitor flash opteration>*/
 
 	iput(mfi->ino);
 

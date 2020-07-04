@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *	Neighbour Discovery for IPv6
  *	Linux INET6 implementation
  *
@@ -10,6 +14,10 @@
  *      modify it under the terms of the GNU General Public License
  *      as published by the Free Software Foundation; either version
  *      2 of the License, or (at your option) any later version.
+ */
+/*
+ * 2017/11/14     CVE-2015-2922
+ * (C) Huawei Technologies Co., Ltd. < >
  */
 
 /*
@@ -90,6 +98,10 @@
 
 #include <linux/netfilter.h>
 #include <linux/netfilter_ipv6.h>
+
+#include "atplogdef.h"
+#include "msg/kcmsmonitormsgtypes.h"
+#include <linux/atphooks.h>
 
 static u32 ndisc_hash(const void *pkey,
 		      const struct net_device *dev,
@@ -812,6 +824,17 @@ static void ndisc_recv_ns(struct sk_buff *skb)
 				 * who is doing DAD
 				 * so fail our DAD process
 				 */
+    		/*log the collision mac*/
+    		const unsigned char * dadmacaddr = NULL;
+                char acLogBuf[ATP_LOG_SIZE];
+                dadmacaddr = skb_mac_header(skb);
+                snprintf(acLogBuf, sizeof(acLogBuf), "DAD_LOG: dev %s collision with %02X:%02X:%02X:%02X:%02X:%02X",
+                    		dev->name,
+                    		dadmacaddr[6], dadmacaddr[7],
+                    		dadmacaddr[8], dadmacaddr[9],
+                    		dadmacaddr[10], dadmacaddr[11]);
+                printk("acLogBuf is %s\n", acLogBuf);
+                syswatch_sendLog(ATP_LOG_TYPE_DAD, ATP_LOG_LEVEL_WARNING, 0, acLogBuf);
 				addrconf_dad_failure(ifp);
 				return;
 			} else {
@@ -948,6 +971,16 @@ static void ndisc_recv_na(struct sk_buff *skb)
 	if (ifp) {
 		if (skb->pkt_type != PACKET_LOOPBACK
 		    && (ifp->flags & IFA_F_TENTATIVE)) {
+			const unsigned char * dadmacaddr = NULL;
+            char acLogBuf[ATP_LOG_SIZE];
+            dadmacaddr = skb_mac_header(skb);
+            snprintf(acLogBuf, sizeof(acLogBuf), "DAD_LOG: dev %s collision with %02X:%02X:%02X:%02X:%02X:%02X",
+                		dev->name,
+                		dadmacaddr[6], dadmacaddr[7],
+                		dadmacaddr[8], dadmacaddr[9],
+                		dadmacaddr[10], dadmacaddr[11]);
+            printk("acLogBuf is %s\n", acLogBuf);
+            syswatch_sendLog(ATP_LOG_TYPE_DAD, ATP_LOG_LEVEL_WARNING, 0, acLogBuf);
 				addrconf_dad_failure(ifp);
 				return;
 		}
@@ -1251,6 +1284,8 @@ static void ndisc_router_discovery(struct sk_buff *skb)
 		rt = NULL;
 	}
 
+    ATP_HOOK_VOID(ATP_IPV6_NDISC_DEL_POLICYROUTE, &ipv6_hdr(skb)->saddr, skb->dev, &lifetime);
+
 	if (rt == NULL && lifetime) {
 		ND_PRINTK3(KERN_DEBUG
 			   "ICMPv6 RA: adding default router.\n");
@@ -1279,7 +1314,15 @@ static void ndisc_router_discovery(struct sk_buff *skb)
 	if (rt)
 		rt6_set_expires(rt, jiffies + (HZ * lifetime));
 	if (ra_msg->icmph.icmp6_hop_limit) {
-		in6_dev->cnf.hop_limit = ra_msg->icmph.icmp6_hop_limit;
+		/* Only set hop_limit on the interface if it is higher than
+		 * the current hop_limit.
+		 */
+		if (in6_dev->cnf.hop_limit < ra_msg->icmph.icmp6_hop_limit) {
+			in6_dev->cnf.hop_limit = ra_msg->icmph.icmp6_hop_limit;
+		} else {
+			ND_PRINTK2(KERN_WARNING 
+				"RA: Got route advertisement with lower hop_limit than current\n");
+		}
 		if (rt)
 			dst_metric_set(&rt->dst, RTAX_HOPLIMIT,
 				       ra_msg->icmph.icmp6_hop_limit);
@@ -1347,9 +1390,17 @@ skip_linkparms:
 			     NEIGH_UPDATE_F_ISROUTER);
 	}
 
+#ifdef CONFIG_ATP_COMMON
+    /*Start:wan测地址不能通过RA前缀生成*/
+	/*accept_ra()此函数是用于判断ra报文是从网关br0来的，还是从wan侧来的，前面1302行已经判断了，此处在做同样的判断会导致
+	wan侧地址不能通过ra前缀生成，以及前缀路由也不能生成*/
+	if (accept_ra(in6_dev))
+		goto out;
+	/*End:wan测地址不能通过RA前缀生成*/
+#else
 	if (!accept_ra(in6_dev))
 		goto out;
-
+#endif
 #ifdef CONFIG_IPV6_ROUTE_INFO
 	if (ipv6_chk_addr(dev_net(in6_dev->dev), &ipv6_hdr(skb)->saddr, NULL, 0))
 		goto skip_routeinfo;
@@ -1392,6 +1443,10 @@ skip_routeinfo:
 		}
 	}
 
+#ifndef CONFIG_SUPPORT_ATP
+    /*Start of ATP 2013-5-10 : Data IPv6 PMTU packet to big messages based in RA MTU*/    
+    /*According to HOMEGW-15157 and TOCPE0051 3.4.5.1.5, HG should set LAN side RA MTU value to the value negotiated by PPP.*/
+    /*So ignore mtu option in RA*/
 	if (ndopts.nd_opts_mtu) {
 		__be32 n;
 		u32 mtu;
@@ -1412,6 +1467,8 @@ skip_routeinfo:
 			rt6_mtu_change(skb->dev, mtu);
 		}
 	}
+    /*End of ATP 2013-5-10 */
+#endif
 
 	if (ndopts.nd_useropts) {
 		struct nd_opt_hdr *p;
@@ -1482,6 +1539,13 @@ static void ndisc_redirect_rcv(struct sk_buff *skb)
 
 	if (ipv6_addr_equal(dest, target)) {
 		on_link = 1;
+    } 
+    /* BEGIN: Added , 2009/11/27 IPv6Ready- Host Test v6LC.2.3.6 Part G: Target Address is Multicast */    
+    else if (ipv6_addr_is_multicast(target)) {
+		ND_PRINTK2(KERN_WARNING
+			   "ICMPv6 Redirect: target address is multicast.\n");
+		return;
+    /* END:   Added , 2009/11/27 */
 	} else if (ipv6_addr_type(target) !=
 		   (IPV6_ADDR_UNICAST|IPV6_ADDR_LINKLOCAL)) {
 		ND_PRINTK2(KERN_WARNING
@@ -1783,14 +1847,6 @@ static void ndisc_warn_deprecated_sysctl(struct ctl_table *ctl,
 	static int warned;
 	if (strcmp(warncomm, current->comm) && warned < 5) {
 		strcpy(warncomm, current->comm);
-		printk(KERN_WARNING
-			"process `%s' is using deprecated sysctl (%s) "
-			"net.ipv6.neigh.%s.%s; "
-			"Use net.ipv6.neigh.%s.%s_ms "
-			"instead.\n",
-			warncomm, func,
-			dev_name, ctl->procname,
-			dev_name, ctl->procname);
 		warned++;
 	}
 }

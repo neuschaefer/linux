@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * Copyright © 1999-2010 David Woodhouse <dwmw2@infradead.org> et al.
  *
  * This program is free software; you can redistribute it and/or modify
@@ -31,6 +35,7 @@
 
 #define MTD_CHAR_MAJOR 90
 #define MTD_BLOCK_MAJOR 31
+#define MAX_MTD_DEVICES 32
 
 #define MTD_ERASE_PENDING	0x01
 #define MTD_ERASING		0x02

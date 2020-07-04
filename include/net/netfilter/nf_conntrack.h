@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * Connection state tracking for netfilter.  This is separated from,
  * but required by, the (future) NAT layer; it can also be used by an iptables
  * extension.
@@ -31,6 +35,16 @@
 
 #include <net/netfilter/nf_conntrack_tuple.h>
 
+#if defined(CONFIG_HSAN)
+#define QOS_UPLINK_CONTROL_MASK  0xfff0
+#define QOS_POLICER_MASK  0xf000
+#define QOS_WMM_MASK  0xf0000
+#define QOS_WMM_QUEUE_NUM 8
+#endif
+
+#ifdef CONFIG_ATP_ROUTE_BALANCE
+#define ROUTE_BALANCE_DEFAULT_NH  0xFF
+#endif
 /* per conntrack: protocol private data */
 union nf_conntrack_proto {
 	/* insert conntrack proto private data here */
@@ -207,7 +221,12 @@ struct nf_conn {
 #ifdef CONFIG_NET_NS
 	struct net *ct_net;
 #endif
-
+#if (defined CONFIG_HSAN)
+    unsigned int h_link[IP_CT_DIR_MAX];
+    u_int32_t time_bf;
+    u_int32_t packets_bf;
+    u_int32_t packets;
+#endif
 	/* Storage reserved for other modules, must be the last member */
 	union nf_conntrack_proto proto;
 
@@ -232,6 +251,16 @@ struct nf_conn {
 		unsigned int app_data_len;
 	} layer7;
 #endif    
+#ifdef CONFIG_DPI_PARSE
+	u_int32_t  ulProtoID;
+	u_int32_t  ulcounter;
+    u_int32_t  ulRank;
+	bool       bIsContinue;
+	void   *   pvFlow;
+#endif
+#ifdef CONFIG_ATP_ROUTE_BALANCE
+    unsigned char nh_sel;
+#endif
 };
 
 static inline struct nf_conn *
@@ -426,6 +455,14 @@ extern unsigned int nf_conntrack_htable_size;
 extern unsigned int nf_conntrack_max;
 extern unsigned int nf_conntrack_hash_rnd;
 void init_nf_conntrack_hash_rnd(void);
+
+#ifdef CONFIG_ATP_CONNTRACK_CLEAN
+extern int nf_conntrack_clean;
+#endif
+
+#ifdef CONFIG_ATP_HYBRID
+extern int nf_ct_need_redo_snat(struct sk_buff *skb, struct net_device *dev, __be32 src_addr);
+#endif
 
 #define NF_CT_STAT_INC(net, count)	\
 	__this_cpu_inc((net)->ct.stat->count)

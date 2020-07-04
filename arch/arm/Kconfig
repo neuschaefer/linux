@@ -45,7 +45,11 @@ config ARM
 
 config ARM_HAS_SG_CHAIN
 	bool
-
+	
+config HSAN
+	bool
+	default y
+	
 config HAVE_PWM
 	bool
 
@@ -72,6 +76,7 @@ config GENERIC_CLOCKEVENTS_BROADCAST
 
 config KTIME_SCALAR
 	bool
+	default y
 
 config HAVE_TCM
 	bool
@@ -298,6 +303,20 @@ config ARCH_REALVIEW
 	select NEED_MACH_MEMORY_H
 	help
 	  This enables support for ARM Ltd RealView boards.
+
+config ARCH_HSAN
+	bool "HSAN platform family"
+	select ARM_AMBA
+	select CLKSRC_MMIO
+	select CLKDEV_LOOKUP
+	select GENERIC_CLOCKEVENTS
+	select ICST
+	select NEED_MACH_IO_H
+	select NEED_MACH_MEMORY_H
+	select HSAN
+	select MIGHT_HAVE_PCI
+	help
+	  This enables support for HSAN platform.
 
 config ARCH_VERSATILE
 	bool "ARM Ltd. Versatile family"
@@ -1009,38 +1028,7 @@ config ARCH_ZYNQ
 	select USE_OF
 	help
 	  Support for Xilinx Zynq ARM Cortex A9 Platform
-
-config ARCH_BCM63XX
-	bool "Broadcom 63XX Architecture"
-	depends on BCM_KF_ARM_BCM963XX
-	help
-	  Support for Broadcome 63XX series architecture
-
 endchoice
-
-config BUZZZ
-	bool "Broadcom BUZZZ Tool Framework"
-	default n
-	help
-	  Enable kernel tools framework: event/performance/function call tracing
-
-config BUZZZ_FUNC
-	bool "Broadcom BUZZZ Func Tool"
-	default n
-	help
-	  Enable Function tracing tool
-
-config BUZZZ_PMON
-	bool "Broadcom BUZZZ PMON Tool"
-	default n
-	help
-	  Enable performance monitoring tool
-
-config BUZZZ_KEVT
-	bool "Broadcom BUZZZ Kernel Event Tracing Tool"
-	default n
-	help
-	  Enable Kernel Event Tracing tool
 
 #
 # This is sorted alphabetically by mach-* pathname.  However, plat-*
@@ -1115,6 +1103,9 @@ source "arch/arm/mach-mmp/Kconfig"
 
 source "arch/arm/mach-realview/Kconfig"
 
+if ARCH_HSAN
+source "arch/arm/mach-hsan/Kconfig"
+endif
 source "arch/arm/mach-sa1100/Kconfig"
 
 source "arch/arm/plat-samsung/Kconfig"
@@ -1157,9 +1148,6 @@ source "arch/arm/plat-versatile/Kconfig"
 source "arch/arm/mach-vt8500/Kconfig"
 
 source "arch/arm/mach-w90x900/Kconfig"
-if BCM_KF_ARM_BCM963XX
-source "arch/arm/plat-bcm63xx/Kconfig"
-endif
 
 # Definitions to make life easier
 config ARCH_ACORN
@@ -1439,18 +1427,6 @@ config PL310_ERRATA_769419
 	  on systems with an outer cache, the store buffer is drained
 	  explicitly.
 
-if BCM_KF_ARM_BCM963XX
-config ARM_ERRATA_798181
-	bool "ARM errata: TLBI/DSB failure on Cortex-A15"
-	depends on CPU_V7 && SMP
-	help
-	  On Cortex-A15 (r0p0..r3p2) the TLBI*IS/DSB operations are not
-	  adequately shooting down all use of the old entries. This
-	  option enables the Linux kernel workaround for this erratum
-	  which sends an IPI to the CPUs that are running the same ASID
-	  as the one being invalidated.
-endif
-
 endmenu
 
 source "arch/arm/common/Kconfig"
@@ -1513,8 +1489,9 @@ config PCI_HOST_ITE8152
 
 source "drivers/pci/Kconfig"
 
-if BCM_KF_ARM_BCM963XX
+if ARCH_HSAN
 source "drivers/pci/pcie/Kconfig"
+source "drivers/pci/hotplug/Kconfig"
 endif
 
 source "drivers/pcmcia/Kconfig"

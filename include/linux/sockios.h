@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * INET		An implementation of the TCP/IP protocol suite for the LINUX
  *		operating system.  INET is implemented using the  BSD Socket
  *		interface as the means of communication with the user level.
@@ -19,6 +23,7 @@
 #define _LINUX_SOCKIOS_H
 
 #include <asm/sockios.h>
+#include "atpconfig.h"
 
 /* Linux-specific socket ioctls */
 #define SIOCINQ		FIONREAD
@@ -85,6 +90,14 @@
 
 #define SIOCOUTQNSD	0x894B		/* output queue size (not sent only) */
 
+/*ATP add start*/
+#define SIOCETHWLMIRROR   0x894C /* get/set port mirror parameters	*/
+
+/* read and write externel lan switch */
+#define SIOCGEXTSWREG	0x894D		/* Read External Switch register.	*/
+#define SIOCSEXTSWREG	0x894E		/* Write External Switch register.*/
+#define SIOCDUMPEXTSWREG	0x894F		/* dump External Switch register.*/
+/*ATP add end*/
 /* ARP cache control calls. */
 		    /*  0x8950 - 0x8952  * obsolete calls, don't re-use */
 #define SIOCDARP	0x8953		/* delete ARP table entry	*/
@@ -127,7 +140,7 @@
 /* hardware time stamping: parameters in linux/net_tstamp.h */
 #define SIOCSHWTSTAMP   0x89b0
 
-#if !defined(CONFIG_BCM_IN_KERNEL) || defined(CONFIG_BCM_KF_MISC_IOCTLS) || defined(CONFIG_BCM_KF_NETFILTER)
+#if !defined(CONFIG_BCM_IN_KERNEL) || defined(CONFIG_BCM_KF_MISC_IOCTLS) || defined(CONFIG_BCM_KF_NETFILTER) || defined(CONFIG_SMUX)
 /***********************BRCM global ioctl calls*****************************/
 #define SIOC_BRCM_GLOBAL_BASE    0x89c0
 #define SIOCGIFTRANSSTART  (SIOC_BRCM_GLOBAL_BASE+0)    /* Used by SNMP */
@@ -156,4 +169,9 @@
  */
  
 #define SIOCPROTOPRIVATE 0x89E0 /* to 89EF */
+
+#define SIOQOSDSCPCOUNT 0x89E2  /* ATP add, Add for BT DSCP statistic*/
+
+#define SIOCOAMLOOPBACK 0x89E3 /* ATP add, Set OAM loopback enable*/
+
 #endif	/* _LINUX_SOCKIOS_H */

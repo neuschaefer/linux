@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * USB Serial Console driver
  *
  * Copyright (C) 2001 - 2002 Greg Kroah-Hartman (greg@kroah.com)
@@ -287,7 +291,12 @@ void usb_serial_console_init(int serial_debug, int minor)
 {
 	debug = serial_debug;
 
-	if (minor == 0) {
+	
+#ifdef CONFIG_USB_SERIAL_XR21V1410	
+	if (8 == minor) {
+#else
+    if (0 == minor) {
+#endif
 		/*
 		 * Call register_console() if this is the first device plugged
 		 * in.  If we call it earlier, then the callback to

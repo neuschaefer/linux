@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *	Ioctl handler
  *	Linux ethernet bridge
  *
@@ -19,7 +23,12 @@
 #include <linux/times.h>
 #include <net/net_namespace.h>
 #include <asm/uaccess.h>
+#include <linux/atphooks.h>
 #include "br_private.h"
+
+#ifdef CONFIG_MLD_SNOOPING
+#include "br_mld_snooping.h"
+#endif
 #if defined(CONFIG_BCM_KF_IGMP) && defined(CONFIG_BR_IGMP_SNOOP)
 #include "br_igmp.h"
 #endif
@@ -669,6 +678,14 @@ static int old_dev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 	case BRCTL_SET_BR_FDB_LIMIT:
 		return set_fdb_mac_limit(br, args[1], args[2], args[3], args[4]);        
 #endif
+#ifdef CONFIG_BRIDGE_PORT_RELAY
+        case BRCTL_SET_PORT_RELAY:
+        {
+            int iEnable = args[2];
+            ATP_HOOK_VOID(ATP_BR_IOCTL_PORT_RELAY, (void *)args[1], (void *)&iEnable, NULL);
+            return 0;
+        }
+#endif
 	}
 
 	return -EOPNOTSUPP;
@@ -822,6 +839,19 @@ static int old_deviceless(struct net *net, void __user *uarg)
 		dev_put(dev);
 		return 0;
 	}
+#endif
+#ifdef CONFIG_MLD_SNOOPING
+    case BRCTL_SET_MLD_SNOOPING:
+    {
+        br_mld_snooping_set_enable((int)args[1]);
+        return 0;
+    }
+    
+    case BRCTL_SHOW_MLD_SNOOPING:
+    {
+		br_mld_snooping_show();
+        return 0;
+    }
 #endif
 #if defined(CONFIG_BCM_KF_MLD) && defined(CONFIG_BR_MLD_SNOOP)
 	case BRCTL_MLD_ENABLE_SNOOPING:
@@ -1009,6 +1039,8 @@ static int old_deviceless(struct net *net, void __user *uarg)
 		return 0;
 	}
 #endif
+    default:
+        ATP_HOOK_WITH_RETURN(ATP_BR_IOCTL_HOOK, (void *)net, (void *)args, NULL);
 	}
 
 	return -EOPNOTSUPP;

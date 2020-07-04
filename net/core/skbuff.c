@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *	Routines having to do with the 'struct sk_buff' memory handlers.
  *
  *	Authors:	Alan Cox <alan@lxorguk.ukuu.org.uk>
@@ -159,7 +163,18 @@ void skb_headerinit(unsigned int headroom, unsigned int datalen,
 					RecycleFuncP recycle_hook, unsigned int recycle_context,
 					struct blog_t * blog_p)		/* defined(CONFIG_BLOG) */
 {
+#ifdef CONFIG_ATP_BRCM
+    int i = 0;
+    int len = offsetof(struct sk_buff, truesize) / 4;
+    unsigned int *p;
+    p = (unsigned int *)skb;
+	for (i = 0; i < len; i++)
+    {
+		p[i] = 0;
+    }
+#else
 	memset(skb, 0, offsetof(struct sk_buff, truesize));
+#endif
 
 	skb->truesize = datalen + sizeof(struct sk_buff);
 	atomic_set(&skb->users, 1);
@@ -189,8 +204,17 @@ void skb_headerinit(unsigned int headroom, unsigned int datalen,
 	skb_shinfo(skb)->ip6_frag_id = 0;
 	skb_shinfo(skb)->tx_flags = 0;
 	skb_shinfo(skb)->frag_list = NULL;
+#ifdef CONFIG_ATP_BRCM
+    //!!!!!!Attention, test only, sizeof(skb_shinfo(skb)->hwtstamps) is 16
+    p = (unsigned int *)&(skb_shinfo(skb)->hwtstamps);
+    p[0] = 0;
+    p[1] = 0;
+    p[2] = 0;
+    p[3] = 0;
+#else
 	memset(&(skb_shinfo(skb)->hwtstamps), 0,
 	                                    sizeof(skb_shinfo(skb)->hwtstamps));
+#endif
 
 	skb_shinfo(skb)->dirty_p=NULL;
 }
@@ -289,6 +313,11 @@ static void skb_under_panic(struct sk_buff *skb, int sz, void *here)
  *
  */
 
+#ifdef CONFIG_ATP_SKB_LIMIT
+atomic_t skb_buff_alloc_num;
+volatile unsigned long skb_max_alloc_num = 0;
+#endif
+
 /**
  *	__alloc_skb	-	allocate a network buffer
  *	@size: size to allocate
@@ -319,6 +348,13 @@ struct sk_buff *__alloc_skb(unsigned int size, gfp_t gfp_mask,
 	if (!skb)
 		goto out;
 	prefetchw(skb);
+
+#ifdef CONFIG_ATP_SKB_LIMIT
+	if((skb_max_alloc_num) && atomic_read(&skb_buff_alloc_num) >= skb_max_alloc_num)
+	{
+		goto nodata;
+	}
+#endif
 
 	/* We do our best to align skb_shared_info on a separate cache
 	 * line. It usually works because kmalloc(X > SMP_CACHE_BYTES) gives
@@ -351,6 +387,10 @@ struct sk_buff *__alloc_skb(unsigned int size, gfp_t gfp_mask,
 	 * the tail pointer in struct sk_buff!
 	 */
 	memset(skb, 0, offsetof(struct sk_buff, tail));
+#endif
+
+#ifdef CONFIG_ATP_SKB_LIMIT
+	atomic_inc(&skb_buff_alloc_num);
 #endif
 
 	/* Account for allocated memory : skb + skb->head */
@@ -660,6 +700,9 @@ static void skb_release_data(struct sk_buff *skb)
 #endif /* CONFIG_BCM_RUNNER */
 #endif /* CONFIG_BCM_KF_RUNNER */
 		kfree(skb->head);
+#ifdef CONFIG_ATP_SKB_LIMIT
+		atomic_dec(&skb_buff_alloc_num);
+#endif
 	}
 }
 
@@ -755,6 +798,7 @@ static void skb_release_all(struct sk_buff *skb)
 	if ( (skb->bl_alloc == SKB_STANDARD) || (skb->bl_alloc == SKB_BL_RELEASE_DATA) )
 #endif /* CONFIG_BCM_RUNNER */
 #endif /* CONFIG_BCM_KF_RUNNER */
+
 	skb_release_data(skb);
 }
 
@@ -1428,7 +1472,11 @@ static void __copy_skb_header(struct sk_buff *new, const struct sk_buff *old)
 	new->sp			= secpath_get(old->sp);
 #endif
 	memcpy(new->cb, old->cb, sizeof(old->cb));
+#if (defined CONFIG_HSAN)
+	memcpy(new->hi_cb, old->hi_cb, sizeof(old->hi_cb));
+#endif
 	new->csum		= old->csum;
+	new->lanindev		= old->lanindev;  /* add for lan interface iptables  */
 	new->local_df		= old->local_df;
 	new->pkt_type		= old->pkt_type;
 	new->ip_summed		= old->ip_summed;
@@ -1483,7 +1531,9 @@ static void __copy_skb_header(struct sk_buff *new, const struct sk_buff *old)
 #endif
 #endif /* CONFIG_BCM_KF_NBUFF */
 	new->vlan_tci		= old->vlan_tci;
-
+#if defined(CONFIG_BLOG) && defined(CONFIG_PPPOL2TP) && defined(CONFIG_L2TP_FAST_FORWARD)
+	new->skip_blog		= old->skip_blog;
+#endif
 #if defined(CONFIG_BCM_KF_WL)
 	new->pktc_flags		= old->pktc_flags;
 #endif
@@ -1765,6 +1815,34 @@ struct sk_buff *skb_copy(const struct sk_buff *skb, gfp_t gfp_mask)
 }
 EXPORT_SYMBOL(skb_copy);
 
+
+struct sk_buff *skb_copy_extend_header(const struct sk_buff *skb, gfp_t gfp_mask, int len)
+{
+	int headerlen = skb->data - skb->head + len;
+	/*
+	 *	Allocate the copy buffer
+	 */
+	struct sk_buff *n;
+#ifdef NET_SKBUFF_DATA_USES_OFFSET
+	n = alloc_skb(skb->end + skb->data_len + len, gfp_mask);
+#else
+	n = alloc_skb(skb->end - skb->head + skb->data_len + len, gfp_mask);
+#endif
+	if (!n)
+		return NULL;
+
+	/* Set the data pointer */
+	skb_reserve(n, headerlen);
+	/* Set the tail pointer and length */
+	skb_put(n, skb->len);
+
+	if (skb_copy_bits(skb, -headerlen, n->head, headerlen + skb->len))
+		BUG();
+
+	copy_skb_header(n, skb);
+	return n;
+}
+EXPORT_SYMBOL(skb_copy_extend_header);
 /**
  *	__pskb_copy	-	create copy of an sk_buff with private head.
  *	@skb: buffer to copy
@@ -1861,6 +1939,13 @@ int pskb_expand_head(struct sk_buff *skb, int nhead, int ntail,
 
 	size = SKB_DATA_ALIGN(size);
 
+#ifdef CONFIG_ATP_SKB_LIMIT
+	if( (skb_max_alloc_num) && atomic_read(&skb_buff_alloc_num) >= skb_max_alloc_num)
+	{
+		goto nodata;
+	}
+#endif
+
 #if defined(CONFIG_BCM_KF_NBUFF)
 	/* the fastpath optimizations are problematic for preallocated buffers */
 	fastpath = false;
@@ -1891,6 +1976,9 @@ int pskb_expand_head(struct sk_buff *skb, int nhead, int ntail,
 	if (!data)
 		goto nodata;
 	size = SKB_WITH_OVERHEAD(ksize(data));
+#ifdef CONFIG_ATP_SKB_LIMIT
+	atomic_inc(&skb_buff_alloc_num);
+#endif
 
 	/* Copy only real data... and, alas, header. This should be
 	 * optimized for the cases when header is void.

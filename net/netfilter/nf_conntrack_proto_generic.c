@@ -1,3 +1,7 @@
+/*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
 /* (C) 1999-2001 Paul `Rusty' Russell
  * (C) 2002-2004 Netfilter Core Team <coreteam@netfilter.org>
  *
@@ -13,6 +17,31 @@
 #include <net/netfilter/nf_conntrack_l4proto.h>
 
 static unsigned int nf_ct_generic_timeout __read_mostly = 600*HZ;
+
+// CVE-2014-8160
+static bool nf_generic_should_process(u8 proto)  
+{  
+	switch (proto) {  
+#ifdef CONFIG_NF_CT_PROTO_SCTP_MODULE  
+	case IPPROTO_SCTP:  
+		return false;  
+#endif  
+#ifdef CONFIG_NF_CT_PROTO_DCCP_MODULE  
+	case IPPROTO_DCCP:  
+		return false;  
+#endif  
+#ifdef CONFIG_NF_CT_PROTO_GRE_MODULE  
+	case IPPROTO_GRE:  
+		return false;  
+#endif  
+#ifdef CONFIG_NF_CT_PROTO_UDPLITE_MODULE  
+	case IPPROTO_UDPLITE:  
+		return false;  
+#endif  
+	default:  
+		return true;  
+	}  
+}  
 
 static bool generic_pkt_to_tuple(const struct sk_buff *skb,
 				 unsigned int dataoff,
@@ -62,7 +91,8 @@ static int generic_packet(struct nf_conn *ct,
 static bool generic_new(struct nf_conn *ct, const struct sk_buff *skb,
 			unsigned int dataoff, unsigned int *timeouts)
 {
-	return true;
+	// CVE-2013-8160
+	return nf_generic_should_process(nf_ct_protonum(ct));
 }
 
 #if IS_ENABLED(CONFIG_NF_CT_NETLINK_TIMEOUT)

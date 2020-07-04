@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * INET		An implementation of the TCP/IP protocol suite for the LINUX
  *		operating system.  INET is implemented using the  BSD Socket
  *		interface as the means of communication with the user level.
@@ -45,7 +49,9 @@
 #include <linux/export.h>
 #include <net/sock.h>
 #include <net/raw.h>
-
+#ifdef CONFIG_ATP_HYBRID_REORDER
+#include "ipgre_reorder.h"
+#endif
 /*
  *	Report socket allocation statistics [mea@utu.fi]
  */
@@ -71,8 +77,15 @@ static int sockstat_seq_show(struct seq_file *seq, void *v)
 		   sock_prot_inuse_get(net, &udplite_prot));
 	seq_printf(seq, "RAW: inuse %d\n",
 		   sock_prot_inuse_get(net, &raw_prot));
+#ifdef CONFIG_ATP_COMMON
+    /* start add ipfrag count */
+	seq_printf(seq,  "FRAG: inuse %d ipcnt %d memory %d\n",
+			ip_frag_nqueues(net), ip_frag_nipcnt(net), ip_frag_mem(net)); 
+    /* end add ipfrag count */
+#else
 	seq_printf(seq,  "FRAG: inuse %d memory %d\n",
 			ip_frag_nqueues(net), ip_frag_mem(net));
+#endif
 	return 0;
 }
 
@@ -258,6 +271,8 @@ static const struct snmp_mib snmp4_net_list[] = {
 	SNMP_MIB_ITEM("TCPReqQFullDrop", LINUX_MIB_TCPREQQFULLDROP),
 	SNMP_MIB_ITEM("TCPRetransFail", LINUX_MIB_TCPRETRANSFAIL),
 	SNMP_MIB_ITEM("TCPRcvCoalesce", LINUX_MIB_TCPRCVCOALESCE),
+	/*Modify  CVE-2019-11478 20190925 */
+	SNMP_MIB_ITEM("TCPWqueueTooBig", LINUX_MIB_TCPWQUEUETOOBIG),
 	SNMP_MIB_SENTINEL
 };
 
@@ -444,6 +459,13 @@ static int netstat_seq_show(struct seq_file *seq, void *v)
 					     offsetof(struct ipstats_mib, syncp)));
 
 	seq_putc(seq, '\n');
+
+#ifdef CONFIG_ATP_HYBRID_REORDER
+    if (ipgre_reorder_seq_show_hook)
+    {
+        ipgre_reorder_seq_show_hook(seq);
+    }
+#endif
 	return 0;
 }
 

@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * xHCI host controller driver
  *
  * Copyright (C) 2008 Intel Corp.
@@ -2705,6 +2709,7 @@ static unsigned int count_sg_trbs_needed(struct xhci_hcd *xhci, struct urb *urb)
 
 static void check_trb_math(struct urb *urb, int num_trbs, int running_total)
 {
+#if 0
 	if (num_trbs != 0)
 		dev_err(&urb->dev->dev, "%s - ep %#x - Miscalculated number of "
 				"TRBs, %d left\n", __func__,
@@ -2717,6 +2722,7 @@ static void check_trb_math(struct urb *urb, int num_trbs, int running_total)
 				running_total, running_total,
 				urb->transfer_buffer_length,
 				urb->transfer_buffer_length);
+#endif				
 }
 
 static void giveback_first_trb(struct xhci_hcd *xhci, int slot_id,

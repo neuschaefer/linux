@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * Device tables which are exported to userspace via
  * scripts/mod/file2alias.c.  You must keep that file in sync with this
  * header.
@@ -109,7 +113,10 @@ struct usb_device_id {
 	__u8		bDeviceClass;
 	__u8		bDeviceSubClass;
 	__u8		bDeviceProtocol;
-
+	/*Used for HUAWEI NDIS*/
+    /*<通过接入顺序来判断usb设备begin*/
+	__u16       bInterfaceSequence;
+    /* >*/
 	/* Used for interface class matches */
 	__u8		bInterfaceClass;
 	__u8		bInterfaceSubClass;
@@ -131,6 +138,9 @@ struct usb_device_id {
 #define USB_DEVICE_ID_MATCH_INT_SUBCLASS	0x0100
 #define USB_DEVICE_ID_MATCH_INT_PROTOCOL	0x0200
 
+/*< 通过接入顺序来判断usb设备begin*/
+#define USB_DEVICE_ID_MATCH_INT_SEQUENCE      0x0400
+/* end>*/
 #define HID_ANY_ID				(~0)
 
 struct hid_device_id {

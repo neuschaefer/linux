@@ -1,3 +1,7 @@
+/*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
 /** -*- linux-c -*- ***********************************************************
  * Linux PPP over Ethernet (PPPoX/PPPoE) Sockets
  *
@@ -85,6 +89,14 @@
 
 #include <asm/uaccess.h>
 
+#include "msg/kcmsmonitormsgtypes.h"
+
+/*ATP新增*/
+typedef struct pppoe_dis_msg {
+    char   name[IFNAMSIZ];
+    struct pppoe_hdr ph;
+}pppoe_dis_msg_st;
+
 #define PPPOE_HASH_BITS 4
 #define PPPOE_HASH_SIZE (1 << PPPOE_HASH_BITS)
 #define PPPOE_HASH_MASK	(PPPOE_HASH_SIZE - 1)
@@ -157,6 +169,173 @@ static int hash_item(__be16 sid, unsigned char *addr)
 
 	return hash & PPPOE_HASH_MASK;
 }
+
+
+
+struct dt_skb_head {
+	struct sk_buff *head;
+	struct sk_buff *tail;
+};
+
+/* default buffer size is 16 */
+#define DT_SKB_BUF_SIZE  16
+
+/* max time that skb keep in buffer, 3 seconds */
+#define DT_SKB_AGE 3
+
+/* skb buffer control data */
+static int s_dt_skb_count = 0;
+static struct dt_skb_head s_dt_skb_buf = {0, 0};
+static DEFINE_RWLOCK(s_dt_skb_buf_lock);
+
+/**
+ * The skb not match to a socket, put to this buffer.
+ */
+static void dt_skb_buf_push(struct sk_buff *skb)
+{
+	//struct timeval tv;
+	struct sk_buff *skb_old, *skb_new;
+
+	/* Clone new skb */
+	skb_new = skb_clone(skb, GFP_ATOMIC);
+	if (skb_new == 0) {
+		return;
+	}
+	if (!skb_new->tstamp.tv.sec) {
+		//do_gettimeofday(&tv);
+		//skb_set_timestamp(skb_new, &tv);
+		__net_timestamp(skb_new);
+	}
+
+	write_lock_bh(&s_dt_skb_buf_lock);
+	/* Add skb to list tail. */
+	if (s_dt_skb_buf.tail == 0) {
+		s_dt_skb_buf.head = skb_new;
+		s_dt_skb_buf.tail = skb_new;
+	}
+	else {
+		s_dt_skb_buf.tail->next = skb_new;
+		s_dt_skb_buf.tail = skb_new;
+	}
+	skb_new->next = 0;
+
+	/* If exceed buffer size, free the oldest one. */
+	s_dt_skb_count++;
+	if (s_dt_skb_count > DT_SKB_BUF_SIZE) {
+		skb_old = s_dt_skb_buf.head;
+		s_dt_skb_buf.head = skb_old->next;
+		skb_old->next = 0;
+		kfree_skb(skb_old);
+		s_dt_skb_count--;
+	}
+	//printk("DT: pppoe_skb_buf_push, count=0x%x\n", s_dt_skb_count);
+	write_unlock_bh(&s_dt_skb_buf_lock);
+}
+
+/**
+ * The socket has connected, receive skbs belong to it. 
+ */
+static void dt_skb_buf_pop(struct sock *sk, int id)
+{
+	//struct timeval stamp;
+	ktime_t  ktime_now;
+	struct pppoe_hdr *ph;
+	struct sk_buff *skb, *skb_next, *skb_prev;
+	
+	/* get current time stamp */
+	//do_gettimeofday(&stamp);
+	ktime_now = ktime_get_real();
+
+	write_lock_bh(&s_dt_skb_buf_lock);
+
+	skb_next = skb_prev = 0;
+	skb = s_dt_skb_buf.head;
+	while (skb != 0) {
+		/* Find skb belong to this 'id'. */
+		ph = (struct pppoe_hdr *)skb->network_header;
+		if (ph->sid != id) {
+			skb_prev = skb;
+			skb = skb->next;
+			continue;
+		}
+
+		/* Disconnect skb from list */
+		skb_next = skb->next;
+		if (s_dt_skb_buf.head == skb) {
+			s_dt_skb_buf.head = skb_next;
+            if (s_dt_skb_buf.tail == skb)
+            {
+                s_dt_skb_buf.tail = skb_next;
+            }
+		}
+		else if (s_dt_skb_buf.tail == skb) 
+        {
+			s_dt_skb_buf.tail = skb_prev;
+			if (s_dt_skb_buf.tail != 0) {
+				s_dt_skb_buf.tail->next = 0;
+			}
+		}
+        else 
+        {
+            skb_prev->next = skb->next;
+        }
+
+		skb->next = 0;
+		//if ((stamp.tv_sec - skb->tstamp.off_sec) < DT_SKB_AGE) {
+		if ((ktime_now.tv.sec - skb->tstamp.tv.sec) < DT_SKB_AGE) {
+			/* Receive skb to socket queue */
+			sock_hold(sk);
+			sk_receive_skb(sk, skb, 0);
+		}
+		else {
+			/* skb too old, free it. */
+			kfree_skb(skb);
+		}
+
+		/* Go to next skb */
+		skb = skb_next;
+
+        if(s_dt_skb_count>0)
+		s_dt_skb_count--;
+	}
+
+	//printk("DT: pppoe_skb_buf_pop, count=0x%x\n", s_dt_skb_count);
+	write_unlock_bh(&s_dt_skb_buf_lock);
+}
+
+/**
+ * Cleanup the skb buffer.
+ */
+static void dt_skb_buf_clean(void)
+{
+	struct sk_buff *skb, *skb_next;
+
+	write_lock_bh(&s_dt_skb_buf_lock);
+
+	skb_next = 0;
+	skb = s_dt_skb_buf.head;
+	while (skb != 0) {
+		/* Disconnect skb from list */
+		skb_next = skb->next;
+		skb->next = 0;
+
+		/* free skb */
+		kfree_skb(skb);
+
+		/* Go to next skb */
+		skb = skb_next;
+	}
+
+	//printk("DT: dt_skb_buf_clean, count=0x%x\n", s_dt_skb_count);
+
+	s_dt_skb_count = 0;
+	s_dt_skb_buf.head = 0;
+	s_dt_skb_buf.tail = 0;
+	write_unlock_bh(&s_dt_skb_buf_lock);
+}
+
+
+
 
 /**********************************************************************
  *
@@ -450,11 +629,13 @@ static int pppoe_rcv(struct sk_buff *skb, struct net_device *dev,
 	 * is known to be safe.
 	 */
 	po = get_item(pn, ph->sid, eth_hdr(skb)->h_source, dev->ifindex);
-	if (!po)
-		goto drop;
-
-	return sk_receive_skb(sk_pppox(po), skb, 0);
-
+	
+	if (po != NULL) {
+		return sk_receive_skb(sk_pppox(po), skb, 0);
+	}
+	else {
+		dt_skb_buf_push(skb);
+	}
 drop:
 	kfree_skb(skb);
 out:
@@ -493,6 +674,15 @@ static int pppoe_disc_rcv(struct sk_buff *skb, struct net_device *dev,
 	pn = pppoe_pernet(dev_net(dev));
 	po = get_item(pn, ph->sid, eth_hdr(skb)->h_source, dev->ifindex);
 	if (po) {
+
+	    //HOMEGW-15159, from W723V, 接收到PADT(无lcp terminate)报文后，向pppc发信号断开
+	    //syswatch_nl_send(ATP_MSG_MONITOR_EVT_RCV_PADT, NULL, 0);
+        pppoe_dis_msg_st padi = {0};
+        snprintf(padi.name, IFNAMSIZ, dev->name);
+        padi.name[IFNAMSIZ - 1] = '\0';
+        memcpy((void *)&padi.ph, (const void *)ph, sizeof(struct pppoe_hdr));
+        syswatch_nl_send(ATP_MSG_MONITOR_EVT_RCV_PADT, (unsigned char *)&padi, sizeof(struct pppoe_dis_msg));
+
 		struct sock *sk = sk_pppox(po);
 
 		bh_lock_sock(sk);
@@ -822,6 +1012,9 @@ static int pppoe_ioctl(struct socket *sock, unsigned int cmd,
 		sk->sk_state &= ~PPPOX_RELAY;
 		err = 0;
 		break;
+	case 0xAA:
+		dt_skb_buf_pop(sk, po->pppoe_pa.sid);
+		break;
 
 	default:
 		err = -ENOTTY;
@@ -873,6 +1066,16 @@ static int pppoe_sendmsg(struct kiocb *iocb, struct socket *sock,
 
 	skb->dev = dev;
 
+	/*Start of for qos function */
+	#if defined(CONFIG_IMQ) && !defined(CONFIG_DT_QOS)
+	skb->mark = sk->sk_mark;
+	/* if qos enable, all packet to IMQ */
+    skb->mark |= QOS_DEFAULT_MARK;
+	#endif
+	#ifdef CONFIG_DT_QOS
+	skb->mark |= 0x7; /* The top priority is 0x7 */
+	#endif
+	/*End of for qos function */
 	skb->priority = sk->sk_priority;
 	skb->protocol = cpu_to_be16(ETH_P_PPP_SES);
 
@@ -948,6 +1151,12 @@ static int __pppoe_xmit(struct sock *sk, struct sk_buff *skb)
 	dev_hard_header(skb, dev, ETH_P_PPP_SES,
 			po->pppoe_pa.remote, NULL, data_len);
 
+	/*Start of added by Huawei for qos function 2012-1-6 */
+	#ifdef CONFIG_IMQ
+	/* if qos enable, all packet to IMQ */
+    skb->mark |= QOS_DEFAULT_MARK;
+	#endif 
+	/*End of added by Huawei for qos function 2012-1-6 */
 	dev_queue_xmit(skb);
 	return 1;
 
@@ -988,8 +1197,9 @@ static int pppoe_recvmsg(struct kiocb *iocb, struct socket *sock,
 				flags & MSG_DONTWAIT, &error);
 	if (error < 0)
 		goto end;
-
-	m->msg_namelen = 0;
+		
+	//CVE-2013-7270
+	//m->msg_namelen = 0;
 
 	if (skb) {
 		total_len = min_t(size_t, total_len, skb->len);

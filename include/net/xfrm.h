@@ -1,3 +1,7 @@
+/*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
 #ifndef _NET_XFRM_H
 #define _NET_XFRM_H
 
@@ -213,6 +217,12 @@ struct xfrm_state {
 	struct xfrm_lifetime_cur curlft;
 	struct tasklet_hrtimer	mtimer;
 
+#ifdef CONFIG_XFRM_IDLE_TIME
+#define             IDLE_TIMEOUT_FLAG          (0x01)
+    uint8_t             ucFlag;
+    struct timer_list   idletimer;
+#endif
+
 	/* Last used time */
 	unsigned long		lastused;
 
@@ -238,6 +248,9 @@ static inline struct net *xs_net(struct xfrm_state *x)
 
 /* xflags - make enum if more show up */
 #define XFRM_TIME_DEFER	1
+#ifdef CONFIG_SUPPORT_ATP
+#define XFRM_NEED_DELETE    (0x02)
+#endif
 
 enum {
 	XFRM_STATE_VOID,
@@ -1544,6 +1557,11 @@ extern int km_migrate(const struct xfrm_selector *sel, u8 dir, u8 type,
 extern struct xfrm_state * xfrm_migrate_state_find(struct xfrm_migrate *m);
 extern struct xfrm_state * xfrm_state_migrate(struct xfrm_state *x,
 					      struct xfrm_migrate *m);
+
+#ifdef CONFIG_SUPPORT_ATP
+extern void xfrm_migrate_del_acq_state_link(struct net *net, struct xfrm_state *x);
+extern void xfrm_migrate_add_acq_link(struct net *net, struct xfrm_state *x);
+#endif
 extern int xfrm_migrate(const struct xfrm_selector *sel, u8 dir, u8 type,
 			struct xfrm_migrate *m, int num_bundles,
 			struct xfrm_kmaddress *k);
@@ -1665,6 +1683,21 @@ static inline void xfrm_states_delete(struct xfrm_state **states, int n)
 	for (i = 0; i < n; i++)
 		xfrm_state_delete(*(states + i));
 }
+
+#ifdef CONFIG_SUPPORT_ATP
+static inline void xfrm_states_delete2(struct xfrm_state **states, int n)
+{
+	int i;
+	for (i = 0; i < n; i++)
+	{
+        if (XFRM_STATE_ACQ != states[i]->km.state)
+        {
+    		xfrm_state_delete(*(states + i));
+        }
+	}
+}
+#endif
+
 #endif
 
 #ifdef CONFIG_XFRM

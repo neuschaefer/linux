@@ -1,3 +1,7 @@
+/*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
 #if defined(CONFIG_BCM_KF_BLOG)
 
 #ifndef __BLOG_H_INCLUDED__
@@ -808,7 +812,43 @@ typedef union {
 /* To enable user filtering, see blog_filter(), invoked in blog_finit() */
 /* #define CC_BLOG_SUPPORT_USER_FILTER */
 
+/* Start of modified for dscpcount 2012-03-22 */
+#ifdef CONFIG_DSCP_QOS
+#define DSCP_COUNT_STATMAX                15
+#define DSCP_COUNT_STATMIN                1
+#define DSCP_MOVE_BIT                     24
+#endif
+                                           
+#define TYPE_ETH                    0x0000  /* LAN: ETH, WAN: EoA, MER, PPPoE */
+#define TYPE_PPP                    0x0001  /*           WAN: PPPoA */
+#define TYPE_IP                     0x0002  /*           WAN: IPoA */
 
+#ifndef CONFIG_ARM
+                                            /* Ethernet Encapsulations */
+#define TYPE_ETH_P_IP               0x0800  /* IPv4 in Ethernet */
+#define TYPE_ETH_P_IPV6             0x86DD  /* IPv6 in Ethernet */
+#define TYPE_ETH_P_8021Q            0x8100  /* VLAN in Ethernet */
+#define TYPE_ETH_P_8021AD           0x88A8
+#define TYPE_ETH_P_PPP_DIS          0x8863  /* PPPoE Discovery in Ethernet */
+#define TYPE_ETH_P_PPP_SES          0x8864  /* PPPoE Session in Ethernet */
+#define TYPE_ETH_P_BCM              0x8874  /* BCM Switch Hdr */
+#define TYPE_ETH_P_BCM2             0x888A  /* BCM Switch Hdr for ext switch */
+#define TYPE_ETH_P_MPLS_UC          0x8847  /* MPLS Unicast */
+#define TYPE_ETH_P_MPLS_MC          0x8848  /* MPLS Multicast */
+
+                                            /* PPP Encapsulations */
+#define TYPE_PPP_IP                 0x0021  /* IPv4 in PPP */
+#define TYPE_PPP_IPV6               0x0057  /* IPv6 in PPP */
+#define TYPE_PPP_IPCP               0x8021  /* PPP IP Control Protocol */
+#define TYPE_PPP_LCP                0xC021  /* PPP Link Control Protocol */
+#define TYPE_PPP_MP                 0x003D  /* PPP Multilink Protocol */
+#define TYPE_PPP_IPV6CP             0x8057  /* PPP IPv6 Control Protocol */
+#define TYPE_PPP_MPLSCP             0x80FD  /* PPP MPLS Control Protocol */
+#define TYPE_PPP_MPLS_UC            0x0281  /* PPP MPLS Unicast */
+#define TYPE_PPP_MPLS_MC            0x0283  /* PPP MPLS Multicast */
+
+#endif
+/* End of modified for dscpcount 2012-03-22 */
 
 /*
  * -----------------------------------------------------------------------------
@@ -1563,6 +1603,14 @@ uint16_t blog_getTxMtu(Blog_t * blog_p);
  */
 extern void blog_lock_bh(void);
 extern void blog_unlock_bh(void);
+
+/* Start of modified  for dscpcount 2012-03-22 */
+#if defined(CONFIG_DSCP_QOS)
+extern int32_t blog_getdscpstatisticdata(int32_t index);
+extern void blog_setdscpswitch(int32_t iEnable);
+extern void blog_cleardscpstatisticdata(int32_t index);
+#endif
+/* End of modified for dscpcount 2012-03-22 */
 
 /*
   * Per packet basis modification feature

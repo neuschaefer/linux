@@ -64,3 +64,7 @@ obj-$(CONFIG_JS_RTC)		+= js-rtc.o
 js-rtc-y = rtc.o
 
 obj-$(CONFIG_TILE_SROM)		+= tile-srom.o
+ifeq ($(CONFIG_BUILD_COMPONENT_HOMEMATIC),y)
+obj-m += eq3_char_loop.o
+obj-m += mxs_raw_auart.o
+endif

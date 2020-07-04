@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * INET		An implementation of the TCP/IP protocol suite for the LINUX
  *		operating system.  INET is implemented using the  BSD Socket
  *		interface as the means of communication with the user level.
@@ -79,11 +83,23 @@
 #include <linux/mroute.h>
 #include <linux/netlink.h>
 #include <linux/tcp.h>
+#include <linux/inetdevice.h>
+
+#if defined(CONFIG_IMQ) || defined(CONFIG_IMQ_MODULE)
+#include <linux/imq.h>
+#endif
 
 #if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
 #include <linux/blog.h>
 #endif
 
+/*Start of Protocol:网关自身业务的平滑切换 */
+#ifdef CONFIG_ATP_HYBRID
+#include <net/netfilter/nf_conntrack.h>
+#include "atp_interface.h"
+#define L2TP_PORT   (1701)
+#endif
+/*End of Protocol */
 int sysctl_ip_default_ttl __read_mostly = IPDEFTTL;
 EXPORT_SYMBOL(sysctl_ip_default_ttl);
 
@@ -101,6 +117,22 @@ int __ip_local_out(struct sk_buff *skb)
 
 	iph->tot_len = htons(skb->len);
 	ip_send_check(iph);
+#ifdef CONFIG_ATP_CONNTRACK_CLEAN
+	/* Start of added  for conntrack clean with gateway service 2012-6-18 */
+	skb->mark |= CONNTRACK_AVOID_SERVICE;
+	/* End of added  for conntrack clean with gateway service 2012-6-18 */
+#endif
+#ifdef CONFIG_ATP_HYBRID_GREACCEL
+    if ((IPPROTO_GRE == iph->protocol) && (skb->mark & PPP_TRIGER_MARK))
+    {
+        return 1;
+    }
+#endif    
+
+#ifdef CONFIG_DOWN_RATE_CONTROL
+	skb->mark |= QOS_DOWNDEFAULT_MARK;
+#endif
+
 	return nf_hook(NFPROTO_IPV4, NF_INET_LOCAL_OUT, skb, NULL,
 		       skb_dst(skb)->dev, dst_output);
 }
@@ -174,6 +206,12 @@ int ip_build_and_send_pkt(struct sk_buff *skb, struct sock *sk,
 
 	skb->priority = sk->sk_priority;
 	skb->mark = sk->sk_mark;
+	/*Start of added  for qos function 2012-1-6 */
+#if defined(CONFIG_IMQ)
+	/* if qos enable, all packet to IMQ */
+        skb->mark |= QOS_DEFAULT_MARK;
+#endif
+	/*End of added  for qos function 2012-1-6 */
 
 	/* Send it out. */
 	return ip_local_out(skb);
@@ -249,7 +287,12 @@ static int ip_finish_output(struct sk_buff *skb)
 		return dst_output(skb);
 	}
 #endif
-	if (skb->len > ip_skb_dst_mtu(skb) && !skb_is_gso(skb))
+    /*来自DSLITE隧道的报文不进行V4分片*/
+	if (skb->len > ip_skb_dst_mtu(skb) && !skb_is_gso(skb) && 0 == strstr(skb->dev->name, "ip6tnl")
+#ifdef CONFIG_ATP_HYBRID_GREACCEL	
+        && !IS_GRE_DEV(skb->dev->name)
+#endif		
+		)
 		return ip_fragment(skb, ip_finish_output2);
 	else
 		return ip_finish_output2(skb);
@@ -327,11 +370,35 @@ int ip_mc_output(struct sk_buff *skb)
 int ip_output(struct sk_buff *skb)
 {
 	struct net_device *dev = skb_dst(skb)->dev;
+#ifdef CONFIG_ATP_HYBRID_GREACCEL	
+	struct iphdr *iph = ip_hdr(skb);
+#endif
+    
+/*Start of Protocol:网关自身业务的平滑切换*/
+#ifdef CONFIG_ATP_HYBRID
+    struct nf_conn *nfct;
+	unsigned int fonip = 0x00AC1102;
+	unsigned int isL2tp = 0;
+	struct udphdr *uh;
+#endif
+/*End of Protocol */
+
 
 	IP_UPD_PO_STATS(dev_net(dev), IPSTATS_MIB_OUT, skb->len);
 
 	skb->dev = dev;
 	skb->protocol = htons(ETH_P_IP);
+
+#ifdef CONFIG_ATP_HYBRID_GREACCEL
+    if ((IPPROTO_GRE == iph->protocol) && (skb->mark & PPP_TRIGER_MARK))
+    {
+        return ip_finish_output(skb);
+    }
+#endif  
+
+#if defined(CONFIG_IMQ) || defined(CONFIG_IMQ_MODULE)
+    skb->mark |= QOS_DEFAULT_MARK;
+#endif
 
 	return NF_HOOK_COND(NFPROTO_IPV4, NF_INET_POST_ROUTING, skb, NULL, dev,
 			    ip_finish_output,
@@ -428,6 +495,12 @@ packet_routed:
 
 	skb->priority = sk->sk_priority;
 	skb->mark = sk->sk_mark;
+	/*Start of added for qos function 2012-1-6 */
+	/* if qos enable, all packet to IMQ */
+#if defined(CONFIG_IMQ)
+        skb->mark |= QOS_DEFAULT_MARK;
+#endif
+	/*End of added for qos function 2012-1-6 */
 
 	res = ip_local_out(skb);
 	rcu_read_unlock();
@@ -817,15 +890,20 @@ static inline int ip_ufo_append_data(struct sock *sk,
 		/* initialize protocol header pointer */
 		skb->transport_header = skb->network_header + fragheaderlen;
 
-		skb->ip_summed = CHECKSUM_PARTIAL;
 		skb->csum = 0;
 
-		/* specify the length of each IP datagram fragment */
-		skb_shinfo(skb)->gso_size = maxfraglen - fragheaderlen;
-		skb_shinfo(skb)->gso_type = SKB_GSO_UDP;
 		__skb_queue_tail(queue, skb);
+	// CVE-2013-4470
+	} else if (skb_is_gso(skb)) { 
+		goto append; 
 	}
 
+	skb->ip_summed = CHECKSUM_PARTIAL; 
+	/* specify the length of each IP datagram fragment */ 
+	skb_shinfo(skb)->gso_size = maxfraglen - fragheaderlen; 
+	skb_shinfo(skb)->gso_type = SKB_GSO_UDP; 
+	
+append: 	
 	return skb_append_datato_frags(sk, skb, getfrag, from,
 				       (length - transhdrlen));
 }
@@ -1393,6 +1471,12 @@ struct sk_buff *__ip_make_skb(struct sock *sk,
 
 	skb->priority = sk->sk_priority;
 	skb->mark = sk->sk_mark;
+	/*Start of added  for qos function 2012-1-6 */
+	/* if qos enable, all packet to IMQ */
+#if defined(CONFIG_IMQ)
+        skb->mark |= QOS_DEFAULT_MARK;
+#endif
+	/*End of added  for qos function 2012-1-6 */
 	/*
 	 * Steal rt from cork.dst to avoid a pair of atomic_inc/atomic_dec
 	 * on dst refcount

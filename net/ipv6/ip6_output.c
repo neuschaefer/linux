@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *	IPv6 output functions
  *	Linux INET6 implementation
  *
@@ -25,7 +29,11 @@
  *			:       add ip6_append_data and related functions
  *				for datagram xmit
  */
-
+  /*
+ * 2017/11/14     CVE-2017-7542 CVE-2017-9242
+ * (C) Huawei Technologies Co., Ltd. < >
+ */
+ 
 #include <linux/errno.h>
 #include <linux/kernel.h>
 #include <linux/string.h>
@@ -67,6 +75,16 @@ int __ip6_local_out(struct sk_buff *skb)
 		len = 0;
 	ipv6_hdr(skb)->payload_len = htons(len);
 
+#ifdef CONFIG_ATP_HYBRID_GREACCEL
+    if ((IPPROTO_GRE == ipv6_hdr(skb)->nexthdr) && (skb->mark & PPP_TRIGER_MARK))
+    {
+        return 1;
+    }
+#endif
+
+#ifdef CONFIG_DOWN_RATE_CONTROL
+	skb->mark |= QOS_DOWNDEFAULT_MARK;
+#endif
 	return nf_hook(NFPROTO_IPV6, NF_INET_LOCAL_OUT, skb, NULL,
 		       skb_dst(skb)->dev, dst_output);
 }
@@ -135,6 +153,13 @@ static int ip6_finish_output2(struct sk_buff *skb)
 				skb->len);
 	}
 
+/* Start of added  for enable qos uplink 2013-3-11 */
+#if defined(CONFIG_QOS_IPV6) && defined(CONFIG_IMQ)
+    /* if qos enable, all packet to ifb */
+    skb->mark |= QOS_DEFAULT_MARK;
+#endif
+/* End of added  for enable qos uplink 2013-3-11 */
+
 	rcu_read_lock();
 	neigh = dst_get_neighbour_noref(dst);
 	if (neigh) {
@@ -175,6 +200,13 @@ int ip6_output(struct sk_buff *skb)
 		kfree_skb(skb);
 		return 0;
 	}
+#ifdef CONFIG_ATP_HYBRID_GREACCEL
+    skb->dev = dev;
+    if ((IPPROTO_GRE == ipv6_hdr(skb)->nexthdr) && (skb->mark & PPP_TRIGER_MARK))
+    {
+        return ip6_finish_output(skb);
+    }
+#endif
 
 	return NF_HOOK_COND(NFPROTO_IPV6, NF_INET_POST_ROUTING, skb, NULL, dev,
 			    ip6_finish_output,
@@ -197,6 +229,7 @@ int ip6_xmit(struct sock *sk, struct sk_buff *skb, struct flowi6 *fl6,
 	int seg_len = skb->len;
 	int hlimit = -1;
 	u32 mtu;
+
 
 	if (opt) {
 		unsigned int head_room;
@@ -254,6 +287,11 @@ int ip6_xmit(struct sock *sk, struct sk_buff *skb, struct flowi6 *fl6,
 	if ((skb->len <= mtu) || skb->local_df || skb_is_gso(skb)) {
 		IP6_UPD_PO_STATS(net, ip6_dst_idev(skb_dst(skb)),
 			      IPSTATS_MIB_OUT, skb->len);
+
+#ifdef CONFIG_DOWN_RATE_CONTROL
+	skb->mark |= QOS_DOWNDEFAULT_MARK;
+#endif
+
 		return NF_HOOK(NFPROTO_IPV6, NF_INET_LOCAL_OUT, skb, NULL,
 			       dst->dev, dst_output);
 	}
@@ -479,7 +517,14 @@ int ip6_forward(struct sk_buff *skb)
 	if ( isULA(&hdr->daddr) || isULA(&hdr->saddr) )
 		if ((skb->dev->priv_flags & IFF_WANDEV) || 
 			(dst->dev->priv_flags & IFF_WANDEV) )
-			goto drop;
+		{   
+#ifdef CONFIG_ATP_COMMON			
+            /*Start of ATP: 网关lan侧使用ULA源地址，目标地址为wan侧ipv6地址发送icmpv6 ping请求，网关未转发到wan侧后，还应该向PC回复ICMPv6 目的不可达报文*/
+			icmpv6_send(skb, ICMPV6_DEST_UNREACH, ICMPV6_ADDR_UNREACH, 0);
+            /*End of ATP */
+#endif			
+		    goto drop;
+		}
 #endif
 
 	/* XXX: idev->cnf.proxy_ndp? */
@@ -622,7 +667,7 @@ static void ip6_copy_metadata(struct sk_buff *to, struct sk_buff *from)
 
 int ip6_find_1stfragopt(struct sk_buff *skb, u8 **nexthdr)
 {
-	u16 offset = sizeof(struct ipv6hdr);
+	unsigned int offset = sizeof(struct ipv6hdr);
 	struct ipv6_opt_hdr *exthdr =
 				(struct ipv6_opt_hdr *)(ipv6_hdr(skb) + 1);
 	unsigned int packet_len = skb->tail - skb->network_header;
@@ -630,6 +675,7 @@ int ip6_find_1stfragopt(struct sk_buff *skb, u8 **nexthdr)
 	*nexthdr = &ipv6_hdr(skb)->nexthdr;
 
 	while (offset + 1 <= packet_len) {
+        unsigned int len;
 
 		switch (**nexthdr) {
 
@@ -650,7 +696,10 @@ int ip6_find_1stfragopt(struct sk_buff *skb, u8 **nexthdr)
 			return offset;
 		}
 
-		offset += ipv6_optlen(exthdr);
+		len = ipv6_optlen(exthdr);
+		if (len + offset >= IPV6_MAXPLEN)
+			return -EINVAL;
+		offset += len;
 		*nexthdr = &exthdr->nexthdr;
 		exthdr = (struct ipv6_opt_hdr *)(skb_network_header(skb) +
 						 offset);
@@ -977,11 +1026,18 @@ static struct dst_entry *ip6_sk_dst_check(struct sock *sk,
 					  const struct flowi6 *fl6)
 {
 	struct ipv6_pinfo *np = inet6_sk(sk);
-	struct rt6_info *rt = (struct rt6_info *)dst;
+    // CVE-2013-2232
+    struct rt6_info *rt;
 
 	if (!dst)
 		goto out;
 
+	// CVE-2013-2232
+    if (dst->ops->family != AF_INET6) {
+        dst_release(dst);
+        return NULL;
+    }
+    rt = (struct rt6_info *)dst;
 	/* Yes, checking route validity in not connected
 	 * case is not very simple. Take into account,
 	 * that we do not support routing by source, TOS,
@@ -1187,6 +1243,8 @@ static inline int ip6_ufo_append_data(struct sock *sk,
 	 * udp datagram
 	 */
 	if ((skb = skb_peek_tail(&sk->sk_write_queue)) == NULL) {
+		// CVE-2013-4387
+		struct frag_hdr fhdr;  
 		skb = sock_alloc_send_skb(sk,
 			hh_len + fragheaderlen + transhdrlen + 20,
 			(flags & MSG_DONTWAIT), &err);
@@ -1207,12 +1265,6 @@ static inline int ip6_ufo_append_data(struct sock *sk,
 
 		skb->ip_summed = CHECKSUM_PARTIAL;
 		skb->csum = 0;
-	}
-
-	err = skb_append_datato_frags(sk,skb, getfrag, from,
-				      (length - transhdrlen));
-	if (!err) {
-		struct frag_hdr fhdr;
 
 		/* Specify the length of each IPv6 datagram fragment.
 		 * It has to be a multiple of 8.
@@ -1223,15 +1275,10 @@ static inline int ip6_ufo_append_data(struct sock *sk,
 		ipv6_select_ident(&fhdr, rt);
 		skb_shinfo(skb)->ip6_frag_id = fhdr.identification;
 		__skb_queue_tail(&sk->sk_write_queue, skb);
-
-		return 0;
-	}
-	/* There is not enough support do UPD LSO,
-	 * so follow normal path
-	 */
-	kfree_skb(skb);
-
-	return err;
+	}		
+	// CVE-2013-4387
+	return skb_append_datato_frags(sk, skb, getfrag, from,  
+			       (length - transhdrlen));  
 }
 
 static inline struct ipv6_opt_hdr *ip6_opt_dup(struct ipv6_opt_hdr *src,
@@ -1246,11 +1293,13 @@ static inline struct ipv6_rt_hdr *ip6_rthdr_dup(struct ipv6_rt_hdr *src,
 	return src ? kmemdup(src, (src->hdrlen + 1) * 8, gfp) : NULL;
 }
 
-static void ip6_append_data_mtu(int *mtu,
-				int *maxfraglen,
-				unsigned int fragheaderlen,
-				struct sk_buff *skb,
-				struct rt6_info *rt)
+// CVE-2013-4163
+static void ip6_append_data_mtu(unsigned int *mtu,
+                int *maxfraglen,
+                unsigned int fragheaderlen,
+                struct sk_buff *skb,
+                struct rt6_info *rt,
+                bool pmtuprobe)
 {
 	if (!(rt->dst.flags & DST_XFRM_TUNNEL)) {
 		if (skb == NULL) {
@@ -1262,7 +1311,10 @@ static void ip6_append_data_mtu(int *mtu,
 			 * this fragment is not first, the headers
 			 * space is regarded as data space.
 			 */
-			*mtu = dst_mtu(rt->dst.path);
+            // CVE-2013-4163
+            *mtu = min(*mtu, pmtuprobe ?
+                    rt->dst.dev->mtu :
+                    dst_mtu(rt->dst.path));
 		}
 		*maxfraglen = ((*mtu - fragheaderlen) & ~7)
 			      + fragheaderlen - sizeof(struct frag_hdr);
@@ -1279,11 +1331,11 @@ int ip6_append_data(struct sock *sk, int getfrag(void *from, char *to,
 	struct ipv6_pinfo *np = inet6_sk(sk);
 	struct inet_cork *cork;
 	struct sk_buff *skb, *skb_prev = NULL;
-	unsigned int maxfraglen, fragheaderlen;
+	// CVE-2013-4163
+	unsigned int maxfraglen, fragheaderlen, mtu; 
 	int exthdrlen;
 	int dst_exthdrlen;
 	int hh_len;
-	int mtu;
 	int copy;
 	int err;
 	int offset = 0;
@@ -1402,27 +1454,28 @@ int ip6_append_data(struct sock *sk, int getfrag(void *from, char *to,
 	 * --yoshfuji
 	 */
 
-	cork->length += length;
-	if (length > mtu) {
-		int proto = sk->sk_protocol;
-		if (dontfrag && (proto == IPPROTO_UDP || proto == IPPROTO_RAW)){
-			ipv6_local_rxpmtu(sk, fl6, mtu-exthdrlen);
-			return -EMSGSIZE;
+		// CVE-2013-4387
+		if ((length > mtu) && dontfrag && (sk->sk_protocol == IPPROTO_UDP ||  
+							   sk->sk_protocol == IPPROTO_RAW)) {  
+			ipv6_local_rxpmtu(sk, fl6, mtu-exthdrlen);  
+			return -EMSGSIZE;  
+		} 
+
+		skb = skb_peek_tail(&sk->sk_write_queue);  
+		cork->length += length;  
+		if (((length > mtu) ||  
+	    	 (skb && skb_is_gso(skb))) &&  
+		    (sk->sk_protocol == IPPROTO_UDP) &&  
+		    (rt->dst.dev->features & NETIF_F_UFO)) {  
+			err = ip6_ufo_append_data(sk, getfrag, from, length,  
+						  hh_len, fragheaderlen,  
+						  transhdrlen, mtu, flags, rt);  
+			if (err)  
+				goto error;  
+			return 0;  
 		}
 
-		if (proto == IPPROTO_UDP &&
-		    (rt->dst.dev->features & NETIF_F_UFO)) {
-
-			err = ip6_ufo_append_data(sk, getfrag, from, length,
-						  hh_len, fragheaderlen,
-						  transhdrlen, mtu, flags, rt);
-			if (err)
-				goto error;
-			return 0;
-		}
-	}
-
-	if ((skb = skb_peek_tail(&sk->sk_write_queue)) == NULL)
+	if (!skb) 
 		goto alloc_new_skb;
 
 	while (length > 0) {
@@ -1444,9 +1497,11 @@ alloc_new_skb:
 			else
 				fraggap = 0;
 			/* update mtu and maxfraglen if necessary */
+			// CVE-2013-4163
 			if (skb == NULL || skb_prev == NULL)
-				ip6_append_data_mtu(&mtu, &maxfraglen,
-						    fragheaderlen, skb, rt);
+                ip6_append_data_mtu(&mtu, &maxfraglen,
+                    fragheaderlen, skb, rt,
+                    np->pmtudisc == IPV6_PMTUDISC_PROBE);
 
 			skb_prev = skb;
 
@@ -1484,6 +1539,11 @@ alloc_new_skb:
 			 */
 			alloclen += sizeof(struct frag_hdr);
 
+			copy = datalen - transhdrlen - fraggap;
+			if (copy < 0) {
+				err = -EINVAL;
+				goto error;
+			}
 			if (transhdrlen) {
 				skb = sock_alloc_send_skb(sk,
 						alloclen + hh_len,
@@ -1535,13 +1595,9 @@ alloc_new_skb:
 				data += fraggap;
 				pskb_trim_unique(skb_prev, maxfraglen);
 			}
-			copy = datalen - transhdrlen - fraggap;
-
-			if (copy < 0) {
-				err = -EINVAL;
-				kfree_skb(skb);
-				goto error;
-			} else if (copy > 0 && getfrag(from, data + transhdrlen, offset, copy, fraggap, skb) < 0) {
+			if (copy > 0 &&
+			    getfrag(from, data + transhdrlen, offset,
+				    copy, fraggap, skb) < 0) {
 				err = -EFAULT;
 				kfree_skb(skb);
 				goto error;

@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * drivers/pci/pci-driver.c
  *
  * (C) Copyright 2002-2004, 2007 Greg Kroah-Hartman <greg@kroah.com>
@@ -1281,6 +1285,9 @@ struct bus_type pci_bus_type = {
 	.dev_attrs	= pci_dev_attrs,
 	.bus_attrs	= pci_bus_attrs,
 	.pm		= PCI_PM_OPS_PTR,
+#ifdef CONFIG_HSAN  //fix me to CONFIG_HSAN future
+    .acp = 0x0, 
+#endif
 };
 
 static int __init pci_driver_init(void)

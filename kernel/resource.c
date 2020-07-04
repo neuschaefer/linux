@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *	linux/kernel/resource.c
  *
  * Copyright (C) 1999	Linus Torvalds
@@ -6,7 +10,11 @@
  *
  * Arbitrary resource management.
  */
-
+/*
+ * 2017/11/14     CVE-2015-8944
+ * (C) Huawei Technologies Co., Ltd. < >
+ */
+ 
 #include <linux/export.h>
 #include <linux/errno.h>
 #include <linux/ioport.h>
@@ -142,7 +150,7 @@ static const struct file_operations proc_iomem_operations = {
 static int __init ioresources_init(void)
 {
 	proc_create("ioports", 0, NULL, &proc_ioports_operations);
-	proc_create("iomem", 0, NULL, &proc_iomem_operations);
+	proc_create("iomem", S_IRUSR, NULL, &proc_iomem_operations);
 	return 0;
 }
 __initcall(ioresources_init);

@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
    RFCOMM implementation for Linux Bluetooth stack (BlueZ)
    Copyright (C) 2002 Maxim Krasnyansky <maxk@qualcomm.com>
    Copyright (C) 2002 Marcel Holtmann <marcel@holtmann.org>
@@ -158,7 +162,6 @@ struct rfcomm_session {
 	struct timer_list timer;
 	unsigned long    state;
 	unsigned long    flags;
-	atomic_t         refcnt;
 	int              initiator;
 
 	/* Default DLC parameters */
@@ -275,11 +278,6 @@ static inline void rfcomm_dlc_unthrottle(struct rfcomm_dlc *d)
 /* ---- RFCOMM sessions ---- */
 void   rfcomm_session_getaddr(struct rfcomm_session *s, bdaddr_t *src,
 								bdaddr_t *dst);
-
-static inline void rfcomm_session_hold(struct rfcomm_session *s)
-{
-	atomic_inc(&s->refcnt);
-}
 
 /* ---- RFCOMM sockets ---- */
 struct sockaddr_rc {

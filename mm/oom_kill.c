@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *  linux/mm/oom_kill.c
  * 
  *  Copyright (C)  1998,2000  Rik van Riel
@@ -38,6 +42,14 @@
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/oom.h>
+
+#ifdef CONFIG_CRASH_DUMPFILE
+#include "atpcrash.h"
+#endif
+
+#ifdef CONFIG_HIMEM_DUMPFILE
+extern int hw_ssp_set_dump_info(const char *fmt, ...);
+#endif
 
 int sysctl_panic_on_oom;
 int sysctl_oom_kill_allocating_task;
@@ -777,6 +789,25 @@ void out_of_memory(struct zonelist *zonelist, gfp_t gfp_mask,
 
 #else
 
+#ifdef CONFIG_CRASH_DUMPFILE
+    ATP_KRNL_CRASH_ClearInfo();
+    ATP_KRNL_CRASH_AppendInfo("\n\n%s triggered out of memory codition (oom killer not called): "
+        "gfp_mask=0x%x, order=%d, oom_adj=%d\n\n",current->comm, gfp_mask, order, current->signal->oom_adj);
+    ATP_KRNL_CRASH_OutputInfo();
+#endif
+#ifdef CONFIG_HIMEM_DUMPFILE
+              hw_ssp_set_dump_info("\n\n%s triggered out of memory codition (oom killer not called): "
+          "gfp_mask=0x%x, order=%d, oom_adj=%d\n\n",
+		current->comm, gfp_mask, order, current->signal->oom_adj);
+#endif
+#ifdef CONFIG_HSAN
+     printk(KERN_WARNING "\n\n%s triggered out of memory codition (oom killer not called): "
+          "gfp_mask=0x%x, order=%d, oom_adj=%d\n\n",
+		current->comm, gfp_mask, order, current->signal->oom_adj);
+	show_mem(0);
+	dump_stack();
+	printk("\n");
+#endif
 	/*
 	 * Check if there were limitations on the allocation (only relevant for
 	 * NUMA) that may require different handling.

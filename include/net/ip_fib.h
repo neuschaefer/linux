@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * INET		An implementation of the TCP/IP protocol suite for the LINUX
  *		operating system.  INET  is implemented using the  BSD Socket
  *		interface as the means of communication with the user level.
@@ -54,6 +58,12 @@ struct fib_nh {
 #ifdef CONFIG_IP_ROUTE_MULTIPATH
 	int			nh_weight;
 	int			nh_power;
+#ifdef CONFIG_ATP_ROUTE_BALANCE
+	unsigned long		nh_last_rx_bytes;	/*最后一次记录的rx字节数*/
+	unsigned long		nh_traffic;			/*接口当前即时流量,单位10Kbit 确保不溢出*/
+	unsigned long		nh_bandwidth;		/*接口带宽单位10Kbit 确保不溢出*/
+	unsigned int		nh_percent;			/*first wan百分比,0为非first wan*/
+#endif
 #endif
 #ifdef CONFIG_IP_ROUTE_CLASSID
 	__u32			nh_tclassid;

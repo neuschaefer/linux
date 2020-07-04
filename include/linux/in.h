@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * INET		An implementation of the TCP/IP protocol suite for the LINUX
  *		operating system.  INET is implemented using the  BSD Socket
  *		interface as the means of communication with the user level.
@@ -87,6 +91,9 @@ struct in_addr {
 #define IP_MINTTL       21
 #define IP_NODEFRAG     22
 
+/*Original in dev*/
+#define IP_ORIGINDEV    23
+
 /* IP_MTU_DISCOVER values */
 #define IP_PMTUDISC_DONT		0	/* Never send DF frames */
 #define IP_PMTUDISC_WANT		1	/* Use per route hints	*/
@@ -112,6 +119,29 @@ struct in_addr {
 #define MCAST_MSFILTER			48
 #define IP_MULTICAST_ALL		49
 #define IP_UNICAST_IF			50
+
+/* START of add  for HG526v3 强制门户 at 2013.1.4*/
+#ifdef CONFIG_ATP_PRSITE
+#define PRSITE_ADD                      51
+#define PRSITE_DEL                      52
+#define PRSITE_INFO_ADD                 53
+#define PRSITE_MODIFY                   54
+#define PRSITE_DUMP                     55
+#endif
+/* END of add  for HG526v3 强制门户 at 2013.1.4*/
+
+/*Start of ATP 2013-1-31 for HOMEGW-15189/RFC4604: SSM模式下只能发type 1/5/6报文, option 64-67不能使用，跳过到较大的空间区域，避免和别的功能冲突*/
+#define MCAST_SSM_ADD                 110
+#define MCAST_SSM_DEL                 111
+#define MCAST_ASM_ADD                 112
+#define MCAST_ASM_DEL                 113
+/*End of ATP 2013-1-31 for HOMEGW-15189/RFC4604 */
+
+#define WAN_BIND_BRIDGE 60
+
+#ifdef CONFIG_TAG_NOVLAN_IPTV_PACKETS
+#define ET_IGMP_VLAN 62
+#endif
 
 #define MCAST_EXCLUDE	0
 #define MCAST_INCLUDE	1
@@ -250,6 +280,14 @@ struct sockaddr_in {
 #include <asm/byteorder.h> 
 
 #ifdef __KERNEL__
+
+/* ATP igmp等模块使用 */
+/* Some random defines to make it easier in the kernel.. */
+#define LOOPBACK(x)	(((x) & htonl(0xff000000)) == htonl(0x7f000000))
+#define MULTICAST(x)	(((x) & htonl(0xf0000000)) == htonl(0xe0000000))
+#define BADCLASS(x)	(((x) & htonl(0xf0000000)) == htonl(0xf0000000))
+#define ZERONET(x)	(((x) & htonl(0xff000000)) == htonl(0x00000000))
+#define LOCAL_MCAST(x)	(((x) & htonl(0xFFFFFF00)) == htonl(0xE0000000))
 
 #include <linux/errno.h>
 

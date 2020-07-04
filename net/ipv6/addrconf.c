@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *	IPv6 Address [auto]configuration
  *	Linux INET6 implementation
  *
@@ -89,6 +93,12 @@
 #include <linux/seq_file.h>
 #include <linux/export.h>
 
+#ifdef CONFIG_ATP_COMMON
+extern int atp_ipv6_addr_conf_dadstop(struct inet6_ifaddr *ifp, int dad_failed);
+extern void atp_ipv6_addr_conf_linklocal(struct inet6_dev *idev, struct in6_addr *addr);
+extern void atp_ipv6_addr_conf_prefixrcv(struct prefix_info *pinfo, struct net_device *dev, unsigned long rt_expires);
+#endif
+
 /* Set to 3 to get tracing... */
 #define ACONF_DEBUG 2
 
@@ -135,7 +145,13 @@ static int ipv6_count_addresses(struct inet6_dev *idev);
  *	Configured unicast address hash table
  */
 static struct hlist_head inet6_addr_lst[IN6_ADDR_HSIZE];
+
+#if CONFIG_ATP_COMMON
+DEFINE_SPINLOCK(addrconf_hash_lock);
+EXPORT_SYMBOL(addrconf_hash_lock);
+#else
 static DEFINE_SPINLOCK(addrconf_hash_lock);
+#endif
 
 static void addrconf_verify(unsigned long);
 
@@ -155,12 +171,9 @@ static void addrconf_dad_completed(struct inet6_ifaddr *ifp);
 static void addrconf_dad_run(struct inet6_dev *idev);
 static void addrconf_rs_timer(unsigned long data);
 static void __ipv6_ifa_notify(int event, struct inet6_ifaddr *ifa);
-static void ipv6_ifa_notify(int event, struct inet6_ifaddr *ifa);
 
 static void inet6_prefix_notify(int event, struct inet6_dev *idev,
 				struct prefix_info *pinfo);
-static bool ipv6_chk_same_addr(struct net *net, const struct in6_addr *addr,
-			       struct net_device *dev);
 
 #if defined(CONFIG_BCM_KF_IP)
 static struct inet6_dev * ipv6_find_idev(struct net_device *dev);
@@ -169,12 +182,36 @@ static struct inet6_dev * ipv6_find_idev(struct net_device *dev);
 static ATOMIC_NOTIFIER_HEAD(inet6addr_chain);
 
 static struct ipv6_devconf ipv6_devconf __read_mostly = {
+/* start of  2009-09-18 默认开启IPv6的路由功能 */
+#ifdef CONFIG_SUPPORT_ATP
+    .forwarding     = 1,
+#else
 	.forwarding		= 0,
+#endif	
+/* end of  2009-09-18 默认开启IPv6的路由功能 */
 	.hop_limit		= IPV6_DEFAULT_HOPLIMIT,
 	.mtu6			= IPV6_MIN_MTU,
-	.accept_ra		= 1,
+/* start of  2009-10-20 默认关闭接收RA的功能，因为考虑到PPP接口需要基于nas接口，如果
+ * 开启的话可能这些nas接口会处理RA,注意如果要细化可以接收RA(从而可以处理路由等信息)
+ * 那么要控制的变量是 autoconf 
+ */
+#ifdef CONFIG_SUPPORT_ATP
+        .accept_ra      = 0,
+#else
+        .accept_ra      = 1,
+#endif
+/* end of  2009-10-20 默认关闭接收RA的功能，因为考虑到PPP接口需要基于nas接口，如果
+ * 开启的话可能这些nas接口会处理RA,注意如果要细化可以接收RA(从而可以处理路由等信息)
+ * 那么要控制的变量是 autoconf 
+ */
 	.accept_redirects	= 1,
-	.autoconf		= 1,
+/*  start of  2009-10-21 默认情况下，所有接口既不处理RA也不自动配置地址 */
+#ifdef CONFIG_SUPPORT_ATP
+	.autoconf		    = 0,
+#else
+    .autoconf           = 1,
+#endif
+/*  end of  2009-10-21 默认情况下，所有接口既不处理RA也不自动配置地址 */
 	.force_mld_version	= 0,
 	.dad_transmits		= 1,
 	.rtr_solicits		= MAX_RTR_SOLICITATIONS,
@@ -187,6 +224,11 @@ static struct ipv6_devconf ipv6_devconf __read_mostly = {
 	.regen_max_retry	= REGEN_MAX_RETRY,
 	.max_desync_factor	= MAX_DESYNC_FACTOR,
 #endif
+
+#ifdef CONFIG_SUPPORT_ATP_IPV6_ENABLE
+        .enable             = IPV6_ENABLE,
+#endif
+
 	.max_addresses		= IPV6_MAX_ADDRESSES,
 	.accept_ra_defrtr	= 1,
 	.accept_ra_pinfo	= 1,
@@ -205,15 +247,44 @@ static struct ipv6_devconf ipv6_devconf __read_mostly = {
 #else
 	.accept_dad		= 1,
 #endif
+/* start of  2009-12-05 支持多播路由 */
+#ifdef CONFIG_IPV6_MROUTE
+	.mc_forwarding		= 0,
+#endif
+/* end of  2009-12-05 支持多播路由 */
 };
 
 static struct ipv6_devconf ipv6_devconf_dflt __read_mostly = {
-	.forwarding		= 0,
+/* start of  2009-09-18 默认开启IPv6的路由功能 */
+#ifdef CONFIG_SUPPORT_ATP
+        .forwarding     = 1,
+#else
+        .forwarding     = 0,
+#endif   
+/* end of  2009-09-18 默认开启IPv6的路由功能 */
 	.hop_limit		= IPV6_DEFAULT_HOPLIMIT,
 	.mtu6			= IPV6_MIN_MTU,
-	.accept_ra		= 1,
+/* start of  2009-10-20 默认关闭接收RA的功能，因为考虑到PPP接口需要基于nas接口，如果
+ * 开启的话可能这些nas接口会处理RA,注意如果要细化可以接收RA(从而可以处理路由等信息)
+ * 那么要控制的变量是 autoconf 
+ */
+#ifdef CONFIG_SUPPORT_ATP
+	.accept_ra		= 0,
+#else
+    .accept_ra      = 1,
+#endif
+/* end of  2009-10-20 默认关闭接收RA的功能，因为考虑到PPP接口需要基于nas接口，如果
+ * 开启的话可能这些nas接口会处理RA,注意如果要细化可以接收RA(从而可以处理路由等信息)
+ * 那么要控制的变量是 autoconf 
+ */
 	.accept_redirects	= 1,
-	.autoconf		= 1,
+    /*  start of  2009-10-21 默认情况下，所有接口既不处理RA也不自动配置地址 */
+#ifdef CONFIG_SUPPORT_ATP
+        .autoconf           = 0,
+#else
+        .autoconf           = 1,
+#endif
+    /*  end of  2009-10-21 默认情况下，所有接口既不处理RA也不自动配置地址 */
 	.dad_transmits		= 1,
 	.rtr_solicits		= MAX_RTR_SOLICITATIONS,
 	.rtr_solicit_interval	= RTR_SOLICITATION_INTERVAL,
@@ -225,6 +296,11 @@ static struct ipv6_devconf ipv6_devconf_dflt __read_mostly = {
 	.regen_max_retry	= REGEN_MAX_RETRY,
 	.max_desync_factor	= MAX_DESYNC_FACTOR,
 #endif
+
+#ifdef CONFIG_SUPPORT_ATP_IPV6_ENABLE
+    .enable             = IPV6_ENABLE,
+#endif
+
 	.max_addresses		= IPV6_MAX_ADDRESSES,
 	.accept_ra_defrtr	= 1,
 	.accept_ra_pinfo	= 1,
@@ -243,6 +319,11 @@ static struct ipv6_devconf ipv6_devconf_dflt __read_mostly = {
 #else
 	.accept_dad		= 1,
 #endif
+/* start of  2009-12-05 支持多播路由 */
+#ifdef CONFIG_IPV6_MROUTE
+	.mc_forwarding		= 0,
+#endif
+/* end of  2009-12-05 支持多播路由 */
 };
 
 /* IPv6 Wildcard Address and Loopback Address defined by RFC2553 */
@@ -263,11 +344,12 @@ static inline int addrconf_is_prefix_route(const struct rt6_info *rt)
 	return (rt->rt6i_flags & (RTF_GATEWAY | RTF_DEFAULT)) == 0;
 }
 
-static void addrconf_del_timer(struct inet6_ifaddr *ifp)
+void addrconf_del_timer(struct inet6_ifaddr *ifp)
 {
 	if (del_timer(&ifp->timer))
 		__in6_ifa_put(ifp);
 }
+EXPORT_SYMBOL_GPL(addrconf_del_timer);
 
 enum addrconf_timer_t {
 	AC_NONE,
@@ -370,6 +452,17 @@ static struct inet6_dev * ipv6_add_dev(struct net_device *dev)
 	INIT_LIST_HEAD(&ndev->addr_list);
 
 	memcpy(&ndev->cnf, dev_net(dev)->ipv6.devconf_dflt, sizeof(ndev->cnf));
+	/*将WAN口的enable置为0, 不让它发包,cms的WAN初始化时会再将其按需置位*/
+#ifdef CONFIG_SUPPORT_ATP_IPV6_ENABLE
+	if (IS_WAN_DEVICE(dev->name))
+	{
+	    ndev->cnf.enable = IPV6_DISABLE;
+	}
+	else
+	{
+	    ndev->cnf.enable = IPV6_ENABLE;
+	}
+#endif
 	ndev->cnf.mtu6 = dev->mtu;
 	ndev->cnf.sysctl = NULL;
 
@@ -615,6 +708,28 @@ ipv6_link_dev_addr(struct inet6_dev *idev, struct inet6_ifaddr *ifp)
 
 static u32 ipv6_addr_hash(const struct in6_addr *addr)
 {
+#ifdef CONFIG_ATP_BRCM
+	struct in6_addr ip6addr;
+
+#if 0	//as only s6_addr32[2] and s6_addr32[3] is needed, so no need to copy s6_addr32[0] and s6_addr32[1]
+	ip6addr.s6_addr16[0] = addr->s6_addr16[0];	//0
+	ip6addr.s6_addr16[1] = addr->s6_addr16[1];	//0
+	ip6addr.s6_addr16[2] = addr->s6_addr16[2];	//1
+	ip6addr.s6_addr16[3] = addr->s6_addr16[3];	//1
+#endif	
+	ip6addr.s6_addr16[4] = addr->s6_addr16[4];	//2
+	ip6addr.s6_addr16[5] = addr->s6_addr16[5];	//2
+	ip6addr.s6_addr16[6] = addr->s6_addr16[6];	//3
+	ip6addr.s6_addr16[7] = addr->s6_addr16[7];	//3
+
+	/*
+	 * We perform the hash function over the last 64 bits of the address
+	 * This will include the IEEE address token on links that support it.
+	 */
+	return jhash_2words((__force u32)ip6addr.s6_addr32[2],
+			    (__force u32)ip6addr.s6_addr32[3], 0)				
+		& (IN6_ADDR_HSIZE - 1);
+#else
 	/*
 	 * We perform the hash function over the last 64 bits of the address
 	 * This will include the IEEE address token on links that support it.
@@ -622,6 +737,7 @@ static u32 ipv6_addr_hash(const struct in6_addr *addr)
 	return jhash_2words((__force u32)addr->s6_addr32[2],
 			    (__force u32)addr->s6_addr32[3], 0)
 		& (IN6_ADDR_HSIZE - 1);
+#endif		
 }
 
 /* On success it returns ifp with increased reference count */
@@ -1326,7 +1442,7 @@ int ipv6_chk_addr(struct net *net, const struct in6_addr *addr,
 }
 EXPORT_SYMBOL(ipv6_chk_addr);
 
-static bool ipv6_chk_same_addr(struct net *net, const struct in6_addr *addr,
+bool ipv6_chk_same_addr(struct net *net, const struct in6_addr *addr,
 			       struct net_device *dev)
 {
 	unsigned int hash = ipv6_addr_hash(addr);
@@ -1343,6 +1459,7 @@ static bool ipv6_chk_same_addr(struct net *net, const struct in6_addr *addr,
 	}
 	return false;
 }
+EXPORT_SYMBOL(ipv6_chk_same_addr);
 
 int ipv6_chk_prefix(const struct in6_addr *addr, struct net_device *dev)
 {
@@ -1396,9 +1513,24 @@ struct inet6_ifaddr *ipv6_get_ifaddr(struct net *net, const struct in6_addr *add
 
 /* Gets referenced address, destroys ifaddr */
 
+/* 如下规则:
+ * 1 如果地址是手动配置的同时该地址不是链路地址范围，那么该地址不会重新生成
+ * 2 如果地址不是手动配置的，而且前缀小于等于64，那么重新生成
+ */
 static void addrconf_dad_stop(struct inet6_ifaddr *ifp, int dad_failed)
 {
-	if (ifp->flags&IFA_F_PERMANENT) {
+#if CONFIG_ATP_COMMON 
+    if(1 == atp_ipv6_addr_conf_dadstop(ifp, dad_failed))
+    {
+        return;
+    }
+#endif
+
+/* start of 2009-12-03 解决IP地址冲突 */
+	if ((ifp->flags&IFA_F_PERMANENT)
+        && !(ifp->scope & IFA_LINK)) 
+    {        
+/* end of 2009-12-03 解决IP地址冲突 */
 		spin_lock_bh(&ifp->lock);
 		addrconf_del_timer(ifp);
 		ifp->flags |= IFA_F_TENTATIVE;
@@ -1937,6 +2069,10 @@ void addrconf_prefix_rcv(struct net_device *dev, u8 *opt, int len, bool sllao)
 		}
 		if (rt)
 			dst_release(&rt->dst);
+        
+#if CONFIG_ATP_COMMON
+        atp_ipv6_addr_conf_prefixrcv(pinfo, dev, rt_expires);
+#endif
 	}
 
 	/* Try to figure out our local address for this prefix */
@@ -2441,8 +2577,11 @@ static void init_loopback(struct net_device *dev)
 
 	add_addr(idev, &in6addr_loopback, 128, IFA_HOST);
 }
-
+#ifdef CONFIG_SUPPORT_ATP
+static void addrconf_add_linklocal(struct inet6_dev *idev, struct in6_addr *addr)
+#else
 static void addrconf_add_linklocal(struct inet6_dev *idev, const struct in6_addr *addr)
+#endif
 {
 	struct inet6_ifaddr * ifp;
 	u32 addr_flags = IFA_F_PERMANENT;
@@ -2453,6 +2592,9 @@ static void addrconf_add_linklocal(struct inet6_dev *idev, const struct in6_addr
 		addr_flags |= IFA_F_OPTIMISTIC;
 #endif
 
+#if CONFIG_ATP_COMMON
+    atp_ipv6_addr_conf_linklocal(idev, addr);
+#endif
 
 	ifp = ipv6_add_addr(idev, addr, 64, IFA_LINK, addr_flags);
 	if (!IS_ERR(ifp)) {
@@ -2715,10 +2857,14 @@ static int addrconf_notify(struct notifier_block *this, unsigned long event,
 #endif
 #if defined(CONFIG_NET_IPGRE) || defined(CONFIG_NET_IPGRE_MODULE)
 		case ARPHRD_IPGRE:
+#ifndef CONFIG_ATP_HYBRID		
 			addrconf_gre_config(dev);
 			break;
+#else
+		case ARPHRD_IP6GRE:
 #endif
-		case ARPHRD_TUNNEL6:
+#endif
+		case ARPHRD_TUNNEL6:        
 			addrconf_ip6_tnl_config(dev);
 			break;
 		case ARPHRD_LOOPBACK:
@@ -4359,13 +4505,14 @@ static void __ipv6_ifa_notify(int event, struct inet6_ifaddr *ifp)
 	}
 }
 
-static void ipv6_ifa_notify(int event, struct inet6_ifaddr *ifp)
+void ipv6_ifa_notify(int event, struct inet6_ifaddr *ifp)
 {
 	rcu_read_lock_bh();
 	if (likely(ifp->idev->dead == 0))
 		__ipv6_ifa_notify(event, ifp);
 	rcu_read_unlock_bh();
 }
+EXPORT_SYMBOL(ipv6_ifa_notify);
 
 #ifdef CONFIG_SYSCTL
 
@@ -4599,6 +4746,18 @@ static struct addrconf_sysctl_table
 			.proc_handler	= proc_dointvec,
 		},
 #endif
+
+#ifdef CONFIG_SUPPORT_ATP_IPV6_ENABLE
+        {
+			.procname	=	"enable",
+			.data		=	&ipv6_devconf.enable,
+			.maxlen		=	sizeof(int),
+			.mode		=	0644,
+            .proc_handler   =   &addrconf_sysctl_ipv6_enable,
+            .strategy   =   &addrconf_sysctl_ipv6_enable_strategy,
+		},
+#endif
+
 		{
 			.procname	= "max_addresses",
 			.data		= &ipv6_devconf.max_addresses,

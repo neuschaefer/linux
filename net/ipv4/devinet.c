@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *	NET3	IP device support routines.
  *
  *		This program is free software; you can redistribute it and/or
@@ -71,6 +75,11 @@ static struct ipv4_devconf ipv4_devconf = {
 		[IPV4_DEVCONF_SEND_REDIRECTS - 1] = 1,
 		[IPV4_DEVCONF_SECURE_REDIRECTS - 1] = 1,
 		[IPV4_DEVCONF_SHARED_MEDIA - 1] = 1,
+#ifdef CONFIG_ATP_COMMON
+		/*start of added  for arp ignore */
+		[IPV4_DEVCONF_ARP_IGNORE - 1] = 1,
+		/*end of added by for arp ignore */
+#endif
 	},
 };
 
@@ -81,6 +90,11 @@ static struct ipv4_devconf ipv4_devconf_dflt = {
 		[IPV4_DEVCONF_SECURE_REDIRECTS - 1] = 1,
 		[IPV4_DEVCONF_SHARED_MEDIA - 1] = 1,
 		[IPV4_DEVCONF_ACCEPT_SOURCE_ROUTE - 1] = 1,
+#ifdef CONFIG_ATP_COMMON
+		/*start of added for arp ignore */
+		[IPV4_DEVCONF_ARP_IGNORE - 1] = 1,
+		/*end of added  for arp ignore */
+#endif
 	},
 };
 

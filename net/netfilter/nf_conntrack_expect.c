@@ -1,3 +1,7 @@
+/*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
 /* Expectation handling for nf_conntrack. */
 
 /* (C) 1999-2001 Paul `Rusty' Russell
@@ -166,6 +170,39 @@ nf_ct_find_expectation(struct net *net, u16 zone,
 
 	return NULL;
 }
+
+
+#ifdef CONFIG_NF_CONNTRACK_PRI
+/*为确保ALG类型连接跟踪能建立，需新增一个不影响原有预期连接状态的查找函数*/
+struct nf_conntrack_expect *
+nf_ct_find_expectation_safe(struct net *net, const struct nf_conntrack_tuple *tuple)
+{
+	struct nf_conntrack_expect *i, *exp = NULL;
+	struct hlist_node *n;
+	unsigned int h;
+
+	if (!net->ct.expect_count)
+		return NULL;
+
+	h = nf_ct_expect_dst_hash(tuple);
+	hlist_for_each_entry(i, n, &net->ct.expect_hash[h], hnode) {
+		if (!(i->flags & NF_CT_EXPECT_INACTIVE) &&
+		    nf_ct_tuple_mask_cmp(tuple, &i->tuple, &i->mask)) {
+			exp = i;
+			break;
+		}
+	}
+
+	if (!exp) {
+		return NULL;
+	}
+
+	atomic_inc(&exp->use);
+	return exp;
+}
+EXPORT_SYMBOL_GPL(nf_ct_find_expectation_safe);
+#endif
+
 
 /* delete all expectations for this conntrack */
 void nf_ct_remove_expectations(struct nf_conn *ct)
@@ -618,6 +655,12 @@ int nf_conntrack_expect_init(struct net *net)
 		}
 		nf_ct_expect_max = nf_ct_expect_hsize * 4;
 	}
+
+#ifdef CONFIG_SUPPORT_ATP
+	//使用FULL CONE时会建连接预期，设置和nf_conntrack_max一样大
+	/*Fix me :如需根据是否启用ConeNat决定预期连接个数，建议在用户空间设置*/
+	nf_ct_expect_max = nf_conntrack_max;
+#endif
 
 	net->ct.expect_count = 0;
 	net->ct.expect_hash = nf_ct_alloc_hashtable(&nf_ct_expect_hsize, 0);

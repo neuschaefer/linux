@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * xHCI host controller driver
  *
  * Copyright (C) 2008 Intel Corp.
@@ -1209,12 +1213,14 @@ static unsigned int xhci_parse_exponent_interval(struct usb_device *udev,
 	unsigned int interval;
 
 	interval = clamp_val(ep->desc.bInterval, 1, 16) - 1;
+#if 0	
 	if (interval != ep->desc.bInterval - 1)
 		dev_warn(&udev->dev,
 			 "ep %#x - rounding interval to %d %sframes\n",
 			 ep->desc.bEndpointAddress,
 			 1 << interval,
 			 udev->speed == USB_SPEED_FULL ? "" : "micro");
+#endif
 
 	if (udev->speed == USB_SPEED_FULL) {
 		/*
@@ -1240,12 +1246,14 @@ static unsigned int xhci_microframes_to_exponent(struct usb_device *udev,
 
 	interval = fls(desc_interval) - 1;
 	interval = clamp_val(interval, min_exponent, max_exponent);
+#if 0	
 	if ((1 << interval) != desc_interval)
 		dev_warn(&udev->dev,
 			 "ep %#x - rounding interval to %d microframes, ep desc says %d microframes\n",
 			 ep->desc.bEndpointAddress,
 			 1 << interval,
 			 desc_interval);
+#endif
 
 	return interval;
 }

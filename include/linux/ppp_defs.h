@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * ppp_defs.h - PPP definitions.
  *
  * Copyright 1994-2000 Paul Mackerras.
@@ -87,6 +91,16 @@ enum NPmode {
     NPMODE_QUEUE		/* save it up for later. */
 };
 
+#ifdef CONFIG_PPP_ONDEMAND_V4_V6_SEPARATE
+/*
+ * Whether the NP has come up, be set by user space pppd
+ */
+enum NPstate {
+    NPSTATE_DOWN,		/* not in up state yet, may send packet to pppd to notify dialing procedure*/
+    NPSTATE_UP,		        /* up, ready to send packet through netif */
+};
+#endif
+
 /*
  * Statistics for LQRP and pppstats
  */
@@ -151,4 +165,15 @@ struct ppp_idle {
     __kernel_time_t recv_idle;	/* time since last NP packet received */
 };
 
+#ifdef CONFIG_PPP_ONDEMAND_V4_V6_SEPARATE
+struct ppp_v4_idle {
+    time_t xmit_v4_idle;		/* time since last IPv4 NP packet sent */
+    time_t recv_v4_idle;		/* time since last IPv4 NP packet received */
+};
+
+struct ppp_v6_idle {
+    time_t xmit_v6_idle;		/* time since last IPv6 NP packet sent */
+    time_t recv_v6_idle;		/* time since last IPv6 NP packet received */
+};
+#endif
 #endif /* _PPP_DEFS_H_ */

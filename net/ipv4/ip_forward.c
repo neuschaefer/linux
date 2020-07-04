@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * INET		An implementation of the TCP/IP protocol suite for the LINUX
  *		operating system.  INET is implemented using the  BSD Socket
  *		interface as the means of communication with the user level.
@@ -38,10 +42,21 @@
 #include <linux/route.h>
 #include <net/route.h>
 #include <net/xfrm.h>
+#ifdef CONFIG_ATP_HYBRID
+#include <net/netfilter/nf_conntrack.h>
+#endif
+
+/* do not send exceed icmp when recv the dhcp from HAAP */ 
+#ifdef CONFIG_ATP_HYBRID
+#define DHCPC_UDP_PORT        68    
+#endif
 
 static int ip_forward_finish(struct sk_buff *skb)
 {
 	struct ip_options * opt	= &(IPCB(skb)->opt);
+#ifdef CONFIG_ATP_HYBRID
+    struct nf_conn *nfct;
+#endif
 
 	IP_INC_STATS_BH(dev_net(skb_dst(skb)->dev), IPSTATS_MIB_OUTFORWDATAGRAMS);
 
@@ -55,6 +70,9 @@ int ip_forward(struct sk_buff *skb)
 {
 	struct iphdr *iph;	/* Our header */
 	struct rtable *rt;	/* Route we use */
+#ifdef CONFIG_ATP_HYBRID     
+    struct udphdr *uh;	/* do not send exceed icmp when recv the dhcp from HAAP */ 
+#endif
 	struct ip_options * opt	= &(IPCB(skb)->opt);
 
 	if (skb_warn_if_lro(skb))
@@ -130,6 +148,20 @@ sr_failed:
 	 goto drop;
 
 too_many_hops:
+#ifdef CONFIG_ATP_HYBRID 
+    /* start do not send exceed icmp when recv the dhcp from HAAP */ 
+    if (IPPROTO_UDP == ip_hdr(skb)->protocol)
+    {
+        __skb_pull(skb, ip_hdrlen(skb));
+	    skb_reset_transport_header(skb);   
+        uh = udp_hdr(skb);
+        if (DHCPC_UDP_PORT == ntohs(uh->dest))
+        {
+            goto drop;
+        }
+    }
+    /* end do not send exceed icmp when recv the dhcp from HAAP */ 
+#endif    
 	/* Tell the sender its packet died... */
 	IP_INC_STATS_BH(dev_net(skb_dst(skb)->dev), IPSTATS_MIB_INHDRERRORS);
 	icmp_send(skb, ICMP_TIME_EXCEEDED, ICMP_EXC_TTL, 0);

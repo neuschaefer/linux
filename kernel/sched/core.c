@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *  kernel/sched/core.c
  *
  *  Kernel scheduler and related syscalls
@@ -79,6 +83,13 @@
 #include <asm/mutex.h>
 #ifdef CONFIG_PARAVIRT
 #include <asm/paravirt.h>
+#endif
+#ifdef CONFIG_CRASH_DUMPFILE
+#include "atpcrash.h"
+#endif
+
+#ifdef CONFIG_HIMEM_DUMPFILE
+extern int hw_ssp_set_dump_info(const char *fmt, ...);
 #endif
 
 #include "sched.h"
@@ -341,6 +352,13 @@ static struct rq *task_rq_lock(struct task_struct *p, unsigned long *flags)
 
 	for (;;) {
 		raw_spin_lock_irqsave(&p->pi_lock, *flags);
+		/* Modified for avoiding the problem: Kernel panic for CPU id changed to be an invalid value when the task wake up. Test operation: plug out usb storage disk when write a big file into a ntfs partition with ntfs-3g. */
+		if(task_cpu(p) >= NR_CPUS || task_cpu(p) < 0){
+			rq = NULL;
+			raw_spin_unlock_irqrestore(&p->pi_lock, *flags);
+			return rq;
+		}
+		/* Modified for avoiding the problem: Kernel panic for CPU id changed to be an invalid value when the task wake up. Test operation: plug out usb storage disk when write a big file into a ntfs partition with ntfs-3g. */
 		rq = task_rq(p);
 		raw_spin_lock(&rq->lock);
 		if (likely(rq == task_rq(p)))
@@ -3270,8 +3288,21 @@ static noinline void __schedule_bug(struct task_struct *prev)
 	if (oops_in_progress)
 		return;
 
+#ifdef CONFIG_CRASH_DUMPFILE		
+	ATP_KRNL_CRASH_ClearInfo();
+#endif
+
 	printk(KERN_ERR "BUG: scheduling while atomic: %s/%d/0x%08x\n",
 		prev->comm, prev->pid, preempt_count());
+#ifdef CONFIG_CRASH_DUMPFILE	
+	ATP_KRNL_CRASH_AppendInfo(KERN_ERR "BUG: scheduling while atomic: %s/%d/0x%08x\n",
+		prev->comm, prev->pid, preempt_count());
+#endif		
+
+#ifdef CONFIG_HIMEM_DUMPFILE
+        hw_ssp_set_dump_info((KERN_ERR "BUG: scheduling while atomic: %s/%d/0x%08x\n",
+		prev->comm, prev->pid, preempt_count()));
+#endif
 
 	debug_show_held_locks(prev);
 	print_modules();
@@ -3647,7 +3678,6 @@ static inline void sched_submit_work(struct task_struct *tsk)
 {
 	if (!tsk->state || tsk_is_pi_blocked(tsk))
 		return;
-
 	/*
 	 * If a worker went to sleep, notify and ask workqueue whether
 	 * it wants to wake up a task to maintain concurrency.
@@ -4828,6 +4858,9 @@ out_put_task:
 	put_online_cpus();
 	return retval;
 }
+#if (defined CONFIG_HSAN)
+EXPORT_SYMBOL(sched_setaffinity);
+#endif
 
 static int get_user_cpu_mask(unsigned long __user *user_mask_ptr, unsigned len,
 			     struct cpumask *new_mask)
@@ -7684,7 +7717,7 @@ void normalize_rt_tasks(void)
 
 #endif /* CONFIG_MAGIC_SYSRQ */
 
-#if defined(CONFIG_IA64) || defined(CONFIG_KGDB_KDB)
+#if defined(CONFIG_IA64) || defined(CONFIG_KGDB_KDB) || defined(CONFIG_HSAN)
 /*
  * These functions are only useful for the IA64 MCA handling, or kdb.
  *
@@ -8519,6 +8552,15 @@ struct cgroup_subsys cpu_cgroup_subsys = {
 };
 
 #endif	/* CONFIG_CGROUP_SCHED */
+
+#if (defined CONFIG_HSAN)
+int sched_setscheduler_export(struct task_struct *p, int policy,
+		       struct sched_param *param)
+{
+	return __sched_setscheduler(p, policy, param, true);
+}
+EXPORT_SYMBOL(sched_setscheduler_export); 
+#endif
 
 #ifdef CONFIG_CGROUP_CPUACCT
 

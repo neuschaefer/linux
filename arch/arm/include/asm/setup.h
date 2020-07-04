@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *  linux/include/asm/setup.h
  *
  *  Copyright (C) 1997-1999 Russell King
@@ -126,6 +130,16 @@ struct tag_cmdline {
 	char	cmdline[1];	/* this is the minimum size */
 };
 
+
+#if (defined CONFIG_HSAN)
+#define ATAG_FLASH          0x5441000A
+
+struct tag_flash 
+{
+    char ac_flash_info[1]; /* this is the mininum size */
+};
+#endif
+
 /* acorn RiscPC specific information */
 #define ATAG_ACORN	0x41000101
 
@@ -170,6 +184,9 @@ struct tag {
 		struct tag_revision	revision;
 		struct tag_videolfb	videolfb;
 		struct tag_cmdline	cmdline;
+#if (defined CONFIG_HSAN)
+		struct tag_flash    st_flash_info;
+#endif
 
 		/*
 		 * Acorn specific

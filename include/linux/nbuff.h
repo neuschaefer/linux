@@ -1,3 +1,7 @@
+/*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
 #if defined(CONFIG_BCM_KF_NBUFF)
 
 #ifndef __NBUFF_H_INCLUDED__
@@ -1723,5 +1727,27 @@ static inline void dump_pkt(const char * fname, uint8_t * pBuf, uint32_t len)
 #endif
 
 #endif  /* defined(__NBUFF_H_INCLUDED__) */
+#else
+struct sk_buff;
+struct blog_t;
+struct net_device;
+typedef int (*HardStartXmitFuncP) (struct sk_buff *skb,
+                                   struct net_device *dev);
 
+struct fkbuff;
+typedef struct fkbuff FkBuff_t;
+
+#define FKB_NULL                    ((FkBuff_t *)NULL)
+
+#include <linux/nbuff_types.h>
+
+#define PBUF_2_PNBUFF(pBuf,realType) \
+            ( (pNBuff_t) ((uint32_t)(pBuf)   | (uint32_t)(realType)) )
+#define PNBUFF_2_PBUF(pNBuff)       \
+            ( (uint8_t*) ((uint32_t)(pNBuff) & (uint32_t)NBUFF_PTR_MASK) )
+/*
+ * Function   : fkb_free
+ * Description: Free a FKB object to its respective preallocated pool.
+ */
+extern void fkb_free(FkBuff_t * fkb_p);
 #endif

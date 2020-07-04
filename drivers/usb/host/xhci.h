@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * xHCI host controller driver
  *
  * Copyright (C) 2008 Intel Corp.
@@ -1522,6 +1526,7 @@ static inline struct usb_hcd *xhci_to_hcd(struct xhci_hcd *xhci)
 #define XHCI_DEBUG	0
 #endif
 
+#if 0
 #define xhci_dbg(xhci, fmt, args...) \
 	do { if (XHCI_DEBUG) dev_dbg(xhci_to_hcd(xhci)->self.controller , fmt , ## args); } while (0)
 #define xhci_info(xhci, fmt, args...) \
@@ -1530,6 +1535,12 @@ static inline struct usb_hcd *xhci_to_hcd(struct xhci_hcd *xhci)
 	dev_err(xhci_to_hcd(xhci)->self.controller , fmt , ## args)
 #define xhci_warn(xhci, fmt, args...) \
 	dev_warn(xhci_to_hcd(xhci)->self.controller , fmt , ## args)
+#else
+#define xhci_dbg(xhci, fmt, args...)
+#define xhci_info(xhci, fmt, args...)
+#define xhci_err(xhci, fmt, args...)
+#define xhci_warn(xhci, fmt, args...)
+#endif
 
 /* TODO: copied from ehci.h - can be refactored? */
 /* xHCI spec says all registers are little endian */
@@ -1808,4 +1819,10 @@ struct xhci_input_control_ctx *xhci_get_input_control_ctx(struct xhci_hcd *xhci,
 struct xhci_slot_ctx *xhci_get_slot_ctx(struct xhci_hcd *xhci, struct xhci_container_ctx *ctx);
 struct xhci_ep_ctx *xhci_get_ep_ctx(struct xhci_hcd *xhci, struct xhci_container_ctx *ctx, unsigned int ep_index);
 
+#if (defined CONFIG_HSAN)
+struct hiusb_plat_data {
+	void (*start_hcd)(void __iomem *base);
+	void (*stop_hcd)(void);
+};
+#endif
 #endif /* __LINUX_XHCI_HCD_H */

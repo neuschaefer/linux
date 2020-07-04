@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * Implement the default iomap interfaces
  *
  * (C) Copyright 2004 Linus Torvalds
@@ -33,6 +37,7 @@ void __iomem *pci_iomap(struct pci_dev *dev, int bar, unsigned long maxlen)
 		return NULL;
 	if (maxlen && len > maxlen)
 		len = maxlen;
+#if 0 //xy
 #if defined(CONFIG_BCM_KF_ARM_BCM963XX)
   /* IO Resource not supported */
   if (!IS_ENABLED(CONFIG_NO_GENERIC_PCI_IOPORT_MAP) && (flags & IORESOURCE_IO))
@@ -40,6 +45,7 @@ void __iomem *pci_iomap(struct pci_dev *dev, int bar, unsigned long maxlen)
 	if (flags & IORESOURCE_IO)
 #endif
 		return __pci_ioport_map(dev, start, len);
+#endif
 	if (flags & IORESOURCE_MEM) {
 		if (flags & IORESOURCE_CACHEABLE)
 			return ioremap(start, len);

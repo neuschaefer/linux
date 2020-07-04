@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * linux/kernel/irq/manage.c
  *
  * Copyright (C) 1992, 1998-2006 Linus Torvalds, Ingo Molnar
@@ -193,6 +197,9 @@ int irq_set_affinity(unsigned int irq, const struct cpumask *mask)
 	raw_spin_unlock_irqrestore(&desc->lock, flags);
 	return ret;
 }
+#if (defined CONFIG_HSAN)
+EXPORT_SYMBOL(irq_set_affinity);
+#endif
 
 int irq_set_affinity_hint(unsigned int irq, const struct cpumask *m)
 {

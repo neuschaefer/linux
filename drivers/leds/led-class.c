@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * LED Class Core
  *
  * Copyright (C) 2005 John Lenz <lenz@cs.wisc.edu>
@@ -22,6 +26,9 @@
 #include "leds.h"
 
 static struct class *leds_class;
+#if 1
+extern void led_traffic_report( struct led_classdev* led_cdev);
+#endif
 
 static void led_update_brightness(struct led_classdev *led_cdev)
 {
@@ -71,9 +78,72 @@ static ssize_t led_max_brightness_show(struct device *dev,
 	return sprintf(buf, "%u\n", led_cdev->max_brightness);
 }
 
+static ssize_t led_breath_speed_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct led_classdev *led_cdev = dev_get_drvdata(dev);
+
+	return sprintf(buf, "%lu\n", led_cdev->breath_speed);
+}
+
+static ssize_t led_breath_speed_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size)
+{
+	struct led_classdev *led_cdev = dev_get_drvdata(dev);
+	int ret = -EINVAL;
+	char *after;
+	unsigned long state = simple_strtoul(buf, &after, 10);
+	size_t count = after - buf;
+
+	if (isspace(*after))
+		count++;
+
+	if (count == size) {
+		led_cdev->breath_speed = state;
+		ret = count;
+	}
+
+	return ret;
+}
+
+
+#if 1
+static ssize_t led_traffic_show(struct device *dev,
+                                struct device_attribute *attr, char *buf)
+{
+    struct led_classdev *led_cdev = dev_get_drvdata(dev);
+
+    return sprintf(buf, "%u\n", led_cdev->traffic);
+}
+
+static ssize_t led_traffic_store(struct device *dev,
+                                 struct device_attribute *attr, const char *buf, size_t size)
+{
+    struct led_classdev *led_cdev = dev_get_drvdata(dev);
+    ssize_t ret = -EINVAL;
+    char *after;
+    unsigned long state = simple_strtoul(buf, &after, 10);
+    size_t count = after - buf;
+    if (*after && isspace(*after))
+        count++;
+
+    if (count == size)
+    {
+        led_cdev->traffic = state;
+    }
+    
+    led_traffic_report(led_cdev);    
+    return ret;
+}
+#endif
+
 static struct device_attribute led_class_attrs[] = {
 	__ATTR(brightness, 0644, led_brightness_show, led_brightness_store),
+#if 1
+    __ATTR(traffic, 0644, led_traffic_show, led_traffic_store),
+#endif
 	__ATTR(max_brightness, 0444, led_max_brightness_show, NULL),
+	__ATTR(breath_speed, 0644, led_breath_speed_show, led_breath_speed_store),
 #ifdef CONFIG_LEDS_TRIGGERS
 	__ATTR(trigger, 0644, led_trigger_show, led_trigger_store),
 #endif
@@ -96,6 +166,7 @@ static void led_timer_function(unsigned long data)
 		/* Time to switch the LED on. */
 		brightness = led_cdev->blink_brightness;
 		delay = led_cdev->blink_delay_on;
+		led_cdev->blink_delay_current++;
 	} else {
 		/* Store the current brightness value to be able
 		 * to restore it when the delay_off period is over.
@@ -103,6 +174,10 @@ static void led_timer_function(unsigned long data)
 		led_cdev->blink_brightness = brightness;
 		brightness = LED_OFF;
 		delay = led_cdev->blink_delay_off;
+		if (led_cdev->blink_delay_current == led_cdev->blink_delay_count) {
+			delay += led_cdev->blink_delay_off2;
+			led_cdev->blink_delay_current = 0;
+		}
 	}
 
 	led_set_brightness(led_cdev, brightness);

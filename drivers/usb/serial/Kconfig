@@ -64,6 +64,15 @@ config USB_SERIAL_AIRCABLE
 	    To compile this driver as a module, choose M here: the module
 	    will be called aircable.
 
+config USB_SERIAL_XR21V1410
+	tristate "USB Exar XR21V1410 USB Serial Driver"
+	help
+	  Say Y here if you want to use a Exar XR21V1410 USB to Serial
+	  device.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called xr_usb_serial
+	  
 config USB_SERIAL_ARK3116
 	tristate "USB ARK Micro 3116 USB Serial Driver"
 	help

@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * INET		An implementation of the TCP/IP protocol suite for the LINUX
  *		operating system.  INET is implemented using the  BSD Socket
  *		interface as the means of communication with the user level.
@@ -111,6 +115,9 @@
 #include <linux/sysctl.h>
 #endif
 #include <net/secure_seq.h>
+#ifdef CONFIG_ATP_ROUTE_BALANCE
+#include <net/netfilter/nf_conntrack.h>
+#endif
 
 #define RT_FL_TOS(oldflp4) \
 	((oldflp4)->flowi4_tos & (IPTOS_RT_MASK | RTO_ONLINK))
@@ -1920,7 +1927,12 @@ static unsigned int ipv4_mtu(const struct dst_entry *dst)
 	const struct rtable *rt = (const struct rtable *) dst;
 	unsigned int mtu = dst_metric_raw(dst, RTAX_MTU);
 
-	if (mtu && rt_is_output_route(rt))
+#ifdef  CONFIG_ATP_HYBRID
+    /*hybrid gre接口转v4包，需要使用学到的pmtu,否则转发总是返回icmp too big*/
+	if (mtu && ((rt_is_output_route(rt)) || ('g' == dst->dev->name[0])))
+#else
+    if (mtu && rt_is_output_route(rt))
+#endif
 		return mtu;
 
 	mtu = dst->dev->mtu;
@@ -2220,8 +2232,26 @@ static int ip_mkroute_input(struct sk_buff *skb,
 	unsigned hash;
 
 #ifdef CONFIG_IP_ROUTE_MULTIPATH
-	if (res->fi && res->fi->fib_nhs > 1)
+	if (res->fi && res->fi->fib_nhs > 1) {
+		/*选路前route记住ct之前选路结果*/
+#ifdef CONFIG_ATP_ROUTE_BALANCE
+		struct nf_conn *ct = (struct nf_conn *)skb->nfct;
+		if (ct) {
+			if (ct->master) {
+				ct->nh_sel = ct->master->nh_sel;
+			}
+
+			res->nh_sel = ct->nh_sel;
+		}
+#endif
 		fib_select_multipath(res);
+		/*选路后ct记住route选路结果*/
+#ifdef CONFIG_ATP_ROUTE_BALANCE
+		if (ct) {
+			ct->nh_sel = res->nh_sel;
+		}
+#endif
+	}
 #endif
 
 	/* create a routing cache entry */

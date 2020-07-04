@@ -1,3 +1,7 @@
+/*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
 /* SIP extension for IP connection tracking.
  *
  * (C) 2005 by Christian Hentschel <chentschel@arnet.com.ar>
@@ -2528,9 +2532,17 @@ static int __init nf_conntrack_sip_init(void)
 
 			tmpname = &sip_names[i][j][0];
 			if (ports[i] == SIP_PORT)
+#ifdef CONFIG_SUPPORT_ATP
+				snprintf(tmpname, sizeof(sip_names[i][j]), "sip");
+#else
 				sprintf(tmpname, "sip");
+#endif
 			else
+#ifdef CONFIG_SUPPORT_ATP
+				snprintf(tmpname, sizeof(sip_names[i][j]), "sip-%u", i);
+#else
 				sprintf(tmpname, "sip-%u", i);
+#endif
 			sip[i][j].name = tmpname;
 
 			pr_debug("port #%u: %u\n", i, ports[i]);

@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * Generic PPP layer for Linux.
  *
  * Copyright 1999-2002 Paul Mackerras.
@@ -58,7 +62,14 @@
 #include <linux/blog.h>
 #endif
 
+#ifdef CONFIG_ATP_HYBRID
+#include <net/netfilter/nf_conntrack.h>
+#endif
+
 #define PPP_VERSION	"2.4.2"
+#ifdef CONFIG_PPTP_TUNNEL
+unsigned int pptp_interface_unit = 0;
+#endif
 
 /*
  * Network protocols we support.
@@ -151,6 +162,19 @@ struct ppp {
 	unsigned pass_len, active_len;
 #endif /* CONFIG_PPP_FILTER */
 	struct net	*ppp_net;	/* the net we belong to */
+
+#ifdef CONFIG_PPP_ONDEMAND_V4_V6_SEPARATE
+    unsigned int	v4_state;		/* whether ipv4 is up , if not up & there comes v4 packet, queue it to pppd to trigger v4 dialing*/
+    unsigned int	v6_state;		/* whether ipv6 is up, see above */
+    unsigned long	last_v4_xmit;	/* jiffies when last IPv4 pkt sent */
+    unsigned long	last_v4_recv;	/* jiffies when last IPv4 pkt rcvd */
+    unsigned long	last_v6_xmit;	/* jiffies when last IPv6 pkt sent */
+    unsigned long	last_v6_recv;	/* jiffies when last IPv6 pkt rcvd */
+#endif
+
+    /*按需拨号保存触发报文，做NAT之后再转发出去*/
+    unsigned int closegate;
+    struct sk_buff_head demand_skb_header;
 };
 
 /*
@@ -231,6 +255,9 @@ struct ppp_net {
 /* We limit the length of ppp->file.rq to this (arbitrary) value */
 #define PPP_MAX_RQLEN	32
 
+/*ppp按需拨号队列最大长度*/
+#define PPP_MAX_DLEN 64
+
 /*
  * Maximum number of multilink fragments queued up.
  * This has to be large enough to cope with the maximum latency of
@@ -246,6 +273,9 @@ struct ppp_net {
 /* Compare multilink sequence numbers (assumed to be 32 bits wide) */
 #define seq_before(a, b)	((s32)((a) - (b)) < 0)
 #define seq_after(a, b)		((s32)((a) - (b)) > 0)
+
+/* 按需拨号中的wan lan bind关系*/
+extern char g_acWanBind[8][128];
 
 /* Prototypes. */
 static int ppp_unattached_ioctl(struct net *net, struct ppp_file *pf,
@@ -579,6 +609,13 @@ static long ppp_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	int err = -EFAULT, val, val2, i;
 	struct ppp_idle idle;
 	struct npioctl npi;
+    struct sk_buff *skb;    /*按需拨号包重发扩展*/
+#ifdef CONFIG_PPP_ONDEMAND_V4_V6_SEPARATE
+	struct ppp_v4_idle v4idle;
+	struct ppp_v6_idle v6idle;
+	struct npstateioctl npsti;
+#endif
+
 	int unit, cflags;
 	struct slcompress *vj;
 #if defined(CONFIG_BCM_KF_PPP) && defined(CONFIG_BCM_KF_NETDEV_PATH)
@@ -635,6 +672,9 @@ static long ppp_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		case PPPIOCCONNECT:
 			if (get_user(unit, p))
 				break;
+#ifdef CONFIG_PPTP_TUNNEL
+            pptp_interface_unit = unit;
+#endif
 			err = ppp_connect_channel(pch, unit);
 			break;
 
@@ -755,7 +795,42 @@ static long ppp_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			break;
 		err = 0;
 		break;
+	/* ATP 按需拨号扩展*/
+    case PPPIOCSCLOSE:
+        ppp->closegate = 1;
+        err = 0;
+        break;
+    case PPPIOCSOPEN:
+        ppp->closegate = 0;
+        while(ppp->demand_skb_header.qlen > 0)
+        {
+            skb = skb_dequeue(&ppp->demand_skb_header);
+            if (skb)
+            {
+                netif_receive_skb(skb);
+            }
+        }
+        err = 0;
+        break;
+#ifdef CONFIG_PPP_ONDEMAND_V4_V6_SEPARATE
+/*get IPv4 idle time*/
+	case PPPIOCGV4IDLE:
+		v4idle.xmit_v4_idle = (jiffies - ppp->last_v4_xmit) / HZ;
+		v4idle.recv_v4_idle = (jiffies - ppp->last_v4_recv) / HZ;
+		if (copy_to_user(argp, &v4idle, sizeof(v4idle)))
+			break;
+		err = 0;
+		break;
 
+/*get IPv6 idle time*/
+	case PPPIOCGV6IDLE:
+		v6idle.xmit_v6_idle = (jiffies - ppp->last_v6_xmit) / HZ;
+		v6idle.recv_v6_idle = (jiffies - ppp->last_v6_recv) / HZ;
+		if (copy_to_user(argp, &v6idle, sizeof(v6idle)))
+			break;
+		err = 0;
+		break;
+#endif
 	case PPPIOCSMAXCID:
 		if (get_user(val, p))
 			break;
@@ -799,6 +874,36 @@ static long ppp_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		}
 		err = 0;
 		break;
+
+#ifdef CONFIG_PPP_ONDEMAND_V4_V6_SEPARATE
+        /*change and set np state*/
+        case PPPIOCGNPSTATE:
+        case PPPIOCSNPSTATE:
+                if (copy_from_user(&npsti, argp, sizeof(npsti)))
+                    break;
+                if (PPP_IP != npsti.protocol && PPP_IPV6 != npsti.protocol)
+                    break;
+                if (cmd == PPPIOCGNPSTATE) { /*get*/
+                    err = -EFAULT;
+                    if (PPP_IP == npsti.protocol)
+                        npsti.state = ppp->v4_state;
+                    else
+                        npsti.state = ppp->v6_state;
+                    if (copy_to_user(argp, &npsti, sizeof(npsti)))
+                        break;
+                }
+                else /*set*/
+                {
+                    if (PPP_IP == npsti.protocol){
+                        ppp->v4_state = npsti.state;
+                    }
+                    else{
+                        ppp->v6_state = npsti.state;
+                    }
+                }
+                err = 0;
+                break;
+#endif
 
 #ifdef CONFIG_PPP_FILTER
 	case PPPIOCSPASS:
@@ -1020,6 +1125,14 @@ ppp_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	case NPMODE_ERROR:
 		goto outf;
 	}
+
+#ifdef CONFIG_ATP_HYBRID
+    struct iphdr  *iph = ip_hdr(skb);
+    if (IPVERSION == iph->version && nf_ct_need_redo_snat(skb, dev, iph->saddr)) {
+        clear_bit(IPS_SRC_NAT_DONE_BIT, &((struct nf_conn *)skb->nfct)->status);
+        goto outf;
+    }
+#endif
 
 	/* Put the 2-byte PPP protocol number on the front,
 	   making sure there is room for the address and control fields. */
@@ -1274,7 +1387,7 @@ static void ppp_setup(struct net_device *dev)
 	dev->hard_header_len = PPP_HDRLEN;
 	dev->mtu = PPP_MRU;
 	dev->addr_len = 0;
-	dev->tx_queue_len = 3;
+	dev->tx_queue_len = 20;//@20120724 ppp缓冲中排队更多数据包，20为经验值 ，内核原始值为3
 	dev->type = ARPHRD_PPP;
 	dev->flags = IFF_POINTOPOINT | IFF_NOARP | IFF_MULTICAST;
 #if defined(CONFIG_BCM_KF_WANDEV)
@@ -1373,6 +1486,37 @@ pad_compress_skb(struct ppp *ppp, struct sk_buff *skb)
 	return new_skb;
 }
 
+#ifdef CONFIG_SUPPORT_ATP
+static int atp_on_demand_filter(struct sk_buff *skb)
+{
+    unsigned int mark = 0;
+    int i = 0;
+    int proto = 0;
+
+	//此处判断如果是LAN侧报文，则进行触发
+    if (skb->mark & PPP_TRIGER_MARK)
+    {
+        //printk("receive packet from LAN.\n");
+        return 1;
+    }
+    
+#ifdef CONFIG_DT_PPP_DYN_DIAL
+    //let ipv4 ping pass
+    proto = ((skb->data[0] << 8) + skb->data[1]);
+    if ((PPP_IP == proto) && (0x01 == skb->data[11]) && (0x08 == skb->data[11+11]))
+    {
+        return 1;
+    }
+    else if((proto == PPP_IPV6)&&(skb->data[2+6] == 0x3a)&&(skb->data[2+40] == 0x80))
+    {
+        return 1;
+    }
+#endif
+
+    return 0;
+}
+#endif
+
 #if defined(CONFIG_BCM_KF_PPP)
 /*
 brcm_on_demand_filter(...) and ppp_send_frame(...) are protected for SMP+Preempt safety
@@ -1421,6 +1565,30 @@ brcm_on_demand_filter(char *data)
 }
 #endif
 
+#ifdef CONFIG_SUPPORT_ATP
+static struct sk_buff* get_original_skb(struct sk_buff *skb)
+{
+    struct sk_buff *skb2 = NULL;
+
+    skb2 = skb_copy(skb, GFP_ATOMIC);
+    if (skb2 != NULL)
+    {
+        skb2->dev = skb2->lanindev;
+        skb2->protocol = cpu_to_be16(ETH_P_IP);
+        skb2->data[0] = 0x8;
+        skb2->data[1] = 0;
+        dst_release(skb_dst(skb2));
+        nf_conntrack_put(skb2->nfct);
+        nf_conntrack_put_reasm(skb2->nfct_reasm);
+        skb_dst_set(skb2, NULL);
+        skb2->nfct = NULL;
+        skb2->nfctinfo = 0;
+        skb_pull(skb2, 2);          
+    }
+
+    return skb2;
+}
+#endif
 /*
  * Compress and send a frame.
  * The caller should have locked the xmit path,
@@ -1433,13 +1601,23 @@ ppp_send_frame(struct ppp *ppp, struct sk_buff *skb)
 	struct sk_buff *new_skb;
 	int len;
 	unsigned char *cp;
+    struct sk_buff *skb2;
+    struct net_device *dev = NULL;
+    struct ppp *ppptmp;
+    int brKey = -1;
+    int i;
+#ifdef CONFIG_PPTP_TUNNEL
+    char pptpinterface[5] = {0};
+#endif
 #if defined(CONFIG_BCM_KF_PPP)
 	unsigned char *data;
 	int timestamp = 1;
 
-	if ( proto == PPP_IP) {
+	if (( proto == PPP_IP) || (proto == PPP_IPV6)) {
 		data = skb->data;
-		timestamp = brcm_on_demand_filter(data);
+#ifdef CONFIG_SUPPORT_ATP
+        timestamp = atp_on_demand_filter(skb);
+#endif
 	}
 #endif	
 
@@ -1464,14 +1642,30 @@ ppp_send_frame(struct ppp *ppp, struct sk_buff *skb)
 #if defined(CONFIG_BCM_KF_PPP)
 	       if (timestamp)
 #endif					       
-			ppp->last_xmit = jiffies;
+			{
+				ppp->last_xmit = jiffies;
+#ifdef CONFIG_PPP_ONDEMAND_V4_V6_SEPARATE
+				if (PPP_IP == proto)
+					ppp->last_v4_xmit = jiffies;
+				if (PPP_IPV6 == proto)
+					ppp->last_v6_xmit = jiffies;
+#endif
+			}
 		skb_pull(skb, 2);
 #else
 		/* for data packets, record the time */
 #if defined(CONFIG_BCM_KF_PPP)
 	       if (timestamp)
 #endif			
-			ppp->last_xmit = jiffies;
+			{
+				ppp->last_xmit = jiffies;
+#ifdef CONFIG_PPP_ONDEMAND_V4_V6_SEPARATE
+				if (PPP_IP == proto)
+					ppp->last_v4_xmit = jiffies;
+				if (PPP_IPV6 == proto)
+					ppp->last_v6_xmit = jiffies;
+#endif
+			}
 #endif /* CONFIG_PPP_FILTER */
 	}
 
@@ -1481,6 +1675,21 @@ ppp_send_frame(struct ppp *ppp, struct sk_buff *skb)
 
 	++ppp->dev->stats.tx_packets;
 	ppp->dev->stats.tx_bytes += skb->len - 2;
+
+	/*此部分为后续新增*/
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+    /* Gather extended statistics based on the packet type */
+    switch (skb->pkt_type) {
+	case PACKET_BROADCAST:
+            ppp->dev->stats.tx_broadcast_packets ++;
+            break;
+
+	case PACKET_MULTICAST:
+            ppp->dev->stats.tx_multicast_packets++;
+            ppp->dev->stats.tx_multicast_bytes += skb->len - 2;
+            break;
+    }
+#endif   
 
 	switch (proto) {
 	case PPP_IP:
@@ -1521,6 +1730,8 @@ ppp_send_frame(struct ppp *ppp, struct sk_buff *skb)
 		/* peek at outbound CCP frames */
 		ppp_ccp_peek(ppp, skb, 0);
 		break;
+	default:
+		break;
 	}
 
 	/* try to do packet compression */
@@ -1542,17 +1753,84 @@ ppp_send_frame(struct ppp *ppp, struct sk_buff *skb)
 	 * If we are waiting for traffic (demand dialling),
 	 * queue it up for pppd to receive.
 	 */
-	if (ppp->flags & SC_LOOP_TRAFFIC) {
-		if (ppp->file.rq.qlen > PPP_MAX_RQLEN)
-			goto drop;
+#ifdef CONFIG_PPTP_TUNNEL
+    sprintf(pptpinterface,"ppp%d",pptp_interface_unit);
+#endif
+	if (ppp->flags & SC_LOOP_TRAFFIC
+#ifdef CONFIG_PPP_ONDEMAND_V4_V6_SEPARATE
+#ifdef CONFIG_PPTP_TUNNEL
+		/*pptp接口不支持按需拨号*/
+		|| ((ppp->v4_state==NPSTATE_DOWN && proto==PPP_IP) && strcmp(ppp->dev->name, pptpinterface))
+#else
+        || (ppp->v4_state==NPSTATE_DOWN && proto==PPP_IP) 
+#endif
+	    || (ppp->v6_state==NPSTATE_DOWN && proto==PPP_IPV6)
+#endif
+	) {
 #if defined(CONFIG_BCM_KF_PPP)
 		if (!timestamp)
 			goto drop;
-#endif		
-		skb_queue_tail(&ppp->file.rq, skb);
-		wake_up_interruptible(&ppp->file.rwait);
+#endif
+        if (skb->lanindev && ppp->demand_skb_header.qlen < PPP_MAX_DLEN)
+        {
+            skb2 = get_original_skb(skb);
+            if (skb2)
+            {
+                skb_queue_tail(&ppp->demand_skb_header, skb2);
+            }
+        }
+
+	    /*触发同一个bridge上的所有WAN*/
+	    for(i = 0;i < 8;i++)
+        {
+            if(strstr(g_acWanBind[i], ppp->dev->name))
+            {
+                brKey = i;
+                break;
+            }
+        }
+	    for_each_netdev(&init_net, dev)
+	    {
+            if (strstr(dev->name, "ppp"))
+            {
+                if(0 == strcmp(dev->name, ppp->dev->name)
+                    || (-1 != brKey && strstr(g_acWanBind[brKey], dev->name)))
+                {
+                    ppptmp = netdev_priv(dev);
+                        
+            		if (ppptmp->file.rq.qlen > PPP_MAX_RQLEN)
+            			continue;
+	
+            		skb2 = skb_clone(skb, GFP_ATOMIC);
+                    if(skb2)
+                    {
+                        skb_queue_tail(&ppptmp->file.rq, skb2);
+                    }
+                    else
+                    {
+                        goto drop;
+                    }
+            		wake_up_interruptible(&ppptmp->file.rwait);
+                }
+            }
+	    }
+        kfree_skb(skb);
 		return;
 	}
+
+    if ((PPP_IP == proto) && ppp->closegate)
+    {
+        if (skb->lanindev && ppp->demand_skb_header.qlen < PPP_MAX_DLEN)
+        {
+            skb2 = get_original_skb(skb);
+            if (skb2)
+            {
+                skb_queue_tail(&ppp->demand_skb_header, skb2);
+            }
+        }
+        
+        goto drop;
+    }
 
 	ppp->xmit_pending = skb;
 	ppp_push(ppp);
@@ -2116,6 +2394,20 @@ ppp_receive_nonmp_frame(struct ppp *ppp, struct sk_buff *skb)
 	++ppp->dev->stats.rx_packets;
 	ppp->dev->stats.rx_bytes += skb->len - 2;
 
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+    /* Gather extended statistics based on the packet type */
+    switch (skb->pkt_type) {
+	case PACKET_BROADCAST:
+            ppp->dev->stats.rx_broadcast_packets ++;
+            break;
+
+	case PACKET_MULTICAST:
+            ppp->dev->stats.multicast++;
+            ppp->dev->stats.rx_multicast_bytes += skb->len - 2;
+            break;
+    }
+#endif    
+
 	npi = proto_to_npindex(proto);
 	if (npi < 0) {
 		/* control or unknown frame - pass it to pppd */
@@ -2152,12 +2444,26 @@ ppp_receive_nonmp_frame(struct ppp *ppp, struct sk_buff *skb)
 		}
 		if (!(ppp->active_filter
 		      && sk_run_filter(skb, ppp->active_filter) == 0))
-	      if (timestamp)
+			if (timestamp) {
 			   ppp->last_recv = jiffies;
+#ifdef CONFIG_PPP_ONDEMAND_V4_V6_SEPARATE
+                    if (PPP_IP == proto)
+                        ppp->last_v4_recv = jiffies;
+                    if (PPP_IPV6 == proto)
+                        ppp->last_v6_recv = jiffies;
+#endif
+			}
 		skb_pull(skb, 2);
 #else
-		if (timestamp)
+		if (timestamp) {
 		   ppp->last_recv = jiffies;
+#ifdef CONFIG_PPP_ONDEMAND_V4_V6_SEPARATE
+                    if (PPP_IP == proto)
+                        ppp->last_v4_recv = jiffies;
+                    if (PPP_IPV6 == proto)
+                        ppp->last_v6_recv = jiffies;
+#endif
+		}
 #endif /* CONFIG_PPP_FILTER */
 
 #else
@@ -2181,12 +2487,26 @@ ppp_receive_nonmp_frame(struct ppp *ppp, struct sk_buff *skb)
 				return;
 			}
 			if (!(ppp->active_filter &&
-			      sk_run_filter(skb, ppp->active_filter) == 0))
+			      sk_run_filter(skb, ppp->active_filter) == 0)) {
 				ppp->last_recv = jiffies;
+#ifdef CONFIG_PPP_ONDEMAND_V4_V6_SEPARATE
+                    if (PPP_IP == proto)
+                        ppp->last_v4_recv = jiffies;
+                    if (PPP_IPV6 == proto)
+                        ppp->last_v6_recv = jiffies;
+#endif
+			}
 			__skb_pull(skb, 2);
-		} else
+		} else {
 #endif /* CONFIG_PPP_FILTER */
 			ppp->last_recv = jiffies;
+#ifdef CONFIG_PPP_ONDEMAND_V4_V6_SEPARATE
+                    if (PPP_IP == proto)
+                        ppp->last_v4_recv = jiffies;
+                    if (PPP_IPV6 == proto)
+                        ppp->last_v6_recv = jiffies;
+#endif
+		}
 #endif /* CONFIG_BCM_KF_PPP */
 
 		if ((ppp->dev->flags & IFF_UP) == 0 ||
@@ -3035,6 +3355,12 @@ ppp_create_interface(struct net *net, int unit, int *retp)
 	ppp->file.hdrlen = PPP_HDRLEN - 2;	/* don't count proto bytes */
 	for (i = 0; i < NUM_NP; ++i)
 		ppp->npmode[i] = NPMODE_PASS;
+#ifdef CONFIG_PPP_ONDEMAND_V4_V6_SEPARATE
+    /*init proto state*/
+	ppp->v4_state = NPSTATE_DOWN;
+	ppp->v6_state = NPSTATE_DOWN;
+#endif
+
 	INIT_LIST_HEAD(&ppp->channels);
 	spin_lock_init(&ppp->rlock);
 	spin_lock_init(&ppp->wlock);
@@ -3043,6 +3369,10 @@ ppp_create_interface(struct net *net, int unit, int *retp)
 	skb_queue_head_init(&ppp->mrq);
 #endif /* CONFIG_PPP_MULTILINK */
 
+    /*for on demand*/
+    ppp->closegate = 0;
+    skb_queue_head_init(&ppp->demand_skb_header);
+    
 	/*
 	 * drum roll: don't forget to set
 	 * the net device is belong to
@@ -3077,8 +3407,10 @@ ppp_create_interface(struct net *net, int unit, int *retp)
 
 	/* Initialize the new ppp unit */
 	ppp->file.index = unit;
+	sprintf(dev->name, "ppp%d", unit);
 
-#if defined(CONFIG_BCM_KF_PPP)
+	/*从DT同步，使用自己的接口名生成方式*/
+#if 0 //defined(CONFIG_BCM_KF_PPP)
    if (unit >= 0)
    {
       unsigned num[3]={0,0,0};
@@ -3111,8 +3443,8 @@ ppp_create_interface(struct net *net, int unit, int *retp)
          sprintf(dev->name, "pppoa%d", num[0]);
       }
    }
-#else
-	sprintf(dev->name, "ppp%d", unit);
+//#else
+//	sprintf(dev->name, "ppp%d", unit);
 #endif
 
 
@@ -3218,6 +3550,8 @@ static void ppp_destroy_interface(struct ppp *ppp)
 #ifdef CONFIG_PPP_MULTILINK
 	skb_queue_purge(&ppp->mrq);
 #endif /* CONFIG_PPP_MULTILINK */
+	/*清除按需拨号队列*/
+	skb_queue_purge(&ppp->demand_skb_header);
 #ifdef CONFIG_PPP_FILTER
 	kfree(ppp->pass_filter);
 	ppp->pass_filter = NULL;
@@ -3423,6 +3757,147 @@ static void *unit_find(struct idr *p, int n)
 {
 	return idr_find(p, n);
 }
+
+#if (defined CONFIG_HSAN)
+#include <linux/if_pppox.h>
+#include <linux/etherdevice.h>
+struct pppox_sock *ppp_get_sock(struct net_device *ppp_dev)
+{
+    struct ppp        *ppp  = NULL;
+    struct list_head  *list = NULL;
+    struct channel    *pch  = NULL;
+    struct sock       *sk   = NULL;
+    struct pppox_sock *po   = NULL;
+
+    if (0 == (ppp_dev->flags & IFF_POINTOPOINT))
+    {
+        return NULL;
+    }
+
+    if (   NULL == (ppp = netdev_priv(ppp_dev))
+        || NULL == (list = &ppp->channels)
+        || list_empty(list))
+    {
+        return NULL;
+    }
+
+    if ((ppp->flags & SC_MULTILINK) == 0) 
+    {
+        list= list->next;
+        pch = list_entry(list, struct channel, clist);
+        sk  = (struct sock *) pch->chan->private;
+        po  = pppox_sk(sk);
+    }
+
+    return po;
+}
+
+unsigned short ppp_get_sessionid(int ifindex)
+{
+    struct net_device *ppp_dev  = NULL;
+    unsigned short    sessionid = -1;
+    struct pppox_sock *po       = NULL;
+
+    ppp_dev = dev_get_by_index(&init_net, ifindex);
+    if (ppp_dev == NULL)
+    {
+        goto out_0;
+    }
+    
+    po = ppp_get_sock(ppp_dev);
+    if (NULL == po)
+    {
+        goto out_1;
+    }
+
+    sessionid = po->num;
+
+    dev_put(ppp_dev);
+    return sessionid;
+
+out_1:
+    dev_put(ppp_dev);
+out_0:
+    return -1;
+}
+
+int ppp_get_mac(int ifindex, unsigned char *local_mac, unsigned char *peer_mac)
+{
+    struct net_device *ppp_dev    = NULL;
+    struct net_device *master_dev = NULL;
+    struct pppox_sock *po         = NULL;
+
+    ppp_dev = dev_get_by_index(&init_net, ifindex);
+    if (NULL == ppp_dev)
+    {
+        goto out_0;
+    }
+
+    po = ppp_get_sock(ppp_dev);
+    if (NULL == po)
+    {
+        goto out_1;
+    }
+
+    master_dev = dev_get_by_index(&init_net, po->proto.pppoe.ifindex);
+    if (NULL == master_dev)
+    {
+        goto out_1;
+    }
+    
+    if (   !is_valid_ether_addr(master_dev->dev_addr)
+        || !is_valid_ether_addr(po->proto.pppoe.pa.remote))
+    {
+        goto out_2;
+    }
+    
+    memcpy(local_mac, master_dev->dev_addr, ETH_ALEN);
+    memcpy(peer_mac,  po->proto.pppoe.pa.remote, ETH_ALEN);
+
+    dev_put(ppp_dev);
+    dev_put(master_dev);
+    return 0;
+
+out_2:
+    dev_put(master_dev);
+out_1:
+    dev_put(ppp_dev);
+out_0:
+    return -1;
+}
+
+int ppp_get_matserindex(int ifindex, int *master_ifindex)
+{
+    struct net_device *ppp_dev = NULL;
+    struct pppox_sock *po      = NULL;
+
+    ppp_dev = dev_get_by_index(&init_net, ifindex);
+    if (NULL == ppp_dev )
+    {
+        goto out_0;
+    }
+
+    po = ppp_get_sock(ppp_dev);
+    if (NULL == po)
+    {
+        goto out_1;
+    }
+
+    (*master_ifindex) = po->proto.pppoe.ifindex;
+
+    dev_put(ppp_dev);    
+    return 0;
+
+out_1:
+    dev_put(ppp_dev);
+out_0:
+    return -1;
+}
+
+EXPORT_SYMBOL(ppp_get_matserindex);
+EXPORT_SYMBOL(ppp_get_sessionid);
+EXPORT_SYMBOL(ppp_get_mac);
+#endif
 
 /* Module/initialization stuff */
 

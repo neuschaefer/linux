@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *  linux/kernel/printk.c
  *
  *  Copyright (C) 1991, 1992  Linus Torvalds
@@ -43,6 +47,15 @@
 #include <linux/rculist.h>
 
 #include <asm/uaccess.h>
+
+/*Add by Huawei 2010-9-21 添加去掉console打印的特性*/
+#include "atpconfig.h"
+/*add by  2010-11-10 for on/off console*/
+#if defined(SUPPORT_ATP_SECURITY_REDLINE_CONSOLE)
+extern int g_TagConsole;
+#endif
+/*end add by  2010-11-10 for on/off console*/
+/*Add by Huawei 2010-9-21 添加去掉console打印的特性*/
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/printk.h>
@@ -518,6 +531,19 @@ static void __call_console_drivers(unsigned start, unsigned end)
 {
 	struct console *con;
 
+/*Add by Huawei 2010-9-21 添加去掉console打印的特性*/
+/*add by  2010-11-10*/
+#ifndef HISI_CHIP
+#if defined(SUPPORT_ATP_SECURITY_REDLINE_CONSOLE)
+    if (g_TagConsole == 0)
+    {
+		return;
+	}
+#endif
+#endif
+/*end add by  2010-11-10*/
+/*Add by Huawei 2010-9-21 添加去掉console打印的特性*/
+
 	migrate_disable();
 	for_each_console(con) {
 		if (exclusive_console && con != exclusive_console)
@@ -699,9 +725,20 @@ static void call_console_drivers(unsigned start, unsigned end)
 	cur_index = start;
 	start_print = start;
 	while (cur_index != end) {
-		if (msg_level < 0 && ((end - cur_index) > 2)) {
+		if (msg_level < 0 && ((end - cur_index) > 2)) { 
+			/*  
+			 * prepare buf_prefix, as a contiguous array,  
+			 * to be processed by log_prefix function  
+			 */  
+			char buf_prefix[SYSLOG_PRI_MAX_LENGTH+1];  
+			unsigned i;  
+			for (i = 0; i < ((end - cur_index)) && (i < SYSLOG_PRI_MAX_LENGTH); i++) {  
+				buf_prefix[i] = LOG_BUF(cur_index + i);  
+			}  
+			buf_prefix[i] = '\0'; /* force '\0' as last string character */  
+
 			/* strip log prefix */
-			cur_index += log_prefix(&LOG_BUF(cur_index), &msg_level, NULL);
+			cur_index += log_prefix((const char *)&buf_prefix, &msg_level, NULL);
 			start_print = cur_index;
 		}
 		while (cur_index != end) {
@@ -805,11 +842,41 @@ static int have_callable_console(void)
  *
  * See the vsnprintf() documentation for format string extensions over C99.
  */
+/* !< define in bhal.c > */
+/*SUPPORT_HG253*/
+#if defined(SUPPORT_ATP_PRINTK_OFF)
+/*g_ulkrnl_dbg_flags = 1 open printk ,0 close printk*/
+/*Start Add For SUPPORT MAX3100 SPI TO UART By  2011-12-06*/
+#ifdef CONFIG_SPI_MAX3100_CONSOLE
+	int g_ulkrnl_dbg_flags = 1;
+#else
+	int g_ulkrnl_dbg_flags =1; 
+#endif
+/*End Add For SUPPORT MAX3100 SPI TO UART By  2011-12-06*/
+#endif
+/*end*/
 
 asmlinkage int printk(const char *fmt, ...)
 {
 	va_list args;
 	int r;
+
+/*SUPPORT_HG253*/
+#if defined(SUPPORT_ATP_PRINTK_OFF)
+    if (!g_ulkrnl_dbg_flags)
+    {
+        return 0;
+    }
+#endif
+/*end*/
+
+#if defined(CONFIG_ATP_HYBRID)
+    /*skip BCM too many "FCACHEfc_transmit ERROR: unexpected IP protocol 6"*/
+    if (strstr(fmt, "unexpected IP protocol"))
+    {
+        return 0;
+    }
+#endif
 
 #ifdef CONFIG_KGDB_KDB
 	if (unlikely(kdb_trap_printk)) {
@@ -1923,4 +1990,71 @@ void kmsg_dump(enum kmsg_dump_reason reason)
 		dumper->dump(dumper, reason, s1, l1, s2, l2);
 	rcu_read_unlock();
 }
+
+#define LOG_STRING_LEN      (1000)
+#define COLOR_START         "\033[1;33;40m"
+#define COLOR_END           "\033[0m"
+void color_printk(const char *pszFunc, 
+            int ulLine, unsigned long retip, char *pstFmt, ...)
+{
+     static char acBuffer[LOG_STRING_LEN] = {0};
+     char *pszStr = NULL;
+     unsigned int ulLen = 0;
+     unsigned int ulAllLen = 0;
+     va_list ap;
+
+     pszStr = acBuffer;
+    memset(acBuffer, 0, sizeof(acBuffer) );
+    ulLen = snprintf(pszStr, (LOG_STRING_LEN - ulAllLen), "%s ", COLOR_START);
+    pszStr += ulLen;
+    ulAllLen += ulLen;
+
+    if (pszFunc)
+    {
+        ulLen = snprintf(pszStr, (LOG_STRING_LEN - ulAllLen), 
+                            "Func:[%s] ", pszFunc);
+        pszStr += ulLen;
+        ulAllLen += ulLen;
+    }
+
+    if (ulLine)
+    {
+        ulLen = snprintf(pszStr, (LOG_STRING_LEN - ulAllLen), 
+                            "Line:[%d] ", ulLine);
+        pszStr += ulLen;
+        ulAllLen += ulLen;
+    }
+    
+    if (retip)
+    {
+        ulLen = snprintf(pszStr, (LOG_STRING_LEN - ulAllLen), 
+                            "caller:[%p] ", (void *)retip);
+        pszStr += ulLen;
+        ulAllLen += ulLen;
+    }
+
+        ulLen = snprintf(pszStr, (LOG_STRING_LEN - ulAllLen), "%s ====> ", COLOR_END);
+        pszStr += ulLen;
+        ulAllLen += ulLen;
+
+    
+    va_start(ap, pstFmt);
+    ulLen = vsnprintf(pszStr, (LOG_STRING_LEN - ulAllLen), pstFmt, ap);    
+    va_end(ap);
+
+    pszStr += ulLen;
+    ulAllLen += ulLen;
+    snprintf(pszStr, (LOG_STRING_LEN - ulAllLen), "%s", "\r\n");
+
+    printk(acBuffer);
+
+    return ;
+}
+EXPORT_SYMBOL(color_printk);
+/*SUPPORT_HG253*/
+#if defined(SUPPORT_ATP_PRINTK_OFF)
+EXPORT_SYMBOL(g_ulkrnl_dbg_flags);
+#endif
+/*end*/
+
 #endif

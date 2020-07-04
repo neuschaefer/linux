@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *  linux/kernel/panic.c
  *
  *  Copyright (C) 1991, 1992  Linus Torvalds
@@ -48,6 +52,22 @@ static long no_blink(int state)
 /* Returns how long it waited in ms */
 long (*panic_blink)(int state);
 EXPORT_SYMBOL(panic_blink);
+#ifdef CONFIG_BUILD_PANIC
+struct pt_regs *p_regs = NULL;/*记录保存register信息*/
+typedef void (* hw_write_panic_info)(char acPanicInfo[128],  struct pt_regs *regs);
+hw_write_panic_info g_pf_write_panic_info = NULL;/*注册回调函数*/
+
+void hw_set_write_panic_func(hw_write_panic_info  pf_write_panic_info)
+{
+	g_pf_write_panic_info =  pf_write_panic_info;
+}
+void set_panic_regs(struct pt_regs *regs)
+{
+    p_regs = regs;
+}
+
+EXPORT_SYMBOL(hw_set_write_panic_func);
+#endif
 
 /*
  * Stop ourself in panic -- architecture code may override this
@@ -73,6 +93,9 @@ void panic(const char *fmt, ...)
 	va_list args;
 	long i, i_next = 0;
 	int state = 0;
+#ifdef CONFIG_BUILD_PANIC		
+	char acPanicInfo[128] = {0};
+#endif
 
 	/*
 	 * It's possible to come here directly from a panic-assertion and
@@ -93,6 +116,14 @@ void panic(const char *fmt, ...)
 	vsnprintf(buf, sizeof(buf), fmt, args);
 	va_end(args);
 	printk(KERN_EMERG "Kernel panic - not syncing: %s\n",buf);
+#ifdef CONFIG_BUILD_PANIC
+	if (NULL != g_pf_write_panic_info)
+	{
+            snprintf(acPanicInfo, 127, "%s", buf);
+	     /*回调函数将panic信息写入到Panic内存*/		
+            g_pf_write_panic_info(acPanicInfo, p_regs);
+	}
+#endif
 #ifdef CONFIG_DEBUG_BUGVERBOSE
 	/*
 	 * Avoid nested stack-dumping if a panic occurs during oops processing
@@ -413,7 +444,7 @@ static void warn_slowpath_common(const char *file, int line, void *caller,
 		vprintk(args->fmt, args->args);
 
 	print_modules();
-	dump_stack();
+	//dump_stack();
 	print_oops_end_marker();
 	add_taint(taint);
 }

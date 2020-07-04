@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * net/sched/act_api.c	Packet action API.
  *
  *		This program is free software; you can redistribute it and/or
@@ -26,6 +30,19 @@
 #include <net/sch_generic.h>
 #include <net/act_api.h>
 #include <net/netlink.h>
+
+#ifdef CONFIG_ATP_HYBRID
+#include <net/ip.h>
+#include <linux/tc_act/tc_gact.h>
+
+/* Private data stored for received packets in the skb.
+ */
+struct act_skb_cb {
+	int     (*act)(struct sk_buff *, struct tc_action *, struct tcf_result *);
+};
+
+#define ACT_SKB_CB(skb)	((struct act_skb_cb *) &skb->cb[sizeof(struct inet_skb_parm)])
+#endif
 
 void tcf_hash_destroy(struct tcf_common *p, struct tcf_hashinfo *hinfo)
 {
@@ -377,6 +394,32 @@ int tcf_action_exec(struct sk_buff *skb, const struct tc_action *act,
 		ret = TC_ACT_OK;
 		goto exec_done;
 	}
+#ifdef CONFIG_ATP_HYBRID    
+	while ((a = act) != NULL) {
+repeat:
+        /* 执行多个act时，后面的act无法执行，每次都是执行第一个act，添加判断之前执行或该act之后，           
+           不再执行， 同时跳过gact处理，直接进入下一个act */
+		if ((a->ops && a->ops->act) 
+            && (ACT_SKB_CB(skb)->act != a->ops->act)
+            && (a->ops->type != TCA_ACT_GACT))
+        {
+
+            ACT_SKB_CB(skb)->act = a->ops->act;
+            
+			ret = a->ops->act(skb, a, res);
+			if (TC_MUNGED & skb->tc_verd) {
+				/* copied already, allow trampling */
+				skb->tc_verd = SET_TC_OK2MUNGE(skb->tc_verd);
+				skb->tc_verd = CLR_TC_MUNGED(skb->tc_verd);
+			}
+			if (ret == TC_ACT_REPEAT)
+				goto repeat;	/* we need a ttl - JHS */
+			if (ret != TC_ACT_PIPE)
+				goto exec_done;
+		}
+		act = a->next;
+	}
+#else
 	while ((a = act) != NULL) {
 repeat:
 		if (a->ops && a->ops->act) {
@@ -393,6 +436,7 @@ repeat:
 		}
 		act = a->next;
 	}
+#endif
 exec_done:
 	return ret;
 }

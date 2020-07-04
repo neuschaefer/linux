@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * INET		An implementation of the TCP/IP protocol suite for the LINUX
  *		operating system.  INET is implemented using the  BSD Socket
  *		interface as the means of communication with the user level.
@@ -55,6 +59,9 @@ extern void tcp_time_wait(struct sock *sk, int state, int timeo);
 #define MAX_TCP_HEADER	(128 + MAX_HEADER)
 #define MAX_TCP_OPTION_SPACE 40
 
+/*Modify  CVE-2019-11479 20190925 */
+#define TCP_MIN_SND_MSS      500
+#define TCP_MIN_GSO_SIZE     (TCP_MIN_SND_MSS - MAX_TCP_OPTION_SPACE)
 /* 
  * Never offer a window over 32767 without using window scaling. Some
  * poor stacks do signed 16bit maths! 
@@ -206,6 +213,8 @@ extern void tcp_time_wait(struct sock *sk, int state, int timeo);
 /* TCP initial congestion window as per draft-hkchu-tcpm-initcwnd-01 */
 #define TCP_INIT_CWND		10
 
+#define TCP_OUT_OF_ORDER_MAX    60
+
 extern struct inet_timewait_death_row tcp_death_row;
 
 /* sysctl variables for tcp */
@@ -246,6 +255,7 @@ extern int sysctl_tcp_tso_win_divisor;
 extern int sysctl_tcp_abc;
 extern int sysctl_tcp_mtu_probing;
 extern int sysctl_tcp_base_mss;
+extern int sysctl_tcp_min_snd_mss;   /*Modify  CVE-2019-11479 20190925 */
 extern int sysctl_tcp_workaround_signed_windows;
 extern int sysctl_tcp_slow_start_after_idle;
 extern int sysctl_tcp_max_ssthresh;
@@ -256,6 +266,11 @@ extern int sysctl_tcp_thin_dupack;
 extern atomic_long_t tcp_memory_allocated;
 extern struct percpu_counter tcp_sockets_allocated;
 extern int tcp_memory_pressure;
+
+/* BEGIN: Added, 2013/7/18 For port scan.*/
+extern int sysctl_port_scan;
+extern int sysctl_port_scan_ipv6;
+/* END:   Added, 2013/7/18 */
 
 /*
  * The next routines deal with comparing 32 bit unsigned ints

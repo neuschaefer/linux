@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *	DDP:	An implementation of the AppleTalk DDP protocol for
  *		Ethernet 'ELAP'.
  *
@@ -1740,7 +1744,8 @@ static int atalk_recvmsg(struct kiocb *iocb, struct socket *sock, struct msghdr 
 			 size_t size, int flags)
 {
 	struct sock *sk = sock->sk;
-	struct sockaddr_at *sat = (struct sockaddr_at *)msg->msg_name;
+	//CVE-2013-7270
+	//struct sockaddr_at *sat = (struct sockaddr_at *)msg->msg_name;
 	struct ddpehdr *ddp;
 	int copied = 0;
 	int offset = 0;
@@ -1768,17 +1773,15 @@ static int atalk_recvmsg(struct kiocb *iocb, struct socket *sock, struct msghdr 
 		msg->msg_flags |= MSG_TRUNC;
 	}
 	err = skb_copy_datagram_iovec(skb, offset, msg->msg_iov, copied);
-
-	if (!err) {
-		if (sat) {
-			sat->sat_family      = AF_APPLETALK;
-			sat->sat_port        = ddp->deh_sport;
-			sat->sat_addr.s_node = ddp->deh_snode;
-			sat->sat_addr.s_net  = ddp->deh_snet;
-		}
-		msg->msg_namelen = sizeof(*sat);
+	//CVE-2013-7270
+	if (!err && msg->msg_name) {
+		struct sockaddr_at *sat = msg->msg_name;
+		sat->sat_family      = AF_APPLETALK;
+		sat->sat_port        = ddp->deh_sport;
+		sat->sat_addr.s_node = ddp->deh_snode;
+		sat->sat_addr.s_net  = ddp->deh_snet;
+	    msg->msg_namelen     = sizeof(*sat);
 	}
-
 	skb_free_datagram(sk, skb);	/* Free the datagram. */
 
 out:

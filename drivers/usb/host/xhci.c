@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * xHCI host controller driver
  *
  * Copyright (C) 2008 Intel Corp.
@@ -28,9 +32,15 @@
 #include <linux/slab.h>
 
 #include "xhci.h"
+#if (defined CONFIG_HSAN)
+#include <mach/hi_hsan.h>
+#endif
 
 #define DRIVER_AUTHOR "Sarah Sharp"
 #define DRIVER_DESC "'eXtensible' Host Controller (xHC) Driver"
+#if (defined CONFIG_HSAN)
+static const char	hcd_name [] = "xhci_hcd";
+#endif
 
 /* Some 0.95 hardware can't handle the chain bit on a Link TRB being cleared */
 static int link_quirk;
@@ -187,7 +197,7 @@ int xhci_reset(struct xhci_hcd *xhci)
 	return ret;
 }
 
-#ifdef CONFIG_PCI
+#if (defined CONFIG_PCI) && (!(defined CONFIG_HSAN))
 static int xhci_free_msi(struct xhci_hcd *xhci)
 {
 	int i;
@@ -1653,28 +1663,28 @@ static int xhci_configure_endpoint_result(struct xhci_hcd *xhci,
 
 	switch (*cmd_status) {
 	case COMP_ENOMEM:
-		dev_warn(&udev->dev, "Not enough host controller resources "
-				"for new device state.\n");
+		//dev_warn(&udev->dev, "Not enough host controller resources "
+		//		"for new device state.\n");
 		ret = -ENOMEM;
 		/* FIXME: can we allocate more resources for the HC? */
 		break;
 	case COMP_BW_ERR:
 	case COMP_2ND_BW_ERR:
-		dev_warn(&udev->dev, "Not enough bandwidth "
-				"for new device state.\n");
+		//dev_warn(&udev->dev, "Not enough bandwidth "
+		//		"for new device state.\n");
 		ret = -ENOSPC;
 		/* FIXME: can we go back to the old state? */
 		break;
 	case COMP_TRB_ERR:
 		/* the HCD set up something wrong */
-		dev_warn(&udev->dev, "ERROR: Endpoint drop flag = 0, "
-				"add flag = 1, "
-				"and endpoint is not disabled.\n");
+		//dev_warn(&udev->dev, "ERROR: Endpoint drop flag = 0, "
+		//		"add flag = 1, "
+		//		"and endpoint is not disabled.\n");
 		ret = -EINVAL;
 		break;
 	case COMP_DEV_ERR:
-		dev_warn(&udev->dev, "ERROR: Incompatible device for endpoint "
-				"configure command.\n");
+		//dev_warn(&udev->dev, "ERROR: Incompatible device for endpoint "
+		//		"configure command.\n");
 		ret = -ENODEV;
 		break;
 	case COMP_SUCCESS:
@@ -1698,27 +1708,27 @@ static int xhci_evaluate_context_result(struct xhci_hcd *xhci,
 
 	switch (*cmd_status) {
 	case COMP_EINVAL:
-		dev_warn(&udev->dev, "WARN: xHCI driver setup invalid evaluate "
-				"context command.\n");
+		//dev_warn(&udev->dev, "WARN: xHCI driver setup invalid evaluate "
+		//		"context command.\n");
 		ret = -EINVAL;
 		break;
 	case COMP_EBADSLT:
-		dev_warn(&udev->dev, "WARN: slot not enabled for"
-				"evaluate context command.\n");
+		//dev_warn(&udev->dev, "WARN: slot not enabled for"
+		//		"evaluate context command.\n");
 	case COMP_CTX_STATE:
-		dev_warn(&udev->dev, "WARN: invalid context state for "
-				"evaluate context command.\n");
+		//dev_warn(&udev->dev, "WARN: invalid context state for "
+		//		"evaluate context command.\n");
 		xhci_dbg_ctx(xhci, virt_dev->out_ctx, 1);
 		ret = -EINVAL;
 		break;
 	case COMP_DEV_ERR:
-		dev_warn(&udev->dev, "ERROR: Incompatible device for evaluate "
-				"context command.\n");
+		//dev_warn(&udev->dev, "ERROR: Incompatible device for evaluate "
+		//		"context command.\n");
 		ret = -ENODEV;
 		break;
 	case COMP_MEL_ERR:
 		/* Max Exit Latency too large error */
-		dev_warn(&udev->dev, "WARN: Max Exit Latency too large\n");
+		//dev_warn(&udev->dev, "WARN: Max Exit Latency too large\n");
 		ret = -EINVAL;
 		break;
 	case COMP_SUCCESS:
@@ -3595,12 +3605,12 @@ int xhci_address_device(struct usb_hcd *hcd, struct usb_device *udev)
 		ret = -EINVAL;
 		break;
 	case COMP_TX_ERR:
-		dev_warn(&udev->dev, "Device not responding to set address.\n");
+		//dev_warn(&udev->dev, "Device not responding to set address.\n");
 		ret = -EPROTO;
 		break;
 	case COMP_DEV_ERR:
-		dev_warn(&udev->dev, "ERROR: Incompatible device for address "
-				"device command.\n");
+		//dev_warn(&udev->dev, "ERROR: Incompatible device for address "
+		//		"device command.\n");
 		ret = -ENODEV;
 		break;
 	case COMP_SUCCESS:
@@ -4059,6 +4069,13 @@ int xhci_gen_setup(struct usb_hcd *hcd, xhci_get_quirks_t get_quirks)
 
 	get_quirks(dev, xhci);
 
+	/* In xhci controllers which follow xhci 1.0 spec gives a spurious
+	 * success event after a short transfer. This quirk will ignore such
+	 * spurious event.
+	 */
+	if (xhci->hci_version > 0x96)
+		xhci->quirks |= XHCI_SPURIOUS_SUCCESS;
+
 	/* Make sure the HC is halted. */
 	retval = xhci_halt(xhci);
 	if (retval)
@@ -4095,15 +4112,35 @@ MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_AUTHOR(DRIVER_AUTHOR);
 MODULE_LICENSE("GPL");
 
+#if (defined CONFIG_HSAN)
+#include "../hsan/hi_xhci.c"
+#endif
 static int __init xhci_hcd_init(void)
 {
 	int retval;
 
+#if (defined CONFIG_HSAN)
+    
+    if(HI_CHIP_ID_H_E == hi_get_chip_id())
+    {
+        return -ENODEV;
+    }
+  
+    if (usb_disabled())
+        return -ENODEV;
+    
+    retval = platform_device_register(&hiusb_xhci_platdev);
+    if (retval < 0) {
+        printk("%s->%d, platform_device_register fail.\n", __FUNCTION__, __LINE__);
+        return -ENODEV;
+    }        
+#else
 	retval = xhci_register_pci();
 	if (retval < 0) {
 		printk(KERN_DEBUG "Problem registering PCI driver.");
 		return retval;
 	}
+#endif
 	retval = xhci_register_plat();
 	if (retval < 0) {
 		printk(KERN_DEBUG "Problem registering platform driver.");
@@ -4129,14 +4166,22 @@ static int __init xhci_hcd_init(void)
 	BUILD_BUG_ON(sizeof(struct xhci_doorbell_array) != 256*32/8);
 	return 0;
 unreg_pci:
+#if !(defined CONFIG_HSAN)
 	xhci_unregister_pci();
+#endif	
 	return retval;
 }
 module_init(xhci_hcd_init);
 
 static void __exit xhci_hcd_cleanup(void)
 {
-	xhci_unregister_pci();
-	xhci_unregister_plat();
+#if (defined CONFIG_HSAN)
+	if(HI_CHIP_ID_T_E == hi_get_chip_id())
+	{
+		xhci_unregister_plat();
+		platform_device_unregister(&hiusb_xhci_platdev);
+	}
+#endif
+
 }
 module_exit(xhci_hcd_cleanup);

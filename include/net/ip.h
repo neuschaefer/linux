@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * INET		An implementation of the TCP/IP protocol suite for the LINUX
  *		operating system.  INET is implemented using the  BSD Socket
  *		interface as the means of communication with the user level.
@@ -421,6 +425,7 @@ static inline struct sk_buff *ip_check_defrag(struct sk_buff *skb, u32 user)
 #endif
 int ip_frag_mem(struct net *net);
 int ip_frag_nqueues(struct net *net);
+int ip_frag_nipcnt(struct net *net); /* add ipfrag count */
 
 /*
  *	Functions provided by ip_forward.c

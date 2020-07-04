@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *  ebt_ip6
  *
  *	Authors:
@@ -33,6 +37,29 @@ union pkthdr {
 	} icmphdr;
 };
 
+#ifdef CONFIG_BRIDGE_EBT_IP_IPRANGE
+static inline int iprange_ipv6_sub(const struct in6_addr *a, const struct in6_addr *b)
+{
+	unsigned int i;
+	int r;
+
+	for (i = 0; i < 4; ++i) {
+		r = ntohl(a->s6_addr32[i]) - ntohl(b->s6_addr32[i]);
+		if (r != 0)
+			return r;
+	}
+
+	return 0;
+}
+#endif
+
+// get IPv6 flowlabel field
+static inline __u32 ipv6_get_flfield(const struct ipv6hdr *ipv6h)
+{
+    __u32 fl = (*(const __be32 *)ipv6h);
+	return (fl & IPV6_FLOWLABEL_MASK);
+}
+
 static bool
 ebt_ip6_mt(const struct sk_buff *skb, struct xt_action_param *par)
 {
@@ -41,18 +68,49 @@ ebt_ip6_mt(const struct sk_buff *skb, struct xt_action_param *par)
 	struct ipv6hdr _ip6h;
 	const union pkthdr *pptr;
 	union pkthdr _pkthdr;
+#ifdef CONFIG_BRIDGE_EBT_IP_IPRANGE
+    bool m;
+#endif
 
 	ih6 = skb_header_pointer(skb, 0, sizeof(_ip6h), &_ip6h);
 	if (ih6 == NULL)
 		return false;
+	/* info->dscp is first 6 bit of traffic class 2013-3-29 */
 	if (info->bitmask & EBT_IP6_TCLASS &&
-	   FWINV(info->tclass != ipv6_get_dsfield(ih6), EBT_IP6_TCLASS))
+	   FWINV(info->tclass != (ipv6_get_dsfield(ih6)>>2), EBT_IP6_TCLASS))
+		return false;
+
+    // check flow label
+	if (info->bitmask & EBT_IP6_FLOWLBL &&
+	   FWINV(info->flowlbl != ipv6_get_flfield(ih6), EBT_IP6_FLOWLBL))
 		return false;
 	if (FWINV(ipv6_masked_addr_cmp(&ih6->saddr, &info->smsk,
 				       &info->saddr), EBT_IP6_SOURCE) ||
 	    FWINV(ipv6_masked_addr_cmp(&ih6->daddr, &info->dmsk,
 				       &info->daddr), EBT_IP6_DEST))
 		return false;
+#ifdef CONFIG_BRIDGE_EBT_IP_IPRANGE    
+    //ipv6 range
+    if (info->bitmask & EBT_IP6_SRANGE)
+    {
+		m  = iprange_ipv6_sub(&ih6->saddr, &info->ip6range_src.min_ip6) < 0;
+		m |= iprange_ipv6_sub(&ih6->saddr, &info->ip6range_src.max_ip6) > 0;
+		m ^= !!(info->invflags & EBT_IP6_SRANGE);
+		if (m)
+			return false;
+    }
+    
+    if (info->bitmask & EBT_IP6_DRANGE)
+    {
+		m  = iprange_ipv6_sub(&ih6->daddr, &info->ip6range_dst.min_ip6) < 0;
+		m |= iprange_ipv6_sub(&ih6->daddr, &info->ip6range_dst.max_ip6) > 0;
+		m ^= !!(info->invflags & EBT_IP6_DRANGE);
+		if (m)
+		{
+			return false;
+		}
+    }
+#endif
 	if (info->bitmask & EBT_IP6_PROTO) {
 		uint8_t nexthdr = ih6->nexthdr;
 		__be16 frag_off;

@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *	X.25 Packet Layer release 002
  *
  *	This is ALPHA test software. This code may break your machine,
@@ -1343,9 +1347,9 @@ static int x25_recvmsg(struct kiocb *iocb, struct socket *sock,
 	if (sx25) {
 		sx25->sx25_family = AF_X25;
 		sx25->sx25_addr   = x25->dest_addr;
+		//CVE-2013-7270
+        msg->msg_namelen = sizeof(*sx25);
 	}
-
-	msg->msg_namelen = sizeof(struct sockaddr_x25);
 
 	x25_check_rbuf(sk);
 	rc = copied;

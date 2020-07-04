@@ -197,6 +197,16 @@ config NF_CONNTRACK_FTP
 	  which generalize ip_conntrack to support other layer 3 protocols.
 
 	  To compile it as a module, choose M here.  If unsure, say N.
+config ATP_CONNTRACK_CLEAN
+        bool "Connection tracking clean support (EXPERIMENTAL) "
+        depends on NF_CONNTRACK && SUPPORT_ATP
+		help
+		  Clean conntrack as following:
+		  1: clean dns conntracks; 2: clean sipproxy conntracks;
+		  9: clean all conntracks; others: clean conntracks by dest port
+		  exp: echo 80 > /proc/sys/net/ipv4/netfilter/ip_ct_clean
+
+		  If unsure, say N.
 
 config NF_CONNTRACK_H323
 	tristate "H.323 protocol support"
@@ -741,6 +751,16 @@ config NETFILTER_XT_TARGET_TCPMSS
 
 	  To compile it as a module, choose M here.  If unsure, say N.
 
+config NETFILTER_XT_MATCH_DNS_FLT
+	tristate  '"dns_flt" match support'
+	depends on NETFILTER_XTABLES
+	help
+    This option adds a `dns_flt' match, which allows you to match
+    the dns name in the dns packet.
+
+    If you want to compile it as a module, say M here and read
+    <file:Documentation/modules.txt>.  If unsure, say `N'.
+
 config NETFILTER_XT_TARGET_TCPOPTSTRIP
 	tristate '"TCPOPTSTRIP" target support (EXPERIMENTAL)'
 	depends on EXPERIMENTAL
@@ -1210,6 +1230,14 @@ config NETFILTER_XT_MATCH_U32
 	  The specification of what to extract is general enough to skip over
 	  headers with lengths stored in the packet, as in IP or TCP header
 	  lengths.
+
+	  Details and examples are in the kernel module source.
+
+config NETFILTER_XT_MATCH_IIF
+	tristate '"iif" match support'
+	depends on NETFILTER_ADVANCED
+	---help---
+	  iif allows you to match the original packet receive interface
 
 	  Details and examples are in the kernel module source.
 

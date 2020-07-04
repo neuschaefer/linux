@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * Driver model for leds and led triggers
  *
  * Copyright (C) 2005 John Lenz <lenz@cs.wisc.edu>
@@ -63,8 +67,11 @@ struct led_classdev {
 	const char		*default_trigger;	/* Trigger to use */
 
 	unsigned long		 blink_delay_on, blink_delay_off;
+	unsigned long		 blink_delay_count, blink_delay_off2;
+	unsigned long		 blink_delay_current;
 	struct timer_list	 blink_timer;
 	int			 blink_brightness;
+	int          breath_speed;
 #if 1
     int  traffic;
 #endif
@@ -102,6 +109,8 @@ extern void led_classdev_resume(struct led_classdev *led_cdev);
 extern void led_blink_set(struct led_classdev *led_cdev,
 			  unsigned long *delay_on,
 			  unsigned long *delay_off);
+
+
 /**
  * led_brightness_set - set LED brightness
  * @led_cdev: the LED to set

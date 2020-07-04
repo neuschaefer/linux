@@ -1,3 +1,7 @@
+/*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
 #ifndef _LINUX_XFRM_H
 #define _LINUX_XFRM_H
 
@@ -69,6 +73,9 @@ struct xfrm_lifetime_cfg {
 	__u64	hard_add_expires_seconds;
 	__u64	soft_use_expires_seconds;
 	__u64	hard_use_expires_seconds;
+#ifdef CONFIG_XFRM_IDLE_TIME
+    __u64   idle_time_seconds;
+#endif
 };
 
 struct xfrm_lifetime_cur {
@@ -83,6 +90,8 @@ struct xfrm_replay_state {
 	__u32	seq;
 	__u32	bitmap;
 };
+//CVE-2012-6536
+#define XFRMA_REPLAY_ESN_MAX	4096
 
 struct xfrm_replay_state_esn {
 	unsigned int	bmp_len;
@@ -210,6 +219,11 @@ enum {
 
 	XFRM_MSG_MAPPING,
 #define XFRM_MSG_MAPPING XFRM_MSG_MAPPING
+
+#ifdef CONFIG_XFRM_IDLE_TIME
+    XFRM_MSG_SA_IDLE,
+#define XFRM_MSG_SA_IDLE XFRM_MSG_SA_IDLE
+#endif
 	__XFRM_MSG_MAX
 };
 #define XFRM_MSG_MAX (__XFRM_MSG_MAX - 1)

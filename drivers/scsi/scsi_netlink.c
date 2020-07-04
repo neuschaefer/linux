@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *  scsi_netlink.c  - SCSI Transport Netlink Interface
  *
  *  Copyright (C) 2006   James Smart, Emulex Corporation
@@ -112,7 +116,7 @@ scsi_nl_rcv_msg(struct sk_buff *skb)
 			goto next_msg;
 		}
 
-		if (!capable(CAP_SYS_ADMIN)) {
+		if (!netlink_capable(skb, CAP_SYS_ADMIN)) {
 			err = -EPERM;
 			goto next_msg;
 		}

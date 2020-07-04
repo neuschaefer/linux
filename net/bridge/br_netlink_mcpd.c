@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
 *    Copyright (c) 2012 Broadcom Corporation
 *    All Rights Reserved
 *
@@ -437,15 +441,13 @@ static void mcpd_nl_process_registration(struct sk_buff *skb)
         ptr += sizeof(t_MCPD_MSG_HDR);
         ((t_MCPD_REGISTER *)new_ptr)->code = MCPD_SUCCESS;
         registration_type = ((t_MCPD_REGISTER *)ptr)->registration_type; 
-        if (snoop_registered_pid[registration_type] != nlh->nlmsg_pid) {
+        if (!snoop_registered_pid[registration_type])
             snoop_registered_pid[registration_type] = nlh->nlmsg_pid;
-            printk("br_netlink_mcpd.c: Setting registration type %d pid to %d\n", registration_type, snoop_registered_pid[registration_type]);
-        }
         if ((mcpd_pid) && (mcpd_pid != snoop_registered_pid[registration_type]/*nlh->nlmsg_pid*/))
         {
             struct sk_buff *new_skb2 = alloc_skb(buf_size, GFP_ATOMIC);
             if(!new_skb2) {
-                printk("br_netlink_mcpd.c:%d %s() error no mem\n", __LINE__, __FUNCTION__);
+                printk("br_netlink_mcpd.c:%d %s() errr no mem\n", __LINE__, __FUNCTION__);
                 return;
             }
 
@@ -465,7 +467,7 @@ static void mcpd_nl_process_registration(struct sk_buff *skb)
 } /* mcpd_nl_process_registration */
 
 
-static int mcpd_is_br_port(struct net_bridge *br,struct net_device *from_dev)
+int mcpd_is_br_port(struct net_bridge *br,struct net_device *from_dev)
 {
     struct net_bridge_port *p = NULL;
     int ret = 0;
@@ -537,8 +539,7 @@ static void mcpd_nl_process_igmp_snoop_entry(struct sk_buff *skb)
                 br_igmp_mc_fdb_remove(from_dev,
                                   br, 
                                   prt, 
-                                  &snoop_entry->rxGrp, 
-                                  &snoop_entry->txGrp, 
+                                  &snoop_entry->destGrp, 
                                   &snoop_entry->rep, 
                                   snoop_entry->mode, 
                                   &snoop_entry->src);
@@ -574,15 +575,13 @@ static void mcpd_nl_process_igmp_snoop_entry(struct sk_buff *skb)
                                snoop_entry->wan_info[idx].if_ops,
                                br, 
                                prt, 
-                               &snoop_entry->rxGrp,
-                               &snoop_entry->txGrp,
+                               &snoop_entry->grp,
+                               &snoop_entry->destGrp,
                                &snoop_entry->rep, 
                                snoop_entry->mode, 
                                snoop_entry->tci,
                                &snoop_entry->src,
-                               snoop_entry->lanppp,
-                               snoop_entry->excludePort,
-                               snoop_entry->enRtpSeqCheck);
+                               snoop_entry->lanppp);
             }
             rcu_read_unlock();
             dev_put(from_dev);
@@ -596,7 +595,7 @@ static void mcpd_nl_process_igmp_snoop_entry(struct sk_buff *skb)
     /* if LAN-2-LAN snooping enabled make an entry                         *
      * unless multicast DNAT is being used (grp and destGrp are different) */
     if (br_mcast_get_lan2lan_snooping(BR_MCAST_PROTO_IGMP, br) &&
-        (snoop_entry->rxGrp.s_addr == snoop_entry->txGrp.s_addr) ) 
+        (snoop_entry->grp.s_addr == snoop_entry->destGrp.s_addr) ) 
     {
         rcu_read_lock();
         prt = br_get_port(br, snoop_entry->port_no);
@@ -615,8 +614,7 @@ static void mcpd_nl_process_igmp_snoop_entry(struct sk_buff *skb)
             br_igmp_mc_fdb_remove(dev,
                                     br, 
                                     prt, 
-                                    &snoop_entry->txGrp, 
-                                    &snoop_entry->txGrp, 
+                                    &snoop_entry->grp, 
                                     &snoop_entry->rep, 
                                     snoop_entry->mode, 
                                     &snoop_entry->src);
@@ -635,15 +633,13 @@ static void mcpd_nl_process_igmp_snoop_entry(struct sk_buff *skb)
                                MCPD_IF_TYPE_BRIDGED,
                                br, 
                                prt, 
-                               &snoop_entry->txGrp, 
-                               &snoop_entry->txGrp, 
+                               &snoop_entry->grp, 
+                               &snoop_entry->grp, 
                                &snoop_entry->rep, 
                                snoop_entry->mode, 
                                snoop_entry->tci,
                                &snoop_entry->src,
-                               snoop_entry->lanppp,
-                               -1,
-                               0);
+                               snoop_entry->lanppp);
         }
         rcu_read_unlock();
     }
@@ -1055,7 +1051,7 @@ void mcpd_nl_send_igmp_purge_entry(struct net_bridge_mc_fdb_entry *igmp_entry)
 
     purge_entry = (t_MCPD_IGMP_PURGE_ENTRY *)ptr;
 
-    purge_entry->grp.s_addr = igmp_entry->txGrp.s_addr;
+    purge_entry->grp.s_addr = igmp_entry->grp.s_addr;
     purge_entry->src.s_addr = igmp_entry->src_entry.src.s_addr;
     purge_entry->rep.s_addr = rep->rep.s_addr;
 

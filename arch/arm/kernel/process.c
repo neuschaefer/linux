@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *  linux/arch/arm/kernel/process.c
  *
  *  Copyright (C) 1996-2000 Russell King - Converted to ARM.
@@ -278,8 +282,26 @@ void machine_power_off(void)
 		pm_power_off();
 }
 
+typedef void (*sd56xx_reboot_callback)(void);
+
+sd56xx_reboot_callback g_pv_sd56xx_reboot_callback = NULL;
+
+void sd56xx_reboot_reg(sd56xx_reboot_callback pv_callback)
+{
+    printk("REGISTER g_pv_sd56xx_reboot_callback.\n");
+
+    g_pv_sd56xx_reboot_callback = pv_callback;
+}
+EXPORT_SYMBOL(sd56xx_reboot_reg);
+
 void machine_restart(char *cmd)
 {
+	printk("RESET!\n");	
+	if (g_pv_sd56xx_reboot_callback != NULL)
+    {
+       	g_pv_sd56xx_reboot_callback();
+    }
+
 	machine_shutdown();
 
 	arm_pm_restart(reboot_mode, cmd);

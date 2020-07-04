@@ -1,3 +1,7 @@
+/*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
 #ifndef __LINUX_MROUTE_H
 #define __LINUX_MROUTE_H
 
@@ -223,7 +227,7 @@ struct mfc_cache {
 
 #define MFC_LINES		64
 
-#ifdef __BIG_ENDIAN
+#ifdef CONFIG_SUPPORT_ATP
 #define MFC_HASH(a,b)	(((((__force u32)(__be32)a)>>24)^(((__force u32)(__be32)b)>>26))&(MFC_LINES-1))
 #else
 #define MFC_HASH(a,b)	((((__force u32)(__be32)a)^(((__force u32)(__be32)b)>>2))&(MFC_LINES-1))

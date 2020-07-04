@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *  linux/mm/swap_state.c
  *
  *  Copyright (C) 1991, 1992, 1993, 1994  Linus Torvalds
@@ -19,6 +23,14 @@
 #include <linux/page_cgroup.h>
 
 #include <asm/pgtable.h>
+
+#ifdef CONFIG_HIMEM_DUMPFILE
+extern int hw_ssp_set_dump_info(const char *fmt, ...);
+#endif
+
+#ifdef CONFIG_CRASH_DUMPFILE
+extern int ATP_KRNL_CRASH_AppendInfo(const char *fmt, ...);
+#endif
 
 /*
  * swapper_space is a fiction, retained to simplify the path through
@@ -60,6 +72,23 @@ void show_swap_cache_info(void)
 		swap_cache_info.find_success, swap_cache_info.find_total);
 	printk("Free swap  = %ldkB\n", nr_swap_pages << (PAGE_SHIFT - 10));
 	printk("Total swap = %lukB\n", total_swap_pages << (PAGE_SHIFT - 10));
+#ifdef CONFIG_CRASH_DUMPFILE
+	ATP_KRNL_CRASH_AppendInfo("%lu pages in swap cache\n", total_swapcache_pages);
+	ATP_KRNL_CRASH_AppendInfo("Swap cache stats: add %lu, delete %lu, find %lu/%lu\n",
+		swap_cache_info.add_total, swap_cache_info.del_total,
+		swap_cache_info.find_success, swap_cache_info.find_total);
+	ATP_KRNL_CRASH_AppendInfo("Free swap  = %ldkB\n", nr_swap_pages << (PAGE_SHIFT - 10));	
+	ATP_KRNL_CRASH_AppendInfo("Total swap = %lukB\n", total_swap_pages << (PAGE_SHIFT - 10));	
+#endif
+
+#ifdef CONFIG_HIMEM_DUMPFILE
+        hw_ssp_set_dump_info("%lu pages in swap cache\n", total_swapcache_pages);     
+        hw_ssp_set_dump_info("Swap cache stats: add %lu, delete %lu, find %lu/%lu\n",
+		swap_cache_info.add_total, swap_cache_info.del_total,
+		swap_cache_info.find_success, swap_cache_info.find_total);
+        hw_ssp_set_dump_info("Free swap  = %ldkB\n", nr_swap_pages << (PAGE_SHIFT - 10));        
+        hw_ssp_set_dump_info("Total swap = %lukB\n", total_swap_pages << (PAGE_SHIFT - 10));                
+#endif
 }
 
 /*

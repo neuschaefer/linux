@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *
  *	Generic internet FLOW.
  *
@@ -10,6 +14,8 @@
 #include <linux/socket.h>
 #include <linux/in6.h>
 #include <linux/atomic.h>
+#include <linux/kernel.h>
+#include <linux/bug.h>
 
 struct flowi_common {
 	int	flowic_oif;

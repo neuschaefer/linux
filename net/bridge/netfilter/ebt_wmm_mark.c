@@ -1,4 +1,7 @@
-#if defined(CONFIG_BCM_KF_NETFILTER)
+/*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
 /*
 *    Copyright (c) 2003-2012 Broadcom Corporation
 *    All Rights Reserved
@@ -41,17 +44,23 @@ static unsigned int ebt_wmm_mark_tg(struct sk_buff *skb, const struct xt_action_
    
 {
 	const struct ebt_wmm_mark_t_info *info = par->targinfo;
-#if !defined(CONFIG_BCM963138) && !defined(CONFIG_BCM963148) && !defined(CONFIG_BCM96838)
+
 	struct iphdr *iph;
-	struct vlan_hdr *frame;
-	unsigned short TCI;
-#endif
+	struct vlan_hdr *frame;	
 	unsigned char prio = 0;
+	unsigned short TCI;
+
+	/*Add 解决大流量挂机导致死机问题*/
+	if (NULL == skb->network_header)
+	{
+	    return EBT_DROP;
+	}
+	/*End 解决大流量挂机导致死机问题*/
+
 	if (info->markset != WMM_MARK_VALUE_NONE) {
 		/* use marset regardless of supported classification method */
 		prio = (unsigned char)info->markset;
 
-#if !defined(CONFIG_BCM963138) && !defined(CONFIG_BCM963148) && !defined(CONFIG_BCM96838) /* TOS/DSCP priority update will be handled in wlan driver (bcmutils.c, pktsetprio()) */
       if (skb->protocol == __constant_htons(ETH_P_8021Q)) {
 
          unsigned short pbits = (unsigned short)(info->markset & 0x0000f000);
@@ -94,7 +103,6 @@ static unsigned int ebt_wmm_mark_tg(struct sk_buff *skb, const struct xt_action_
 #endif
 
 		prio = iph->tos>>WMM_DSCP_MASK_SHIFT ;
-#endif /* if 0 */
 	}
 		
     //printk("markset 0x%08x, mark 0x%x, mark 0x%x \n", info->markset, info->mark, (*pskb)->mark);
@@ -170,4 +178,3 @@ static void __exit ebt_wmm_mark_fini(void)
 module_init(ebt_wmm_mark_init);
 module_exit(ebt_wmm_mark_fini);
 MODULE_LICENSE("GPL");
-#endif

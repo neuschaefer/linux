@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * linux/ipc/msg.c
  * Copyright (C) 1992 Krishna Balasubramanian
  *
@@ -197,7 +201,9 @@ static int newque(struct ipc_namespace *ns, struct ipc_params *params)
 		ipc_rcu_putref(msq);
 		return retval;
 	}
-
+    
+//CVE-2015-7613
+#if 0
 	/*
 	 * ipc_addid() locks msq
 	 */
@@ -207,6 +213,8 @@ static int newque(struct ipc_namespace *ns, struct ipc_params *params)
 		ipc_rcu_putref(msq);
 		return id;
 	}
+#endif
+
 
 	msq->q_stime = msq->q_rtime = 0;
 	msq->q_ctime = get_seconds();
@@ -216,6 +224,17 @@ static int newque(struct ipc_namespace *ns, struct ipc_params *params)
 	INIT_LIST_HEAD(&msq->q_messages);
 	INIT_LIST_HEAD(&msq->q_receivers);
 	INIT_LIST_HEAD(&msq->q_senders);
+
+    //CVE-2015-7613    
+	/*
+	 * ipc_addid() locks msq
+	 */
+	id = ipc_addid(&msg_ids(ns), &msq->q_perm, ns->msg_ctlmni);
+	if (id < 0) {
+		security_msg_queue_free(msq);
+		ipc_rcu_putref(msq);
+		return id;
+	}
 
 	msg_unlock(msq);
 

@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *	Handle incoming frames
  *	Linux ethernet bridge
  *
@@ -31,6 +35,10 @@
 #if defined(CONFIG_BCM_KF_IGMP)
 #include "br_igmp.h"
 #endif
+
+#ifdef CONFIG_MLD_SNOOPING
+#include "br_mld_snooping.h"
+#endif
 #if defined(CONFIG_BCM_KF_MLD) && defined(CONFIG_BR_MLD_SNOOP)
 #include "br_mld.h"
 #endif
@@ -41,9 +49,16 @@
 
 uint32_t (*wl_pktc_req_hook)(int req_id, uint32_t param0, uint32_t param1, uint32_t param2) = NULL;
 EXPORT_SYMBOL(wl_pktc_req_hook);
-uint32_t (*dhd_pktc_req_hook)(int req_id, uint32_t param0, uint32_t param1, uint32_t param2) = NULL;
-EXPORT_SYMBOL(dhd_pktc_req_hook);
 #endif /* PKTC */
+#endif
+
+#include <linux/if_arp.h>
+#include <linux/if_vlan.h>
+#include <linux/inetdevice.h>
+
+#include <linux/atphooks.h>
+#ifdef CONFIG_IGMP_SNOOPING
+extern int br_igmp_snooping_forward(struct sk_buff *skb, struct net_bridge *br,unsigned char *dest,int forward);
 #endif
 
 /* Bridge group multicast address 802.1d (pg 51). */
@@ -72,7 +87,12 @@ static int br_pass_frame_up(struct sk_buff *skb)
 	brstats->rx_bytes += skb->len;
 	u64_stats_update_end(&brstats->syncp);
 
+    /*ipcheck接收arp的lan indev*/
+	ATP_HOOK_VOID(ATP_BR_LOCALIN_BF_CHG_DEV, skb, NULL, NULL);
+
 	indev = skb->dev;
+    /* add lan interface (eth0.5) in iptables 20090217 */
+    skb->lanindev = indev;
 	skb->dev = brdev;
 
 	return NF_HOOK(NFPROTO_BRIDGE, NF_BR_LOCAL_IN, skb, indev, NULL,
@@ -103,7 +123,7 @@ int br_handle_frame_finish(struct sk_buff *skb)
 	if (!p || p->state == BR_STATE_DISABLED)
 		goto drop;
 
-#if (defined(CONFIG_BCM_KF_IGMP) && defined(CONFIG_BR_IGMP_SNOOP)) || defined(CONFIG_BCM_KF_IGMP_RATE_LIMIT)
+#if (defined(CONFIG_BCM_KF_IGMP) || defined(CONFIG_BCM_KF_IGMP_RATE_LIMIT)) && defined(CONFIG_BR_IGMP_SNOOP)
 	br_igmp_get_ip_igmp_hdrs(skb, &pipmcast, &pigmp, NULL);
 #endif
 
@@ -209,10 +229,14 @@ int br_handle_frame_finish(struct sk_buff *skb)
 	br_fdb_update(br, p, eth_hdr(skb)->h_source);
 #endif
 
+	/*START MODIFY:Huawei 2012-11-20 FOR snooping开关失效*/
+	/*ATP 使用自己的snooping处理*/
+#ifndef CONFIG_SUPPORT_ATP
 	if (!is_broadcast_ether_addr(dest) && is_multicast_ether_addr(dest) &&
 	    br_multicast_rcv(br, p, skb))
 		goto drop;
-
+#endif
+	/*END MODIFY:Huawei 2012-11-20 FOR snooping开关失效*/
 #if defined(CONFIG_BCM_KF_WL)
 	if ((p->state == BR_STATE_LEARNING) && (skb->protocol != htons(0x886c) /*ETHER_TYPE_BRCM*/))
 #else
@@ -261,6 +285,30 @@ int br_handle_frame_finish(struct sk_buff *skb)
 	}
 #endif
 	else if (is_multicast_ether_addr(dest)) {
+#ifdef CONFIG_SUPPORT_ATP
+		// 先默认可以允许网关接收并转发给其他接口
+		skb2 = skb;
+#if defined(CONFIG_MLD_SNOOPING)
+		if ((0x33 == dest[0]) && (0x33 == dest[1]))
+        {
+			if ((NULL != skb) && (br_mld_snooping_forward(skb,br,dest, 1)))
+			{
+				// 如果被snooping处理了，那么这种情况下表示的是报文不需要被转发了 
+				skb = NULL;
+			}
+		}
+#endif
+#if defined(CONFIG_IGMP_SNOOPING)
+        if ((0x33 != dest[0]) || (0x33 != dest[1]))
+        {
+            if ((NULL != skb) && (br_igmp_snooping_forward(skb, br, (unsigned char *)dest, 1)))
+            {
+                // 如果被snooping处理了，那么这种情况下表示的是报文不需要被转发了 
+                skb = NULL;
+            }
+		}
+#endif
+#else
 		mdst = br_mdb_get(br, skb);
 		if (mdst || BR_INPUT_SKB_CB_MROUTERS_ONLY(skb)) {
 			if ((mdst && mdst->mglist) ||
@@ -272,7 +320,7 @@ int br_handle_frame_finish(struct sk_buff *skb)
 				goto out;
 		} else
 			skb2 = skb;
-
+#endif
 		br->dev->stats.multicast++;
 #if defined(CONFIG_BCM_KF_EXTSTATS)
 		br->dev->stats.rx_multicast_bytes += skb2->len;
@@ -301,8 +349,6 @@ int br_handle_frame_finish(struct sk_buff *skb)
 			struct net_bridge_fdb_entry *src = __br_fdb_get(br, eth_hdr(skb)->h_source);
 			struct net_device *root_dst_dev_p = dst->dst->dev;
 			BlogPhy_t srcPhyType, dstPhyType;
-			uint32_t chainIdx;
-			uint32_t pktc_tx_enabled;
 
 			if (unlikely(src == NULL))
 				goto next; 
@@ -310,8 +356,9 @@ int br_handle_frame_finish(struct sk_buff *skb)
 			srcPhyType = BLOG_GET_PHYTYPE(src->dst->dev->path.hw_port_type);
 			dstPhyType = BLOG_GET_PHYTYPE(dst->dst->dev->path.hw_port_type);
 
-			pktc_tx_enabled = wl_pktc_req_hook ? 
-						wl_pktc_req_hook(GET_PKTC_TX_MODE, 0, 0, 0) : 0;
+			if (unlikely(wl_pktc_req_hook == NULL))
+				goto next;
+			
 			if ((srcPhyType == BLOG_WLANPHY) && (dstPhyType == BLOG_ENETPHY))
 			{
 				from_wl_to_switch = 1;
@@ -322,7 +369,7 @@ int br_handle_frame_finish(struct sk_buff *skb)
 			}
 			else if ((srcPhyType == BLOG_ENETPHY || srcPhyType == BLOG_XTMPHY) &&
 				(dstPhyType == BLOG_WLANPHY) &&
-				   pktc_tx_enabled)
+				wl_pktc_req_hook(GET_PKTC_TX_MODE, 0, 0, 0))
 				from_switch_to_wl = 1;
 
 #if defined(CONFIG_BCM_KF_WANDEV)
@@ -333,17 +380,7 @@ int br_handle_frame_finish(struct sk_buff *skb)
 			   see wlc_sendup_chain() function for reference.
 			   For the Tx direction, there are no VLAN interfaces created on wl device when LAN_VLAN flag is enabled in the build.
 			   The netdev_path_is_root() check makes sure that we are always transmitting to a root device */
-#if defined(CONFIG_BCM963138) || defined(CONFIG_BCM963148) || defined(CONFIG_BCM96838)
-				if (from_wl_to_switch && (dhd_pktc_req_hook != NULL)) {
-					dhd_pktc_req_hook(UPDATE_BRC_HOT,
-								     (uint32_t)&(dst->addr.addr[0]),
-								     (uint32_t)root_dst_dev_p, 0);
-				}
-#endif
-				chainIdx = wl_pktc_req_hook ? 
-								wl_pktc_req_hook(UPDATE_BRC_HOT,
-								     (uint32_t)&(dst->addr.addr[0]),
-								     (uint32_t)root_dst_dev_p, 0) : INVALID_CHAIN_IDX;
+				uint32_t chainIdx = wl_pktc_req_hook(UPDATE_BRC_HOT, (uint32_t)&(dst->addr.addr[0]), (uint32_t)root_dst_dev_p, 0);
 				if (chainIdx != INVALID_CHAIN_IDX)
 				{
 					//Update chainIdx in blog
@@ -506,9 +543,7 @@ forward:
 	if (rhook) {
 		if ((*rhook)(skb)) {
 			*pskb = skb;
-			if ( (skb->protocol == htons(0x893a)) || 
-			(skb->protocol == htons(0x8912)) || 
-			(skb->protocol == htons(0x88e1)) )
+			if ( (skb->protocol == htons(0x893a)) || (skb->protocol == htons(0x8912)) || (skb->protocol == htons(0x88e1)) )
 			{
 				br_handle_local_finish(skb);
 			}

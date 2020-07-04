@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *	Generic parts
  *	Linux ethernet bridge
  *
@@ -19,10 +23,17 @@
 #include <linux/llc.h>
 #include <net/llc.h>
 #include <net/stp.h>
+#include <linux/atphooks.h>
 
 #include "br_private.h"
+
+#ifdef CONFIG_MLD_SNOOPING
+#include "br_mld_snooping.h"
+#endif
+
 #if defined(CONFIG_BCM_KF_IGMP) && defined(CONFIG_BR_IGMP_SNOOP)
 #include "br_igmp.h"
+#include "br_igmp_dev_list.h"
 #endif
 #if defined(CONFIG_BCM_KF_MLD) && defined(CONFIG_BR_MLD_SNOOP)
 #include "br_mld.h"
@@ -77,6 +88,10 @@ static int __init br_init(void)
         goto err_out4;
 #endif
 
+#ifdef CONFIG_MLD_SNOOPING
+    br_mld_snooping_init();
+#endif
+
 #if defined(CONFIG_BCM_KF_MLD) && defined(CONFIG_BR_MLD_SNOOP)
 	err = br_mld_snooping_init();
     if(err)
@@ -94,6 +109,7 @@ static int __init br_init(void)
     
     blogRuleVlanNotifyHook = br_mcast_vlan_notify_for_blog_update;
 #endif
+    ATP_HOOK(ATP_BR_INIT, NULL, NULL, NULL, 0);
 
 	return 0;
 err_out4:

@@ -1,3 +1,7 @@
+/*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
 /** -*- linux-c -*- ***********************************************************
  * Linux PPP over X/Ethernet (PPPoX/PPPoE) Sockets
  *
@@ -90,6 +94,11 @@ int pppox_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 
 		rc = 0;
 		sk->sk_state |= PPPOX_BOUND;
+
+		if (pppox_protos[sk->sk_protocol]->ioctl) {
+			pppox_protos[sk->sk_protocol]->ioctl(sock, 0xAA, arg);
+		}
+
 		break;
 	}
 	default:

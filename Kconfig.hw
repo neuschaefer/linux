@@ -1,0 +1,29 @@
+config ATP_SUPPORT_DOUBLE_SYSTEM
+	bool "Sure to support double system "
+	default y
+	
+config ATP_USB_ADAPTOR
+	bool "atp usb adaptor"
+	default n
+
+config INTERNET_LED_SINGTEL
+	bool "Internet Led"
+	default n 
+	depends on BCM96362	
+		
+	
+config BCM96362_DAYINGGASP
+	bool "Implementation daying gasp"
+    depends on BCM96362
+	default n
+	help	
+	  This options enables the support of dayinggasp		  
+	
+config ATP_SUPPORT_ETHERNETLED
+	bool "Ethernet Led"
+	default n 
+	depends on BCM963268	
+config SPI_MAX3100_CONSOLE
+	bool "SUPPORT SPI TO UART MAX3100 CONSOLE"
+	default n
+	depends on SERIAL_MAX3100

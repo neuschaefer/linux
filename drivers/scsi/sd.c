@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *      sd.c Copyright (C) 1992 Drew Eckhardt
  *           Copyright (C) 1993, 1994, 1995, 1999 Eric Youngdale
  *
@@ -66,6 +70,16 @@
 
 #include "sd.h"
 #include "scsi_logging.h"
+#include "atpconfig.h"
+/* Merge from home gateway code. */
+#include <linux/fs.h>
+#include <linux/seq_file.h>
+#include <linux/proc_fs.h>
+#include <linux/string.h>
+#include <linux/ctype.h>
+#include "../usb/storage/usb.h"
+#include "msg/kcmsmonitormsgtypes.h"
+/* Merge from home gateway code. */
 
 MODULE_AUTHOR("Eric Youngdale");
 MODULE_DESCRIPTION("SCSI disk (sd) driver");
@@ -123,6 +137,285 @@ static DEFINE_MUTEX(sd_ref_mutex);
 
 static struct kmem_cache *sd_cdb_cache;
 static mempool_t *sd_cdb_pool;
+
+
+/* Merge from home gateway code. */
+#define SHORT_STRLEN    32
+#define MAX_STRLEN      128
+#define MAX_DISKS       6
+struct usb_diskinfo{
+    char diskname[SHORT_STRLEN];        /*disk name:sda,sdb,....*/
+    char vendor[MAX_STRLEN];            /*vendor name of the usb device*/
+    char model[MAX_STRLEN];             /*product name of the usb device*/
+    char serial[MAX_STRLEN];            /*serial number  of the usb device*/
+    char connectiontype[SHORT_STRLEN];  /*USB1.1,USB2.0,...*/
+    int  scsihostid ;                   /*scsi host num of this device*/  
+    bool isvalid;                       /* if this partion info is valid*/
+    char usbport[SHORT_STRLEN];
+    unsigned long long	capacity;               /*numbers of usb device partitions*/
+} *usbdiskinfos;
+
+struct proc_dir_entry *proc_physicalmedium = NULL;
+struct usb_diskinfo *diskinfos = NULL;
+
+/*get a free member*/
+static struct usb_diskinfo * get_freediskslot(void)
+{
+    int i = 0;
+	int j = -1;
+
+	if( diskinfos != NULL )
+	{
+		for(i=0;i<MAX_DISKS;i++)
+		{
+			if(false == ((struct usb_diskinfo *)diskinfos+i)->isvalid)
+			{
+				j = i;
+				break;
+			}
+		}
+
+		if(j >= 0 && j < MAX_DISKS)
+		{
+			return ((struct usb_diskinfo *)diskinfos+j);
+		}
+	}
+	
+    return NULL;
+}
+
+/*release a used member*/
+static void release_useddiskslot(char *disk_name)
+{
+	int i = 0;
+
+	if( disk_name != NULL )
+	{
+		for(i = 0;i < MAX_DISKS; i++)
+		{
+			if(!strcmp(disk_name,((struct usb_diskinfo *)diskinfos+i)->diskname))
+			{
+				((struct usb_diskinfo *)diskinfos+i)->isvalid = false;
+			}
+		}
+	}
+	
+	return;
+}
+
+static char * replacespace(char *buf)
+{
+	if( buf != NULL )
+	{
+		int i = 0;
+		int len = strlen(buf);
+
+		if(len >= MAX_STRLEN)
+		{
+			len = MAX_STRLEN -1;
+		}
+
+		for(i = 0;i < len;i++)
+		{
+			if(buf[i] == ' ')
+			{
+				buf[i] = '_';
+			}
+		}
+	}
+	
+	return buf;
+}
+
+/* Show the /proc/proc_user_dev file content. */
+static int proc_user_physicalmedium_show(struct seq_file *sfile, void *v)
+{
+	int i = 0;
+	struct usb_diskinfo *disk = NULL;
+	
+	seq_printf(sfile, "%s", "Diskname Vendor       ID       Type   ConnectionType Capacity Port\n");
+	for( i = 0; i < MAX_DISKS; i++ )
+	{
+		if( true == ((struct usb_diskinfo *)diskinfos+i)->isvalid )
+		{
+			disk = ((struct usb_diskinfo *)diskinfos+i);
+			disk->diskname[10] = '\0';
+			disk->vendor[15] = '\0';
+			disk->model[15] = '\0';
+#ifdef SUPPORT_ATP_USBPORT_ONLYONE
+            snprintf(disk->usbport,sizeof(disk->usbport),"%s","1-1");
+#endif            
+			seq_printf(sfile, "%-8s %-12s %-8s %-6s %-14s %llu %-6s \n", 
+					replacespace(disk->diskname), 
+					replacespace(disk->vendor), 
+					replacespace(disk->model), 
+					replacespace(disk->serial), 
+					replacespace(disk->connectiontype), 
+                    disk->capacity,
+                    replacespace(disk->usbport) );
+		}
+	}
+
+	return 0;
+}
+
+static int proc_user_physicalmedium_single_open(struct inode *inode, struct file *file)
+{
+    return(single_open(file, proc_user_physicalmedium_show, NULL));
+}
+
+static const struct file_operations proc_user_physicalmedium_fops = {
+	.open		= proc_user_physicalmedium_single_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
+
+
+static void proc_user_physicalmedium_create(void)
+{
+    proc_physicalmedium = proc_create("proc_user_usbdevs", S_IFREG | S_IRUSR , NULL, &proc_user_physicalmedium_fops );
+
+    /*initialize physicalmidum devs structure*/
+    diskinfos = kmalloc(sizeof(struct usb_diskinfo)*MAX_DISKS, GFP_KERNEL);
+    if (diskinfos)
+    {
+		int i = 0;
+        memset(diskinfos,0,sizeof(struct usb_diskinfo)*MAX_DISKS);
+		for(i = 0;i < MAX_DISKS;i++)
+		{
+			/* Init the isvalid flag. */
+			((struct usb_diskinfo *)diskinfos+i)->isvalid = false;
+		}
+    }
+}
+
+static void proc_user_physicalmedium_remove(void)
+{
+	/* no problem if it was not registered */
+	remove_proc_entry("proc_user_usbdevs", NULL);
+
+	if (diskinfos != NULL)
+	{
+		kfree(diskinfos);
+		diskinfos = NULL;
+	}
+}
+
+bool sd_not_mount_device(struct us_data *us)
+{
+
+    int idVendor = 0;
+
+    if (!us)
+        return true;
+    
+    idVendor = le16_to_cpu(us->pusb_dev->descriptor.idVendor);
+    
+    if ((idVendor == 0x19d2) || (idVendor == 0x12d1))
+        return true;
+    return false;
+}
+EXPORT_SYMBOL_GPL(sd_not_mount_device);
+
+
+/* Get the physical medium device information. */
+static int get_physicalmedium_usbdev_info(struct scsi_device *sdp, struct scsi_disk *sdkp, struct gendisk *gd)
+{
+    int  giVendor;
+    int  giProduct;
+    int  giInterfaceClass;
+    char DeviceId[16] = {0};
+    char serialnum[5] = {0};
+    char *ser = NULL;
+    int  length = 0;
+    int  i = 0;
+
+    if( sdp != NULL && sdkp != NULL && gd != NULL )
+    {
+        struct usb_diskinfo *disk = NULL;
+        struct Scsi_Host *host = sdp->host;
+        struct us_data *us = host_to_us(host);
+        char *string = NULL;
+
+        giVendor = le16_to_cpu(us->pusb_dev->descriptor.idVendor);
+        giProduct = le16_to_cpu(us->pusb_dev->descriptor.iProduct);
+        giInterfaceClass = us->pusb_intf->altsetting->desc.bInterfaceClass;
+
+        disk = get_freediskslot();
+
+        if (!sd_not_mount_device(us) && disk != NULL)
+        {
+            disk->isvalid = true;
+
+            //序列号存在，ID的结构为vendor+serial后四位
+            if (us->pusb_dev->serial)
+            {
+                //记录该序列号的指针
+                ser = us->pusb_dev->serial;
+                length = strlen(us->pusb_dev->serial);
+                
+                //取序列号的后四位
+                //如果读出来的序列号长度小于4，则补0补够4位
+                if(length < 4)
+                {
+					snprintf(serialnum,sizeof(serialnum),"%s%s",us->pusb_dev->serial,"0000");
+                }
+                else
+                {
+					snprintf(serialnum,sizeof(serialnum),"%s",(ser + length - 4));
+                }
+				snprintf(DeviceId,sizeof(DeviceId),"%04x%s",giVendor,serialnum);
+            }
+            else
+            {
+                //序列号不存在，ID的结构为vendor+product
+				snprintf(DeviceId,sizeof(DeviceId),"%04x%04x",giVendor,giProduct);
+            }
+            
+            for(i = 0 ; i < 8 ; i++)
+            {
+                DeviceId[i] = toupper(DeviceId[i]);
+            }
+            
+            //最终写入proc文件的ID       
+            snprintf(disk->model,sizeof(disk->model),"%s",DeviceId);
+            
+            /*diskname,sda,sdb,...*/
+            snprintf(disk->diskname,sizeof(disk->diskname),"%s",gd->disk_name);
+            
+            /* print the controller name */
+            disk->scsihostid = host->host_no;
+            
+            /* print product, vendor, and serial number strings */
+            if (NULL != us->pusb_dev->manufacturer)
+                string = us->pusb_dev->manufacturer;
+            else if (us->unusual_dev->vendorName)
+                string = us->unusual_dev->vendorName;
+            else
+                string = "Unknown";
+            
+            snprintf(disk->vendor,sizeof(disk->vendor),"%s",string);
+            
+			snprintf(disk->serial,sizeof(disk->serial),"%d",giInterfaceClass);
+            
+            if(USB_SPEED_HIGH == us->pusb_dev->speed )
+            {
+                snprintf(disk->connectiontype,sizeof(disk->connectiontype),"%s","USB2.0");
+            }
+            else
+            {
+                snprintf(disk->connectiontype,sizeof(disk->connectiontype),"%s","USB1.1");
+            }
+            
+            disk->capacity = (((unsigned long long)(sdkp->capacity)*(sdkp->device->sector_size)/1024))/1024;//以M为单位
+            snprintf(disk->usbport,sizeof(disk->usbport),"%s",dev_name(&(us->pusb_dev->dev)));
+        }
+    }
+	
+	return 0;
+}
+/* Merge from home gateway code. */
 
 static const char *sd_cache_types[] = {
 	"write through", "none", "write back",
@@ -2634,6 +2927,11 @@ static void sd_probe_async(void *data, async_cookie_t cookie)
 		  sdp->removable ? "removable " : "");
 	scsi_autopm_put_device(sdp);
 	put_device(&sdkp->dev);
+
+    get_physicalmedium_usbdev_info(sdp,sdkp,gd);
+
+    ATP_Netlink_SendToUserspace(ATP_MSG_MONITOR_EVT_USBSTORAGE_PLUGIN, NULL, 0);
+
 }
 
 /**
@@ -2758,6 +3056,8 @@ static int sd_remove(struct device *dev)
 	sdkp = dev_get_drvdata(dev);
 	scsi_autopm_get_device(sdkp->device);
 
+	release_useddiskslot(sdkp->disk->disk_name);
+	
 	async_synchronize_full();
 	blk_queue_prep_rq(sdkp->device->request_queue, scsi_prep_fn);
 	blk_queue_unprep_rq(sdkp->device->request_queue, NULL);
@@ -2796,6 +3096,8 @@ static void scsi_disk_release(struct device *dev)
 	put_device(&sdkp->device->sdev_gendev);
 
 	kfree(sdkp);
+
+    ATP_Netlink_SendToUserspace(ATP_MSG_MONITOR_EVT_USBSTORAGE_PLUGOUT, NULL, 0);
 }
 
 static int sd_start_stop_device(struct scsi_disk *sdkp, int start)
@@ -2906,6 +3208,8 @@ static int __init init_sd(void)
 {
 	int majors = 0, i, err;
 
+	proc_user_physicalmedium_create();
+
 	SCSI_LOG_HLQUEUE(3, printk("init_sd: sd driver entry point\n"));
 
 	for (i = 0; i < SD_MAJORS; i++)
@@ -2959,6 +3263,8 @@ static void __exit exit_sd(void)
 	int i;
 
 	SCSI_LOG_HLQUEUE(3, printk("exit_sd: exiting sd driver\n"));
+	
+	proc_user_physicalmedium_remove();
 
 	mempool_destroy(sd_cdb_pool);
 	kmem_cache_destroy(sd_cdb_cache);

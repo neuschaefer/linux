@@ -1,3 +1,7 @@
+/*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
 /* (C) 2001-2002 Magnus Boden <mb@ozaba.mine.nu>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -23,6 +27,9 @@ MODULE_DESCRIPTION("TFTP connection tracking helper");
 MODULE_LICENSE("GPL");
 MODULE_ALIAS("ip_conntrack_tftp");
 MODULE_ALIAS_NFCT_HELPER("tftp");
+
+/* 当前定义tftp控制连接的连接跟踪时间为12 Hour, 保证可以根据控制连接找到数据连接跟踪*/
+#define TFTP_MAST_NF_TIMEOUT_SECONDS (43200)
 
 #define MAX_PORTS 8
 static unsigned short ports[MAX_PORTS];
@@ -52,6 +59,11 @@ static int tftp_help(struct sk_buff *skb,
 	if (tfh == NULL)
 		return NF_ACCEPT;
 
+    /* DMZ portmapping修改时要求业务可以立即中断BUILD_NAT_CT_CLEAN控制
+    为保证tftp可以立即中断延长tftp控制连接的连接跟踪超时时间*/    
+#ifdef CONFIG_IP_NF_TFTP_INCREASE_MAST_CONTRACK_TIMEOUT
+    nf_ct_refresh(ct, skb, TFTP_MAST_NF_TIMEOUT_SECONDS * HZ);
+#endif 
 	switch (ntohs(tfh->opcode)) {
 	case TFTP_OPCODE_READ:
 	case TFTP_OPCODE_WRITE:

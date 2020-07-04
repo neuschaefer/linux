@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *	Linux ethernet bridge
  *
  *	Authors:
@@ -43,16 +47,8 @@
 #define BRCTL_SET_PATH_COST 17
 #define BRCTL_GET_FDB_ENTRIES 18
 
-#if !defined(CONFIG_BCM_IN_KERNEL) || defined(CONFIG_BCM_KF_IGMP)
-#define BRCTL_ENABLE_SNOOPING                   21
-#define BRCTL_ENABLE_PROXY_MODE                 22
-#endif
 #if !defined(CONFIG_BCM_IN_KERNEL) || defined(CONFIG_BCM_KF_IGMP_RATE_LIMIT)
-#define BRCTL_ENABLE_IGMP_RATE_LIMIT            23
-#endif
-#if !defined(CONFIG_BCM_IN_KERNEL) || defined(CONFIG_BCM_KF_MLD)
-#define BRCTL_MLD_ENABLE_SNOOPING               24
-#define BRCTL_MLD_ENABLE_PROXY_MODE             25
+#define BRCTL_ENABLE_IGMP_RATE_LIMIT            21    /*not used by our brctl*/
 #endif
 #if !defined(CONFIG_BCM_IN_KERNEL) || defined(CONFIG_BCM_KF_BRIDGE_STATIC_FDB)
 #define BRCTL_ADD_FDB_ENTRIES                   26
@@ -61,9 +57,9 @@
 #if !defined(CONFIG_BCM_IN_KERNEL) || defined(CONFIG_BCM_KF_BRIDGE_DYNAMIC_FDB)
 #define BRCTL_DEL_DYN_FDB_ENTRIES               28
 #endif
-#if !defined(CONFIG_BCM_IN_KERNEL) || defined(CONFIG_BCM_KF_NETFILTER)
-#define BRCTL_SET_FLOWS                         29
-#endif
+
+#define BRCTL_SET_FLOWS              29
+
 #if !defined(CONFIG_BCM_IN_KERNEL) || defined(CONFIG_BCM_KF_UNI_UNI)
 #define BRCTL_SET_UNI_UNI_CTRL                  30
 #endif
@@ -88,6 +84,30 @@
 #if !defined(CONFIG_BCM_IN_KERNEL) || (defined(CONFIG_BCM_KF_BRIDGE_MAC_FDB_LIMIT) && defined(CONFIG_BCM_BRIDGE_MAC_FDB_LIMIT))
 #define BRCTL_GET_BR_FDB_LIMIT                  37
 #define BRCTL_SET_BR_FDB_LIMIT                  38
+#endif
+
+#if defined (CONFIG_IGMP_SNOOPING) 
+//atp 
+#define BRCTL_SET_IGMP_SNOOPING 23
+#define BRCTL_SHOW_IGMP_SNOOPING 24
+#else
+//bcm的组播加速才用
+#define BRCTL_ENABLE_SNOOPING        22
+#define BRCTL_ENABLE_PROXY_MODE      23
+#endif
+
+#if defined (CONFIG_MLD_SNOOPING)
+//atp 
+#define BRCTL_SET_MLD_SNOOPING  25
+#define BRCTL_SHOW_MLD_SNOOPING 26
+#else
+//bcm的组播加速才用
+#define BRCTL_MLD_ENABLE_SNOOPING    25
+#define BRCTL_MLD_ENABLE_PROXY_MODE  26
+#endif
+
+#ifdef CONFIG_BRIDGE_PORT_RELAY
+#define BRCTL_SET_PORT_RELAY 34
 #endif
 
 #define BR_STATE_DISABLED 0
@@ -148,6 +168,14 @@ struct __fdb_entry {
 #endif
 };
 
+/*ATP新增*/
+struct __fdb_lan
+{
+    __u8 mac_addr[6];
+    __u8 port_no;
+    char lanname[16];
+};
+
 #ifdef __KERNEL__
 
 #include <linux/netdevice.h>
@@ -182,6 +210,12 @@ extern br_should_route_hook_t __rcu *br_should_route_hook;
 #if defined(CONFIG_BCM_KF_FBOND) && (defined(CONFIG_BCM_FBOND) || defined(CONFIG_BCM_FBOND_MODULE))
 typedef struct net_device *(* br_fb_process_hook_t)(struct sk_buff *skb_p, uint16_t h_proto, struct net_device *txDev );
 extern void br_fb_bind(br_fb_process_hook_t brFbProcessHook);
+#endif
+
+#if (defined CONFIG_HSAN)
+extern int hi_br_get_port(int ifindex, unsigned char *addr); 
+extern int hi_br_find_mac(struct net_device *dev, unsigned char *addr);
+extern struct net_bridge_fdb_entry * hi_br_find_fdb(struct net_device *dev, unsigned char *addr); 
 #endif
 
 #endif

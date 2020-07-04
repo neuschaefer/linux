@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *	IPv6 input
  *	Linux INET6 implementation
  *
@@ -135,7 +139,18 @@ int ipv6_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt
 		}
 		hdr = ipv6_hdr(skb);
 	}
-
+#ifdef CONFIG_SUPPORT_ATP
+    /*start  WAN接口收到报文大于自身MTU的报文时回复too big报文*/
+    if (skb->len > skb->dev->mtu) {
+        icmpv6_send(skb, ICMPV6_PKT_TOOBIG, 0, skb->dev->mtu);
+        IP6_INC_STATS_BH(net,
+				 idev, IPSTATS_MIB_INTOOBIGERRORS);
+		IP6_INC_STATS_BH(net,
+				 idev, IPSTATS_MIB_FRAGFAILS);
+        goto drop;
+    }
+    /*end  WAN接口收到报文大于自身MTU的报文时回复too big报文*/
+#endif
 	if (hdr->nexthdr == NEXTHDR_HOP) {
 		if (ipv6_parse_hopopts(skb) < 0) {
 			IP6_INC_STATS_BH(net, idev, IPSTATS_MIB_INHDRERRORS);

@@ -1,0 +1,64 @@
+# define a global config variable
+
+menu "HSAN platform feature"
+
+config MACH_HSAN
+	bool "HSAN platform"
+	select CPU_V7
+	select ARM_GIC
+	select OUTER_CACHE
+	select HAVE_SMP
+	select HSAN
+	help
+	  Include support for the HSAN platform.
+  
+config HSAN_KCONSOLE
+	int "Kernel console( 0 => UART0, 1 => UART1)"
+	range 0 1
+	default 0
+	help
+	  Select uart port as the default console used by kernel
+
+config HSAN_KCONSOLE_BAUD
+	int "Kernel console baud rate"
+	default 115200
+	help
+	   Default uart port baud rate
+	   
+config HSAN_BUSCLK
+	int "HSAN_BUSCLK"
+	default "100000000"
+	help
+      	Default AHB clock rate
+
+config HSAN_EDB
+    bool "HSAN EDB"
+    default n
+    help
+        used to early debug
+        
+menu "HSAN memory partition address"
+
+config HSAN_PHYS_OFFSET
+	hex "HSAN_PHYS_OFFSET"
+	default "0x82000000"
+	help    
+        
+config HSAN_ZRELADDR
+	hex "HSAN_ZRELADDR"
+	default "0x82008000"
+	help    
+
+config HSAN_PARAMS_PHYS
+	hex "HSAN_PARAMS_PHYS"
+	default "0x82000100"
+	help
+
+config HSAN_INITRD_PHYS
+	hex "HSAN_INITRD_PHYS"
+	default "0x82c00000"
+	help      
+
+endmenu
+endmenu
+

@@ -1,3 +1,7 @@
+/*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
 #ifndef ASMARM_DMA_MAPPING_H
 #define ASMARM_DMA_MAPPING_H
 
@@ -75,43 +79,59 @@ static inline dma_addr_t virt_to_dma(struct device *dev, void *addr)
  * Private support functions: these are not part of the API and are
  * liable to change.  Drivers must not use these.
  */
-static inline void __dma_single_cpu_to_dev(const void *kaddr, size_t size,
+static inline void __dma_single_cpu_to_dev(struct device *dev, const void *kaddr, size_t size, 
 	enum dma_data_direction dir)
 {
 	extern void ___dma_single_cpu_to_dev(const void *, size_t,
 		enum dma_data_direction);
 
+#if (defined CONFIG_HSAN)
+	if (!((dev->acp) || ((NULL != dev->bus)&&(dev->bus->acp))))		
+#else
 	if (!arch_is_coherent())
+#endif		
 		___dma_single_cpu_to_dev(kaddr, size, dir);
 }
 
-static inline void __dma_single_dev_to_cpu(const void *kaddr, size_t size,
+static inline void __dma_single_dev_to_cpu(struct device *dev, const void *kaddr, size_t size,
 	enum dma_data_direction dir)
 {
 	extern void ___dma_single_dev_to_cpu(const void *, size_t,
 		enum dma_data_direction);
-
-	if (!arch_is_coherent())
+	
+#if (defined CONFIG_HSAN)
+		if (!((dev->acp) || ((NULL != dev->bus)&&(dev->bus->acp))))		
+#else
+		if (!arch_is_coherent())
+#endif	
 		___dma_single_dev_to_cpu(kaddr, size, dir);
 }
 
-static inline void __dma_page_cpu_to_dev(struct page *page, unsigned long off,
+static inline void __dma_page_cpu_to_dev(struct device *dev, struct page *page, unsigned long off,
 	size_t size, enum dma_data_direction dir)
 {
 	extern void ___dma_page_cpu_to_dev(struct page *, unsigned long,
 		size_t, enum dma_data_direction);
-
-	if (!arch_is_coherent())
+    
+#if (defined CONFIG_HSAN)
+            if (!((dev->acp) || ((NULL != dev->bus)&&(dev->bus->acp))))      
+#else
+            if (!arch_is_coherent())
+#endif	
 		___dma_page_cpu_to_dev(page, off, size, dir);
 }
 
-static inline void __dma_page_dev_to_cpu(struct page *page, unsigned long off,
+static inline void __dma_page_dev_to_cpu(struct device *dev, struct page *page, unsigned long off,
 	size_t size, enum dma_data_direction dir)
 {
 	extern void ___dma_page_dev_to_cpu(struct page *, unsigned long,
 		size_t, enum dma_data_direction);
 
-	if (!arch_is_coherent())
+#if (defined CONFIG_HSAN)
+            if (!((dev->acp) || ((NULL != dev->bus)&&(dev->bus->acp))))      
+#else
+            if (!arch_is_coherent())
+#endif	
 		___dma_page_dev_to_cpu(page, off, size, dir);
 }
 
@@ -289,14 +309,14 @@ static inline int dmabounce_sync_for_device(struct device *d, dma_addr_t addr,
 static inline dma_addr_t __dma_map_page(struct device *dev, struct page *page,
 	     unsigned long offset, size_t size, enum dma_data_direction dir)
 {
-	__dma_page_cpu_to_dev(page, offset, size, dir);
+	__dma_page_cpu_to_dev(dev, page, offset, size, dir);
 	return pfn_to_dma(dev, page_to_pfn(page)) + offset;
 }
 
 static inline void __dma_unmap_page(struct device *dev, dma_addr_t handle,
 		size_t size, enum dma_data_direction dir)
 {
-	__dma_page_dev_to_cpu(pfn_to_page(dma_to_pfn(dev, handle)),
+	__dma_page_dev_to_cpu(dev, pfn_to_page(dma_to_pfn(dev, handle)),
 		handle & ~PAGE_MASK, size, dir);
 }
 #endif /* CONFIG_DMABOUNCE */
@@ -432,7 +452,7 @@ static inline void dma_sync_single_range_for_cpu(struct device *dev,
 	if (!dmabounce_sync_for_cpu(dev, handle, offset, size, dir))
 		return;
 
-	__dma_single_dev_to_cpu(dma_to_virt(dev, handle) + offset, size, dir);
+	__dma_single_dev_to_cpu(dev, dma_to_virt(dev, handle) + offset, size, dir);
 }
 
 static inline void dma_sync_single_range_for_device(struct device *dev,
@@ -446,7 +466,7 @@ static inline void dma_sync_single_range_for_device(struct device *dev,
 	if (!dmabounce_sync_for_device(dev, handle, offset, size, dir))
 		return;
 
-	__dma_single_cpu_to_dev(dma_to_virt(dev, handle) + offset, size, dir);
+	__dma_single_cpu_to_dev(dev, dma_to_virt(dev, handle) + offset, size, dir);
 }
 
 static inline void dma_sync_single_for_cpu(struct device *dev,

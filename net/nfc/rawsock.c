@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * Copyright (C) 2011 Instituto Nokia de Tecnologia
  *
  * Authors:
@@ -234,8 +238,9 @@ static int rawsock_recvmsg(struct kiocb *iocb, struct socket *sock,
 	skb = skb_recv_datagram(sk, flags, noblock, &rc);
 	if (!skb)
 		return rc;
-
-	msg->msg_namelen = 0;
+		
+	//CVE-2013-7270
+	//msg->msg_namelen = 0;
 
 	copied = skb->len;
 	if (len < copied) {

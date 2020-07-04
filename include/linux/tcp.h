@@ -510,4 +510,8 @@ static inline struct tcp_timewait_sock *tcp_twsk(const struct sock *sk)
 
 #endif	/* __KERNEL__ */
 
+/*Modify  CVE-2019-11477 20190925 */
+int tcp_skb_shift(struct sk_buff *to, struct sk_buff *from, int pcount,
+		  int shiftlen);
+
 #endif	/* _LINUX_TCP_H */

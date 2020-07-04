@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *  linux/arch/arm/kernel/traps.c
  *
  *  Copyright (C) 1995-2009 Russell King
@@ -37,6 +41,17 @@
 
 #include "signal.h"
 
+#include <mach/hi_hsan.h>
+
+#ifdef CONFIG_HIMEM_DUMPFILE
+extern int hw_ssp_set_dump_info(const char *fmt, ...);
+#endif
+#ifdef CONFIG_CRASH_DUMPFILE
+extern int ATP_KRNL_CRASH_AppendInfo(const char *fmt, ...);
+extern int ATP_KRNL_CRASH_ClearInfo(void);
+extern int ATP_KRNL_CRASH_OutputInfo(void);
+#endif
+
 static const char *handler[]= { "prefetch abort", "data abort", "address exception", "interrupt" };
 
 void *vectors_page;
@@ -58,6 +73,14 @@ void dump_backtrace_entry(unsigned long where, unsigned long from, unsigned long
 {
 #ifdef CONFIG_KALLSYMS
 	printk("[<%08lx>] (%pS) from [<%08lx>] (%pS)\n", where, (void *)where, from, (void *)from);
+#ifdef CONFIG_HIMEM_DUMPFILE
+    hw_ssp_set_dump_info("[<%08lx>] (%pS) from [<%08lx>] (%pS)\n", where, (void *)where, from, (void *)from);
+#endif
+#ifdef CONFIG_CRASH_DUMPFILE
+    ATP_KRNL_CRASH_ClearInfo();
+    ATP_KRNL_CRASH_AppendInfo("[<%08lx>] (%pS) from [<%08lx>] (%pS)\n", where, (void *)where, from, (void *)from);
+    ATP_KRNL_CRASH_OutputInfo();
+#endif
 #else
 	printk("Function entered at [<%08lx>] from [<%08lx>]\n", where, from);
 #endif
@@ -101,7 +124,14 @@ static void dump_mem(const char *lvl, const char *str, unsigned long bottom,
 	set_fs(KERNEL_DS);
 
 	printk("%s%s(0x%08lx to 0x%08lx)\n", lvl, str, bottom, top);
-
+#ifdef CONFIG_HIMEM_DUMPFILE
+       hw_ssp_set_dump_info("%s%s(0x%08lx to 0x%08lx)\n", lvl, str, bottom, top);
+#endif
+#ifdef CONFIG_CRASH_DUMPFILE
+        ATP_KRNL_CRASH_ClearInfo();
+        ATP_KRNL_CRASH_AppendInfo("%s%s(0x%08lx to 0x%08lx)\n", lvl, str, bottom, top);
+        ATP_KRNL_CRASH_OutputInfo();
+#endif
 	for (first = bottom & ~31; first < top; first += 32) {
 		unsigned long p;
 		char str[sizeof(" 12345678") * 8 + 1];
@@ -119,6 +149,14 @@ static void dump_mem(const char *lvl, const char *str, unsigned long bottom,
 			}
 		}
 		printk("%s%04lx:%s\n", lvl, first & 0xffff, str);
+#ifdef CONFIG_HIMEM_DUMPFILE
+        hw_ssp_set_dump_info("%s%04lx:%s\n", lvl, first & 0xffff, str);
+#endif
+#ifdef CONFIG_CRASH_DUMPFILE
+        ATP_KRNL_CRASH_ClearInfo();
+        ATP_KRNL_CRASH_AppendInfo("%s%04lx:%s\n", lvl, first & 0xffff, str);
+        ATP_KRNL_CRASH_OutputInfo();
+#endif            
 	}
 
 	set_fs(fs);
@@ -158,7 +196,14 @@ static void dump_instr(const char *lvl, struct pt_regs *regs)
 		}
 	}
 	printk("%sCode: %s\n", lvl, str);
-
+#ifdef CONFIG_HIMEM_DUMPFILE
+    hw_ssp_set_dump_info("%sCode: %s\n", lvl, str);
+#endif 
+#ifdef CONFIG_CRASH_DUMPFILE
+    ATP_KRNL_CRASH_ClearInfo();
+    ATP_KRNL_CRASH_AppendInfo("%sCode: %s\n", lvl, str);
+    ATP_KRNL_CRASH_OutputInfo();
+#endif  
 	set_fs(fs);
 }
 
@@ -174,7 +219,14 @@ static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
 	int ok = 1;
 
 	printk("Backtrace: ");
-
+#ifdef CONFIG_HIMEM_DUMPFILE
+       hw_ssp_set_dump_info("Backtrace: ");
+#endif 
+#ifdef CONFIG_CRASH_DUMPFILE
+       ATP_KRNL_CRASH_ClearInfo();
+       ATP_KRNL_CRASH_AppendInfo("Backtrace: ");
+       ATP_KRNL_CRASH_OutputInfo();
+#endif 
 	if (!tsk)
 		tsk = current;
 
@@ -191,14 +243,47 @@ static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
 
 	if (!fp) {
 		printk("no frame pointer");
+#ifdef CONFIG_HIMEM_DUMPFILE
+              hw_ssp_set_dump_info("no frame pointer");
+#endif 
+#ifdef CONFIG_CRASH_DUMPFILE
+       ATP_KRNL_CRASH_ClearInfo();
+       ATP_KRNL_CRASH_AppendInfo("no frame pointer");
+       ATP_KRNL_CRASH_OutputInfo();
+#endif
 		ok = 0;
 	} else if (verify_stack(fp)) {
 		printk("invalid frame pointer 0x%08x", fp);
+#ifdef CONFIG_HIMEM_DUMPFILE
+              hw_ssp_set_dump_info("invalid frame pointer 0x%08x", fp);
+#endif
+#ifdef CONFIG_CRASH_DUMPFILE
+              ATP_KRNL_CRASH_ClearInfo();
+              ATP_KRNL_CRASH_AppendInfo("invalid frame pointer 0x%08x", fp);
+              ATP_KRNL_CRASH_OutputInfo();
+#endif       
 		ok = 0;
 	} else if (fp < (unsigned long)end_of_stack(tsk))
+       {   
 		printk("frame pointer underflow");
+#ifdef CONFIG_HIMEM_DUMPFILE
+              hw_ssp_set_dump_info("frame pointer underflow");
+#endif
+#ifdef CONFIG_CRASH_DUMPFILE
+              ATP_KRNL_CRASH_ClearInfo();
+              ATP_KRNL_CRASH_AppendInfo("frame pointer underflow");
+              ATP_KRNL_CRASH_OutputInfo();
+#endif
+       }
 	printk("\n");
-
+#ifdef CONFIG_HIMEM_DUMPFILE
+      hw_ssp_set_dump_info("\n");
+#endif         
+#ifdef CONFIG_CRASH_DUMPFILE
+      ATP_KRNL_CRASH_ClearInfo();
+      ATP_KRNL_CRASH_AppendInfo("\n");
+      ATP_KRNL_CRASH_OutputInfo();
+#endif
 	if (ok)
 		c_backtrace(fp, mode);
 }
@@ -206,10 +291,66 @@ static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
 
 void dump_stack(void)
 {
+#if (defined CONFIG_HSAN) 
+	extern  struct task_struct *curr_task(int cpu);
+	int curr_cpuid ;
+    struct task_struct *curr;
+    curr_cpuid= smp_processor_id();
+    printk("current cpuid:%x\n",curr_cpuid);
+
+    printk("cpu0 dump_stack\n");
+#ifdef CONFIG_HIMEM_DUMPFILE
+      hw_ssp_set_dump_info("current cpuid:%x\n",curr_cpuid);
+      hw_ssp_set_dump_info("cpu0 dump_stack\n");
+#endif            
+    curr = curr_task(0);
+	dump_backtrace(NULL, curr);
+
+    printk("cpu1 dump_stack\n");
+#ifdef CONFIG_HIMEM_DUMPFILE
+    hw_ssp_set_dump_info("cpu1 dump_stack\n");
+#endif            
+    
+    curr = curr_task(1);
+	dump_backtrace(NULL, curr);
+	arch_reset(0, "reboot"); 
+#else
 	dump_backtrace(NULL, NULL);
+#endif
 }
 
 EXPORT_SYMBOL(dump_stack);
+
+#if (defined CONFIG_HSAN)
+void hi_dumpall(void)
+{
+	int curcpuid = 0;
+	int cpuid    = 0;
+    struct task_struct *curr = NULL;
+    //
+    curcpuid = smp_processor_id();
+    cpuid    = curcpuid;
+    // 
+    printk("\ncurrent cpu%d:%d dump_stack: ",NR_CPUS,curcpuid);    
+#ifdef CONFIG_HIMEM_DUMPFILE
+    hw_ssp_set_dump_info("\ncurrent cpu%d:%d dump_stack: ",NR_CPUS,curcpuid);
+#endif
+    do {
+        printk("\ncpu%d:%d ",NR_CPUS,cpuid);
+#ifdef CONFIG_HIMEM_DUMPFILE
+        hw_ssp_set_dump_info("\ncpu%d:%d ",NR_CPUS,cpuid);
+#endif
+        curr = curr_task(cpuid);
+    	dump_backtrace(NULL, curr);
+    	// other cpu
+        if ( ++cpuid >= NR_CPUS )
+        {
+            cpuid = 0;
+        }
+    }while( curcpuid != cpuid );
+}
+EXPORT_SYMBOL(hi_dumpall);
+#endif
 
 void show_stack(struct task_struct *tsk, unsigned long *sp)
 {
@@ -241,7 +382,16 @@ static int __die(const char *str, int err, struct thread_info *thread, struct pt
 
 	printk(KERN_EMERG "Internal error: %s: %x [#%d]" S_PREEMPT S_SMP
 	       S_ISA "\n", str, err, ++die_counter);
-
+#ifdef CONFIG_HIMEM_DUMPFILE
+        hw_ssp_set_dump_info("Internal error: %s: %x [#%d]" S_PREEMPT S_SMP
+	       S_ISA "\n", str, err, ++die_counter);
+#endif
+#ifdef CONFIG_CRASH_DUMPFILE
+      ATP_KRNL_CRASH_ClearInfo();
+      ATP_KRNL_CRASH_AppendInfo("Internal error: %s: %x [#%d]" S_PREEMPT S_SMP
+           S_ISA "\n", str, err, ++die_counter);
+      ATP_KRNL_CRASH_OutputInfo();
+#endif
 	/* trap and error numbers are mostly meaningless on ARM */
 	ret = notify_die(DIE_OOPS, str, regs, err, tsk->thread.trap_no, SIGSEGV);
 	if (ret == NOTIFY_STOP)
@@ -251,11 +401,24 @@ static int __die(const char *str, int err, struct thread_info *thread, struct pt
 	__show_regs(regs);
 	printk(KERN_EMERG "Process %.*s (pid: %d, stack limit = 0x%p)\n",
 		TASK_COMM_LEN, tsk->comm, task_pid_nr(tsk), thread + 1);
-
+#ifdef CONFIG_HIMEM_DUMPFILE
+        hw_ssp_set_dump_info("Process %.*s (pid: %d, stack limit = 0x%p)\n",
+		TASK_COMM_LEN, tsk->comm, task_pid_nr(tsk), thread + 1);
+#endif 
+#ifdef CONFIG_CRASH_DUMPFILE
+      ATP_KRNL_CRASH_ClearInfo();
+      ATP_KRNL_CRASH_AppendInfo("Process %.*s (pid: %d, stack limit = 0x%p)\n",
+          TASK_COMM_LEN, tsk->comm, task_pid_nr(tsk), thread + 1);
+      ATP_KRNL_CRASH_OutputInfo();
+#endif
 	if (!user_mode(regs) || in_interrupt()) {
 		dump_mem(KERN_EMERG, "Stack: ", regs->ARM_sp,
 			 THREAD_SIZE + (unsigned long)task_stack_page(tsk));
+    #if (defined CONFIG_HSAN) 
+        dump_stack();
+    #else
 		dump_backtrace(regs, tsk);
+    #endif
 		dump_instr(KERN_EMERG, regs);
 	}
 
@@ -267,6 +430,9 @@ static DEFINE_RAW_SPINLOCK(die_lock);
 /*
  * This function is protected against re-entrancy.
  */
+ #ifdef CONFIG_SUPPORT_PANIC
+ extern void set_panic_regs(struct pt_regs *regs);
+#endif
 void die(const char *str, struct pt_regs *regs, int err)
 {
 	struct thread_info *thread = current_thread_info();
@@ -290,13 +456,29 @@ void die(const char *str, struct pt_regs *regs, int err)
 	bust_spinlocks(0);
 	add_taint(TAINT_DIE);
 	raw_spin_unlock_irq(&die_lock);
+ #ifdef CONFIG_SUPPORT_PANIC
+       /*记录register信息，以备Panic写到内存*/
+       set_panic_regs(regs);
+ #endif
 	oops_exit();
 
 	if (in_interrupt())
+       {   
 		panic("Fatal exception in interrupt");
+#ifdef CONFIG_HIMEM_DUMPFILE
+              hw_ssp_set_dump_info("Fatal exception in interrupt");
+#endif 
+        
+       }
+
 	if (panic_on_oops)
+       {   
 		panic("Fatal exception");
-	if (ret != NOTIFY_STOP)
+#ifdef CONFIG_HIMEM_DUMPFILE
+              hw_ssp_set_dump_info("Fatal exception");
+#endif         
+       }
+    if (ret != NOTIFY_STOP)
 		do_exit(SIGSEGV);
 }
 
@@ -426,6 +608,10 @@ die_sig:
 		dump_instr(KERN_INFO, regs);
 	}
 #endif
+#if 0 //def CONFIG_HIMEM_DUMPFILE
+              hw_ssp_set_dump_info(KERN_INFO "%s (%d): undefined instruction: pc=%p\n",
+			current->comm, task_pid_nr(current), pc);
+#endif         
 
 	info.si_signo = SIGILL;
 	info.si_errno = 0;
@@ -439,6 +625,10 @@ asmlinkage void do_unexp_fiq (struct pt_regs *regs)
 {
 	printk("Hmm.  Unexpected FIQ received, but trying to continue\n");
 	printk("You may have a hardware problem...\n");
+#ifdef CONFIG_HIMEM_DUMPFILE
+      hw_ssp_set_dump_info("Hmm.  Unexpected FIQ received, but trying to continue\n");
+      hw_ssp_set_dump_info("You may have a hardware problem...\n");
+#endif        
 }
 
 /*
@@ -664,11 +854,30 @@ asmlinkage int arm_syscall(int no, struct pt_regs *regs)
 		}
 	}
 #endif
+#ifdef CONFIG_HIMEM_DUMPFILE
+      hw_ssp_set_dump_info("[%d] %s: arm syscall %d\n",
+		       task_pid_nr(current), current->comm, no);
+#endif        
+#ifdef CONFIG_CRASH_DUMPFILE
+      ATP_KRNL_CRASH_ClearInfo();
+      ATP_KRNL_CRASH_AppendInfo("[%d] %s: arm syscall %d\n",
+               task_pid_nr(current), current->comm, no);
+      ATP_KRNL_CRASH_OutputInfo();
+#endif
 	info.si_signo = SIGILL;
 	info.si_errno = 0;
 	info.si_code  = ILL_ILLTRP;
 	info.si_addr  = (void __user *)instruction_pointer(regs) -
 			 (thumb_mode(regs) ? 2 : 4);
+    
+#ifdef CONFIG_HIMEM_DUMPFILE
+      hw_ssp_set_dump_info("Oops - bad syscall(2)");
+#endif        
+#ifdef CONFIG_CRASH_DUMPFILE
+      ATP_KRNL_CRASH_ClearInfo();
+      ATP_KRNL_CRASH_AppendInfo("Oops - bad syscall(2)");
+      ATP_KRNL_CRASH_OutputInfo();
+#endif
 
 	arm_notify_die("Oops - bad syscall(2)", regs, &info, no, 0);
 	return 0;
@@ -714,6 +923,11 @@ late_initcall(arm_mrc_hook_init);
 
 void __bad_xchg(volatile void *ptr, int size)
 {
+#ifdef CONFIG_HIMEM_DUMPFILE
+      hw_ssp_set_dump_info("xchg: bad data size: pc 0x%p, ptr 0x%p, size %d\n",
+		__builtin_return_address(0), ptr, size);
+#endif        
+
 	printk("xchg: bad data size: pc 0x%p, ptr 0x%p, size %d\n",
 		__builtin_return_address(0), ptr, size);
 	BUG();
@@ -730,6 +944,11 @@ baddataabort(int code, unsigned long instr, struct pt_regs *regs)
 	unsigned long addr = instruction_pointer(regs);
 	siginfo_t info;
 
+#ifdef CONFIG_HIMEM_DUMPFILE
+      hw_ssp_set_dump_info(KERN_ERR "[%d] %s: bad data abort: code %d instr 0x%08lx\n",
+			task_pid_nr(current), current->comm, code, instr);
+#endif        
+
 #ifdef CONFIG_DEBUG_USER
 	if (user_debug & UDBG_BADABORT) {
 		printk(KERN_ERR "[%d] %s: bad data abort: code %d instr 0x%08lx\n",
@@ -743,6 +962,9 @@ baddataabort(int code, unsigned long instr, struct pt_regs *regs)
 	info.si_errno = 0;
 	info.si_code  = ILL_ILLOPC;
 	info.si_addr  = (void __user *)addr;
+#ifdef CONFIG_HIMEM_DUMPFILE
+      hw_ssp_set_dump_info("unknown data abort code");
+#endif        
 
 	arm_notify_die("unknown data abort code", regs, &info, instr, 0);
 }
@@ -782,6 +1004,10 @@ void abort(void)
 
 	/* if that doesn't kill us, halt */
 	panic("Oops failed to kill thread");
+#ifdef CONFIG_HIMEM_DUMPFILE
+      hw_ssp_set_dump_info("Oops failed to kill thread");
+#endif        
+    
 }
 EXPORT_SYMBOL(abort);
 

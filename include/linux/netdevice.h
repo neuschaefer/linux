@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * INET		An implementation of the TCP/IP protocol suite for the LINUX
  *		operating system.  INET is implemented using the  BSD Socket
  *		interface as the means of communication with the user level.
@@ -1138,8 +1142,14 @@ struct net_device {
 	/* Instance data managed by the core of Wireless Extensions. */
 	struct iw_public_data *	wireless_data;
 #endif
+#if (defined CONFIG_HSAN)
+	struct net_device_ops *netdev_ops;
+    void                  *pv_ndo_start_xmit;
+	unsigned int           ext_dev;
+#else
 	/* Management operations */
 	const struct net_device_ops *netdev_ops;
+#endif
 	const struct ethtool_ops *ethtool_ops;
 
 	/* Hardware header description */
@@ -2656,6 +2666,13 @@ extern struct rtnl_link_stats64 *dev_get_stats(struct net_device *dev,
 extern void netdev_stats_to_stats64(struct rtnl_link_stats64 *stats64,
 				    const struct net_device_stats *netdev_stats);
 
+#ifdef CONFIG_ATP_HYBRID_GREACCEL
+extern unsigned int	hisi_sw_accel_flag;
+extern void (*kernel_get_bcm_vlan_real_dev_hook)(struct net_device *vlan_dev, struct net_device **real_dev);
+extern void (*accel_show_seq_show_hook)(struct seq_file *seq);
+extern void (*accel_flush_seq_show_hook)(struct seq_file *seq);
+extern unsigned int (*kernel_accel_recv_hook)(struct sk_buff *skb, struct net_device *dev);
+#endif
 extern int		netdev_max_backlog;
 extern int		netdev_tstamp_prequeue;
 extern int		weight_p;

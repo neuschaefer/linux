@@ -1,3 +1,7 @@
+/*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
 #ifndef __NET_FRAG_H__
 #define __NET_FRAG_H__
 
@@ -5,12 +9,18 @@ struct netns_frags {
 	int			nqueues;
 	atomic_t		mem;
 	struct list_head	lru_list;
+    //CVE-2014-0100
+    spinlock_t          lru_lock;
 
 	/* sysctls */
 	int			timeout;
 	int			high_thresh;
 	int			low_thresh;
+	int			ipfrag_count_thresh;  /* add ipfrag count */
+	atomic_t    ipfrag_count;         /* add ipfrag count */
 };
+#define IPFRAG_PACKET_TRRUSIZE_MIN    288   /* add ipfrag count */ 
+
 
 struct inet_frag_queue {
 	struct hlist_node	list;
@@ -71,4 +81,26 @@ static inline void inet_frag_put(struct inet_frag_queue *q, struct inet_frags *f
 		inet_frag_destroy(q, f, NULL);
 }
 
+//CVE-2014-0100
+static inline void inet_frag_lru_move(struct inet_frag_queue *q)
+{
+    spin_lock(&q->net->lru_lock);
+    list_move_tail(&q->lru_list, &q->net->lru_list);
+    spin_unlock(&q->net->lru_lock);
+}
+
+static inline void inet_frag_lru_del(struct inet_frag_queue *q)
+{
+    spin_lock(&q->net->lru_lock);
+    list_del(&q->lru_list);
+    spin_unlock(&q->net->lru_lock);
+}
+
+static inline void inet_frag_lru_add(struct netns_frags *nf,
+                                    struct inet_frag_queue *q)
+{
+    spin_lock(&nf->lru_lock);
+    list_add_tail(&q->lru_list, &nf->lru_list);
+    spin_unlock(&nf->lru_lock);
+}
 #endif

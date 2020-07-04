@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * Copyright (C) 2004 IBM Corporation
  *
  * Authors:
@@ -94,12 +98,14 @@ struct tpm_vendor_specific {
 	bool timeout_adjusted;
 	unsigned long duration[3]; /* jiffies */
 	bool duration_adjusted;
+	void *priv;
 
 	wait_queue_head_t read_queue;
 	wait_queue_head_t int_queue;
 };
 
 #define TPM_VID_INTEL    0x8086
+#define TPM_VPRIV(c)	 ((c)->vendor.priv)
 
 struct tpm_chip {
 	struct device *dev;	/* Device stuff */
@@ -289,6 +295,12 @@ ssize_t	tpm_getcap(struct device *, __be32, cap_t *, const char *);
 extern int tpm_get_timeouts(struct tpm_chip *);
 extern void tpm_gen_interrupt(struct tpm_chip *);
 extern int tpm_do_selftest(struct tpm_chip *);
+extern int tpm_stm_startup(struct tpm_chip *);
+extern int tpm_stm_selftest(struct tpm_chip *);
+extern int tpm_stm_enable(struct tpm_chip *);
+extern int tpm_stm_active(struct tpm_chip *);
+extern int tpm_stm_physicpresence(struct tpm_chip *, u8);
+
 extern unsigned long tpm_calc_ordinal_duration(struct tpm_chip *, u32);
 extern struct tpm_chip* tpm_register_hardware(struct device *,
 				 const struct tpm_vendor_specific *);

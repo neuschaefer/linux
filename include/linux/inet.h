@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *		Swansea University Computer Society NET3
  *
  *	This work is derived from NET2Debugged, which is in turn derived
@@ -50,6 +54,11 @@
  */
 #define INET_ADDRSTRLEN		(16)
 #define INET6_ADDRSTRLEN	(48)
+
+#ifdef CONFIG_HSAN	
+#define HI_ADDR_TYPE_IPV4  (0)
+#define HI_ADDR_TYPE_IPV6  (1)
+#endif
 
 extern __be32 in_aton(const char *str);
 extern int in4_pton(const char *src, int srclen, u8 *dst, int delim, const char **end);

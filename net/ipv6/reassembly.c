@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *	IPv6 fragment reassembly
  *	Linux INET6 implementation
  *
@@ -383,10 +387,8 @@ found:
 	if (fq->q.last_in == (INET_FRAG_FIRST_IN | INET_FRAG_LAST_IN) &&
 	    fq->q.meat == fq->q.len)
 		return ip6_frag_reasm(fq, prev, dev);
-
-	write_lock(&ip6_frags.lock);
-	list_move_tail(&fq->q.lru_list, &fq->q.net->lru_list);
-	write_unlock(&ip6_frags.lock);
+	//CVE-2014-0100
+    inet_frag_lru_move(&fq->q);
 	return -1;
 
 discard_fq:

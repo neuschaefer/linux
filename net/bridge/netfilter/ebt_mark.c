@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *  ebt_mark
  *
  *	Authors:
@@ -17,6 +21,37 @@
 #include <linux/netfilter/x_tables.h>
 #include <linux/netfilter_bridge/ebtables.h>
 #include <linux/netfilter_bridge/ebt_mark_t.h>
+#ifdef CONFIG_NF_CONNTRACK_PRI
+#include <linux/netfilter/nf_conntrack_pri.h>
+#endif
+
+
+#ifdef CONFIG_NF_CONNTRACK_PRI
+static int ebt_action_modify_mark(int action)
+{
+	if (MARK_SET_VALUE == action)
+	{
+		return 1;
+	}
+
+	if (MARK_OR_VALUE == action)
+	{
+		return 1;
+	}
+
+	if (MARK_AND_VALUE == action)
+	{
+		return 1;
+	}
+
+	if (MARK_XOR_VALUE == action)
+	{
+		return 1;
+	}
+
+	return 0;
+}
+#endif
 
 static unsigned int
 ebt_mark_tg(struct sk_buff *skb, const struct xt_action_param *par)
@@ -24,8 +59,25 @@ ebt_mark_tg(struct sk_buff *skb, const struct xt_action_param *par)
 	const struct ebt_mark_t_info *info = par->targinfo;
 	int action = info->target & -16;
 
+#ifdef CONFIG_NF_CONNTRACK_PRI
+	if (ebt_action_modify_mark(action) && nf_pri_is_alg_skb(skb))
+	{
+		nf_pri_set_alg_mark(skb);
+		return info->target | ~EBT_VERDICT_BITS;
+	}
+#endif
+
 	if (action == MARK_SET_VALUE)
-		skb->mark = info->mark;
+	{
+		if (info->mark & 0x000ff000)
+		{
+			skb->mark = (skb->mark & (~0x000ff000)) | info->mark;
+		}
+		else
+		{
+			skb->mark = info->mark;
+		}
+	}
 	else if (action == MARK_OR_VALUE)
 		skb->mark |= info->mark;
 	else if (action == MARK_AND_VALUE)

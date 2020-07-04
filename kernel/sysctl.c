@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * sysctl.c: General linux system control interface
  *
  * Begun 24 March 1995, Stephen Tweedie
@@ -209,6 +213,19 @@ extern struct ctl_table epoll_table[];
 #ifdef HAVE_ARCH_PICK_MMAP_LAYOUT
 int sysctl_legacy_va_layout;
 #endif
+
+/******************************************************************************
+  变量名称  : sysctl_localtime_offset
+  变量作用  : 记录网关配置了时区和夏令时信息后,
+                              UTC时间和本地时间的秒数差
+                              内核用UTC时间计时，用户态程序如 MAC地址的时间过滤
+                              使用的是本地时间, 该差值可籍此变量修正
+  取值范围  : 内核全局
+  调用函数  : ebt_time.c 中的localtime
+
+  注意事项  :
+******************************************************************************/
+int sysctl_localtime_offset = 0;
 
 /* The default sysctl tables: */
 

@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *	Forwarding decision
  *	Linux ethernet bridge
  *
@@ -23,6 +27,7 @@
 #include <linux/export.h>
 #endif
 #include "br_private.h"
+#include "atp_interface.h"
 #if defined(CONFIG_BCM_KF_IGMP)
 #include <linux/ip.h>
 #include <linux/igmp.h>
@@ -31,6 +36,12 @@
 #if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
 #include <linux/blog.h>
 #endif
+
+/* Start of viewed  for qos function 2012-1-6 */
+#if defined(CONFIG_IMQ) || defined(CONFIG_IMQ_MODULE)
+#include <linux/imq.h>
+#endif
+/* End of viewed  for qos function 2012-1-6 */
 
 #if defined(CONFIG_BCM_KF_IP)
 #if defined(CONFIG_BCM96828) && !defined(CONFIG_EPON_HGU)
@@ -130,7 +141,7 @@ static inline int should_deliver(const struct net_bridge_port *p,
 	}
 #endif /* CONFIG_BCM_KF_WANDEV */
 
-#if defined(CONFIG_BCM_KF_IGMP)
+#if defined(CONFIG_BCM_KF_IGMP) && defined(CONFIG_BR_IGMP_SNOOP)
 	/*
 	 * CPE is querying for LAN-2-LAN multicast.  These query messages 
 	 * should not go on WAN interfaces.
@@ -273,6 +284,12 @@ static void __br_forward(const struct net_bridge_port *to, struct sk_buff *skb)
 	indev = skb->dev;
 	skb->dev = to->dev;
 	skb_forward_csum(skb);
+
+/* Start of viewed  for qos function 2012-1-6 */
+#if defined(CONFIG_IMQ) || defined(CONFIG_IMQ_MODULE)
+    skb->mark |= QOS_DEFAULT_MARK;
+#endif
+/* End of viewed  for qos function 2012-1-6 */
 
 	NF_HOOK(NFPROTO_BRIDGE, NF_BR_FORWARD, skb, indev, skb->dev,
 		br_forward_finish);
@@ -479,3 +496,40 @@ void br_multicast_forward(struct net_bridge_mdb_entry *mdst,
 	br_multicast_flood(mdst, skb, skb2, __br_forward);
 }
 #endif
+
+#ifdef CONFIG_IGMP_SNOOPING
+/* DT c4163 add for BT IGMP function. This allow interface which don't join currrent multicast group reciving IGMP report packet. */
+extern unsigned int br_igmp_snooping_no_v1v2report(const struct net_bridge_port *dev_port, struct sk_buff *skb);
+
+static void br_forward_igmpv1v2report(const struct net_bridge_port * to, struct sk_buff * skb)
+{
+	if (to != 0 && br_igmp_snooping_no_v1v2report(to, skb)) {
+		__br_forward(to, skb);
+		return;
+	}
+	kfree_skb(skb);
+}
+
+void br_flood_forward_igmpv1v2report(struct net_bridge *br, struct sk_buff *skb)
+{
+	br_flood(br, skb, NULL, br_forward_igmpv1v2report);
+}
+/* DT c4163 end */
+
+/* BEGIN: Added , 2010/10/29 For BT IGMPv3 query and send report*/
+static void br_send_igmpv3report(const struct net_bridge_port * to, struct sk_buff * skb)
+{
+	if (to != NULL && to->dev != NULL && IS_WAN_DEVICE(to->dev->name)) {
+		__br_forward(to, skb);
+		return;
+	}
+
+	kfree_skb(skb);
+}
+void br_forward_igmpv3report(struct net_bridge *br, struct sk_buff *skb)
+{
+	br_flood(br, skb, NULL, br_send_igmpv3report);
+}
+/* END:   Added , 2010/10/29 */
+#endif
+

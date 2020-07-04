@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *	common UDP/RAW code
  *	Linux INET6 implementation
  *
@@ -32,6 +36,10 @@
 
 #include <linux/errqueue.h>
 #include <asm/uaccess.h>
+
+#if CONFIG_ATP_COMMON
+extern void atp_ipv6_skb_mark(struct sock *sk, struct msghdr *msg, struct sk_buff *skb);
+#endif
 
 static inline int ipv6_mapped_addr_any(const struct in6_addr *a)
 {
@@ -493,6 +501,10 @@ int datagram_recv_ctl(struct sock *sk, struct msghdr *msg, struct sk_buff *skb)
 		__be32 flowinfo = *(__be32 *)nh & IPV6_FLOWINFO_MASK;
 		put_cmsg(msg, SOL_IPV6, IPV6_FLOWINFO, sizeof(flowinfo), &flowinfo);
 	}
+
+#if CONFIG_ATP_COMMON
+    atp_ipv6_skb_mark(sk, msg, skb);
+#endif
 
 	/* HbH is allowed only once */
 	if (np->rxopt.bits.hopopts && opt->hop) {

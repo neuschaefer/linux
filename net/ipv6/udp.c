@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *	UDP over IPv6
  *	Linux INET6 implementation
  *
@@ -348,8 +352,9 @@ int udpv6_recvmsg(struct kiocb *iocb, struct sock *sk,
 	int is_udp4;
 	bool slow;
 
-	if (addr_len)
-		*addr_len=sizeof(struct sockaddr_in6);
+	//CVE-2013-7263
+	//if (addr_len)
+	//	*addr_len=sizeof(struct sockaddr_in6);
 
 	if (flags & MSG_ERRQUEUE)
 		return ipv6_recv_error(sk, msg, len);
@@ -424,6 +429,9 @@ try_again:
 				sin6->sin6_scope_id = IP6CB(skb)->iif;
 		}
 
+		//CVE-2013-7263
+		if (addr_len)
+			*addr_len = sizeof(*sin6);
 	}
 	if (is_udp4) {
 		if (inet->cmsg_flags)
@@ -781,8 +789,12 @@ int __udp6_lib_rcv(struct sk_buff *skb, struct udp_table *udptable,
 			goto discard;
 		UDP6_INC_STATS_BH(net, UDP_MIB_NOPORTS,
 				proto == IPPROTO_UDPLITE);
-
-		icmpv6_send(skb, ICMPV6_DEST_UNREACH, ICMPV6_PORT_UNREACH, 0);
+        /* BEGIN: Added , 2013/7/18 For port scan.*/
+		if (!sysctl_port_scan_ipv6)
+        {
+			icmpv6_send(skb, ICMPV6_DEST_UNREACH, ICMPV6_PORT_UNREACH, 0);
+        }
+		/* END: Added , 2013/7/18 For port scan.*/
 
 		kfree_skb(skb);
 		return 0;
@@ -895,11 +907,17 @@ static int udp_v6_push_pending_frames(struct sock *sk)
 	struct udphdr *uh;
 	struct udp_sock  *up = udp_sk(sk);
 	struct inet_sock *inet = inet_sk(sk);
-	struct flowi6 *fl6 = &inet->cork.fl.u.ip6;
+	//CVE-2013-4162
+	struct flowi6 *fl6;
 	int err = 0;
 	int is_udplite = IS_UDPLITE(sk);
 	__wsum csum = 0;
 
+    //CVE-2013-4162
+    if (up->pending == AF_INET)
+        return udp_push_pending_frames(sk);
+    
+    fl6 = &inet->cork.fl.u.ip6;
 	/* Grab the skbuff where UDP header space exists. */
 	if ((skb = skb_peek(&sk->sk_write_queue)) == NULL)
 		goto out;

@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *	Userspace interface
  *	Linux ethernet bridge
  *
@@ -23,9 +27,13 @@
 #include <linux/if_ether.h>
 #include <linux/slab.h>
 #include <net/sock.h>
+#include <linux/atphooks.h>
 
 #include "br_private.h"
 
+#ifdef CONFIG_MLD_SNOOPING
+#include "br_mld_snooping.h"
+#endif
 #if defined(CONFIG_BCM_KF_IGMP) && defined(CONFIG_BR_IGMP_SNOOP)
 #include "br_igmp.h"
 #endif
@@ -470,6 +478,12 @@ int br_del_if(struct net_bridge *br, struct net_device *dev)
 	p = br_port_get_rtnl(dev);
 	if (!p || p->br != br)
 		return -EINVAL;
+
+    ATP_HOOK(ATP_BR_DEL_IF, p, br, dev, 0);
+
+#ifdef CONFIG_MLD_SNOOPING
+    br_mld_snooping_del_by_nbp(p);
+#endif
 
 #if defined(CONFIG_BCM_KF_BRIDGE_MAC_FDB_LIMIT) && defined(CONFIG_BCM_BRIDGE_MAC_FDB_LIMIT)
 	/* Disable min limit per port in advance */

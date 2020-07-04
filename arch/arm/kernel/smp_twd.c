@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *  linux/arch/arm/kernel/smp_twd.c
  *
  *  Copyright (C) 2002 ARM Ltd.
@@ -26,6 +30,9 @@
 #include <asm/smp_twd.h>
 #include <asm/localtimer.h>
 #include <asm/hardware/gic.h>
+#if (defined CONFIG_HSAN)
+#include <mach/hi_hsan.h>
+#endif
 
 /* set up by the platform code */
 static void __iomem *twd_base;
@@ -84,6 +91,9 @@ static int twd_timer_ack(void)
 {
 	if (__raw_readl(twd_base + TWD_TIMER_INTSTAT)) {
 		__raw_writel(1, twd_base + TWD_TIMER_INTSTAT);
+#if (defined CONFIG_HSAN)        
+        hi_wdg_check();  
+#endif
 		return 1;
 	}
 

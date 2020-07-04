@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * Enhanced Host Controller Interface (EHCI) driver for USB.
  *
  * Maintainer: Alan Stern <stern@rowland.harvard.edu>
@@ -1262,6 +1266,11 @@ MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_AUTHOR (DRIVER_AUTHOR);
 MODULE_LICENSE ("GPL");
 
+#if (defined CONFIG_HSAN)
+#include "../hsan/hi_ehci.c"
+#define PLATFORM_DRIVER g_st_ehci_driver
+#endif
+
 #ifdef CONFIG_PCI
 #include "ehci-pci.c"
 #define	PCI_DRIVER		ehci_pci_driver
@@ -1417,6 +1426,14 @@ static int __init ehci_hcd_init(void)
 		 sizeof(struct ehci_qh), sizeof(struct ehci_qtd),
 		 sizeof(struct ehci_itd), sizeof(struct ehci_sitd));
 
+#if (defined CONFIG_HSAN)
+    retval = hi_ehci_init(); 
+    if (0 != retval)
+    {
+        return retval; 
+    }
+#endif
+
 #ifdef DEBUG
 	ehci_debug_root = debugfs_create_dir("ehci", usb_debug_root);
 	if (!ehci_debug_root) {
@@ -1481,6 +1498,9 @@ clean0:
 	ehci_debug_root = NULL;
 err_debug:
 #endif
+ 	#if (defined CONFIG_HSAN)
+        hi_ehci_exit(); 
+    #endif
 	clear_bit(USB_EHCI_LOADED, &usb_hcds_loaded);
 	return retval;
 }
@@ -1488,6 +1508,12 @@ module_init(ehci_hcd_init);
 
 static void __exit ehci_hcd_cleanup(void)
 {
+
+#if (defined CONFIG_HSAN)
+    hi_ehci_exit(); 
+#endif
+
+    
 #ifdef XILINX_OF_PLATFORM_DRIVER
 	platform_driver_unregister(&XILINX_OF_PLATFORM_DRIVER);
 #endif

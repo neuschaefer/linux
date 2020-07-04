@@ -1,3 +1,7 @@
+/*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
 /* Kernel module to match packet length. */
 /* (C) 1999-2001 James Morris <jmorros@intercode.com.au>
  *
@@ -33,6 +37,9 @@ length_mt(const struct sk_buff *skb, struct xt_action_param *par)
 	skb_p->ipt_log.u32[BLOG_MIN_LEN_INDEX] = info->min;
 	skb_p->ipt_log.u32[BLOG_MAX_LEN_INDEX] = info->max;
 #endif
+#ifdef CONFIG_ATP_BRCM
+	blog_skip((struct sk_buff *)skb);
+#endif
 	return (pktlen >= info->min && pktlen <= info->max) ^ info->invert;
 }
 
@@ -49,6 +56,9 @@ length_mt6(const struct sk_buff *skb, struct xt_action_param *par)
 	skb_p->ipt_check |= IPT_MATCH_LENGTH;
 	skb_p->ipt_log.u32[BLOG_MIN_LEN_INDEX] = info->min;
 	skb_p->ipt_log.u32[BLOG_MAX_LEN_INDEX] = info->max;
+#endif
+#ifdef CONFIG_ATP_BRCM
+	blog_skip((struct sk_buff *)skb);
 #endif
 	return (pktlen >= info->min && pktlen <= info->max) ^ info->invert;
 }

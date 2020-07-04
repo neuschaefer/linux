@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * sysctl_net_ipv6.c: sysctl interface to net IPV6 subsystem.
  *
  * Changes:
@@ -15,6 +19,13 @@
 #include <net/ipv6.h>
 #include <net/addrconf.h>
 #include <net/inet_frag.h>
+#include <net/udp.h>
+#include <net/tcp.h>
+
+/* BEGIN: Added , 2013/7/18 For port scan.*/
+int sysctl_port_scan_ipv6 __read_mostly = 1;
+EXPORT_SYMBOL(sysctl_port_scan_ipv6);
+/* END:   Added , 2013/7/18 */
 
 static struct ctl_table empty[1];
 
@@ -48,6 +59,15 @@ static ctl_table ipv6_table_template[] = {
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec
 	},
+	/* BEGIN: Added , 2013/7/18 For port scan */
+    {
+		.procname	= "port_scan",
+		.data		= &sysctl_port_scan_ipv6,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec
+	},
+	/* END:   Added , 2013/7/18 */
 	{ }
 };
 

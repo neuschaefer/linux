@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * platform_device.h - generic, centralized driver model
  *
  * Copyright (c) 2001-2003 Patrick Mochel <mochel@osdl.org>
@@ -30,6 +34,9 @@ struct platform_device {
 
 	/* arch specific additions */
 	struct pdev_archdata	archdata;
+#if (defined CONFIG_HSAN)
+    int acp; 
+#endif
 };
 
 #define platform_get_device_id(pdev)	((pdev)->id_entry)

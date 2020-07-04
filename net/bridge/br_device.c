@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *	Device handling code
  *	Linux ethernet bridge
  *
@@ -20,9 +24,14 @@
 #include <linux/netfilter_bridge.h>
 
 #include <asm/uaccess.h>
+#include <linux/atphooks.h>
 #include "br_private.h"
 #if defined(CONFIG_BCM_KF_WL) 
 #include "linux/bcm_skb_defines.h"
+#endif
+
+#ifdef CONFIG_MLD_SNOOPING
+#include "br_mld_snooping.h"
 #endif
 
 #if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
@@ -39,6 +48,10 @@ extern uint32_t (*wl_pktc_req_hook)(int req_id, uint32_t param0, uint32_t param1
 #endif
 #if defined(CONFIG_BCM_KF_MLD) && defined(CONFIG_BR_MLD_SNOOP)
 #include "br_mld.h"
+#endif
+
+#ifdef CONFIG_IGMP_SNOOPING
+extern int br_igmp_snooping_forward(struct sk_buff *skb, struct net_bridge *br,unsigned char *dest,int forward);
 #endif
 
 #if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
@@ -297,6 +310,8 @@ netdev_tx_t br_dev_xmit(struct sk_buff *skb, struct net_device *dev)
 			br_flood_deliver(br, skb);
 			goto out;
 		}
+// TODO: 新内核已经支持了IGMP/MLD snooping功能，该功能和平台的IGMP功能需要二选一
+#ifndef CONFIG_ATP_COMMON
 		if (br_multicast_rcv(br, NULL, skb)) {
 			kfree_skb(skb);
 			goto out;
@@ -307,6 +322,29 @@ netdev_tx_t br_dev_xmit(struct sk_buff *skb, struct net_device *dev)
 			br_multicast_deliver(mdst, skb);
 		else
 			br_flood_deliver(br, skb);
+#else
+#ifdef CONFIG_ATP_MLD_SNOOPING
+		if ((0x33 == dest[0]) && (0x33 == dest[1]))
+		{
+			if (!br_mld_snooping_forward(skb, br, (unsigned char *) dest, 0))
+			{
+				br_flood_deliver(br, skb);
+			}
+		}
+		else
+		{
+			br_flood_deliver(br, skb);
+		}
+#elif defined(CONFIG_IGMP_SNOOPING)
+		if (!br_igmp_snooping_forward(skb, br, (unsigned char *)dest, 0))
+		{
+			br_flood_deliver(br, skb);
+		}
+#else
+		br_flood_deliver(br, skb);
+#endif
+
+#endif
 	} else if ((dst = __br_fdb_get(br, dest)) != NULL)
 #if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
 	{

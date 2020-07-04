@@ -13,6 +13,7 @@ obj-$(CONFIG_USB_RTL8150)	+= rtl8150.o
 obj-$(CONFIG_USB_HSO)		+= hso.o
 obj-$(CONFIG_USB_NET_AX8817X)	+= asix.o
 obj-$(CONFIG_USB_NET_CDCETHER)	+= cdc_ether.o
+obj-$(CONFIG_USB_NET_HW_CDC_DRIVER) += hw_cdc_driver.o RnicDemandDialFileIO.o
 obj-$(CONFIG_USB_NET_CDC_EEM)	+= cdc_eem.o
 obj-$(CONFIG_USB_NET_DM9601)	+= dm9601.o
 obj-$(CONFIG_USB_NET_SMSC75XX)	+= smsc75xx.o
@@ -24,7 +25,7 @@ obj-$(CONFIG_USB_NET_RNDIS_HOST)	+= rndis_host.o
 obj-$(CONFIG_USB_NET_CDC_SUBSET)	+= cdc_subset.o
 obj-$(CONFIG_USB_NET_ZAURUS)	+= zaurus.o
 obj-$(CONFIG_USB_NET_MCS7830)	+= mcs7830.o
-obj-$(CONFIG_USB_USBNET)	+= usbnet.o
+obj-$(CONFIG_USB_USBNET)	+= usbnet.o RnicDemandDialFileIO.o
 obj-$(CONFIG_USB_NET_INT51X1)	+= int51x1.o
 obj-$(CONFIG_USB_CDC_PHONET)	+= cdc-phonet.o
 obj-$(CONFIG_USB_NET_KALMIA)	+= kalmia.o
@@ -35,3 +36,6 @@ obj-$(CONFIG_USB_NET_CDC_NCM)	+= cdc_ncm.o
 obj-$(CONFIG_USB_VL600)		+= lg-vl600.o
 obj-$(CONFIG_USB_NET_QMI_WWAN)	+= qmi_wwan.o
 
+
+obj-$(CONFIG_USB_QMITTY)	+= qmitty.o
+obj-$(CONFIG_USB_NET_RMNET_ETHERNET) +=rmnet_ethernet.o

@@ -1,3 +1,7 @@
+/*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
 #ifndef _IPV6_H
 #define _IPV6_H
 
@@ -126,7 +130,7 @@ struct ipv6hdr {
 
 	struct	in6_addr	saddr;
 	struct	in6_addr	daddr;
-};
+} LINUX_NET_PACKED; /*Hybrid IPv6对齐提高性能*/
 
 #ifdef __KERNEL__
 /*
@@ -151,6 +155,11 @@ struct ipv6_devconf {
 	__s32		regen_max_retry;
 	__s32		max_desync_factor;
 #endif
+
+#ifdef CONFIG_SUPPORT_ATP_IPV6_ENABLE
+    __s32       enable;
+#endif
+
 	__s32		max_addresses;
 	__s32		accept_ra_defrtr;
 	__s32		accept_ra_pinfo;
@@ -345,8 +354,15 @@ struct ipv6_pinfo {
 				ohopopts:1,
 				dstopts:1,
 				odstopts:1,
-                                rxflow:1,
+				rxflow:1,
+#ifdef CONFIG_SUPPORT_ATP
+
 				rxtclass:1,
+				rxnfmark:1,
+				rxindev:1,
+#else
+				rxtclass:1,
+#endif
 				rxpmtu:1,
 				rxorigdstaddr:1;
 				/* 2 bits hole */

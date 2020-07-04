@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *  linux/arch/arm/mm/dma-mapping.c
  *
  *  Copyright (C) 2000-2004 Russell King
@@ -360,7 +364,11 @@ __dma_alloc(struct device *dev, size_t size, dma_addr_t *handle, gfp_t gfp,
 	if (!page)
 		return NULL;
 
-	if (!arch_is_coherent())
+#if (defined CONFIG_HSAN)
+     if (!((dev->acp) || ((NULL != dev->bus)&&(dev->bus->acp))))      
+#else
+     if (!arch_is_coherent())
+#endif
 		addr = __dma_alloc_remap(page, size, gfp, prot, caller);
 	else
 		addr = page_address(page);
@@ -462,7 +470,11 @@ void dma_free_coherent(struct device *dev, size_t size, void *cpu_addr, dma_addr
 
 	size = PAGE_ALIGN(size);
 
-	if (!arch_is_coherent())
+#if (defined CONFIG_HSAN)
+         if (!((dev->acp) || ((NULL != dev->bus)&&(dev->bus->acp))))      
+#else
+         if (!arch_is_coherent())
+#endif
 		__dma_free_remap(cpu_addr, size);
 
 	__dma_free_buffer(pfn_to_page(dma_to_pfn(dev, handle)), size);
@@ -694,7 +706,7 @@ void dma_sync_sg_for_cpu(struct device *dev, struct scatterlist *sg,
 					    sg_dma_len(s), dir))
 			continue;
 
-		__dma_page_dev_to_cpu(sg_page(s), s->offset,
+		__dma_page_dev_to_cpu(dev, sg_page(s), s->offset,
 				      s->length, dir);
 	}
 
@@ -720,7 +732,7 @@ void dma_sync_sg_for_device(struct device *dev, struct scatterlist *sg,
 					sg_dma_len(s), dir))
 			continue;
 
-		__dma_page_cpu_to_dev(sg_page(s), s->offset,
+		__dma_page_cpu_to_dev(dev, sg_page(s), s->offset,
 				      s->length, dir);
 	}
 

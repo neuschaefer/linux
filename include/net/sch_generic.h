@@ -1,3 +1,7 @@
+/*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
 #ifndef __NET_SCHED_GENERIC_H
 #define __NET_SCHED_GENERIC_H
 
@@ -425,10 +429,44 @@ static inline bool qdisc_tx_is_noop(const struct net_device *dev)
 	return true;
 }
 
+/* start 上行分流带宽配置不准确 20130620  */
+#ifdef CONFIG_ATP_HYBRID
+#include <linux/if_arp.h>
+#include "atp_interface.h"
+#define GRE_ETH_HLEN            14
+#define GRE_IP_HDRLEN	        20	/* bytes */
+#define GRE_IP6_HDRLEN	        40	/* bytes */
+#define GRE_GRE_HDRLEN	        12	/* bytes */
+#define GRE_PPP_HDRLEN	        8	/* bytes */
+
+static inline unsigned int qdisc_pkt_len(const struct sk_buff *skb)
+{
+    /* Hybrid上行分流计算流量时，没有添加GRE, IP, PPP, ETH头 */
+    if (IS_GRE_DEV(skb->dev->name))
+    {
+        if (ARPHRD_IPGRE == skb->dev->type)
+        {
+            return qdisc_skb_cb(skb)->pkt_len + GRE_ETH_HLEN + GRE_IP_HDRLEN + GRE_GRE_HDRLEN + GRE_PPP_HDRLEN;
+        }
+        else if (ARPHRD_IP6GRE == skb->dev->type)
+        {
+            return qdisc_skb_cb(skb)->pkt_len + GRE_ETH_HLEN + GRE_IP6_HDRLEN + GRE_GRE_HDRLEN + GRE_PPP_HDRLEN;
+        }
+        else
+        {
+            return qdisc_skb_cb(skb)->pkt_len + GRE_ETH_HLEN + GRE_GRE_HDRLEN + GRE_PPP_HDRLEN;
+        }   
+    }
+
+    return qdisc_skb_cb(skb)->pkt_len;
+}
+#else
 static inline unsigned int qdisc_pkt_len(const struct sk_buff *skb)
 {
 	return qdisc_skb_cb(skb)->pkt_len;
 }
+#endif
+/* end 上行分流带宽配置不准确 20130620  */
 
 /* additional qdisc xmit flags (NET_XMIT_MASK in linux/netdevice.h) */
 enum net_xmit_qdisc_t {

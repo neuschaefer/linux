@@ -1,3 +1,7 @@
+/*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
 #ifndef __LINUX_IP_NETFILTER_H
 #define __LINUX_IP_NETFILTER_H
 
@@ -62,6 +66,9 @@ enum nf_ip_hook_priorities {
 	NF_IP_PRI_CONNTRACK = -200,
 	NF_IP_PRI_MANGLE = -150,
 	NF_IP_PRI_NAT_DST = -100,
+#if defined(CONFIG_DPI_PARSE)
+	NF_IP_PRI_DPI = -50,
+#endif
 	NF_IP_PRI_FILTER = 0,
 	NF_IP_PRI_SECURITY = 50,
 	NF_IP_PRI_NAT_SRC = 100,

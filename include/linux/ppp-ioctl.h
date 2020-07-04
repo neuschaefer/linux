@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * ppp-ioctl.h - PPP ioctl definitions.
  *
  * Copyright 1999-2002 Paul Mackerras.
@@ -55,6 +59,13 @@ struct npioctl {
 	enum NPmode	mode;
 };
 
+#ifdef CONFIG_PPP_ONDEMAND_V4_V6_SEPARATE
+struct npstateioctl {
+	int		protocol;	/* PPP protocol, e.g. PPP_IP */
+	enum NPstate state;
+};
+#endif
+
 /* Structure describing a CCP configuration option, for PPPIOCSCOMPRESS */
 struct ppp_option_data {
 	__u8	__user *ptr;
@@ -82,10 +93,25 @@ struct pppol2tp_ioc_stats {
 typedef char	ppp_real_dev_name[IFNAMSIZ];
 #endif
 
+/* ATP add, PPP device name type */
+typedef char	ppp_name[IFNAMSIZ];
+
 /*
  * Ioctl definitions.
  */
+#ifdef CONFIG_PPP_ONDEMAND_V4_V6_SEPARATE
+ //for v4 v6 seperate
+#define PPPIOCGV6IDLE	_IOR('t', 97, struct ppp_v6_idle) /* get ipv6 idle time */
+#define PPPIOCGV4IDLE	_IOR('t', 96, struct ppp_v4_idle) /* get ipv4 idle time */
+#define PPPIOCGNPSTATE	_IOWR('t', 95, struct npstateioctl) /* get NP state */
+#define PPPIOCSNPSTATE	_IOW('t', 94, struct npstateioctl)  /* set NP state */
+#endif
 
+/*按需拨号在启用伪路由前需关闸，在拨号成功后nat设置完成后在开闸 close gate  start*/ 
+#define PPPIOCSCLOSE	_IOW('t', 93, int)	/* drop all packet from lan */
+#define PPPIOCSOPEN	_IOW('t', 92, int)	/* no close gate */
+/*按需拨号在启用伪路由前需关闸，在拨号成功后nat设置完成后在开闸 close gate  end*/
+ 
 #define	PPPIOCGFLAGS	_IOR('t', 90, int)	/* get configuration flags */
 #define	PPPIOCSFLAGS	_IOW('t', 89, int)	/* set configuration flags */
 #define	PPPIOCGASYNCMAP	_IOR('t', 88, int)	/* get async map */
@@ -119,7 +145,6 @@ typedef char	ppp_real_dev_name[IFNAMSIZ];
 #if defined(CONFIG_BCM_KF_PPP)
 #define	PPPIOCSREALDEV	_IOW('t', 53, ppp_real_dev_name) /* set real device name */
 #endif
-
 #define SIOCGPPPSTATS   (SIOCDEVPRIVATE + 0)
 #define SIOCGPPPVER     (SIOCDEVPRIVATE + 1)	/* NEVER change this!! */
 #define SIOCGPPPCSTATS  (SIOCDEVPRIVATE + 2)

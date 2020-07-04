@@ -30,9 +30,10 @@ obj-$(CONFIG_MTD_SWAP)		+= mtdswap.o
 nftl-objs		:= nftlcore.o nftlmount.o
 inftl-objs		:= inftlcore.o inftlmount.o
 
+ifdef CONFIG_HSAN
+obj-$(CONFIG_HSAN) += hsan/
+else
 obj-y		+= chips/ lpddr/ maps/ devices/ nand/ onenand/ tests/
+endif
 
-#if defined(CONFIG_BCM_KF_MTD_BCMNAND)
-obj-$(CONFIG_MTD_BRCMNAND)	+= brcmnand/
-#endif # BCM_KF
 obj-$(CONFIG_MTD_UBI)		+= ubi/

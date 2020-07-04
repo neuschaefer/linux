@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  * LED Kernel Timer Trigger
  *
  * Copyright 2005-2006 Openedhand Ltd.
@@ -77,8 +81,66 @@ static ssize_t led_delay_off_store(struct device *dev,
 	return ret;
 }
 
+static ssize_t led_delay_count_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct led_classdev *led_cdev = dev_get_drvdata(dev);
+
+	return sprintf(buf, "%lu\n", led_cdev->blink_delay_count);
+}
+
+static ssize_t led_delay_count_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size)
+{
+	struct led_classdev *led_cdev = dev_get_drvdata(dev);
+	int ret = -EINVAL;
+	char *after;
+	unsigned long state = simple_strtoul(buf, &after, 10);
+	size_t count = after - buf;
+
+	if (isspace(*after))
+		count++;
+
+	if (count == size) {
+		led_cdev->blink_delay_count = state;
+		ret = count;
+	}
+
+	return ret;
+}
+
+static ssize_t led_delay_off2_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct led_classdev *led_cdev = dev_get_drvdata(dev);
+
+	return sprintf(buf, "%lu\n", led_cdev->blink_delay_off2);
+}
+
+static ssize_t led_delay_off2_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size)
+{
+	struct led_classdev *led_cdev = dev_get_drvdata(dev);
+	int ret = -EINVAL;
+	char *after;
+	unsigned long state = simple_strtoul(buf, &after, 10);
+	size_t count = after - buf;
+
+	if (isspace(*after))
+		count++;
+
+	if (count == size) {
+		led_cdev->blink_delay_off2 = state;
+		ret = count;
+	}
+
+	return ret;
+}
+
 static DEVICE_ATTR(delay_on, 0644, led_delay_on_show, led_delay_on_store);
 static DEVICE_ATTR(delay_off, 0644, led_delay_off_show, led_delay_off_store);
+static DEVICE_ATTR(delay_count, 0644, led_delay_count_show, led_delay_count_store);
+static DEVICE_ATTR(delay_off2, 0644, led_delay_off2_show, led_delay_off2_store);
 
 static void timer_trig_activate(struct led_classdev *led_cdev)
 {
@@ -92,6 +154,12 @@ static void timer_trig_activate(struct led_classdev *led_cdev)
 	rc = device_create_file(led_cdev->dev, &dev_attr_delay_off);
 	if (rc)
 		goto err_out_delayon;
+	rc = device_create_file(led_cdev->dev, &dev_attr_delay_count);
+	if (rc)
+		goto err_out_delayoff;
+	rc = device_create_file(led_cdev->dev, &dev_attr_delay_off2);
+	if (rc)
+		goto err_out_delaycount;
 
 	led_blink_set(led_cdev, &led_cdev->blink_delay_on,
 		      &led_cdev->blink_delay_off);
@@ -100,6 +168,10 @@ static void timer_trig_activate(struct led_classdev *led_cdev)
 
 	return;
 
+err_out_delaycount:
+	device_remove_file(led_cdev->dev, &dev_attr_delay_count);
+err_out_delayoff:
+	device_remove_file(led_cdev->dev, &dev_attr_delay_off);
 err_out_delayon:
 	device_remove_file(led_cdev->dev, &dev_attr_delay_on);
 }
@@ -109,6 +181,8 @@ static void timer_trig_deactivate(struct led_classdev *led_cdev)
 	if (led_cdev->trigger_data) {
 		device_remove_file(led_cdev->dev, &dev_attr_delay_on);
 		device_remove_file(led_cdev->dev, &dev_attr_delay_off);
+		device_remove_file(led_cdev->dev, &dev_attr_delay_count);
+		device_remove_file(led_cdev->dev, &dev_attr_delay_off2);
 	}
 
 	/* Stop blinking */

@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *	SUCS NET3:
  *
  *	Generic datagram handling routines. These are generic for all
@@ -187,7 +191,8 @@ struct sk_buff *__skb_recv_datagram(struct sock *sk, unsigned flags,
 		skb_queue_walk(queue, skb) {
 			*peeked = skb->peeked;
 			if (flags & MSG_PEEK) {
-				if (*off >= skb->len) {
+                // CVE-2013-0290
+				if (*off >= skb->len && skb->len) {
 					*off -= skb->len;
 					continue;
 				}

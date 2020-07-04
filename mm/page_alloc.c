@@ -1,4 +1,8 @@
 /*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
+/*
  *  linux/mm/page_alloc.c
  *
  *  Manages the free list, the system allocates free pages here.
@@ -78,6 +82,13 @@ EXPORT_PER_CPU_SYMBOL(numa_node);
  */
 DEFINE_PER_CPU(int, _numa_mem_);		/* Kernel "local memory" node */
 EXPORT_PER_CPU_SYMBOL(_numa_mem_);
+#endif
+#ifdef CONFIG_CRASH_DUMPFILE
+#include "atpcrash.h"
+#endif
+
+#ifdef CONFIG_HIMEM_DUMPFILE
+extern int hw_ssp_set_dump_info(const char *fmt, ...);
 #endif
 
 /*
@@ -198,7 +209,11 @@ static char * const zone_names[MAX_NR_ZONES] = {
 	 "Movable",
 };
 
+#ifdef CONFIG_ATP_HYBRID
+int min_free_kbytes = 16384;
+#else
 int min_free_kbytes = 1024;
+#endif
 
 static unsigned long __meminitdata nr_kernel_pages;
 static unsigned long __meminitdata nr_all_pages;
@@ -2780,7 +2795,12 @@ void show_free_areas(unsigned int filter)
 			continue;
 		show_node(zone);
 		printk("%s per-cpu:\n", zone->name);
-
+#ifdef CONFIG_CRASH_DUMPFILE
+        ATP_KRNL_CRASH_AppendInfo("%s per-cpu:\n", zone->name);
+#endif
+#ifdef CONFIG_HIMEM_DUMPFILE
+        hw_ssp_set_dump_info("%s per-cpu:\n", zone->name);
+#endif
 		for_each_online_cpu(cpu) {
 			struct per_cpu_pageset *pageset;
 
@@ -2789,6 +2809,16 @@ void show_free_areas(unsigned int filter)
 			printk("CPU %4d: hi:%5d, btch:%4d usd:%4d\n",
 			       cpu, pageset->pcp.high,
 			       pageset->pcp.batch, pageset->pcp.count);
+#ifdef CONFIG_CRASH_DUMPFILE					
+			ATP_KRNL_CRASH_AppendInfo("CPU %4d: hi:%5d, btch:%4d usd:%4d\n",
+			       cpu, pageset->pcp.high,
+			       pageset->pcp.batch, pageset->pcp.count);
+#endif
+#ifdef CONFIG_HIMEM_DUMPFILE
+                    hw_ssp_set_dump_info( "CPU %4d: hi:%5d, btch:%4d usd:%4d\n",
+			       cpu, pageset->pcp.high,
+			       pageset->pcp.batch, pageset->pcp.count);
+#endif
 		}
 	}
 
@@ -2815,6 +2845,56 @@ void show_free_areas(unsigned int filter)
 		global_page_state(NR_SHMEM),
 		global_page_state(NR_PAGETABLE),
 		global_page_state(NR_BOUNCE));
+#ifdef CONFIG_CRASH_DUMPFILE
+        ATP_KRNL_CRASH_AppendInfo("active_anon:%lu inactive_anon:%lu isolated_anon:%lu\n"
+		" active_file:%lu inactive_file:%lu isolated_file:%lu\n"
+		" unevictable:%lu"
+		" dirty:%lu writeback:%lu unstable:%lu\n"
+		" free:%lu slab_reclaimable:%lu slab_unreclaimable:%lu\n"
+		" mapped:%lu shmem:%lu pagetables:%lu bounce:%lu\n",
+		global_page_state(NR_ACTIVE_ANON),
+		global_page_state(NR_INACTIVE_ANON),
+		global_page_state(NR_ISOLATED_ANON),
+		global_page_state(NR_ACTIVE_FILE),
+		global_page_state(NR_INACTIVE_FILE),
+		global_page_state(NR_ISOLATED_FILE),
+		global_page_state(NR_UNEVICTABLE),
+		global_page_state(NR_FILE_DIRTY),
+		global_page_state(NR_WRITEBACK),
+		global_page_state(NR_UNSTABLE_NFS),
+		global_page_state(NR_FREE_PAGES),
+		global_page_state(NR_SLAB_RECLAIMABLE),
+		global_page_state(NR_SLAB_UNRECLAIMABLE),
+		global_page_state(NR_FILE_MAPPED),
+		global_page_state(NR_SHMEM),
+		global_page_state(NR_PAGETABLE),
+		global_page_state(NR_BOUNCE));
+#endif
+#ifdef CONFIG_HIMEM_DUMPFILE
+              hw_ssp_set_dump_info("active_anon:%lu inactive_anon:%lu isolated_anon:%lu\n"
+		" active_file:%lu inactive_file:%lu isolated_file:%lu\n"
+		" unevictable:%lu"
+		" dirty:%lu writeback:%lu unstable:%lu\n"
+		" free:%lu slab_reclaimable:%lu slab_unreclaimable:%lu\n"
+		" mapped:%lu shmem:%lu pagetables:%lu bounce:%lu\n",
+		global_page_state(NR_ACTIVE_ANON),
+		global_page_state(NR_INACTIVE_ANON),
+		global_page_state(NR_ISOLATED_ANON),
+		global_page_state(NR_ACTIVE_FILE),
+		global_page_state(NR_INACTIVE_FILE),
+		global_page_state(NR_ISOLATED_FILE),
+		global_page_state(NR_UNEVICTABLE),
+		global_page_state(NR_FILE_DIRTY),
+		global_page_state(NR_WRITEBACK),
+		global_page_state(NR_UNSTABLE_NFS),
+		global_page_state(NR_FREE_PAGES),
+		global_page_state(NR_SLAB_RECLAIMABLE),
+		global_page_state(NR_SLAB_UNRECLAIMABLE),
+		global_page_state(NR_FILE_MAPPED),
+		global_page_state(NR_SHMEM),
+		global_page_state(NR_PAGETABLE),
+		global_page_state(NR_BOUNCE));
+#endif
 
 	for_each_populated_zone(zone) {
 		int i;
@@ -2879,6 +2959,125 @@ void show_free_areas(unsigned int filter)
 			zone->pages_scanned,
 			(zone->all_unreclaimable ? "yes" : "no")
 			);
+#ifdef CONFIG_CRASH_DUMPFILE		
+		ATP_KRNL_CRASH_AppendInfo("%s"
+			" free:%lukB"
+			" min:%lukB"
+			" low:%lukB"
+			" high:%lukB"
+			" active_anon:%lukB"
+			" inactive_anon:%lukB"
+			" active_file:%lukB"
+			" inactive_file:%lukB"
+			" unevictable:%lukB"
+			" isolated(anon):%lukB"
+			" isolated(file):%lukB"
+			" present:%lukB"
+			" mlocked:%lukB"
+			" dirty:%lukB"
+			" writeback:%lukB"
+			" mapped:%lukB"
+			" shmem:%lukB"
+			" slab_reclaimable:%lukB"
+			" slab_unreclaimable:%lukB"
+			" kernel_stack:%lukB"
+			" pagetables:%lukB"
+			" unstable:%lukB"
+			" bounce:%lukB"
+			" writeback_tmp:%lukB"
+			" pages_scanned:%lu"
+			" all_unreclaimable? %s"
+			"\n",
+			zone->name,
+			K(zone_page_state(zone, NR_FREE_PAGES)),
+			K(min_wmark_pages(zone)),
+			K(low_wmark_pages(zone)),
+			K(high_wmark_pages(zone)),
+			K(zone_page_state(zone, NR_ACTIVE_ANON)),
+			K(zone_page_state(zone, NR_INACTIVE_ANON)),
+			K(zone_page_state(zone, NR_ACTIVE_FILE)),
+			K(zone_page_state(zone, NR_INACTIVE_FILE)),
+			K(zone_page_state(zone, NR_UNEVICTABLE)),
+			K(zone_page_state(zone, NR_ISOLATED_ANON)),
+			K(zone_page_state(zone, NR_ISOLATED_FILE)),
+			K(zone->present_pages),
+			K(zone_page_state(zone, NR_MLOCK)),
+			K(zone_page_state(zone, NR_FILE_DIRTY)),
+			K(zone_page_state(zone, NR_WRITEBACK)),
+			K(zone_page_state(zone, NR_FILE_MAPPED)),
+			K(zone_page_state(zone, NR_SHMEM)),
+			K(zone_page_state(zone, NR_SLAB_RECLAIMABLE)),
+			K(zone_page_state(zone, NR_SLAB_UNRECLAIMABLE)),
+			zone_page_state(zone, NR_KERNEL_STACK) *
+				THREAD_SIZE / 1024,
+			K(zone_page_state(zone, NR_PAGETABLE)),
+			K(zone_page_state(zone, NR_UNSTABLE_NFS)),
+			K(zone_page_state(zone, NR_BOUNCE)),
+			K(zone_page_state(zone, NR_WRITEBACK_TEMP)),
+			zone->pages_scanned,
+			(zone->all_unreclaimable ? "yes" : "no")
+			);
+#endif
+
+#ifdef CONFIG_HIMEM_DUMPFILE
+		hw_ssp_set_dump_info("%s"
+			" free:%lukB"
+			" min:%lukB"
+			" low:%lukB"
+			" high:%lukB"
+			" active_anon:%lukB"
+			" inactive_anon:%lukB"
+			" active_file:%lukB"
+			" inactive_file:%lukB"
+			" unevictable:%lukB"
+			" isolated(anon):%lukB"
+			" isolated(file):%lukB"
+			" present:%lukB"
+			" mlocked:%lukB"
+			" dirty:%lukB"
+			" writeback:%lukB"
+			" mapped:%lukB"
+			" shmem:%lukB"
+			" slab_reclaimable:%lukB"
+			" slab_unreclaimable:%lukB"
+			" kernel_stack:%lukB"
+			" pagetables:%lukB"
+			" unstable:%lukB"
+			" bounce:%lukB"
+			" writeback_tmp:%lukB"
+			" pages_scanned:%lu"
+			" all_unreclaimable? %s"
+			"\n",
+			zone->name,
+			K(zone_page_state(zone, NR_FREE_PAGES)),
+			K(min_wmark_pages(zone)),
+			K(low_wmark_pages(zone)),
+			K(high_wmark_pages(zone)),
+			K(zone_page_state(zone, NR_ACTIVE_ANON)),
+			K(zone_page_state(zone, NR_INACTIVE_ANON)),
+			K(zone_page_state(zone, NR_ACTIVE_FILE)),
+			K(zone_page_state(zone, NR_INACTIVE_FILE)),
+			K(zone_page_state(zone, NR_UNEVICTABLE)),
+			K(zone_page_state(zone, NR_ISOLATED_ANON)),
+			K(zone_page_state(zone, NR_ISOLATED_FILE)),
+			K(zone->present_pages),
+			K(zone_page_state(zone, NR_MLOCK)),
+			K(zone_page_state(zone, NR_FILE_DIRTY)),
+			K(zone_page_state(zone, NR_WRITEBACK)),
+			K(zone_page_state(zone, NR_FILE_MAPPED)),
+			K(zone_page_state(zone, NR_SHMEM)),
+			K(zone_page_state(zone, NR_SLAB_RECLAIMABLE)),
+			K(zone_page_state(zone, NR_SLAB_UNRECLAIMABLE)),
+			zone_page_state(zone, NR_KERNEL_STACK) *
+				THREAD_SIZE / 1024,
+			K(zone_page_state(zone, NR_PAGETABLE)),
+			K(zone_page_state(zone, NR_UNSTABLE_NFS)),
+			K(zone_page_state(zone, NR_BOUNCE)),
+			K(zone_page_state(zone, NR_WRITEBACK_TEMP)),
+			zone->pages_scanned,
+			(zone->all_unreclaimable ? "yes" : "no")
+			);
+#endif
 		printk("lowmem_reserve[]:");
 		for (i = 0; i < MAX_NR_ZONES; i++)
 			printk(" %lu", zone->lowmem_reserve[i]);
@@ -5177,7 +5376,10 @@ int __meminit init_per_zone_wmark_min(void)
 
 	lowmem_kbytes = nr_free_buffer_pages() * (PAGE_SIZE >> 10);
 
+#ifndef CONFIG_ATP_HYBRID
 	min_free_kbytes = int_sqrt(lowmem_kbytes * 16);
+#endif
+
 	if (min_free_kbytes < 128)
 		min_free_kbytes = 128;
 	if (min_free_kbytes > 65536)

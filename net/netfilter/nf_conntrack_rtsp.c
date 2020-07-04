@@ -1,3 +1,7 @@
+/*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
 #if defined(CONFIG_BCM_KF_NETFILTER)
 /* RTSP helper for connection tracking. */
 
@@ -26,11 +30,19 @@
 #include <net/netfilter/nf_conntrack_helper.h>
 #include <linux/netfilter/nf_conntrack_rtsp.h>
 #include <linux/iqos.h>
+#ifdef CONFIG_NF_CONNTRACK_PRI
+#include <linux/netfilter/nf_conntrack_pri.h>
+#endif
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Broadcom Corporation");
 MODULE_DESCRIPTION("RTSP connection tracking helper");
 MODULE_ALIAS("ip_conntrack_rtsp");
+
+
+#ifdef CONFIG_ATP_COMMON
+extern int alg_rtsp_enable;
+#endif
 
 #define RTSP_PORT 554
 
@@ -55,7 +67,7 @@ MODULE_PARM_DESC(max_outstanding,
 int (*nat_rtsp_channel_hook) (struct sk_buff *skb, struct nf_conn *ct,
 			      enum ip_conntrack_info ctinfo,
 			      unsigned int matchoff, unsigned int matchlen,
-			      struct nf_conntrack_expect *exp, int *delta);
+			      struct nf_conntrack_expect *exp);
 EXPORT_SYMBOL_GPL(nat_rtsp_channel_hook);
 
 /* A pair of data channels (RTP/RTCP) */
@@ -64,14 +76,14 @@ int (*nat_rtsp_channel2_hook) (struct sk_buff *skb, struct nf_conn *ct,
 			       unsigned int matchoff, unsigned int matchlen,
 			       struct nf_conntrack_expect *rtp_exp,
 			       struct nf_conntrack_expect *rtcp_exp,
-			       char dash, int *delta);
+			       char dash);
 EXPORT_SYMBOL_GPL(nat_rtsp_channel2_hook);
 
 /* Modify parameters like client_port in Transport for single data channel */
 int (*nat_rtsp_modify_port_hook) (struct sk_buff *skb, struct nf_conn *ct,
 			      	  enum ip_conntrack_info ctinfo,
 			      	  unsigned int matchoff, unsigned int matchlen,
-			      	  __be16 rtpport, int *delta);
+			      	  __be16 rtpport);
 EXPORT_SYMBOL_GPL(nat_rtsp_modify_port_hook);
 
 /* Modify parameters like client_port in Transport for multiple data channels*/
@@ -79,14 +91,29 @@ int (*nat_rtsp_modify_port2_hook) (struct sk_buff *skb, struct nf_conn *ct,
 			       	   enum ip_conntrack_info ctinfo,
 			       	   unsigned int matchoff, unsigned int matchlen,
 			       	   __be16 rtpport, __be16 rtcpport,
-				   char dash, int *delta);
+				   char dash);
 EXPORT_SYMBOL_GPL(nat_rtsp_modify_port2_hook);
 
 /* Modify parameters like destination in Transport */
 int (*nat_rtsp_modify_addr_hook) (struct sk_buff *skb, struct nf_conn *ct,
 			 	  enum ip_conntrack_info ctinfo,
-			 	  int matchoff, int matchlen, int *delta);
+			 	  int matchoff, int matchlen);
 EXPORT_SYMBOL_GPL(nat_rtsp_modify_addr_hook);
+
+/* Modify parameters like destination in FCC x-NAT */
+int (*rtsp_mangle_xnataddr_hook)(struct sk_buff *skb, struct nf_conn *ct,
+        			       enum ip_conntrack_info ctinfo, 
+        			       unsigned int protoff, uint xnatoff, uint xnatlen, char *nat_buffer);
+EXPORT_SYMBOL_GPL(rtsp_mangle_xnataddr_hook);
+
+/*Init the tcp_buffer*/
+int (*rtsp_init_tcp_buffer_hook)(const char * tcpbuf, uint tcplen);
+EXPORT_SYMBOL_GPL(rtsp_init_tcp_buffer_hook);
+
+/*Mangle the tcp_content*/
+int (*rtsp_mangle_tcp_content_hook)(struct sk_buff *skb, struct nf_conn *ct,
+								enum ip_conntrack_info ctinfo);
+EXPORT_SYMBOL_GPL(rtsp_mangle_tcp_content_hook);
 
 static int memmem(const char *haystack, int haystacklen,
 		  const char *needle, int needlelen)
@@ -286,7 +313,7 @@ static int get_next_destination(const char *tcpdata, int tpoff, int tplen,
 static int expect_rtsp_channel(struct sk_buff *skb, struct nf_conn *ct,
 			       enum ip_conntrack_info ctinfo,
 			       int portoff, int portlen,
-			       __be16 rtpport, int *delta)
+			       __be16 rtpport)
 {
 	int ret = 0;
 	int dir = CTINFO2DIR(ctinfo);
@@ -308,7 +335,7 @@ static int expect_rtsp_channel(struct sk_buff *skb, struct nf_conn *ct,
 	    ct->status & IPS_NAT_MASK) {
 		/* NAT needed */
 		ret = nat_rtsp_channel(skb, ct, ctinfo, portoff, portlen,
-				       rtp_exp, delta);
+				       rtp_exp);
 	} else {		/* Conntrack only */
 		if (nf_ct_expect_related(rtp_exp) == 0) {
 			pr_debug("nf_ct_rtsp: expect RTP ");
@@ -326,7 +353,7 @@ static int expect_rtsp_channel2(struct sk_buff *skb, struct nf_conn *ct,
 				enum ip_conntrack_info ctinfo,
 				int portoff, int portlen,
 				__be16 rtpport, __be16 rtcpport,
-				char dash, int *delta)
+				char dash)
 {
 	int ret = 0;
 	int dir = CTINFO2DIR(ctinfo);
@@ -357,7 +384,7 @@ static int expect_rtsp_channel2(struct sk_buff *skb, struct nf_conn *ct,
 	    ct->status & IPS_NAT_MASK) {
 		/* NAT needed */
 		ret = nat_rtsp_channel2(skb, ct, ctinfo, portoff, portlen,
-				   	rtp_exp, rtcp_exp, dash, delta);
+				   	rtp_exp, rtcp_exp, dash);
 	} else {		/* Conntrack only */
 		if (nf_ct_expect_related(rtp_exp) == 0) {
 			if (nf_ct_expect_related(rtcp_exp) == 0) {
@@ -436,9 +463,20 @@ static int help(struct sk_buff *skb, unsigned int protoff,
 	int destlen = 0;
 	int destoff = 0;
 	__be32 dest = 0;
+    int ret = 0;
 	typeof(nat_rtsp_modify_addr_hook) nat_rtsp_modify_addr;
 	typeof(nat_rtsp_modify_port_hook) nat_rtsp_modify_port;
 	typeof(nat_rtsp_modify_port2_hook) nat_rtsp_modify_port2;
+    typeof(rtsp_mangle_xnataddr_hook) rtsp_mangle_xnataddr;
+	typeof(rtsp_init_tcp_buffer_hook) rtsp_init_tcp_buffer;
+    typeof(rtsp_mangle_tcp_content_hook) rtsp_mangle_tcp_content;
+
+#ifdef CONFIG_ATP_COMMON
+    if (!alg_rtsp_enable)
+    {
+        return NF_ACCEPT;
+    }
+#endif
 
 	/* Until there's been traffic both ways, don't look in packets. */
 	if (ctinfo != IP_CT_ESTABLISHED
@@ -468,15 +506,24 @@ static int help(struct sk_buff *skb, unsigned int protoff,
 	tcpdata = skb_header_pointer(skb, tcpdataoff, tcpdatalen, rtsp_buffer);
 	BUG_ON(tcpdata == NULL);
 
+	rtsp_init_tcp_buffer = rcu_dereference(rtsp_init_tcp_buffer_hook);
+    if (rtsp_init_tcp_buffer)
+    {
+    	rtsp_init_tcp_buffer(tcpdata, tcpdatalen);
+    }
+    
 	/* There may be more than one message in a packet, check them
 	 * one by one */
 	msgoff = msglen = msghdrlen = 0;
 	while(get_next_message(tcpdata, tcpdatalen, &msgoff, &msglen,
 			       &msghdrlen)) {
+	    /*start  :增加DSLITE隧道时的RTSP ALG*/
 		/* Messages from LAN side through MASQUERADED connections */
 		if (memcmp(&ct->tuplehash[dir].tuple.src.u3,
 			   &ct->tuplehash[!dir].tuple.dst.u3,
-			   sizeof(ct->tuplehash[dir].tuple.src.u3)) != 0) {
+			   sizeof(ct->tuplehash[dir].tuple.src.u3)) != 0
+			   || (0 != strstr(skb->dev->name, "ip6tnl") && IP_CT_DIR_ORIGINAL == dir)) {
+	    /*end  :增加DSLITE隧道时的RTSP ALG*/
 			if(memcmp(tcpdata+msgoff, "PAUSE ", 6) == 0) {
 				int cseq = memmem(tcpdata+msgoff, msglen, "CSeq: ", 6);
 				if(cseq == -1) {
@@ -562,12 +609,12 @@ static int help(struct sk_buff *skb, unsigned int protoff,
 		while(get_next_client_port(tcpdata, tpoff, tplen,
 					   &portoff, &portlen,
 					   &rtpport, &rtcpport, &dash)) {
-			int ret=0, delta;
-
+            /*start :增加DSLITE隧道时的RTSP ALG*/
 			if (memcmp(&ct->tuplehash[dir].tuple.src.u3,
 			   	   &ct->tuplehash[!dir].tuple.dst.u3,
 			   	   sizeof(ct->tuplehash[dir].tuple.src.u3))
-			    != 0) {
+			    != 0 || (0 != strstr(skb->dev->name, "ip6tnl") && IP_CT_DIR_ORIGINAL == dir)) {
+			/*end :增加DSLITE隧道时的RTSP ALG*/
 				/* LAN to WAN */
 				if (dash == 0) {
 					/* Single data channel */
@@ -575,8 +622,7 @@ static int help(struct sk_buff *skb, unsigned int protoff,
 								  ctinfo,
 			 					  portoff,
 								  portlen,
-								  rtpport,
-								  &delta);
+								  rtpport);
 				} else {
 					/* A pair of data channels (RTP/RTCP)*/
 					ret = expect_rtsp_channel2(skb, ct,
@@ -585,8 +631,7 @@ static int help(struct sk_buff *skb, unsigned int protoff,
 								   portlen,
 								   rtpport,
 								   rtcpport,
-								   dash,
-								   &delta);
+								   dash);
 				}
 			} else {
 				nat_rtsp_modify_port = rcu_dereference(
@@ -601,8 +646,7 @@ static int help(struct sk_buff *skb, unsigned int protoff,
 								   ctinfo,
 								   portoff,
 								   portlen,
-								   rtpport,
-								   &delta);
+								   rtpport);
 					}
 				} else {
 					/* A pair of data channels (RTP/RTCP)*/
@@ -613,8 +657,7 @@ static int help(struct sk_buff *skb, unsigned int protoff,
 								    portlen,
 								    rtpport,
 								    rtcpport,
-								    dash,
-								    &delta);
+								    dash);
 					}
 				}
 			}
@@ -626,23 +669,6 @@ static int help(struct sk_buff *skb, unsigned int protoff,
 
 			if (ret < 0)
 				goto end;
-
-			if (delta) {
-				/* Packet length has changed, we need to adjust
-				 * everthing */
-				tcpdatalen += delta;
-				msglen += delta;
-				msghdrlen += delta;
-				tplen += delta;
-				portlen += delta;
-
-				/* Relocate TCP payload pointer */
-				tcpdata = skb_header_pointer(skb,
-							     tcpdataoff,
-							     tcpdatalen,
-							     rtsp_buffer);
-				BUG_ON(tcpdata == NULL);
-			}
 		}
 
 		/* Process special destination=<ip>:<port> parameter in 
@@ -652,17 +678,17 @@ static int help(struct sk_buff *skb, unsigned int protoff,
 		while(get_next_dest_ipport(tcpdata, tpoff, tplen,
 					   &destoff, &destlen, &dest,
 					   &portoff, &portlen, &rtpport)) {
-			int ret = 0, delta;
-
+            /*start :增加DSLITE隧道时的RTSP ALG*/
 			/* Process the port part */
 			if (memcmp(&ct->tuplehash[dir].tuple.src.u3,
 			   	   &ct->tuplehash[!dir].tuple.dst.u3,
 			   	   sizeof(ct->tuplehash[dir].tuple.src.u3))
-			    != 0) {
+			    != 0 || (0 != strstr(skb->dev->name, "ip6tnl") && IP_CT_DIR_ORIGINAL == dir)) {
+		    /*end :增加DSLITE隧道时的RTSP ALG*/
 				/* LAN to WAN */
 				ret = expect_rtsp_channel(skb, ct, ctinfo,
 							  portoff, portlen,
-							  rtpport, &delta);
+							  rtpport);
 			} else {
 				/* WAN to LAN */
 				if ((nat_rtsp_modify_port = rcu_dereference(
@@ -671,8 +697,7 @@ static int help(struct sk_buff *skb, unsigned int protoff,
 								   ctinfo,
 								   portoff,
 								   portlen,
-								   rtpport,
-								   &delta);
+								   rtpport);
 				}
 			}
             
@@ -683,23 +708,6 @@ static int help(struct sk_buff *skb, unsigned int protoff,
 			if (ret < 0)
 				goto end;
 
-			if (delta) {
-				/* Packet length has changed, we need to adjust
-				 * everthing */
-				tcpdatalen += delta;
-				msglen += delta;
-				msghdrlen += delta;
-				tplen += delta;
-				portlen += delta;
-
-				/* Relocate TCP payload pointer */
-				tcpdata = skb_header_pointer(skb,
-							     tcpdataoff,
-							     tcpdatalen,
-							     rtsp_buffer);
-				BUG_ON(tcpdata == NULL);
-			}
-
 			/* Then the IP part */
 			if (dest != ct->tuplehash[dir].tuple.src.u3.ip)
 				continue;
@@ -709,25 +717,9 @@ static int help(struct sk_buff *skb, unsigned int protoff,
 			}
 			/* NAT needed */
 			ret = nat_rtsp_modify_addr(skb, ct, ctinfo,
-						   destoff, destlen, &delta);
+						   destoff, destlen);
 			if (ret < 0)
 				goto end;
-
-			if (delta) {
-				/* Packet length has changed, we need
-				 * to adjust everthing */
-				tcpdatalen += delta;
-				msglen += delta;
-				msghdrlen += delta;
-				tplen += delta;
-				portlen += delta;
-
-				/* Relocate TCP payload pointer */
-				tcpdata = skb_header_pointer(skb, tcpdataoff,
-							     tcpdatalen,
-							     rtsp_buffer);
-				BUG_ON(tcpdata == NULL);
-			}
 		}
 
 		if ((nat_rtsp_modify_addr =
@@ -735,41 +727,24 @@ static int help(struct sk_buff *skb, unsigned int protoff,
 		    ct->status & IPS_NAT_MASK) {
 			destoff = destlen = 0;
 			while(get_next_destination(tcpdata, tpoff, tplen,
-					   	   &destoff, &destlen, &dest)) {
-				int ret, delta;
-				
+					   	   &destoff, &destlen, &dest)) {				
 				if (dest != ct->tuplehash[dir].tuple.src.u3.ip)
 					continue;
 
 				/* NAT needed */
 				ret = nat_rtsp_modify_addr(skb, ct, ctinfo,
-							   destoff, destlen,
-				   			   &delta);
+							   destoff, destlen);
 				if (ret < 0)
 					goto end;
-
-				if (delta) {
-					/* Packet length has changed, we need
-					 * to adjust everthing */
-					tcpdatalen += delta;
-					msglen += delta;
-					msghdrlen += delta;
-					tplen += delta;
-					portlen += delta;
-
-					/* Relocate TCP payload pointer */
-					tcpdata = skb_header_pointer(skb,
-							     tcpdataoff,
-							     tcpdatalen,
-							     rtsp_buffer);
-					BUG_ON(tcpdata == NULL);
-				}
-
 			}
 		}
-	}
-
+	}    
 end:
+    rtsp_mangle_tcp_content = rcu_dereference(rtsp_mangle_tcp_content_hook);
+    if (rtsp_mangle_tcp_content)
+    {
+    	rtsp_mangle_tcp_content(skb, ct, ctinfo);
+    }
 	spin_unlock_bh(&nf_rtsp_lock);
 	return NF_ACCEPT;
 }
@@ -777,6 +752,131 @@ end:
 static struct nf_conntrack_helper rtsp[MAX_PORTS];
 static char rtsp_names[MAX_PORTS][sizeof("rtsp-65535")];
 static struct nf_conntrack_expect_policy rtsp_exp_policy;
+
+
+#ifdef CONFIG_RTSP_QOS
+static int is_rtsp_control_tuple(const struct nf_conntrack_tuple *orig)
+{
+	int i;
+
+	if (NULL == orig)
+	{
+		return 0;
+	}
+
+	if (IPPROTO_TCP != orig->dst.protonum)
+	{
+		return 0;
+	}
+
+	for (i = 0; i < ports_c; i++)
+	{
+		if (orig->dst.u.tcp.port == htons(ports[i]))
+		{
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
+
+static int is_rtsp_data_tuple(struct net *net, const struct nf_conntrack_tuple *orig)
+{
+	int is_rtsp = 0;
+
+	struct nf_conntrack_expect *exp = NULL;
+
+	exp = nf_ct_find_expectation_safe(net, orig);
+	if (NULL == exp)
+	{
+		return 0;
+	}
+
+	is_rtsp = is_rtsp_control_tuple(&exp->master->tuplehash[IP_CT_DIR_ORIGINAL].tuple);
+
+	nf_ct_expect_put(exp);
+
+	return is_rtsp;
+}
+
+
+static int is_rtsp_data_ct(struct nf_conn *ct)
+{
+	int i = 0;
+
+	if (NULL == ct)
+	{
+		return 0;
+	}
+
+	if (NULL == ct->master)
+	{
+		return 0;
+	}
+
+	if (IPPROTO_TCP != ct->master->tuplehash[IP_CT_DIR_ORIGINAL].tuple.dst.protonum)
+	{
+		return 0;
+	}
+
+	for (i = 0; i < ports_c; i++)
+	{
+		if (ct->master->tuplehash[IP_CT_DIR_ORIGINAL].tuple.dst.u.tcp.port == htons(ports[i]))
+		{
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
+
+int is_rtsp_tuple(struct net *net, const struct nf_conntrack_tuple *orig)
+{
+	if (is_rtsp_control_tuple(orig))
+	{
+		return 1;
+	}
+
+	/*ct还未建立，使用tuple查找是否属于RTSP数据连接*/
+	if (is_rtsp_data_tuple(net, orig))
+	{
+		return 1;
+	}
+
+	return 0;
+}
+
+
+int is_rtsp_ct(struct nf_conn *ct)
+{
+	if (NULL == ct)
+	{
+		return 0;
+	}
+
+	if (is_rtsp_control_tuple(&ct->tuplehash[IP_CT_DIR_ORIGINAL].tuple))
+	{
+		return 1;
+	}
+
+	if (is_rtsp_data_ct(ct))
+	{
+		return 1;
+	}
+
+	return 0;
+}
+
+static struct nf_conntrack_proto_pri rtsp_pri __read_mostly = {
+   .name = "rtsp",
+   .check_by_tuple = is_rtsp_tuple,
+   .check_by_ct = is_rtsp_ct,
+};
+
+#endif
+
 
 /* don't make this __exit, since it's called from __init ! */
 static void nf_conntrack_rtsp_fini(void)
@@ -796,6 +896,10 @@ static void nf_conntrack_rtsp_fini(void)
 	}
 
 	kfree(rtsp_buffer);
+
+#if defined(CONFIG_RTSP_QOS) && defined(CONFIG_NF_CONNTRACK_PRI)
+	nf_conntrack_pri_unregister(&rtsp_pri);
+#endif
 }
 
 static int __init nf_conntrack_rtsp_init(void)
@@ -807,11 +911,19 @@ static int __init nf_conntrack_rtsp_init(void)
 	if (!rtsp_buffer)
 		return -ENOMEM;
 
+#if defined(CONFIG_RTSP_QOS) && defined(CONFIG_NF_CONNTRACK_PRI)
+	nf_conntrack_pri_register(&rtsp_pri);
+#endif
+
 	if (ports_c == 0)
 		ports[ports_c++] = RTSP_PORT;
 
 	rtsp_exp_policy.max_expected = max_outstanding;
+#ifdef CONFIG_SUPPORT_ATP
+	rtsp_exp_policy.timeout	= (24 * 3600);
+#else
 	rtsp_exp_policy.timeout	= 5 * 60;
+#endif	
 	for (i = 0; i < ports_c; i++) {
 		rtsp[i].tuple.src.l3num = PF_INET;
 		rtsp[i].tuple.src.u.tcp.port = htons(ports[i]);
@@ -822,9 +934,17 @@ static int __init nf_conntrack_rtsp_init(void)
 		rtsp[i].help = help;
 		tmpname = &rtsp_names[i][0];
 		if (ports[i] == RTSP_PORT)
+#ifdef CONFIG_ATP_COMMON
+			snprintf(tmpname, sizeof(rtsp_names[i]), "rtsp");
+#else
 			sprintf(tmpname, "rtsp");
+#endif
 		else
+#ifdef CONFIG_ATP_COMMON
+			snprintf(tmpname, sizeof(rtsp_names[i]), "rtsp-%d", ports[i]);
+#else
 			sprintf(tmpname, "rtsp-%d", ports[i]);
+#endif
 		rtsp[i].name = tmpname;
 
 		pr_debug("nf_ct_rtsp: registering helper for port %d\n",

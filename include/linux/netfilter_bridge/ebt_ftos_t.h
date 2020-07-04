@@ -1,10 +1,18 @@
+/*
+* 2017.09.07 - change this file
+* (C) Huawei Technologies Co., Ltd. < >
+*/
 #ifndef __LINUX_BRIDGE_EBT_FTOS_T_H
 #define __LINUX_BRIDGE_EBT_FTOS_T_H
 
 struct ebt_ftos_t_info
 {
     int           ftos_set;
-	unsigned char ftos;
+    
+    /* Start of modified  for qos ipp/tos function 2012-03-08 */
+	//unsigned char ftos;
+    unsigned int ftos;
+    /* End of modified  for qos ipp/tos function 2012-03-08 */
 	// EBT_ACCEPT, EBT_DROP or EBT_CONTINUE or EBT_RETURN
 	int target;
 };
