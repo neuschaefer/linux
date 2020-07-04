@@ -106,6 +106,11 @@ struct atm_dev_stats {
 #endif
 #define ATM_DROPPARTY 	_IOW('a', ATMIOC_SPECIAL+5,int)
 					/* drop party from p2mp call */
+					
+#if defined(CONFIG_BCM_KF_ATM_BACKEND)
+#define ATM_EXTBACKENDIF _IOW('a',ATMIOC_SPECIAL+6,atm_backend_t)
+#define ATM_SETEXTFILT  _IOW('a',ATMIOC_SPECIAL+7,atm_backend_t)
+#endif
 
 /*
  * These are backend handkers that can be set via the ATM_SETBACKEND call
@@ -115,6 +120,14 @@ struct atm_dev_stats {
 #define ATM_BACKEND_RAW		0	
 #define ATM_BACKEND_PPP		1	/* PPPoATM - RFC2364 */
 #define ATM_BACKEND_BR2684	2	/* Bridged RFC1483/2684 */
+
+#if defined(CONFIG_BCM_KF_ATM_BACKEND)
+#define ATM_BACKEND_RT2684       3  /* Routed RFC1483/2684 */
+#define ATM_BACKEND_BR2684_BCM   4  /* Bridged RFC1483/2684 uses Broadcom ATMAPI*/
+#define ATM_BACKEND_PPP_BCM      5  /* PPPoA uses Broadcom bcmxtmrt driver */
+#define ATM_BACKEND_PPP_BCM_DISCONN    6  /* PPPoA LCP disconnect */
+#define ATM_BACKEND_PPP_BCM_CLOSE_DEV  7  /* PPPoA close device */
+#endif
 
 /* for ATM_GETTYPE */
 #define ATM_ITFTYP_LEN	8	/* maximum length of interface type name */

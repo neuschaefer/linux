@@ -19,6 +19,9 @@
 #include "br_private.h"
 #include "br_private_stp.h"
 
+#if (defined(CONFIG_BCM_KF_IGMP) && defined(CONFIG_BR_IGMP_SNOOP)) || (defined(CONFIG_BCM_KF_MLD) && defined(CONFIG_BR_MLD_SNOOP))
+#include "br_mcast.h"
+#endif
 
 /* Port id is composed of priority and port number.
  * NB: some bits of priority are dropped to
@@ -114,6 +117,9 @@ void br_stp_disable_port(struct net_bridge_port *p)
 	br_fdb_delete_by_port(br, p, 0);
 	br_multicast_disable_port(p);
 
+#if (defined(CONFIG_BCM_KF_IGMP) && defined(CONFIG_BR_IGMP_SNOOP)) || (defined(CONFIG_BCM_KF_MLD) && defined(CONFIG_BR_MLD_SNOOP))
+	br_mcast_handle_netdevice_events(p->dev, NETDEV_CHANGE);
+#endif
 	br_configuration_update(br);
 
 	br_port_state_selection(br);
@@ -141,6 +147,11 @@ static void br_stp_start(struct net_bridge *br)
 		br_port_state_selection(br);
 		spin_unlock_bh(&br->lock);
 	}
+
+#if defined(CONFIG_BCM_KF_BRIDGE_STP)
+	/* STP enabled, send notification for all ports */
+	br_stp_notify_state_bridge(br);
+#endif   
 }
 
 static void br_stp_stop(struct net_bridge *br)
@@ -160,6 +171,10 @@ static void br_stp_stop(struct net_bridge *br)
 	}
 
 	br->stp_enabled = BR_NO_STP;
+#if defined(CONFIG_BCM_KF_BRIDGE_STP)
+	/* STP disabled, send notification for all ports */
+	br_stp_notify_state_bridge(br);
+#endif
 }
 
 void br_stp_set_enabled(struct net_bridge *br, unsigned long val)
@@ -219,6 +234,16 @@ bool br_stp_recalculate_bridge_id(struct net_bridge *br)
 	/* user has chosen a value so keep it */
 	if (br->flags & BR_SET_MAC_ADDR)
 		return false;
+
+#if defined(CONFIG_BCM_KF_BRIDGE_STP)
+	/* if the current bridge address is being used by 
+	   a member device then keep it */
+	list_for_each_entry(p, &br->port_list, list) {
+		if (0 == memcmp(br->bridge_id.addr, p->dev->dev_addr, ETH_ALEN)) {
+			return false;
+		}
+	}
+#endif
 
 	list_for_each_entry(p, &br->port_list, list) {
 		if (addr == br_mac_zero ||

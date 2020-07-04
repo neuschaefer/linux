@@ -68,6 +68,7 @@
 #include <linux/shmem_fs.h>
 #include <linux/slab.h>
 #include <linux/perf_event.h>
+#include <linux/posix-timers.h>
 
 #include <asm/io.h>
 #include <asm/bugs.h>
@@ -87,6 +88,9 @@ extern void mca_init(void);
 extern void sbus_init(void);
 extern void prio_tree_init(void);
 extern void radix_tree_init(void);
+#if defined(CONFIG_BCM_KF_LOG)
+extern void bcmLog_init(void);
+#endif
 #ifndef CONFIG_DEBUG_RODATA
 static inline void mark_rodata_ro(void) { }
 #endif
@@ -112,6 +116,14 @@ EXPORT_SYMBOL(system_state);
  */
 #define MAX_INIT_ARGS CONFIG_INIT_ENV_ARG_LIMIT
 #define MAX_INIT_ENVS CONFIG_INIT_ENV_ARG_LIMIT
+
+#if defined(CONFIG_BCM_KF_DSP)
+extern void __init allocDspModBuffers(void);
+
+#if defined(CONFIG_BCM_KF_GPON_DDRO)
+extern void __init allocGponDDROBuffers(void);
+#endif
+#endif /* CONFIG_BCM_KF_DSP */
 
 extern void time_init(void);
 /* Default late time init is NULL. archs can override this later. */
@@ -217,8 +229,8 @@ static int __init loglevel(char *str)
 	 */
 	if (get_option(&str, &newlevel)) {
 		console_loglevel = newlevel;
-		return 0;
-	}
+	return 0;
+}
 
 	return -EINVAL;
 }
@@ -462,6 +474,10 @@ static void __init mm_init(void)
 	vmalloc_init();
 }
 
+#if defined(CONFIG_BCM_KF_LINKER_WORKAROUND)
+volatile int __attribute__ ((section ("__modver_tmp"))) someModVerVariable = 0;
+#endif
+ 
 asmlinkage void __init start_kernel(void)
 {
 	char * command_line;
@@ -489,6 +505,7 @@ asmlinkage void __init start_kernel(void)
  * Interrupts are still disabled. Do necessary setups, then
  * enable them
  */
+	softirq_early_init();
 	tick_init();
 	boot_cpu_init();
 	page_address_init();
@@ -590,6 +607,21 @@ asmlinkage void __init start_kernel(void)
 		initrd_start = 0;
 	}
 #endif
+
+#if defined(CONFIG_BCM_KF_DSP)
+	/*
+	** Allocate boot time memory for the special DSP module. This allocation can be 
+	** possible only before mem_init(). Please ensure that this allocation is performed 
+	** before mem_init().
+	*/
+	allocDspModBuffers();
+
+#if defined(CONFIG_BCM_KF_GPON_DDRO)
+	allocGponDDROBuffers();
+#endif
+#endif /* CONFIG_BCM_KF_DSP */
+
+
 	page_cgroup_init();
 	debug_objects_mem_init();
 	kmemleak_init();
@@ -631,7 +663,9 @@ asmlinkage void __init start_kernel(void)
 	sfi_init_late();
 
 	ftrace_init();
-
+#if defined(CONFIG_BCM_KF_LOG) && defined(CONFIG_BCM_LOG)
+	bcmLog_init();
+#endif
 	/* Do the rest non-__init'ed, we're now alive */
 	rest_init();
 }
@@ -659,7 +693,7 @@ static int __init_or_module do_one_initcall_debug(initcall_t fn)
 	int ret;
 
 	printk(KERN_DEBUG "calling  %pF @ %i\n", fn, task_pid_nr(current));
-	calltime = ktime_get();
+		calltime = ktime_get();
 	ret = fn();
 	rettime = ktime_get();
 	delta = ktime_sub(rettime, calltime);
@@ -668,7 +702,7 @@ static int __init_or_module do_one_initcall_debug(initcall_t fn)
 		ret, duration);
 
 	return ret;
-}
+	}
 
 int __init_or_module do_one_initcall(initcall_t fn)
 {
@@ -785,6 +819,13 @@ static void __init do_pre_smp_initcalls(void)
 	for (fn = __initcall_start; fn < __initcall0_start; fn++)
 		do_one_initcall(*fn);
 }
+
+#if defined(CONFIG_BCM_KF_IKOS) && defined(CONFIG_BRCM_IKOS) && defined(CONFIG_MIPS)
+/*  
+   IKOS jump_to_kernel_entry function removed. MIPS head.S has the CONFIG_BOOT_RAW to enable entry point 
+   at 0x80010400. 96000D profile has this configuration enabled. Or enable this option in your profile. 
+ */
+#endif
 
 static void run_init_process(const char *init_filename)
 {

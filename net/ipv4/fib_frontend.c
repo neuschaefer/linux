@@ -215,6 +215,12 @@ int fib_validate_source(struct sk_buff *skb, __be32 src, __be32 dst, u8 tos,
 		/* Ignore rp_filter for packets protected by IPsec. */
 		rpf = secpath_exists(skb) ? 0 : IN_DEV_RPFILTER(in_dev);
 
+#if defined(CONFIG_BCM_KF_MCAST_RP_FILTER)
+		/* ignore rp_filter for multicast traffic */
+		if (skb->pkt_type == PACKET_MULTICAST) {
+			rpf = 0;
+		}
+#endif
 		accept_local = IN_DEV_ACCEPT_LOCAL(in_dev);
 		fl4.flowi4_mark = IN_DEV_SRC_VMARK(in_dev) ? skb->mark : 0;
 	}

@@ -22,6 +22,11 @@
 #include <linux/netfilter/nf_conntrack_dccp.h>
 #include <linux/netfilter/nf_conntrack_sctp.h>
 #include <linux/netfilter/nf_conntrack_proto_gre.h>
+#if defined(CONFIG_BCM_KF_PROTO_IPSEC) && \
+	(defined(CONFIG_NF_CONNTRACK_IPSEC) || defined(CONFIG_NF_CONNTRACK_IPSEC_MODULE))
+#include <linux/netfilter/nf_conntrack_ipsec.h>
+#include <linux/netfilter/nf_conntrack_proto_esp.h>
+#endif
 #include <net/netfilter/ipv6/nf_conntrack_icmpv6.h>
 
 #include <net/netfilter/nf_conntrack_tuple.h>
@@ -33,6 +38,10 @@ union nf_conntrack_proto {
 	struct ip_ct_sctp sctp;
 	struct ip_ct_tcp tcp;
 	struct nf_ct_gre gre;
+#if defined(CONFIG_BCM_KF_PROTO_ESP) && \
+	(defined(CONFIG_NF_CT_PROTO_ESP) || defined(CONFIG_NF_CT_PROTO_ESP_MODULE))
+	struct nf_ct_esp esp;
+#endif
 };
 
 union nf_conntrack_expect_proto {
@@ -45,6 +54,14 @@ union nf_conntrack_expect_proto {
 #include <linux/netfilter/nf_conntrack_h323.h>
 #include <linux/netfilter/nf_conntrack_sane.h>
 #include <linux/netfilter/nf_conntrack_sip.h>
+
+#if defined(CONFIG_BCM_KF_NETFILTER)
+#include <linux/netfilter/nf_conntrack_rtsp.h>
+#endif
+
+#if defined(CONFIG_BCM_KF_NETFILTER)
+#define NF_ALG_BUFFER_SIZE 2000
+#endif
 
 /* per conntrack: application helper private data */
 union nf_conntrack_help {
@@ -64,8 +81,15 @@ union nf_conntrack_help {
     defined(CONFIG_NF_CONNTRACK_SANE_MODULE)
 	struct nf_ct_sane_master ct_sane_info;
 #endif
-#if defined(CONFIG_NF_CONNTRACK_SIP) || defined(CONFIG_NF_CONNTRACK_SIP_MODULE)
+#if defined(CONFIG_BCM_KF_NETFILTER) || defined(CONFIG_NF_CONNTRACK_SIP) || defined(CONFIG_NF_CONNTRACK_SIP_MODULE)
 	struct nf_ct_sip_master ct_sip_info;
+#endif
+#if defined(CONFIG_BCM_KF_NETFILTER)
+	struct nf_ct_rtsp_master ct_rtsp_info;
+#if defined(CONFIG_BCM_KF_PROTO_IPSEC) && \
+	(defined(CONFIG_NF_CONNTRACK_IPSEC) || defined(CONFIG_NF_CONNTRACK_IPSEC_MODULE))
+	struct nf_ct_ipsec_master ct_ipsec_info;
+#endif
 #endif
 };
 
@@ -100,6 +124,16 @@ struct nf_conn_help {
 #include <net/netfilter/ipv4/nf_conntrack_ipv4.h>
 #include <net/netfilter/ipv6/nf_conntrack_ipv6.h>
 
+#if defined(CONFIG_BCM_KF_DPI) && defined(CONFIG_BRCM_DPI)
+typedef struct dpi_info
+{
+	unsigned int app_id;
+	uint16_t dev_key;
+	uint16_t flags;
+	unsigned int url_id;
+} dpi_info_t;
+#endif
+
 struct nf_conn {
 	/* Usage count in here is 1 for hash table/destruct timer, 1 per skb,
            plus 1 for any connection(s) we are `master' for */
@@ -107,15 +141,55 @@ struct nf_conn {
 
 	spinlock_t lock;
 
+#if defined(CONFIG_BCM_KF_BLOG)
+#if defined(CONFIG_BLOG)
+	unsigned int blog_key[2];	/* Associating 2=IP_CT_DIR_MAX blogged flows  */
+    unsigned long idle_jiffies; /* connection idled duration, 0 means active  */
+    unsigned long extra_jiffies;/* connection timeout value                   */
+    unsigned long prev_idle;    /* previous idle state                        */
+	struct timer_list prev_timeout;
+#endif
+	unsigned int iq_prio;	    /* Ingress QoS Prio */
+#endif
+#if defined(CONFIG_BCM_KF_NETFILTER)
+	struct list_head safe_list; /* bugfix for lost connections */
+	struct list_head derived_connections; /* Used by master connection */
+	struct list_head derived_list; /* Used by child connection */
+	unsigned derived_timeout;	/* 0 means no derived_timeout, 0xFFFFFFFF
+								 * means never timeout until master ct is
+								 * disconnected, others means timeout secs */
+
+	/* Have we seen traffic both ways yet? (bitset) */ // bcm version
+	unsigned long status; // moved position for bcm
+
+#if defined(CONFIG_NF_DYNDSCP) || defined(CONFIG_NF_DYNDSCP_MODULE)
+	struct nf_tos_inheritance {
+		u_int16_t status;
+		u_int8_t dscp[2];		/* IP_CT_DIR_MAX */
+	}dyndscp; 
+#endif
+	/*---------- Add any custom fields below this line ----------*/
+
+	/* If we were expected by an expectation, this will be it */
+	struct nf_conn *master;  // moved position for bcm
+#endif /* CONFIG_BCM_KF_NETFILTER */
+
+#if defined(CONFIG_BCM_KF_DPI) && defined(CONFIG_BRCM_DPI)
+	dpi_info_t dpi;
+	uint32_t stats_idx;
+#endif
+
 	/* XXX should I move this to the tail ? - Y.K */
 	/* These are my tuples; original and reply */
 	struct nf_conntrack_tuple_hash tuplehash[IP_CT_DIR_MAX];
 
+#if !defined(CONFIG_BCM_KF_NETFILTER)
 	/* Have we seen traffic both ways yet? (bitset) */
 	unsigned long status;
 
 	/* If we were expected by an expectation, this will be it */
 	struct nf_conn *master;
+#endif
 
 	/* Timer function; drops refcnt when it goes off. */
 	struct timer_list timeout;
@@ -136,6 +210,28 @@ struct nf_conn {
 
 	/* Storage reserved for other modules, must be the last member */
 	union nf_conntrack_proto proto;
+
+#if defined(CONFIG_BCM_KF_RUNNER)
+#if defined(CONFIG_BCM_RDPA) || defined(CONFIG_BCM_RDPA_MODULE)
+	void *bl_ctx;
+#endif /* CONFIG_BCM_RDPA || CONFIG_BCM_RDPA_MODULE */
+#endif /* CONFIG_BCM_KF_RUNNER */
+
+#if defined(CONFIG_BCM_KF_XT_MATCH_LAYER7) && \
+	(defined(CONFIG_NETFILTER_XT_MATCH_LAYER7) || defined(CONFIG_NETFILTER_XT_MATCH_LAYER7_MODULE))
+	struct {
+		/*
+		* e.g. "http". NULL before decision. "unknown" after decision
+		* if no match.
+		*/
+		char *app_proto;
+		/*
+		* application layer data so far. NULL after match decision.
+		*/
+		char *app_data;
+		unsigned int app_data_len;
+	} layer7;
+#endif    
 };
 
 static inline struct nf_conn *
@@ -280,11 +376,21 @@ extern void nf_ct_untracked_status_or(unsigned long bits);
 extern void
 nf_ct_iterate_cleanup(struct net *net, int (*iter)(struct nf_conn *i, void *data), void *data);
 extern void nf_conntrack_free(struct nf_conn *ct);
+
+#if defined(CONFIG_BCM_KF_NETFILTER)
+extern struct nf_conn *
+nf_conntrack_alloc(struct net *net, u16 zone,
+		   struct sk_buff *skb,
+		   const struct nf_conntrack_tuple *orig,
+		   const struct nf_conntrack_tuple *repl,
+		   gfp_t gfp);
+#else
 extern struct nf_conn *
 nf_conntrack_alloc(struct net *net, u16 zone,
 		   const struct nf_conntrack_tuple *orig,
 		   const struct nf_conntrack_tuple *repl,
 		   gfp_t gfp);
+#endif
 
 static inline int nf_ct_is_template(const struct nf_conn *ct)
 {

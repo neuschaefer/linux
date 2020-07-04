@@ -2358,6 +2358,10 @@ static int pfkey_spddelete(struct sock *sk, struct sk_buff *skb, const struct sa
 
 out:
 	xfrm_pol_put(xp);
+#if defined(CONFIG_BCM_KF_SPU) && (defined(CONFIG_BCM_SPU) || defined(CONFIG_BCM_SPU_MODULE))
+	if (err == 0)
+		xfrm_garbage_collect(net);
+#endif
 	return err;
 }
 
@@ -2607,6 +2611,10 @@ static int pfkey_spdget(struct sock *sk, struct sk_buff *skb, const struct sadb_
 
 out:
 	xfrm_pol_put(xp);
+#if defined(CONFIG_BCM_KF_SPU) && (defined(CONFIG_BCM_SPU) || defined(CONFIG_BCM_SPU_MODULE))
+	if (delete && err == 0)
+		xfrm_garbage_collect(net);
+#endif
 	return err;
 }
 
@@ -2702,6 +2710,10 @@ static int pfkey_spdflush(struct sock *sk, struct sk_buff *skb, const struct sad
 	audit_info.sessionid = audit_get_sessionid(current);
 	audit_info.secid = 0;
 	err = xfrm_policy_flush(net, XFRM_POLICY_TYPE_MAIN, &audit_info);
+#if defined(CONFIG_BCM_KF_SPU) && (defined(CONFIG_BCM_SPU) || defined(CONFIG_BCM_SPU_MODULE))
+	if (err == 0)
+		xfrm_garbage_collect(net);
+#endif
 	err2 = unicast_flush_resp(sk, hdr);
 	if (err || err2) {
 		if (err == -ESRCH) /* empty table - old silent behavior */

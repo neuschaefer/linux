@@ -60,12 +60,20 @@ SCHED_FEAT(OWNER_SPIN, true)
  */
 SCHED_FEAT(NONTASK_POWER, true)
 
+#ifndef CONFIG_PREEMPT_RT_FULL
 /*
  * Queue remote wakeups on the target CPU and process them
  * using the scheduler IPI. Reduces rq->lock contention/bounces.
  */
 SCHED_FEAT(TTWU_QUEUE, true)
+#else
+SCHED_FEAT(TTWU_QUEUE, false)
+#endif
 
 SCHED_FEAT(FORCE_SD_OVERLAP, false)
+#if defined(CONFIG_BCM_KF_SCHED_RT_SHARE) && !defined(CONFIG_BCM_SCHED_RT_SHARE)
+SCHED_FEAT(RT_RUNTIME_SHARE, false)
+#else
 SCHED_FEAT(RT_RUNTIME_SHARE, true)
+#endif
 SCHED_FEAT(LB_MIN, false)

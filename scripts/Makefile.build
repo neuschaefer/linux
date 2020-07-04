@@ -307,6 +307,26 @@ $(obj)/%.o: $(src)/%.c $(recordmcount_source) FORCE
 	$(call cmd,force_checksrc)
 	$(call if_changed_rule,cc_o_c)
 
+ifdef BCM_KF # defined(CONFIG_BCM_KF_ATM_BACKEND)
+# C++ support
+cmd_cc_o_cpp = $(CXX) $(c_flags) -c -o $@ $<
+quiet_cmd_cc_o_cpp = C++ $(quiet_modtag) $@
+
+define rule_cc_o_cpp
+	$(call echo-cmd,checksrc) $(cmd_checksrc)                         \
+	$(call echo-cmd,cc_o_cpp) $(cmd_cc_o_cpp);                        \
+	$(cmd_modversions)                                                \
+	$(cmd_record_mcount)						  \
+	scripts/basic/fixdep $(depfile) $@ '$(call make-cmd,cc_o_cpp)' >  \
+	                                              $(dot-target).tmp;  \
+	rm -f $(depfile);                                                 \
+	mv -f $(dot-target).tmp $(dot-target).cmd
+endef
+
+%.o: %.cpp FORCE
+	$(call if_changed_rule,cc_o_cpp)
+endif # BCM_KF # (CONFIG_BCM_KF_ATM_BACKEND)
+
 # Single-part modules are special since we need to mark them in $(MODVERDIR)
 
 $(single-used-m): $(obj)/%.o: $(src)/%.c $(recordmcount_source) FORCE

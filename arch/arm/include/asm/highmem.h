@@ -41,6 +41,15 @@ extern void kunmap_high(struct page *page);
 #endif
 #endif
 
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX) && defined(CONFIG_BCM_KF_ARM_ERRATA_798181)
+/*
+ * Needed to be able to broadcast the TLB invalidation for kmap.
+ */
+#ifdef CONFIG_ARM_ERRATA_798181
+#undef ARCH_NEEDS_KMAP_HIGH_GET
+#endif
+#endif
+
 #ifdef ARCH_NEEDS_KMAP_HIGH_GET
 extern void *kmap_high_get(struct page *page);
 #else

@@ -5,6 +5,54 @@
 #define SIP_PORT	5060
 #define SIP_TIMEOUT	3600
 
+#if defined(CONFIG_BCM_KF_NETFILTER)
+
+/* Classes defined by Broadcom */
+#define SIP_EXPECT_CLASS_SIGNALLING	0
+#define SIP_EXPECT_CLASS_AUDIO		1
+#define SIP_EXPECT_CLASS_VIDEO		2
+#define SIP_EXPECT_CLASS_OTHER		3
+#define SIP_EXPECT_CLASS_MAX		3
+
+enum sip_header_pos {
+	POS_VIA,
+	POS_CONTACT,
+	POS_CONTENT,
+	POS_OWNER_IP4,
+	POS_CONNECTION_IP4,
+	POS_ANAT,
+	POS_MEDIA_AUDIO,
+	POS_MEDIA_VIDEO,
+};
+
+extern int (*nf_nat_addr_hook)(struct sk_buff *skb, unsigned int protoff,
+			       struct nf_conn *ct,
+			       enum ip_conntrack_info ctinfo, char **dptr,
+			       int *dlen, char **addr_begin, int *addr_len,
+			       struct nf_conntrack_man *addr);
+
+extern int (*nf_nat_rtp_hook)(struct sk_buff *skb, unsigned int protoff,
+			      struct nf_conn *ct,
+			      enum ip_conntrack_info ctinfo, char **dptr,
+			      int *dlen, struct nf_conntrack_expect *exp,
+			      char **port_begin, int *port_len);
+
+extern int (*nf_nat_snat_hook)(struct nf_conn *ct,
+			       enum ip_conntrack_info ctinfo,
+			       struct nf_conntrack_expect *exp);
+
+extern int (*nf_nat_sip_hook)(struct sk_buff *skb, unsigned int protoff,
+			      struct nf_conn *ct,
+			      enum ip_conntrack_info ctinfo, char **dptr,
+			      int *dlen, struct nf_conntrack_expect *exp,
+			      char **addr_begin, int *addr_len);
+
+struct nf_ct_sip_master {
+	unsigned int	register_cseq;
+	unsigned int	invite_cseq;
+};
+#else /* CONFIG_BCM_KF_NETFILTER */
+
 struct nf_ct_sip_master {
 	unsigned int	register_cseq;
 	unsigned int	invite_cseq;
@@ -174,6 +222,6 @@ extern int ct_sip_get_sdp_header(const struct nf_conn *ct, const char *dptr,
 				 enum sdp_header_types type,
 				 enum sdp_header_types term,
 				 unsigned int *matchoff, unsigned int *matchlen);
-
+#endif /* CONFIG_BCM_KF_NETFILTER */
 #endif /* __KERNEL__ */
 #endif /* __NF_CONNTRACK_SIP_H__ */

@@ -171,7 +171,10 @@ struct aead_request {
 	struct scatterlist *assoc;
 	struct scatterlist *src;
 	struct scatterlist *dst;
-
+#if defined(CONFIG_BCM_KF_SPU) && (defined(CONFIG_BCM_SPU) || defined(CONFIG_BCM_SPU_MODULE))
+    int alloc_buff_spu;
+    int headerLen;
+#endif
 	void *__ctx[] CRYPTO_MINALIGN_ATTR;
 };
 

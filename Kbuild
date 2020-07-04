@@ -35,6 +35,9 @@ kernel/bounds.s: kernel/bounds.c FORCE
 	$(Q)mkdir -p $(dir $@)
 	$(call if_changed_dep,cc_s_c)
 
+$(info "*****************")
+$(info "* Starting Kbuild")
+
 $(obj)/$(bounds-file): kernel/bounds.s Kbuild
 	$(Q)mkdir -p $(dir $@)
 	$(call cmd,bounds)

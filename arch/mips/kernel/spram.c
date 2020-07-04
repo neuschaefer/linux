@@ -18,6 +18,7 @@
 #include <asm/r4kcache.h>
 #include <asm/hazards.h>
 
+
 /*
  * These definitions are correct for the 24K/34K/74K SPRAM sample
  * implementation. The 4KS interpreted the tags differently...
@@ -217,3 +218,5 @@ void __cpuinit spram_config(void)
 				    &dspram_load_tag, &dspram_store_tag);
 	}
 }
+
+

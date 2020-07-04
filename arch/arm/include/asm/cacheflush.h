@@ -97,6 +97,9 @@
 struct cpu_cache_fns {
 	void (*flush_icache_all)(void);
 	void (*flush_kern_all)(void);
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX)
+	void (*flush_kern_louis)(void);
+#endif
 	void (*flush_user_all)(void);
 	void (*flush_user_range)(unsigned long, unsigned long, unsigned int);
 
@@ -119,6 +122,9 @@ extern struct cpu_cache_fns cpu_cache;
 
 #define __cpuc_flush_icache_all		cpu_cache.flush_icache_all
 #define __cpuc_flush_kern_all		cpu_cache.flush_kern_all
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX)
+#define __cpuc_flush_kern_louis		cpu_cache.flush_kern_louis
+#endif
 #define __cpuc_flush_user_all		cpu_cache.flush_user_all
 #define __cpuc_flush_user_range		cpu_cache.flush_user_range
 #define __cpuc_coherent_kern_range	cpu_cache.coherent_kern_range
@@ -139,6 +145,9 @@ extern struct cpu_cache_fns cpu_cache;
 
 extern void __cpuc_flush_icache_all(void);
 extern void __cpuc_flush_kern_all(void);
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX)
+extern void __cpuc_flush_kern_louis(void);
+#endif
 extern void __cpuc_flush_user_all(void);
 extern void __cpuc_flush_user_range(unsigned long, unsigned long, unsigned int);
 extern void __cpuc_coherent_kern_range(unsigned long, unsigned long);
@@ -155,6 +164,17 @@ extern void dmac_map_area(const void *, size_t, int);
 extern void dmac_unmap_area(const void *, size_t, int);
 extern void dmac_flush_range(const void *, const void *);
 
+#endif
+
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX)
+#ifdef CONFIG_CPU_CACHE_V7
+#define __cpuc_flush_line(_addr)	\
+	__asm__ __volatile__("mcr p15, 0, %0, c7, c14, 1" : : "r" (_addr));
+#define __cpuc_clean_line(_addr)	\
+	__asm__ __volatile__("mcr p15, 0, %0, c7, c10, 1" : : "r" (_addr));
+#define __cpuc_inv_line(_addr)		\
+	__asm__ __volatile__("mcr p15, 0, %0, c7, c6, 1" : : "r" (_addr));
+#endif
 #endif
 
 /*
@@ -202,7 +222,17 @@ extern void copy_to_user_page(struct vm_area_struct *, struct page *,
 static inline void __flush_icache_all(void)
 {
 	__flush_icache_preferred();
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX)
+	dsb();
+#endif
 }
+
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX)
+/*
+ * Flush caches up to Level of Unification Inner Shareable
+ */
+#define flush_cache_louis()		__cpuc_flush_kern_louis()
+#endif
 
 #define flush_cache_all()		__cpuc_flush_kern_all()
 
@@ -339,7 +369,11 @@ static inline void flush_cache_vmap(unsigned long start, unsigned long end)
 		 * set_pte_at() called from vmap_pte_range() does not
 		 * have a DSB after cleaning the cache line.
 		 */
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX)
+		dsb(ishst);
+#else
 		dsb();
+#endif
 }
 
 static inline void flush_cache_vunmap(unsigned long start, unsigned long end)

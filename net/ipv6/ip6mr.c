@@ -990,6 +990,38 @@ static int mif6_add(struct net *net, struct mr6_table *mrt,
 	return 0;
 }
 
+#if defined(CONFIG_BCM_KF_IGMP)
+static struct mfc6_cache *ip6mr_cache_find(struct mr6_table *mrt,
+					   struct in6_addr *origin,
+					   struct in6_addr *mcastgrp,
+					   mifi_t mifi)
+{
+	int line = MFC6_HASH(mcastgrp, origin);
+	struct mfc6_cache *c = NULL;
+	struct in6_addr nullOrigin;
+
+	list_for_each_entry(c, &mrt->mfc6_cache_array[line], list) {
+		if (ipv6_addr_equal(&c->mf6c_origin, origin) &&
+		    ipv6_addr_equal(&c->mf6c_mcastgrp, mcastgrp) &&
+		    (c->mf6c_parent == mifi))
+			return c;
+	}
+
+	/* for ASM multicast source does not matter so need to check
+	   for an entry with NULL origin as well */
+	memset(&nullOrigin, 0, sizeof(struct in6_addr));
+	line = MFC6_HASH(mcastgrp, &nullOrigin);
+
+	list_for_each_entry(c, &mrt->mfc6_cache_array[line], list) {
+		if (ipv6_addr_equal(&c->mf6c_origin, &nullOrigin) &&
+			ipv6_addr_equal(&c->mf6c_mcastgrp, mcastgrp) &&
+		    (c->mf6c_parent == mifi))
+			return c;
+	}
+   
+	return NULL;
+}
+#else
 static struct mfc6_cache *ip6mr_cache_find(struct mr6_table *mrt,
 					   const struct in6_addr *origin,
 					   const struct in6_addr *mcastgrp)
@@ -1004,6 +1036,7 @@ static struct mfc6_cache *ip6mr_cache_find(struct mr6_table *mrt,
 	}
 	return NULL;
 }
+#endif
 
 /*
  *	Allocate a multicast cache entry
@@ -1243,8 +1276,14 @@ static int ip6mr_mfc_delete(struct mr6_table *mrt, struct mf6cctl *mfc)
 	line = MFC6_HASH(&mfc->mf6cc_mcastgrp.sin6_addr, &mfc->mf6cc_origin.sin6_addr);
 
 	list_for_each_entry_safe(c, next, &mrt->mfc6_cache_array[line], list) {
+#if defined(CONFIG_BCM_KF_IGMP)
+		if (ipv6_addr_equal(&c->mf6c_origin, &mfc->mf6cc_origin.sin6_addr) &&
+		    ipv6_addr_equal(&c->mf6c_mcastgrp, &mfc->mf6cc_mcastgrp.sin6_addr) &&
+		    (c->mf6c_parent == mfc->mf6cc_parent)) {
+#else
 		if (ipv6_addr_equal(&c->mf6c_origin, &mfc->mf6cc_origin.sin6_addr) &&
 		    ipv6_addr_equal(&c->mf6c_mcastgrp, &mfc->mf6cc_mcastgrp.sin6_addr)) {
+#endif
 			write_lock_bh(&mrt_lock);
 			list_del(&c->list);
 			write_unlock_bh(&mrt_lock);
@@ -1399,8 +1438,14 @@ static int ip6mr_mfc_add(struct net *net, struct mr6_table *mrt,
 	line = MFC6_HASH(&mfc->mf6cc_mcastgrp.sin6_addr, &mfc->mf6cc_origin.sin6_addr);
 
 	list_for_each_entry(c, &mrt->mfc6_cache_array[line], list) {
+#if defined(CONFIG_BCM_KF_IGMP)
+		if (ipv6_addr_equal(&c->mf6c_origin, &mfc->mf6cc_origin.sin6_addr) &&
+		    ipv6_addr_equal(&c->mf6c_mcastgrp, &mfc->mf6cc_mcastgrp.sin6_addr) &&
+		    (c->mf6c_parent == mfc->mf6cc_parent)) {
+#else
 		if (ipv6_addr_equal(&c->mf6c_origin, &mfc->mf6cc_origin.sin6_addr) &&
 		    ipv6_addr_equal(&c->mf6c_mcastgrp, &mfc->mf6cc_mcastgrp.sin6_addr)) {
+#endif
 			found = true;
 			break;
 		}
@@ -1790,7 +1835,11 @@ int ip6mr_ioctl(struct sock *sk, int cmd, void __user *arg)
 			return -EFAULT;
 
 		read_lock(&mrt_lock);
+#if defined(CONFIG_BCM_KF_IGMP)
+		c = NULL;
+#else
 		c = ip6mr_cache_find(mrt, &sr.src.sin6_addr, &sr.grp.sin6_addr);
+#endif
 		if (c) {
 			sr.pktcnt = c->mfc_un.res.pkt;
 			sr.bytecnt = c->mfc_un.res.bytes;
@@ -1945,7 +1994,12 @@ static int ip6mr_forward2(struct net *net, struct mr6_table *mrt,
 	 * result in receiving multiple packets.
 	 */
 	dev = vif->dev;
+#if defined(CONFIG_BCM_KF_IGMP)
+   /* skb->dev is the soruce device. It should not be 
+      set to the destination device */
+#else
 	skb->dev = dev;
+#endif
 	vif->pkt_out++;
 	vif->bytes_out += skb->len;
 
@@ -2024,8 +2078,15 @@ static int ip6_mr_forward(struct net *net, struct mr6_table *mrt,
 			if (psend != -1) {
 				struct sk_buff *skb2 = skb_clone(skb, GFP_ATOMIC);
 				if (skb2)
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+                                {
+					blog_clone(skb, blog_ptr(skb2));
+#endif
 					ip6mr_forward2(net, mrt, skb2, cache, psend);
-			}
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+                                }
+#endif
+                        }
 			psend = ct;
 		}
 	}
@@ -2062,8 +2123,26 @@ int ip6_mr_input(struct sk_buff *skb)
 	}
 
 	read_lock(&mrt_lock);
+
+
+#if defined(CONFIG_BCM_KF_IGMP)
+	/* mroute6 should not apply to MLD traffic
+	   in addition it does not make sense for TCP protocol to be used
+	   for multicast so just check for UDP */
+	if( ipv6_hdr(skb)->nexthdr == IPPROTO_UDP )
+	{
+		mifi_t mifi = ip6mr_find_vif(mrt, skb->dev);
+		cache = ip6mr_cache_find(mrt, &ipv6_hdr(skb)->saddr, 
+		                         &ipv6_hdr(skb)->daddr, mifi);
+	}
+	else
+	{
+		cache = NULL;
+	}
+#else
 	cache = ip6mr_cache_find(mrt,
 				 &ipv6_hdr(skb)->saddr, &ipv6_hdr(skb)->daddr);
+#endif
 
 	/*
 	 *	No usable cache entry
@@ -2129,8 +2208,14 @@ rtattr_failure:
 	return -EMSGSIZE;
 }
 
+#if defined(CONFIG_BCM_KF_IGMP)
+int ip6mr_get_route(struct net *net,
+		    struct sk_buff *skb, struct rtmsg *rtm, int nowait,
+		    unsigned short ifIndex)
+#else
 int ip6mr_get_route(struct net *net,
 		    struct sk_buff *skb, struct rtmsg *rtm, int nowait)
+#endif
 {
 	int err;
 	struct mr6_table *mrt;
@@ -2142,7 +2227,25 @@ int ip6mr_get_route(struct net *net,
 		return -ENOENT;
 
 	read_lock(&mrt_lock);
+#if defined(CONFIG_BCM_KF_IGMP)
+	/* mroute6 should not apply to MLD traffic
+	   in addition it does not make sense for TCP protocol to be used
+	   for multicast so just check for UDP */
+	if( (skb->dev == NULL) || (ipv6_hdr(skb) == NULL) ||
+	    (ipv6_hdr(skb)->nexthdr == IPPROTO_UDP) )
+	{
+		struct net_device *dev = dev_get_by_index(net, ifIndex);
+		mifi_t mifi = ip6mr_find_vif(mrt, dev);
+		cache = ip6mr_cache_find(mrt, &rt->rt6i_src.addr, 
+		                         &rt->rt6i_dst.addr, mifi);
+	}
+	else
+	{
+		cache = NULL;
+	}
+#else
 	cache = ip6mr_cache_find(mrt, &rt->rt6i_src.addr, &rt->rt6i_dst.addr);
+#endif
 
 	if (!cache) {
 		struct sk_buff *skb2;

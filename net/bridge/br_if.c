@@ -26,6 +26,20 @@
 
 #include "br_private.h"
 
+#if defined(CONFIG_BCM_KF_IGMP) && defined(CONFIG_BR_IGMP_SNOOP)
+#include "br_igmp.h"
+#endif
+#if defined(CONFIG_BCM_KF_MLD) && defined(CONFIG_BR_MLD_SNOOP)
+#include "br_mld.h"
+#include <linux/module.h>
+#endif
+#if defined(CONFIG_BCM_KF_IP)
+#include "br_flows.h"
+#endif
+#if defined(CONFIG_BCM_KF_RUNNER) && (defined(CONFIG_BCM_RDPA_BRIDGE) || defined(CONFIG_BCM_RDPA_BRIDGE_MODULE))
+#include "br_fp.h"
+#include "br_fp_hooks.h"
+#endif
 /*
  * Determine initial path cost based on speed.
  * using recommendations from 802.1d standard
@@ -141,6 +155,9 @@ static void del_nbp(struct net_bridge_port *p)
 
 	br_fdb_delete_by_port(br, p, 1);
 
+#if (defined(CONFIG_BCM_KF_IGMP) && defined(CONFIG_BR_IGMP_SNOOP)) || (defined(CONFIG_BCM_KF_MLD) && defined(CONFIG_BR_MLD_SNOOP))
+	br_mcast_handle_netdevice_events(p->dev, NETDEV_CHANGE);
+#endif
 	list_del_rcu(&p->list);
 
 	dev->priv_flags &= ~IFF_BRIDGE_PORT;
@@ -169,6 +186,15 @@ void br_dev_delete(struct net_device *dev, struct list_head *head)
 	list_for_each_entry_safe(p, n, &br->port_list, list) {
 		del_nbp(p);
 	}
+
+#if defined(CONFIG_BCM_KF_IGMP) && defined(CONFIG_BR_IGMP_SNOOP)
+	br_igmp_mc_fdb_cleanup(br);
+	br_igmp_snooping_br_fini(br);
+#endif
+#if defined(CONFIG_BCM_KF_MLD) && defined(CONFIG_BR_MLD_SNOOP)
+	br_mld_mc_fdb_cleanup(br);
+	br_mld_snooping_br_fini(br);
+#endif
 
 	del_timer_sync(&br->gc_timer);
 
@@ -222,9 +248,19 @@ static struct net_bridge_port *new_nbp(struct net_bridge *br,
 	p->flags = 0;
 	br_init_port(p);
 	p->state = BR_STATE_DISABLED;
+
+#if defined(CONFIG_BCM_KF_BRIDGE_MAC_FDB_LIMIT) && defined(CONFIG_BCM_BRIDGE_MAC_FDB_LIMIT)
+	p->min_port_fdb_entries = 0;
+	p->max_port_fdb_entries = 0;
+	p->num_port_fdb_entries = 0;
+#endif
+
 	br_stp_port_timer_init(p);
 	br_multicast_add_port(p);
 
+#if defined(CONFIG_BCM_KF_BRIDGE_STP)
+	br_stp_notify_state_port(p);
+#endif
 	return p;
 }
 
@@ -314,6 +350,10 @@ netdev_features_t br_features_recompute(struct net_bridge *br,
 						     p->dev->features, mask);
 	}
 
+#if defined(CONFIG_BCM_KF_EXTSTATS)
+	features |= NETIF_F_EXTSTATS;
+#endif
+
 	return features;
 }
 
@@ -393,6 +433,10 @@ int br_add_if(struct net_bridge *br, struct net_device *dev)
 	if (changed_addr)
 		call_netdevice_notifiers(NETDEV_CHANGEADDR, br->dev);
 
+#if defined(CONFIG_BCM_KF_RUNNER) && (defined(CONFIG_BCM_RDPA_BRIDGE) || defined(CONFIG_BCM_RDPA_BRIDGE_MODULE))
+		br_fp_hook(BR_FP_PORT_ADD, p, NULL);
+#endif
+
 	dev_set_mtu(br->dev, br_min_mtu(br));
 
 	if (br_fdb_insert(br, p, dev->dev_addr))
@@ -427,6 +471,29 @@ int br_del_if(struct net_bridge *br, struct net_device *dev)
 	if (!p || p->br != br)
 		return -EINVAL;
 
+#if defined(CONFIG_BCM_KF_BRIDGE_MAC_FDB_LIMIT) && defined(CONFIG_BCM_BRIDGE_MAC_FDB_LIMIT)
+	/* Disable min limit per port in advance */
+	(void)br_set_fdb_limit(br, p, 1, 1, 0);
+#endif
+
+#if defined(CONFIG_BCM_KF_IP)
+	/* delete all flow paths tx through this port (dev) from ANY rx port */
+	if (dev->priv_flags & IFF_BCM_VLAN)
+	{
+		br_flow_path_delete(br, NULL, dev);
+
+		/* delete all flow paths tx through other ports from this rx port (dev) */
+		list_for_each_entry(p, &br->port_list, list) {
+			if (p->dev && (p->dev != dev) && ((p->dev)->priv_flags & IFF_BCM_VLAN))
+				br_flow_path_delete(br, dev, p->dev);
+		}
+	}
+	p = br_port_get_rtnl(dev);
+#endif
+#if defined(CONFIG_BCM_KF_RUNNER) && (defined(CONFIG_BCM_RDPA_BRIDGE) || defined(CONFIG_BCM_RDPA_BRIDGE_MODULE))
+	br_fp_hook(BR_FP_PORT_REMOVE, p, NULL);
+#endif
+
 	del_nbp(p);
 
 	spin_lock_bh(&br->lock);
@@ -437,7 +504,6 @@ int br_del_if(struct net_bridge *br, struct net_device *dev)
 		call_netdevice_notifiers(NETDEV_CHANGEADDR, br->dev);
 
 	netdev_update_features(br->dev);
-
 	return 0;
 }
 

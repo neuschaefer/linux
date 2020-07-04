@@ -327,6 +327,8 @@ static void xhci_cleanup_msix(struct xhci_hcd *xhci)
 	return;
 }
 
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX) 
+#ifdef CONFIG_PM
 static void xhci_msix_sync_irqs(struct xhci_hcd *xhci)
 {
 	int i;
@@ -336,6 +338,18 @@ static void xhci_msix_sync_irqs(struct xhci_hcd *xhci)
 			synchronize_irq(xhci->msix_entries[i].vector);
 	}
 }
+#endif
+#else
+static void xhci_msix_sync_irqs(struct xhci_hcd *xhci)
+{
+	int i;
+
+	if (xhci->msix_entries) {
+		for (i = 0; i < xhci->msix_count; i++)
+			synchronize_irq(xhci->msix_entries[i].vector);
+	}
+}
+#endif
 
 static int xhci_try_enable_msi(struct usb_hcd *hcd)
 {
@@ -1732,8 +1746,13 @@ static u32 xhci_count_num_new_endpoints(struct xhci_hcd *xhci,
 	 * (bit 1).  The default control endpoint is added during the Address
 	 * Device command and is never removed until the slot is disabled.
 	 */
+#if defined(CONFIG_BCM_KF_MIPS_BCM963XX) || defined(CONFIG_BCM_KF_ARM_BCM963XX) 
+	valid_add_flags = le32_to_cpu(ctrl_ctx->add_flags) >> 2;
+	valid_drop_flags = le32_to_cpu(ctrl_ctx->drop_flags) >> 2;
+#else
 	valid_add_flags = ctrl_ctx->add_flags >> 2;
 	valid_drop_flags = ctrl_ctx->drop_flags >> 2;
+#endif
 
 	/* Use hweight32 to count the number of ones in the add flags, or
 	 * number of endpoints added.  Don't count endpoints that are changed
@@ -1751,8 +1770,13 @@ static unsigned int xhci_count_num_dropped_endpoints(struct xhci_hcd *xhci,
 	u32 valid_drop_flags;
 
 	ctrl_ctx = xhci_get_input_control_ctx(xhci, in_ctx);
+#if defined(CONFIG_BCM_KF_MIPS_BCM963XX) || defined(CONFIG_BCM_KF_ARM_BCM963XX) 
+	valid_add_flags = le32_to_cpu(ctrl_ctx->add_flags) >> 2;
+	valid_drop_flags = le32_to_cpu(ctrl_ctx->drop_flags) >> 2;
+#else
 	valid_add_flags = ctrl_ctx->add_flags >> 2;
 	valid_drop_flags = ctrl_ctx->drop_flags >> 2;
+#endif
 
 	return hweight32(valid_drop_flags) -
 		hweight32(valid_add_flags & valid_drop_flags);

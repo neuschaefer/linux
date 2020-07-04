@@ -3691,6 +3691,29 @@ static void hub_events(void)
 				clear_port_feature(hdev, i,
 					USB_PORT_FEAT_C_CONNECTION);
 				connect_change = 1;
+#if (defined(CONFIG_BCM_KF_USB_STORAGE) && defined(CONFIG_BCM96318))
+				/*fix for 6318 EHCI data corruption */
+				{
+					static volatile unsigned *usbh_simctrl_reg_ptr = (void *)0xb0005220;
+					static volatile unsigned *ehci_portstatus_reg_ptr = (void *)0xb0005054;
+					static int ohci_memreq_disabled = 0;
+					int ehci_device_present;
+
+					ehci_device_present = (*ehci_portstatus_reg_ptr & 0x1);/*check connect status */
+
+
+					if(!ohci_memreq_disabled && ehci_device_present)
+					{
+						*usbh_simctrl_reg_ptr |= (0x2); /*set bit 1 - USBH_OHCI_MEM_REQ_DIS */  
+						ohci_memreq_disabled =1;
+					}
+					else if(ohci_memreq_disabled && !ehci_device_present)
+					{
+						*usbh_simctrl_reg_ptr &= ~(0x2); /*reset bit 1 - USBH_OHCI_MEM_REQ_DIS */  
+						ohci_memreq_disabled =0;
+					}
+				}
+#endif
 			}
 
 			if (portchange & USB_PORT_STAT_C_ENABLE) {

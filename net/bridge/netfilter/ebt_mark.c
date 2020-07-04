@@ -30,8 +30,76 @@ ebt_mark_tg(struct sk_buff *skb, const struct xt_action_param *par)
 		skb->mark |= info->mark;
 	else if (action == MARK_AND_VALUE)
 		skb->mark &= info->mark;
+#if !defined(CONFIG_BCM_KF_NETFILTER)
 	else
 		skb->mark ^= info->mark;
+#else
+	else if (action == MARK_XOR_VALUE)
+		skb->mark ^= info->mark;
+	else
+   {
+		skb->vtag = (unsigned short)(info->mark);
+
+      /* if the 8021p priority field (bits 0-3) of skb->vtag is not zero, we need
+       * to do p-bit marking.
+       */
+      if (skb->vtag & 0xf)
+      {
+         unsigned short TCI = 0;
+
+         /* if this is a vlan frame, we want to re-mark its p-bit with the 8021p
+          * priority in skb->vtag.
+          * if this is not a vlan frame, we want to add a 8021p tag to it, with
+          * vid=0 and p-bit=the 8021p priority in skb->vtag.
+          */
+	      if ((skb->protocol == __constant_htons(ETH_P_8021Q)))
+	      {
+   	      struct vlan_hdr *frame = (struct vlan_hdr *)(skb->network_header);
+
+		      TCI = ntohs(frame->h_vlan_TCI);
+
+            /* Since the 8021p priority value in vtag had been incremented by 1,
+             * we need to minus 1 from it to get the exact value.
+             */
+            TCI = (TCI & 0x1fff) | (((skb->vtag & 0xf) - 1) << 13);
+
+		      frame->h_vlan_TCI = htons(TCI);
+   	   }
+         else
+         {
+            if ((skb->mac_header - skb->head) < VLAN_HLEN)
+            {
+               printk("ebt_mark_tg: No headroom for VLAN tag. Marking is not done.\n");
+            }
+            else
+            {
+   	         struct vlan_ethhdr *ethHeader;
+
+               skb->protocol = __constant_htons(ETH_P_8021Q);
+               skb->mac_header -= VLAN_HLEN;
+               skb->network_header -= VLAN_HLEN;
+               skb->data -= VLAN_HLEN;
+	            skb->len  += VLAN_HLEN;
+
+               /* Move the mac addresses to the beginning of the new header. */
+               memmove(skb->mac_header, skb->mac_header + VLAN_HLEN, 2 * ETH_ALEN);
+
+               ethHeader = (struct vlan_ethhdr *)(skb->mac_header);
+
+               ethHeader->h_vlan_proto = __constant_htons(ETH_P_8021Q);
+
+               /* Since the 8021p priority value in vtag had been incremented by 1,
+                * we need to minus 1 from it to get the exact value.
+                */
+               TCI = (TCI & 0x1fff) | (((skb->vtag & 0xf) - 1) << 13);
+
+               ethHeader->h_vlan_TCI = htons(TCI);
+            }
+         }
+         skb->vtag = 0;
+      }
+   }
+#endif // CONFIG_BCM_KF_NETFILTER
 
 	return info->target | ~EBT_VERDICT_BITS;
 }
@@ -48,7 +116,12 @@ static int ebt_mark_tg_check(const struct xt_tgchk_param *par)
 		return -EINVAL;
 	tmp = info->target & ~EBT_VERDICT_BITS;
 	if (tmp != MARK_SET_VALUE && tmp != MARK_OR_VALUE &&
+#if defined(CONFIG_BCM_KF_NETFILTER)
+	    tmp != MARK_AND_VALUE && tmp != MARK_XOR_VALUE &&
+            tmp != VTAG_SET_VALUE)
+#else
 	    tmp != MARK_AND_VALUE && tmp != MARK_XOR_VALUE)
+#endif
 		return -EINVAL;
 	return 0;
 }

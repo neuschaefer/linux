@@ -25,6 +25,17 @@
 
 #include "nf_internals.h"
 
+
+#if defined(CONFIG_BCM_KF_RUNNER)
+#if defined(CONFIG_BCM_RDPA) || defined(CONFIG_BCM_RDPA_MODULE)
+#if defined(CONFIG_BCM_RUNNER_RG) || defined(CONFIG_BCM_RUNNER_RG_MODULE)
+#include <net/bl_ops.h>
+struct bl_ops_t *bl_ops = NULL;
+EXPORT_SYMBOL(bl_ops);
+#endif /* CONFIG_BCM_RUNNER_RG || CONFIG_BCM_RUNNER_RG_MODULE */
+#endif /* CONFIG_BCM_RUNNER */
+#endif /* CONFIG_BCM_KF_RUNNER */
+
 static DEFINE_MUTEX(afinfo_mutex);
 
 const struct nf_afinfo __rcu *nf_afinfo[NFPROTO_NUMPROTO] __read_mostly;

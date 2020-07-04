@@ -52,6 +52,17 @@ NESTED(except_vec1_generic, 0, sp)
 NESTED(except_vec3_generic, 0, sp)
 	.set	push
 	.set	noat
+
+#if defined(CONFIG_BCM_KF_DSP_EXCEPT) && defined(CONFIG_BCM_BCMDSP_MODULE)
+	/* if we are running on DSP TP branch to brcm_dsp_except */
+	nop
+	mfc0	k0, $22, 3
+	srl	k0, k0, 31
+	la	k1, main_tp_num
+	lw	k1, 0(k1)
+	bne	k0, k1, brcm_dsp_except
+#endif
+
 #if R5432_CP0_INTERRUPT_WAR
 	mfc0	k0, CP0_INDEX
 #endif
@@ -62,6 +73,14 @@ NESTED(except_vec3_generic, 0, sp)
 #endif
 	PTR_L	k0, exception_handlers(k1)
 	jr	k0
+
+#if defined(CONFIG_BCM_KF_DSP_EXCEPT) && defined(CONFIG_BCM_BCMDSP_MODULE)
+brcm_dsp_except:
+	PTR_LA	ra, ret_from_exception 
+	PTR_LA	k0, 0xa0000200
+	jr	k0 
+#endif
+
 	.set	pop
 	END(except_vec3_generic)
 

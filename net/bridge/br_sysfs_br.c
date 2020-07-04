@@ -20,6 +20,9 @@
 #include <linux/times.h>
 
 #include "br_private.h"
+#if defined(CONFIG_BCM_KF_IGMP) && defined(CONFIG_BR_IGMP_SNOOP)
+#include "br_igmp.h"
+#endif
 
 #define to_dev(obj)	container_of(obj, struct device, kobj)
 #define to_bridge(cd)	((struct net_bridge *)netdev_priv(to_net_dev(cd)))
@@ -63,6 +66,121 @@ static ssize_t store_forward_delay(struct device *d,
 }
 static DEVICE_ATTR(forward_delay, S_IRUGO | S_IWUSR,
 		   show_forward_delay, store_forward_delay);
+
+#if defined(CONFIG_BCM_KF_IGMP) && defined(CONFIG_BR_IGMP_SNOOP)
+static ssize_t show_igmp_proxy(struct device *d,
+				  struct device_attribute *attr, char *buf)
+{
+	struct net_bridge *br = to_bridge(d);
+	return sprintf(buf, "%s\n",(br->igmp_proxy==PROXY_ENABLED_MODE)?"Enabled":"Disabled");
+}
+
+static int set_igmp_proxy(struct net_bridge *br, unsigned long val)
+{
+	br->igmp_proxy=(val>0)?PROXY_ENABLED_MODE:PROXY_DISABLED_MODE;
+	return 0;
+}
+
+static ssize_t store_igmp_proxy(struct device *d,
+				   struct device_attribute *attr,
+				   const char *buf, size_t len)
+{
+	return store_bridge_parm(d, buf, len, set_igmp_proxy);
+}
+
+
+static DEVICE_ATTR(igmp_proxy, S_IRUGO | S_IWUSR,
+		   show_igmp_proxy, store_igmp_proxy);
+
+
+static ssize_t show_igmp_snooping(struct device *d,
+				  struct device_attribute *attr, char *buf)
+{
+	struct net_bridge *br = to_bridge(d);
+        if (br->igmp_snooping==SNOOPING_DISABLED_MODE) 
+		return sprintf(buf, "Disabled(%d)\n",br->igmp_snooping);
+	else if (br->igmp_snooping==SNOOPING_ENABLED_MODE) 
+		return sprintf(buf, "Enabled(%d)\n",br->igmp_snooping);
+	else 
+		return sprintf(buf, "Blocking(%d)\n",br->igmp_snooping);
+}
+static int set_igmp_snooping(struct net_bridge *br, unsigned long val)
+{
+	br->igmp_snooping=(val>SNOOPING_BLOCKING_MODE)?SNOOPING_DISABLED_MODE:(int)val;
+	return 0;
+}
+
+static ssize_t store_igmp_snooping(struct device *d,
+				   struct device_attribute *attr,
+				   const char *buf, size_t len)
+{
+	return store_bridge_parm(d, buf, len, set_igmp_snooping);
+}
+
+static DEVICE_ATTR(igmp_snooping, S_IRUGO | S_IWUSR,
+		   show_igmp_snooping, store_igmp_snooping);
+
+
+#endif
+#if defined(CONFIG_BCM_KF_MLD) && defined(CONFIG_BR_MLD_SNOOP)
+//added to sysfs for show and configure MLD parameters.
+static ssize_t show_mld_proxy(struct device *d,
+				  struct device_attribute *attr, char *buf)
+{
+	struct net_bridge *br = to_bridge(d);
+	return sprintf(buf, "%s\n", br->mld_proxy==PROXY_ENABLED_MODE?"Enabled(1)":"Disabled(0)");
+}
+
+static int set_mld_proxy(struct net_bridge *br, unsigned long val)
+{
+	br->mld_proxy=(val>0)?PROXY_ENABLED_MODE:PROXY_DISABLED_MODE;
+	return 0;
+}
+
+static ssize_t store_mld_proxy(struct device *d,
+				   struct device_attribute *attr,
+				   const char *buf, size_t len)
+{
+	return store_bridge_parm(d, buf, len, set_mld_proxy);
+}
+
+
+static DEVICE_ATTR(mld_proxy, S_IRUGO | S_IWUSR,
+		   show_mld_proxy, store_mld_proxy);
+
+
+static ssize_t show_mld_snooping(struct device *d,
+				  struct device_attribute *attr, char *buf)
+{
+	struct net_bridge *br = to_bridge(d);
+        if (br->mld_snooping==SNOOPING_DISABLED_MODE) 
+		return sprintf(buf, "Disabled(%d)\n",br->mld_snooping);
+	else if (br->mld_snooping==SNOOPING_ENABLED_MODE) 
+		return sprintf(buf, "Enabled(%d)\n",br->mld_snooping);
+	else 
+		return sprintf(buf, "Blocking(%d)\n",br->mld_snooping);
+}
+
+static int set_mld_snooping(struct net_bridge *br, unsigned long val)
+{
+	br->mld_snooping=(val>SNOOPING_BLOCKING_MODE)?SNOOPING_DISABLED_MODE:(int)val;
+	if(br->mld_snooping==SNOOPING_DISABLED_MODE) 
+		br_mcast_wl_flush(br) ;
+	return 0;
+}
+
+static ssize_t store_mld_snooping(struct device *d,
+				   struct device_attribute *attr,
+				   const char *buf, size_t len)
+{
+	return store_bridge_parm(d, buf, len, set_mld_snooping);
+}
+
+static DEVICE_ATTR(mld_snooping, S_IRUGO | S_IWUSR,
+		   show_mld_snooping, store_mld_snooping);
+
+#endif
+
 
 static ssize_t show_hello_time(struct device *d, struct device_attribute *attr,
 			       char *buf)
@@ -698,6 +816,14 @@ static struct attribute *bridge_attrs[] = {
 	&dev_attr_topology_change_timer.attr,
 	&dev_attr_gc_timer.attr,
 	&dev_attr_group_addr.attr,
+#if defined(CONFIG_BCM_KF_IGMP) && defined(CONFIG_BR_IGMP_SNOOP)
+	&dev_attr_igmp_snooping.attr,
+	&dev_attr_igmp_proxy.attr,
+#endif
+#if defined(CONFIG_BCM_KF_MLD) && defined(CONFIG_BR_MLD_SNOOP)
+	&dev_attr_mld_snooping.attr,
+	&dev_attr_mld_proxy.attr,
+#endif
 	&dev_attr_flush.attr,
 #ifdef CONFIG_BRIDGE_IGMP_SNOOPING
 	&dev_attr_multicast_router.attr,

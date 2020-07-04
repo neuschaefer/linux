@@ -21,7 +21,12 @@
 
 #include <linux/types.h>		/* for "__kernel_caddr_t" et al	*/
 #include <linux/socket.h>		/* for "struct sockaddr" et al	*/
+#if !defined(CONFIG_BCM_IN_KERNEL)
+//userspace already has __user defined....
+//#include <bcm_local_kernel_include/linux/compiler.h>		/* for "__user" et al           */
+#else
 #include <linux/compiler.h>		/* for "__user" et al           */
+#endif
 
 #define	IFNAMSIZ	16
 #define	IFALIASZ	256
@@ -81,6 +86,29 @@
 #define IFF_UNICAST_FLT	0x20000		/* Supports unicast filtering	*/
 #define IFF_TEAM_PORT	0x40000		/* device used as team port */
 #define IFF_SUPP_NOFCS	0x80000		/* device supports sending custom FCS */
+
+#if defined(CONFIG_BCM_KF_ENET_SWITCH)
+#if (defined(CONFIG_BCM96816) || defined(CONFIG_BCM96818))  && defined(CONFIG_BCM_GPON_MODULE)
+#define IFF_HW_SWITCH  0x00000
+#else /* All platforms including 6819_BHR except 6816/6818G w/ GPON */
+#define IFF_HW_SWITCH  0x40000
+#endif
+#define IFF_EXT_SWITCH 0x80000             /* Indicates the interface is an external switch interface */
+
+#endif /* CONFIG_BCM_KF_ENET_SWITCH */
+
+#if defined(CONFIG_BCM_KF_IP)
+#define IFF_EPON_IF    0x100000            /* Indicates SFU hardware switching.  */
+#endif
+#if defined(CONFIG_BCM_KF_WANDEV)
+#define IFF_WANDEV     0x200000            /* avoid WAN bridge traffic leaking */
+#endif
+#if defined(CONFIG_BCM_KF_VLAN)
+#define IFF_BCM_VLAN   0x400000            /* Broadcom VLAN Interface */
+#endif
+#if defined(CONFIG_BCM_KF_PPP)
+#define IFF_PPP        0x800000            /* PPP Interface */
+#endif
 
 
 #define IF_GET_IFACE	0x0001		/* for querying only */

@@ -54,6 +54,10 @@
 #include <net/net_namespace.h>
 #include <net/netns/generic.h>
 
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+#include <linux/blog.h>
+#endif
+
 #define PPP_VERSION	"2.4.2"
 
 /*
@@ -69,6 +73,12 @@
 
 #define MPHDRLEN	6	/* multilink protocol header length */
 #define MPHDRLEN_SSN	4	/* ditto with short sequence numbers */
+
+#if defined(CONFIG_BCM_KF_PPP)
+#define FIELD0    4        /* ppp device number ppp0, ppp1, the third digit (max 16) */
+#define FIELD1    8        /* if 0, default mode, 1 vlan mux, 2 msc */    
+#define FIELD2    19       /* if FILED1 is 0, add no extension, 1 add vlan id, 2 add conId for msc */
+#endif
 
 /*
  * An instance of /dev/ppp can be associated with either a ppp
@@ -122,6 +132,11 @@ struct ppp {
 	unsigned long	last_recv;	/* jiffies when last pkt rcvd a0 */
 	struct net_device *dev;		/* network interface device a4 */
 	int		closing;	/* is device closing down? a8 */
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+	BlogStats_t bstats; /* stats when the blog promiscuous layer has consumed packets */
+	struct net_device_stats cstats; /* Cummulative Device stats (rx-bytes, tx-pkts, etc...) */
+#endif
+
 #ifdef CONFIG_PPP_MULTILINK
 	int		nxchan;		/* next channel to send something on */
 	u32		nxseq;		/* next sequence number to send */
@@ -480,6 +495,10 @@ static ssize_t ppp_write(struct file *file, const char __user *buf,
 		goto out;
 	}
 
+#if defined(CONFIG_BCM_KF_PPP)
+	skb->mark = 7;    /* mark with the highest subpriority value */
+#endif	
+
 	skb_queue_tail(&pf->xq, skb);
 
 	switch (pf->kind) {
@@ -562,8 +581,15 @@ static long ppp_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	struct npioctl npi;
 	int unit, cflags;
 	struct slcompress *vj;
+#if defined(CONFIG_BCM_KF_PPP) && defined(CONFIG_BCM_KF_NETDEV_PATH)
+        char real_dev_name[IFNAMSIZ];
+        struct net_device *real_dev;
+#endif
 	void __user *argp = (void __user *)arg;
 	int __user *p = argp;
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+	BlogStats_t bStats;
+#endif
 
 	if (!pf)
 		return ppp_unattached_ioctl(current->nsproxy->net_ns,
@@ -644,6 +670,34 @@ static long ppp_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		err = 0;
 		break;
 
+#if defined(CONFIG_BCM_KF_PPP) && defined(CONFIG_BCM_KF_NETDEV_PATH)
+	case PPPIOCSREALDEV:
+                copy_from_user(real_dev_name, argp, IFNAMSIZ);
+                real_dev_name[IFNAMSIZ-1] = '\0'; /* NULL terminate, just in case */
+
+                real_dev = dev_get_by_name(&init_net, real_dev_name);
+                if(real_dev == NULL)
+                {
+                    printk(KERN_ERR "PPP: Invalid Real Device Name : %s\n", real_dev_name);
+                    err = -EINVAL;
+                    break;
+                }
+
+                err = netdev_path_add(ppp->dev, real_dev);
+                if(err)
+                {
+                    printk(KERN_ERR "PPP: Failed to add %s to Interface path (%d)",
+                           ppp->dev->name, err);
+                }
+                else
+                {
+                    netdev_path_dump(ppp->dev);
+                }
+
+                dev_put(real_dev);
+		break;
+#endif
+
 	case PPPIOCSFLAGS:
 		if (get_user(val, p))
 			break;
@@ -687,6 +741,14 @@ static long ppp_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		break;
 
 	case PPPIOCGIDLE:
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+		memset(&bStats, 0, sizeof(BlogStats_t));
+		blog_notify(FETCH_NETIF_STATS, (void*)ppp->dev, (uint32_t)&bStats, BLOG_PARAM2_NO_CLEAR);
+		if(bStats.tx_packets)
+			ppp->last_xmit = jiffies;
+		if(bStats.rx_packets)
+			ppp->last_recv = jiffies;
+#endif
 		idle.xmit_idle = (jiffies - ppp->last_xmit) / HZ;
 		idle.recv_idle = (jiffies - ppp->last_recv) / HZ;
 		if (copy_to_user(argp, &idle, sizeof(idle)))
@@ -978,6 +1040,183 @@ ppp_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	return NETDEV_TX_OK;
 }
 
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+/* note: BLOG changes for read-only statistic data. */
+
+static inline BlogStats_t *ppp_dev_get_bstats(struct net_device *dev)
+{
+	struct ppp *ppp = netdev_priv(dev);
+
+	return &ppp->bstats;
+}
+static inline struct net_device_stats *ppp_dev_get_cstats(struct net_device *dev)
+{
+	struct ppp *ppp = netdev_priv(dev);
+
+	return &ppp->cstats;
+}
+
+static struct net_device_stats * ppp_dev_collect_stats(struct net_device *dev_p)
+{
+	BlogStats_t bStats;
+	BlogStats_t * bStats_p;
+	struct net_device_stats *dStats_p;
+	struct net_device_stats *cStats_p;
+
+	if ( dev_p == (struct net_device *)NULL )
+		return (struct net_device_stats *)NULL;
+
+	dStats_p = &dev_p->stats;
+	cStats_p = ppp_dev_get_cstats(dev_p);
+	bStats_p = ppp_dev_get_bstats(dev_p);
+
+	memset(&bStats, 0, sizeof(BlogStats_t));
+
+	blog_notify(FETCH_NETIF_STATS, (void*)dev_p,
+				(uint32_t)&bStats, BLOG_PARAM2_NO_CLEAR);
+
+	memcpy( cStats_p, dStats_p, sizeof(struct net_device_stats) );
+   
+#if defined(CONFIG_BCM_KF_EXTSTATS)
+	/* Handle packet count statistics, adding in BlogStats_t entries
+		from the flowcache */
+	cStats_p->rx_packets += ( bStats.rx_packets + bStats_p->rx_packets );
+	cStats_p->tx_packets += ( bStats.tx_packets + bStats_p->tx_packets );
+	cStats_p->multicast  += ( bStats.multicast  + bStats_p->multicast );
+	cStats_p->tx_multicast_packets += ( bStats.tx_multicast_packets + bStats_p->tx_multicast_packets );
+    
+	/* NOTE: There are no broadcast packets in BlogStats_t since the
+		flowcache doesn't accelerate broadcast.  Thus, they aren't added here */
+ 
+	/* set byte counts to 0 if the bstat packet counts are non 0 and the
+		octet counts are 0 */
+	/* Handle RX byte counts */
+	if ( ((bStats.rx_bytes + bStats_p->rx_bytes) == 0) &&
+			((bStats.rx_packets + bStats_p->rx_packets) > 0) )
+	{
+		cStats_p->rx_bytes = 0;
+	}
+	else
+	{
+		cStats_p->rx_bytes   += ( bStats.rx_bytes   + bStats_p->rx_bytes );
+	}
+
+	/* Handle TX byte counts */
+	if ( ((bStats.tx_bytes + bStats_p->tx_bytes) == 0) &&
+			((bStats.tx_packets + bStats_p->tx_packets) > 0) )
+	{
+		cStats_p->tx_bytes = 0;
+	}
+	else
+	{
+		cStats_p->tx_bytes   += ( bStats.tx_bytes   + bStats_p->tx_bytes );
+	}
+
+	/* Handle RX multicast byte counts */
+	if ( ((bStats.rx_multicast_bytes + bStats_p->rx_multicast_bytes) == 0) &&
+			((bStats.multicast + bStats_p->multicast) > 0) )
+	{
+		cStats_p->rx_multicast_bytes = 0;
+	}
+	else
+	{
+		cStats_p->rx_multicast_bytes   += ( bStats.rx_multicast_bytes   + bStats_p->rx_multicast_bytes );
+	}
+
+	/* Handle TX multicast byte counts */
+	if ( ((bStats.tx_multicast_bytes + bStats_p->tx_multicast_bytes) == 0) &&
+			((bStats.tx_multicast_packets + bStats_p->tx_multicast_packets) > 0) )
+	{
+		cStats_p->tx_multicast_bytes = 0;
+	}
+	else
+	{
+		cStats_p->tx_multicast_bytes   += ( bStats.tx_multicast_bytes   + bStats_p->tx_multicast_bytes );
+	}        
+#else
+   
+	cStats_p->rx_packets += ( bStats.rx_packets + bStats_p->rx_packets );
+	cStats_p->tx_packets += ( bStats.tx_packets + bStats_p->tx_packets );
+
+	/* set byte counts to 0 if the bstat packet counts are non 0 and the
+		octet counts are 0 */
+	if ( ((bStats.rx_bytes + bStats_p->rx_bytes) == 0) &&
+		  ((bStats.rx_packets + bStats_p->rx_packets) > 0) )
+	{
+		cStats_p->rx_bytes = 0;
+	}
+	else
+	{
+		cStats_p->rx_bytes   += ( bStats.rx_bytes   + bStats_p->rx_bytes );
+	}
+
+	if ( ((bStats.tx_bytes + bStats_p->tx_bytes) == 0) &&
+		  ((bStats.tx_packets + bStats_p->tx_packets) > 0) )
+	{
+		cStats_p->tx_bytes = 0;
+	}
+	else
+	{
+		cStats_p->tx_bytes   += ( bStats.tx_bytes   + bStats_p->tx_bytes );
+	}
+	cStats_p->multicast  += ( bStats.multicast  + bStats_p->multicast );
+#endif
+
+	return cStats_p;
+}
+
+static void ppp_dev_update_stats(struct net_device * dev_p, 
+                                BlogStats_t * blogStats_p)
+{
+	BlogStats_t * bStats_p;
+
+	if ( dev_p == (struct net_device *)NULL )
+		return;
+
+	bStats_p = ppp_dev_get_bstats(dev_p);
+
+	bStats_p->rx_packets += blogStats_p->rx_packets;
+	bStats_p->tx_packets += blogStats_p->tx_packets;
+	bStats_p->rx_bytes   += blogStats_p->rx_bytes;
+	bStats_p->tx_bytes   += blogStats_p->tx_bytes;
+	bStats_p->multicast  += blogStats_p->multicast;
+
+#if defined(CONFIG_BCM_KF_EXTSTATS)
+	/* Extended statistics */
+	bStats_p->tx_multicast_packets  += blogStats_p->tx_multicast_packets;
+	bStats_p->rx_multicast_bytes    += blogStats_p->rx_multicast_bytes;
+	bStats_p->tx_multicast_bytes    += blogStats_p->tx_multicast_bytes;
+    
+	/* NOTE: There are no broadcast packets in BlogStats_t since the
+		flowcache doesn't accelerate broadcast.  Thus, they aren't added here */    
+#endif       
+
+	return;
+}
+
+static void ppp_dev_clear_stats(struct net_device * dev_p)
+{
+	BlogStats_t * bStats_p;
+	struct net_device_stats *dStats_p;
+	struct net_device_stats *cStats_p;
+
+	if ( dev_p == (struct net_device *)NULL )
+		return;
+
+	dStats_p = &dev_p->stats;
+	cStats_p = ppp_dev_get_cstats(dev_p); 
+	bStats_p = ppp_dev_get_bstats(dev_p);
+
+	blog_notify(FETCH_NETIF_STATS, (void*)dev_p, 0, BLOG_PARAM2_DO_CLEAR);
+
+	memset(bStats_p, 0, sizeof(BlogStats_t));
+	memset(dStats_p, 0, sizeof(struct net_device_stats));
+	memset(cStats_p, 0, sizeof(struct net_device_stats));
+
+	return;
+}
+#endif	/* defined(CONFIG_BLOG) */
+
 static int
 ppp_net_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
@@ -1024,6 +1263,9 @@ ppp_net_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 static const struct net_device_ops ppp_netdev_ops = {
 	.ndo_start_xmit = ppp_start_xmit,
 	.ndo_do_ioctl   = ppp_net_ioctl,
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+	.ndo_get_stats  = ppp_dev_collect_stats,
+#endif
 };
 
 static void ppp_setup(struct net_device *dev)
@@ -1035,8 +1277,21 @@ static void ppp_setup(struct net_device *dev)
 	dev->tx_queue_len = 3;
 	dev->type = ARPHRD_PPP;
 	dev->flags = IFF_POINTOPOINT | IFF_NOARP | IFF_MULTICAST;
+#if defined(CONFIG_BCM_KF_WANDEV)
+	dev->priv_flags = IFF_WANDEV;
+#endif
+#if defined(CONFIG_BCM_KF_PPP)
+	dev->priv_flags |= IFF_PPP;
+#endif
 	dev->features |= NETIF_F_NETNS_LOCAL;
 	dev->priv_flags &= ~IFF_XMIT_DST_RELEASE;
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+	dev->put_stats = ppp_dev_update_stats;
+	dev->clr_stats = ppp_dev_clear_stats;
+#if defined(CONFIG_BCM_KF_EXTSTATS)	
+	dev->features |= NETIF_F_EXTSTATS;
+#endif	
+#endif
 }
 
 /*
@@ -1118,6 +1373,54 @@ pad_compress_skb(struct ppp *ppp, struct sk_buff *skb)
 	return new_skb;
 }
 
+#if defined(CONFIG_BCM_KF_PPP)
+/*
+brcm_on_demand_filter(...) and ppp_send_frame(...) are protected for SMP+Preempt safety
+by ppp_xmit_lock(ppp) => spin_lock_bh(&(ppp)->wlock) and ppp_xmit_unlock(ppp) =>  spin_unlock_bh(&(ppp)->wlock). 
+*/
+
+/*
+ * Excluding timestamp for packet generated from ADSL modem
+ * these include WAN-side RIP,dnsprobe
+ */
+static int
+brcm_on_demand_filter(char *data)
+{
+	unsigned short udp_port=0;
+
+#if 0
+	char cmd;
+
+        printk("%02x%02x%02x%02x\n%02x%02x%02x%02x\n",data[2],data[3],data[4],data[5],data[6],data[7],data[8],data[9]);
+        printk("%02x%02x%02x%02x\n%02x%02x%02x%02x\n",data[10],data[11],data[12],data[13],data[14],data[15],data[16],data[17]);
+        printk("%02x%02x%02x%02x\n",data[18],data[19],data[20],data[21]);
+#endif
+
+	if ( data[11] == 0x2 )  /* IGMP */
+		return 0;
+	if ( data[11] == 0x11 ) { /* UDP */
+	   udp_port= (data[24]<< 8) + data[25];
+	   if ( udp_port == 123 ) { /* ntpclient */
+		return 0;
+	   }
+	   if ( udp_port == 53 ) {
+		if ( data[45] == 'r' && data[46] == 'o' && data[47] == 'o' && data[48] =='t')
+		 
+		return 0;
+	   }
+	   else if (udp_port == 520) { /* RIP */
+#if 0
+			cmd = data[30]; // 1=request, 2=reply
+			if ( cmd == 1)
+#endif
+			  return 0;
+	   }
+	}	
+	   
+        return 1;
+}
+#endif
+
 /*
  * Compress and send a frame.
  * The caller should have locked the xmit path,
@@ -1130,6 +1433,15 @@ ppp_send_frame(struct ppp *ppp, struct sk_buff *skb)
 	struct sk_buff *new_skb;
 	int len;
 	unsigned char *cp;
+#if defined(CONFIG_BCM_KF_PPP)
+	unsigned char *data;
+	int timestamp = 1;
+
+	if ( proto == PPP_IP) {
+		data = skb->data;
+		timestamp = brcm_on_demand_filter(data);
+	}
+#endif	
 
 	if (proto < 0x8000) {
 #ifdef CONFIG_PPP_FILTER
@@ -1149,13 +1461,23 @@ ppp_send_frame(struct ppp *ppp, struct sk_buff *skb)
 		/* if this packet passes the active filter, record the time */
 		if (!(ppp->active_filter &&
 		      sk_run_filter(skb, ppp->active_filter) == 0))
+#if defined(CONFIG_BCM_KF_PPP)
+	       if (timestamp)
+#endif					       
 			ppp->last_xmit = jiffies;
 		skb_pull(skb, 2);
 #else
 		/* for data packets, record the time */
-		ppp->last_xmit = jiffies;
+#if defined(CONFIG_BCM_KF_PPP)
+	       if (timestamp)
+#endif			
+			ppp->last_xmit = jiffies;
 #endif /* CONFIG_PPP_FILTER */
 	}
+
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+	blog_link(IF_DEVICE, blog_ptr(skb), (void*)ppp->dev, DIR_TX, skb->len - 2 );
+#endif
 
 	++ppp->dev->stats.tx_packets;
 	ppp->dev->stats.tx_bytes += skb->len - 2;
@@ -1223,6 +1545,10 @@ ppp_send_frame(struct ppp *ppp, struct sk_buff *skb)
 	if (ppp->flags & SC_LOOP_TRAFFIC) {
 		if (ppp->file.rq.qlen > PPP_MAX_RQLEN)
 			goto drop;
+#if defined(CONFIG_BCM_KF_PPP)
+		if (!timestamp)
+			goto drop;
+#endif		
 		skb_queue_tail(&ppp->file.rq, skb);
 		wake_up_interruptible(&ppp->file.rwait);
 		return;
@@ -1668,11 +1994,42 @@ ppp_receive_error(struct ppp *ppp)
 		slhc_toss(ppp->vj);
 }
 
+#if defined(CONFIG_BCM_KF_PPP)
+/* 
+note: brcm_mcast_filter(...) and ppp_receive_nonmp_frame(...) are protected for SMP+Preempt safety
+by ppp_recv_lock(ppp) => spin_lock_bh(&(ppp)->rlock) and  ppp_recv_unlock(ppp) => spin_unlock_bh(&(ppp)->rlock). 
+*/
+
+static int
+brcm_mcast_filter(char *data)
+{
+	struct iphdr *encap;
+
+	encap = (struct iphdr *)(data + 2);
+	if ( ipv4_is_multicast(encap->daddr)) {
+	   if ( !ipv4_is_local_multicast(encap->daddr)) { // real mcast data
+		//printk("bcm_mcast_filer: 0x%x \n",encap->daddr);
+		return 1;		 // no timestamp
+	   }
+	   else
+		return 0;
+        }
+	else
+		return 0;
+}
+#endif
+
+
 static void
 ppp_receive_nonmp_frame(struct ppp *ppp, struct sk_buff *skb)
 {
 	struct sk_buff *ns;
 	int proto, len, npi;
+#if defined(CONFIG_BCM_KF_PPP)
+	struct sk_buff *tmp;
+	int timestamp=0;
+	unsigned char *data;
+#endif	
 
 	/*
 	 * Decompress the frame, if compressed.
@@ -1687,6 +2044,13 @@ ppp_receive_nonmp_frame(struct ppp *ppp, struct sk_buff *skb)
 		goto err;
 
 	proto = PPP_PROTO(skb);
+
+#if defined(CONFIG_BCM_KF_PPP)
+	if (proto == PPP_IP) {
+		data = skb->data;
+		timestamp = brcm_mcast_filter(data);
+	}
+#endif	
 	switch (proto) {
 	case PPP_VJC_COMP:
 		/* decompress VJ compressed packets */
@@ -1745,6 +2109,10 @@ ppp_receive_nonmp_frame(struct ppp *ppp, struct sk_buff *skb)
 		break;
 	}
 
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+	blog_link(IF_DEVICE, blog_ptr(skb), (void*)ppp->dev, DIR_RX, skb->len - 2 );
+#endif
+
 	++ppp->dev->stats.rx_packets;
 	ppp->dev->stats.rx_bytes += skb->len - 2;
 
@@ -1762,6 +2130,37 @@ ppp_receive_nonmp_frame(struct ppp *ppp, struct sk_buff *skb)
 	} else {
 		/* network protocol frame - give it to the kernel */
 
+#if defined(CONFIG_BCM_KF_PPP)
+#ifdef CONFIG_PPP_FILTER
+		/* check if the packet passes the pass and active filters */
+		/* the filter instructions are constructed assuming
+		   a four-byte PPP header on each packet */
+		if (skb_headroom(skb) < 2) { 
+		    tmp = alloc_skb(skb->len+2,GFP_ATOMIC); 
+		    skb_reserve(tmp, 2); 
+		    memcpy(skb_put(tmp, skb->len), skb->data, skb->len); 
+		    kfree_skb(skb); 
+		    skb = tmp; 
+	   } 
+		*skb_push(skb, 2) = 0;
+		if (ppp->pass_filter
+		    && sk_run_filter(skb, ppp->pass_filter) == 0) {
+			if (ppp->debug & 1)
+				printk(KERN_DEBUG "PPP: inbound frame not passed\n");
+			kfree_skb(skb);
+			return;
+		}
+		if (!(ppp->active_filter
+		      && sk_run_filter(skb, ppp->active_filter) == 0))
+	      if (timestamp)
+			   ppp->last_recv = jiffies;
+		skb_pull(skb, 2);
+#else
+		if (timestamp)
+		   ppp->last_recv = jiffies;
+#endif /* CONFIG_PPP_FILTER */
+
+#else
 #ifdef CONFIG_PPP_FILTER
 		/* check if the packet passes the pass and active filters */
 		/* the filter instructions are constructed assuming
@@ -1788,6 +2187,7 @@ ppp_receive_nonmp_frame(struct ppp *ppp, struct sk_buff *skb)
 		} else
 #endif /* CONFIG_PPP_FILTER */
 			ppp->last_recv = jiffies;
+#endif /* CONFIG_BCM_KF_PPP */
 
 		if ((ppp->dev->flags & IFF_UP) == 0 ||
 		    ppp->npmode[npi] != NPMODE_PASS) {
@@ -2570,12 +2970,23 @@ ppp_get_stats(struct ppp *ppp, struct ppp_stats *st)
 	struct slcompress *vj = ppp->vj;
 
 	memset(st, 0, sizeof(*st));
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+	ppp_dev_collect_stats(ppp->dev);
+
+	st->p.ppp_ierrors = ppp->dev->stats.rx_errors;
+	st->p.ppp_oerrors = ppp->dev->stats.tx_errors;
+	st->p.ppp_ipackets = ppp->cstats.rx_packets;
+	st->p.ppp_ibytes = ppp->cstats.rx_bytes;
+	st->p.ppp_opackets = ppp->cstats.tx_packets;
+	st->p.ppp_obytes = ppp->cstats.tx_bytes;
+#else
 	st->p.ppp_ipackets = ppp->dev->stats.rx_packets;
 	st->p.ppp_ierrors = ppp->dev->stats.rx_errors;
 	st->p.ppp_ibytes = ppp->dev->stats.rx_bytes;
 	st->p.ppp_opackets = ppp->dev->stats.tx_packets;
 	st->p.ppp_oerrors = ppp->dev->stats.tx_errors;
 	st->p.ppp_obytes = ppp->dev->stats.tx_bytes;
+#endif
 	if (!vj)
 		return;
 	st->vj.vjs_packets = vj->sls_o_compressed + vj->sls_o_uncompressed;
@@ -2592,6 +3003,10 @@ ppp_get_stats(struct ppp *ppp, struct ppp_stats *st)
  * Stuff for handling the lists of ppp units and channels
  * and for initialization.
  */
+
+#if defined(CONFIG_BCM_KF_PPP)
+/* note: ppp_create_interface(...) is protected by lock_kernel() and unlock_kernel() in ppp_unattached_ioctl(...). */
+#endif
 
 /*
  * Create a new ppp interface unit.  Fails if it can't allocate memory
@@ -2662,7 +3077,44 @@ ppp_create_interface(struct net *net, int unit, int *retp)
 
 	/* Initialize the new ppp unit */
 	ppp->file.index = unit;
+
+#if defined(CONFIG_BCM_KF_PPP)
+   if (unit >= 0)
+   {
+      unsigned num[3]={0,0,0};
+      unsigned u=unit;
+     
+     /* req_name will beused as ifname and  for
+     * num[1] == 0:  default connection mdoe: ppp0, ppp1...
+     * num[1] == 1:  vlanMux mode: ppp0.100, ppp1.200...  
+     * num[1] == 2:  msc (multiple service mode) ppp0_1, ppp1_3...
+     * num[1] == 3:  pppoa0, pppoa1...
+     *
+     */
+      num[0] = u<<(32-(FIELD2+FIELD1+FIELD0))>>(32-FIELD0);
+      num[1] = u<<(32-(FIELD2+FIELD1))>>(32-FIELD1);
+      num[2] = u<<(32-(FIELD2))>>(32-FIELD2);
+      if (num[1] == 0)
+      {
+         sprintf(dev->name, "ppp%d", num[0]);
+      }
+      else if (num[1] == 1) /* vlan mux */
+      {
+         sprintf(dev->name, "ppp%d.%d", num[0], num[2]);
+      }
+      else if (num[1] == 2) /* msc */
+      {
+         sprintf(dev->name, "ppp%d_%d", num[0], num[2]);
+      }
+      else if (num[1] == 3) /* pppoa */
+      {
+         sprintf(dev->name, "pppoa%d", num[0]);
+      }
+   }
+#else
 	sprintf(dev->name, "ppp%d", unit);
+#endif
+
 
 	ret = register_netdev(dev);
 	if (ret != 0) {
@@ -2715,6 +3167,16 @@ static void ppp_shutdown_interface(struct ppp *ppp)
 	/* This will call dev_close() for us. */
 	ppp_lock(ppp);
 	if (!ppp->closing) {
+#if defined(CONFIG_BCM_KF_PPP)
+                int err;
+                err = netdev_path_remove(ppp->dev);
+                if(err)
+                {
+                    printk(KERN_ERR "PPP: Failed to remove %s from Interface path (%d)",
+                           ppp->dev->name, err);
+                    netdev_path_dump(ppp->dev);
+                }
+#endif
 		ppp->closing = 1;
 		ppp_unlock(ppp);
 		unregister_netdev(ppp->dev);

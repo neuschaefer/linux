@@ -487,6 +487,10 @@ static void __init setup_processor(void)
 	elf_hwcap &= ~HWCAP_THUMB;
 #endif
 
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX) && defined(CONFIG_BCM_KF_ARM_ERRATA_798181)
+	erratum_a15_798181_init();
+#endif
+
 	feat_v6_fixup();
 
 	cacheid_init();
@@ -742,6 +746,25 @@ static int __init parse_tag_cmdline(const struct tag *tag)
 
 __tagtable(ATAG_CMDLINE, parse_tag_cmdline);
 
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX)
+static int __init parse_tag_blparm(const struct tag *tag)
+{
+	/* a dummy function that it has been handled in
+	 * bcm63xx's machine setup code */
+	return 0;
+}
+
+__tagtable(ATAG_BLPARM, parse_tag_blparm);
+
+static int __init parse_tag_rdpsize(const struct tag *tag)
+{
+	/* a dummy function that it has been handled in
+	 * bcm63xx's machine setup code */
+	return 0;
+}
+
+__tagtable(ATAG_RDPSIZE, parse_tag_rdpsize);
+#endif /* (CONFIG_BCM_KF_ARM_BCM963XX) */
 /*
  * Scan the tag table for this tag, and call its parse function.
  * The tag table is built by the linker from all the __tagtable

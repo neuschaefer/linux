@@ -54,6 +54,11 @@
 #include <net/ip6_route.h>
 #endif
 
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+#include <linux/nbuff.h>
+#include <linux/blog.h>
+#endif
+
 /*
    Problems & solutions
    --------------------
@@ -124,6 +129,21 @@ static struct rtnl_link_ops ipgre_link_ops __read_mostly;
 static int ipgre_tunnel_init(struct net_device *dev);
 static void ipgre_tunnel_setup(struct net_device *dev);
 static int ipgre_tunnel_bind_dev(struct net_device *dev);
+
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+static inline 
+int __gre_rcv_check(struct ip_tunnel *tunnel, struct iphdr *iph, 
+	uint16_t len, uint32_t *pkt_seqno);
+
+int gre_rcv_check(struct net_device *dev, struct iphdr *iph,
+	uint16_t len, void **tunl, uint32_t *pkt_seqno);
+
+static inline 
+void __gre_xmit_update(struct ip_tunnel *tunnel, struct iphdr *iph, 
+	uint16_t len);
+void gre_xmit_update(struct ip_tunnel *tunnel, struct iphdr *iph, 
+	uint16_t len);
+#endif
 
 /* Fallback tunnel: no source, no destination, no key, no options */
 
@@ -615,6 +635,12 @@ static int ipgre_rcv(struct sk_buff *skb)
 					  gre_proto))) {
 		struct pcpu_tstats *tstats;
 
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+		blog_link(IF_DEVICE, blog_ptr(skb), (void*)tunnel->dev, DIR_RX, 
+			skb->len);
+		blog_link(GRE_TUNL, blog_ptr(skb), (void*)tunnel, 0, 0);
+		blog_link(TOS_MODE, blog_ptr(skb), tunnel, DIR_RX, BLOG_TOS_FIXED);
+#endif   
 		secpath_reset(skb);
 
 		skb->protocol = gre_proto;
@@ -648,6 +674,15 @@ static int ipgre_rcv(struct sk_buff *skb)
 			tunnel->dev->stats.rx_errors++;
 			goto drop;
 		}
+
+#if (defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG))
+		if (!blog_gre_tunnel_accelerated())
+		{
+			uint32_t pkt_seqno;
+			__gre_rcv_check(tunnel, (struct iphdr *)iph, 
+				(skb->len - (iph->ihl<<2)), &pkt_seqno);
+		}
+#else
 		if (tunnel->parms.i_flags&GRE_SEQ) {
 			if (!(flags&GRE_SEQ) ||
 			    (tunnel->i_seqno && (s32)(seqno - tunnel->i_seqno) < 0)) {
@@ -657,7 +692,7 @@ static int ipgre_rcv(struct sk_buff *skb)
 			}
 			tunnel->i_seqno = seqno + 1;
 		}
-
+#endif
 		/* Warning: All skb pointers will be invalidated! */
 		if (tunnel->dev->type == ARPHRD_ETHER) {
 			if (!pskb_may_pull(skb, ETH_HLEN)) {
@@ -671,6 +706,15 @@ static int ipgre_rcv(struct sk_buff *skb)
 			skb_postpull_rcsum(skb, eth_hdr(skb), ETH_HLEN);
 		}
 
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+		if ((skb->protocol != htons(ETH_P_IP))
+#if IS_ENABLED(CONFIG_IPV6)
+			&& (skb->protocol != htons(ETH_P_IPV6)) 
+#endif
+		) {
+			blog_skip(skb);                         /* No blogging */
+		}
+#endif
 		tstats = this_cpu_ptr(tunnel->dev->tstats);
 		tstats->rx_packets++;
 		tstats->rx_bytes += skb->len;
@@ -710,6 +754,11 @@ static netdev_tx_t ipgre_tunnel_xmit(struct sk_buff *skb, struct net_device *dev
 	int    gre_hlen;
 	__be32 dst;
 	int    mtu;
+
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+	blog_link(IF_DEVICE, blog_ptr(skb), (void*)dev, DIR_TX, skb->len);
+	blog_link(GRE_TUNL, blog_ptr(skb), (void*)tunnel, 0, 0);
+#endif   
 
 	if (dev->type == ARPHRD_ETHER)
 		IPCB(skb)->flags = 0;
@@ -832,6 +881,15 @@ static netdev_tx_t ipgre_tunnel_xmit(struct sk_buff *skb, struct net_device *dev
 	}
 #endif
 
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+	{
+		Blog_t * blog_p = blog_ptr(skb);
+
+		if (blog_p && blog_p->minMtu > mtu)
+			blog_p->minMtu = mtu;
+	}
+#endif
+
 	if (tunnel->err_count > 0) {
 		if (time_before(jiffies,
 				tunnel->err_time + IPTUNNEL_ERR_TIMEO)) {
@@ -884,6 +942,10 @@ static netdev_tx_t ipgre_tunnel_xmit(struct sk_buff *skb, struct net_device *dev
 	iph->daddr		=	fl4.daddr;
 	iph->saddr		=	fl4.saddr;
 
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+	blog_link(TOS_MODE, blog_ptr(skb), tunnel, DIR_TX, tiph->tos);
+#endif   
+
 	if ((iph->ttl = tiph->ttl) == 0) {
 		if (skb->protocol == htons(ETH_P_IP))
 			iph->ttl = old_iph->ttl;
@@ -903,7 +965,11 @@ static netdev_tx_t ipgre_tunnel_xmit(struct sk_buff *skb, struct net_device *dev
 		__be32 *ptr = (__be32*)(((u8*)iph) + tunnel->hlen - 4);
 
 		if (tunnel->parms.o_flags&GRE_SEQ) {
+#if (defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG))
+		if (!blog_gre_tunnel_accelerated()) ++tunnel->o_seqno;
+#else
 			++tunnel->o_seqno;
+#endif
 			*ptr = htonl(tunnel->o_seqno);
 			ptr--;
 		}
@@ -916,6 +982,9 @@ static netdev_tx_t ipgre_tunnel_xmit(struct sk_buff *skb, struct net_device *dev
 			*(__sum16*)ptr = ip_compute_csum((void*)(iph+1), skb->len - sizeof(struct iphdr));
 		}
 	}
+#if (defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG))
+	skb->tunl = tunnel;
+#endif
 
 	nf_reset(skb);
 	tstats = this_cpu_ptr(dev->tstats);
@@ -1623,6 +1692,134 @@ static int ipgre_changelink(struct net_device *dev, struct nlattr *tb[],
 	return 0;
 }
 
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+static inline 
+int __gre_rcv_check(struct ip_tunnel *tunnel, struct iphdr *iph, 
+	uint16_t len, uint32_t *pkt_seqno)
+{
+	int ret = BLOG_GRE_RCV_NO_SEQNO;
+	int grehlen = 4;
+	int iph_len = iph->ihl<<2;
+	__be16 *p = (__be16*)((uint8_t *)iph+iph_len);
+	__be16 flags;
+
+	flags = p[0];
+
+	if (tunnel->parms.i_flags&GRE_CSUM) {
+		uint16_t csum;
+
+		grehlen += 4;
+		csum = *(((__be16 *)p) + 2);
+
+		if (!csum)
+			goto no_csum;
+
+		csum = ip_compute_csum((void*)(iph+1), len - iph_len);
+
+		if (csum) {
+			tunnel->dev->stats.rx_crc_errors++;
+			tunnel->dev->stats.rx_errors++;
+			ret = BLOG_GRE_RCV_CHKSUM_ERR;
+			goto rcv_done;
+		}
+	}
+
+no_csum:
+	if ((tunnel->parms.i_flags&GRE_KEY) && (flags&GRE_KEY))
+		grehlen += 4;
+
+	if (tunnel->parms.i_flags&GRE_SEQ) {
+		uint32_t seqno = *(((__be32 *)p) + (grehlen / 4));
+		*pkt_seqno = seqno;
+		if (tunnel->i_seqno && (s32)(seqno - tunnel->i_seqno) == 0) {
+			tunnel->i_seqno = seqno + 1;
+			ret = BLOG_GRE_RCV_IN_SEQ;
+		} else if (tunnel->i_seqno && (s32)(seqno - tunnel->i_seqno) < 0) {
+			tunnel->dev->stats.rx_fifo_errors++;
+			tunnel->dev->stats.rx_errors++;
+			ret = BLOG_GRE_RCV_OOS_LT;
+		} else {
+			tunnel->i_seqno = seqno + 1;
+			ret = BLOG_GRE_RCV_OOS_GT;
+		}
+	}
+
+rcv_done:
+	return ret;
+}
+
+int gre_rcv_check(struct net_device *dev, struct iphdr *iph, 
+	uint16_t len, void **tunl, uint32_t *pkt_seqno)
+{
+	int ret = BLOG_GRE_RCV_NO_TUNNEL;
+	int grehlen = 4;
+	int iph_len = iph->ihl<<2;
+	struct ip_tunnel *t;
+	__be16 *p = (__be16*)((uint8_t *)iph+iph_len);
+	__be16 flags;
+
+	flags = p[0];
+
+	if (flags&GRE_CSUM)
+		grehlen += 4;
+
+	t = ipgre_tunnel_lookup(dev, iph->saddr, iph->daddr,
+		flags & GRE_KEY ? *(((__be32 *)p) + (grehlen / 4)) : 0, p[1]);
+
+	if (t) {
+		if (t->parms.i_flags == flags) {
+			rcu_read_lock();
+			ret =  __gre_rcv_check(t, iph, len, pkt_seqno);
+			rcu_read_unlock();
+		}
+		else
+			ret = BLOG_GRE_RCV_FLAGS_MISSMATCH;
+	}
+
+	*tunl = (void *) t;	
+	return ret;
+}
+EXPORT_SYMBOL(gre_rcv_check);
+
+/* Adds the TX seqno, Key and updates the GRE checksum */
+static inline 
+void __gre_xmit_update(struct ip_tunnel *tunnel, struct iphdr *iph, 
+	uint16_t len)
+{
+	if (tunnel->parms.o_flags&(GRE_KEY|GRE_CSUM|GRE_SEQ)) {
+		int iph_len = iph->ihl<<2;
+		__be32 *ptr = (__be32*)(((u8*)iph) + tunnel->hlen - 4);
+
+		if (tunnel->parms.o_flags&GRE_SEQ) {
+			++tunnel->o_seqno;
+			*ptr = htonl(tunnel->o_seqno);
+			ptr--;
+		}
+
+		if (tunnel->parms.o_flags&GRE_KEY) {
+			*ptr = tunnel->parms.o_key;
+			ptr--;
+		}
+
+		if (tunnel->parms.o_flags&GRE_CSUM) {
+			*ptr = 0;
+			*(__sum16*)ptr = ip_compute_csum((void*)(iph+1), len - iph_len);
+		}
+		cache_flush_len(ptr, tunnel->hlen);
+	}
+}
+
+/* Adds the oseqno and updates the GRE checksum */
+void gre_xmit_update(struct ip_tunnel *tunnel, struct iphdr *iph, 
+	uint16_t len)
+{
+	rcu_read_lock();
+	__gre_xmit_update(tunnel, iph, len);
+	rcu_read_unlock();
+}
+EXPORT_SYMBOL(gre_xmit_update);
+#endif
+
 static size_t ipgre_get_size(const struct net_device *dev)
 {
 	return
@@ -1737,6 +1934,11 @@ static int __init ipgre_init(void)
 	err = rtnl_link_register(&ipgre_tap_ops);
 	if (err < 0)
 		goto tap_ops_failed;
+
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+	blog_gre_rcv_check_fn = (blog_gre_rcv_check_t) gre_rcv_check;
+	blog_gre_xmit_update_fn = (blog_gre_xmit_upd_t) gre_xmit_update;
+#endif
 
 out:
 	return err;

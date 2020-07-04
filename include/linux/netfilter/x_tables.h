@@ -124,6 +124,25 @@ struct xt_counters_info {
 #define XT_INV_PROTO		0x40	/* Invert the sense of PROTO. */
 
 #ifndef __KERNEL__
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG_FEATURE)
+#define XT_MATCH_ITERATE(type, e, fn, args...)			\
+({								\
+	unsigned int __i;					\
+	int __ret = 0, __rval = 0;						\
+	struct xt_entry_match *__m;				\
+								\
+	for (__i = sizeof(type);				\
+	     __i < (e)->target_offset;				\
+	     __i += __m->u.match_size) {			\
+		__m = (void *)e + __i;				\
+								\
+		__ret = fn(__m , ## args);			\
+		if (__ret != 0)					\
+			__rval = __ret;					\
+	}							\
+	__rval;							\
+})
+#else
 /* fn returns 0 to continue iteration */
 #define XT_MATCH_ITERATE(type, e, fn, args...)			\
 ({								\
@@ -142,6 +161,7 @@ struct xt_counters_info {
 	}							\
 	__ret;							\
 })
+#endif
 
 /* fn returns 0 to continue iteration */
 #define XT_ENTRY_ITERATE_CONTINUE(type, entries, size, n, fn, args...) \

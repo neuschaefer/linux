@@ -57,3 +57,9 @@ obj-$(CONFIG_MTD_VMU)		+= vmu-flash.o
 obj-$(CONFIG_MTD_GPIO_ADDR)	+= gpio-addr-flash.o
 obj-$(CONFIG_MTD_LATCH_ADDR)	+= latch-addr-flash.o
 obj-$(CONFIG_MTD_LANTIQ)	+= lantiq-flash.o
+
+ifdef BCM_KF #  defined(CONFIG_BCM_KF_MTD_BCM963XX)
+obj-$(CONFIG_MTD_BCM963XX)	+= bcm963xx.o
+obj-$(CONFIG_MTD_BCM_SPI_NAND)	+= bcm963xx_mtd.o
+EXTRA_CFLAGS	+= -I$(INC_BRCMSHARED_PUB_PATH)/$(BRCM_BOARD) -I$(INC_BRCMDRIVER_PUB_PATH)/$(BRCM_BOARD)
+endif # BCM_KF

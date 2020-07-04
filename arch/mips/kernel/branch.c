@@ -35,6 +35,7 @@ int __compute_return_epc_for_insn(struct pt_regs *regs,
 	long epc = regs->cp0_epc;
 	int ret = 0;
 
+
 	switch (insn.i_format.opcode) {
 	/*
 	 * jr and jalr are in r_format format.

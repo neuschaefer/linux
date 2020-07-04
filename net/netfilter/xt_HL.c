@@ -32,6 +32,12 @@ ttl_tg(struct sk_buff *skb, const struct xt_action_param *par)
 	const struct ipt_TTL_info *info = par->targinfo;
 	int new_ttl;
 
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG_FEATURE)
+	skb->ipt_check |= IPT_TARGET_TTL;
+	if ( skb->ipt_check & IPT_TARGET_CHECK )
+		return XT_CONTINUE;
+#endif
+
 	if (!skb_make_writable(skb, skb->len))
 		return NF_DROP;
 
@@ -71,6 +77,12 @@ hl_tg6(struct sk_buff *skb, const struct xt_action_param *par)
 	struct ipv6hdr *ip6h;
 	const struct ip6t_HL_info *info = par->targinfo;
 	int new_hl;
+
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG_FEATURE)
+	skb->ipt_check |= IPT_TARGET_HL;
+	if ( skb->ipt_check & IPT_TARGET_CHECK )
+		return XT_CONTINUE;
+#endif
 
 	if (!skb_make_writable(skb, skb->len))
 		return NF_DROP;

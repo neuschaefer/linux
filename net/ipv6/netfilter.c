@@ -118,11 +118,28 @@ __sum16 nf_ip6_checksum(struct sk_buff *skb, unsigned int hook,
 {
 	const struct ipv6hdr *ip6h = ipv6_hdr(skb);
 	__sum16 csum = 0;
+#if defined(CONFIG_MIPS_BCM963XX) && defined(CONFIG_BCM_KF_UNALIGNED_EXCEPTION)
+	struct in6_addr sAddr;
+	struct in6_addr dAddr;
+
+	memcpy(&sAddr, &ip6h->saddr, sizeof(struct in6_addr));
+	memcpy(&dAddr, &ip6h->daddr, sizeof(struct in6_addr));
+#endif
 
 	switch (skb->ip_summed) {
 	case CHECKSUM_COMPLETE:
 		if (hook != NF_INET_PRE_ROUTING && hook != NF_INET_LOCAL_IN)
 			break;
+#if defined(CONFIG_MIPS_BCM963XX) && defined(CONFIG_BCM_KF_UNALIGNED_EXCEPTION)
+		if (!csum_ipv6_magic(&sAddr, &dAddr,
+				     skb->len - dataoff, protocol,
+				     csum_sub(skb->csum,
+					      skb_checksum(skb, 0,
+							   dataoff, 0)))) {
+			skb->ip_summed = CHECKSUM_UNNECESSARY;
+			break;
+		}
+#else
 		if (!csum_ipv6_magic(&ip6h->saddr, &ip6h->daddr,
 				     skb->len - dataoff, protocol,
 				     csum_sub(skb->csum,
@@ -131,8 +148,18 @@ __sum16 nf_ip6_checksum(struct sk_buff *skb, unsigned int hook,
 			skb->ip_summed = CHECKSUM_UNNECESSARY;
 			break;
 		}
+#endif
 		/* fall through */
 	case CHECKSUM_NONE:
+#if defined(CONFIG_MIPS_BCM963XX) && defined(CONFIG_BCM_KF_UNALIGNED_EXCEPTION)
+		skb->csum = ~csum_unfold(
+				csum_ipv6_magic(&sAddr, &dAddr,
+					     skb->len - dataoff,
+					     protocol,
+					     csum_sub(0,
+						      skb_checksum(skb, 0,
+								   dataoff, 0))));
+#else
 		skb->csum = ~csum_unfold(
 				csum_ipv6_magic(&ip6h->saddr, &ip6h->daddr,
 					     skb->len - dataoff,
@@ -140,6 +167,7 @@ __sum16 nf_ip6_checksum(struct sk_buff *skb, unsigned int hook,
 					     csum_sub(0,
 						      skb_checksum(skb, 0,
 								   dataoff, 0))));
+#endif
 		csum = __skb_checksum_complete(skb);
 	}
 	return csum;
@@ -153,6 +181,13 @@ static __sum16 nf_ip6_checksum_partial(struct sk_buff *skb, unsigned int hook,
 	const struct ipv6hdr *ip6h = ipv6_hdr(skb);
 	__wsum hsum;
 	__sum16 csum = 0;
+#if defined(CONFIG_MIPS_BCM963XX) && defined(CONFIG_BCM_KF_UNALIGNED_EXCEPTION)
+	struct in6_addr sAddr;
+	struct in6_addr dAddr;
+
+	memcpy(&sAddr, &ip6h->saddr, sizeof(struct in6_addr));
+	memcpy(&dAddr, &ip6h->daddr, sizeof(struct in6_addr));
+#endif
 
 	switch (skb->ip_summed) {
 	case CHECKSUM_COMPLETE:
@@ -161,11 +196,19 @@ static __sum16 nf_ip6_checksum_partial(struct sk_buff *skb, unsigned int hook,
 		/* fall through */
 	case CHECKSUM_NONE:
 		hsum = skb_checksum(skb, 0, dataoff, 0);
+#if defined(CONFIG_MIPS_BCM963XX) && defined(CONFIG_BCM_KF_UNALIGNED_EXCEPTION)
+		skb->csum = ~csum_unfold(csum_ipv6_magic(&sAddr,
+							 &dAddr,
+							 skb->len - dataoff,
+							 protocol,
+							 csum_sub(0, hsum)));
+#else
 		skb->csum = ~csum_unfold(csum_ipv6_magic(&ip6h->saddr,
 							 &ip6h->daddr,
 							 skb->len - dataoff,
 							 protocol,
 							 csum_sub(0, hsum)));
+#endif
 		skb->ip_summed = CHECKSUM_NONE;
 		return __skb_checksum_complete_head(skb, dataoff + len);
 	}

@@ -25,6 +25,10 @@
 #include <net/netfilter/nf_conntrack_helper.h>
 #include <net/netfilter/nf_conntrack_zones.h>
 #include <linux/netfilter/nf_conntrack_sip.h>
+#if defined(CONFIG_BCM_KF_NETFILTER)
+#include <linux/iqos.h>
+#endif
+
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Christian Hentschel <chentschel@arnet.com.ar>");
@@ -42,6 +46,944 @@ static unsigned int sip_timeout __read_mostly = SIP_TIMEOUT;
 module_param(sip_timeout, uint, 0600);
 MODULE_PARM_DESC(sip_timeout, "timeout for the master SIP session");
 
+#if defined(CONFIG_BCM_KF_NETFILTER)
+
+int (*nf_nat_addr_hook)(struct sk_buff *skb, unsigned int protoff,
+			struct nf_conn *ct, enum ip_conntrack_info ctinfo,
+			char **dptr, int *dlen, char **addr_begin,
+			int *addr_len, struct nf_conntrack_man *addr);
+EXPORT_SYMBOL_GPL(nf_nat_addr_hook);
+
+int (*nf_nat_rtp_hook)(struct sk_buff *skb, unsigned int protoff,
+		       struct nf_conn *ct, enum ip_conntrack_info ctinfo,
+		       char **dptr, int *dlen, struct nf_conntrack_expect *exp,
+		       char **port_begin, int *port_len);
+EXPORT_SYMBOL_GPL(nf_nat_rtp_hook);
+
+int (*nf_nat_snat_hook)(struct nf_conn *ct, enum ip_conntrack_info ctinfo,
+			struct nf_conntrack_expect *exp);
+EXPORT_SYMBOL_GPL(nf_nat_snat_hook);
+
+int (*nf_nat_sip_hook)(struct sk_buff *skb, unsigned int protoff,
+		       struct nf_conn *ct, enum ip_conntrack_info ctinfo,
+		       char **dptr, int *dlen, struct nf_conntrack_expect *exp,
+		       char **addr_begin, int *addr_len);
+EXPORT_SYMBOL_GPL(nf_nat_sip_hook);
+
+struct sip_header_nfo {
+	const char	*lname;
+	const char	*sname;
+	const char	*ln_str;
+	size_t		lnlen;
+	size_t		snlen;
+	size_t		ln_strlen;
+	int		case_sensitive;
+	int		(*match_len)(struct nf_conn *, const char *,
+				     const char *, int *);
+};
+
+static const struct sip_header_nfo ct_sip_hdrs[] = {
+	[POS_VIA] = { 		/* SIP Via header */
+		.lname		= "Via:",
+		.lnlen		= sizeof("Via:") - 1,
+		.sname		= "\r\nv:",
+		.snlen		= sizeof("\r\nv:") - 1, /* rfc3261 "\r\n" */
+		.ln_str		= "UDP ",
+		.ln_strlen	= sizeof("UDP ") - 1,
+	},
+	[POS_CONTACT] = { 	/* SIP Contact header */
+		.lname		= "Contact:",
+		.lnlen		= sizeof("Contact:") - 1,
+		.sname		= "\r\nm:",
+		.snlen		= sizeof("\r\nm:") - 1,
+		.ln_str		= "sip:",
+		.ln_strlen	= sizeof("sip:") - 1,
+	},
+	[POS_CONTENT] = { 	/* SIP Content length header */
+		.lname		= "Content-Length:",
+		.lnlen		= sizeof("Content-Length:") - 1,
+		.sname		= "\r\nl:",
+		.snlen		= sizeof("\r\nl:") - 1,
+		.ln_str		= NULL,
+		.ln_strlen	= 0,
+	},
+	[POS_OWNER_IP4] = {	/* SDP owner address*/
+		.case_sensitive	= 1,
+		.lname		= "\no=",
+		.lnlen		= sizeof("\no=") - 1,
+		.sname		= "\ro=",
+		.snlen		= sizeof("\ro=") - 1,
+		.ln_str		= "IN IP4 ",
+		.ln_strlen	= sizeof("IN IP4 ") - 1,
+	},
+	[POS_CONNECTION_IP4] = {/* SDP connection info */
+		.case_sensitive	= 1,
+		.lname		= "\nc=",
+		.lnlen		= sizeof("\nc=") - 1,
+		.sname		= "\rc=",
+		.snlen		= sizeof("\rc=") - 1,
+		.ln_str		= "IN IP4 ",
+		.ln_strlen	= sizeof("IN IP4 ") - 1,
+	},
+	[POS_ANAT] = {		/* SDP Alternative Network Address Types */
+		.case_sensitive	= 1,
+		.lname		= "\na=",
+		.lnlen		= sizeof("\na=") - 1,
+		.sname		= "\ra=",
+		.snlen		= sizeof("\ra=") - 1,
+		.ln_str		= "alt:",
+		.ln_strlen	= sizeof("alt:") - 1,
+	},
+	[POS_MEDIA_AUDIO] = {		/* SDP media audio info */
+		.case_sensitive	= 1,
+		.lname		= "\nm=audio ",
+		.lnlen		= sizeof("\nm=audio ") - 1,
+		.sname		= "\rm=audio ",
+		.snlen		= sizeof("\rm=audio ") - 1,
+		.ln_str		= NULL,
+		.ln_strlen	= 0,
+	},
+	[POS_MEDIA_VIDEO] = {		/* SDP media video info */
+		.case_sensitive	= 1,
+		.lname		= "\nm=video ",
+		.lnlen		= sizeof("\nm=video ") - 1,
+		.sname		= "\rm=video ",
+		.snlen		= sizeof("\rm=video ") - 1,
+		.ln_str		= NULL,
+		.ln_strlen	= 0,
+	},
+};
+
+//BRCM: move these vars here to allow sip_help() use it
+static struct nf_conntrack_helper sip[MAX_PORTS][2] __read_mostly;
+static char sip_names[MAX_PORTS][2][sizeof("sip-65535")] __read_mostly;
+static const struct nf_conntrack_expect_policy
+sip_exp_policy[SIP_EXPECT_CLASS_MAX + 1] = {
+	[SIP_EXPECT_CLASS_SIGNALLING] = {
+		.max_expected	= 1,
+		.timeout	= 3 * 60,
+	},
+	[SIP_EXPECT_CLASS_AUDIO] = {
+		.max_expected	= 2 * IP_CT_DIR_MAX,
+		.timeout	= 3 * 60,
+	},
+	[SIP_EXPECT_CLASS_VIDEO] = {
+		.max_expected	= 2 * IP_CT_DIR_MAX,
+		.timeout	= 3 * 60,
+	},
+	[SIP_EXPECT_CLASS_OTHER] = {
+		.max_expected	= 2 * IP_CT_DIR_MAX,
+		.timeout	= 3 * 60,
+	},
+};
+
+#if 0 // Don't register the helper such that fc can accelerate the RTP streams.
+static int rtp_help(struct sk_buff *skb, unsigned int protoff,
+		    struct nf_conn *ct, enum ip_conntrack_info ctinfo)
+{
+	return NF_ACCEPT;
+}
+
+/* Null RTP helper to avoid flow cache bypassing it */
+static struct nf_conntrack_helper nf_conntrack_helper_rtp __read_mostly = {
+	.name			= "RTP",
+	.me			= THIS_MODULE,
+	.help			= rtp_help
+};
+#endif
+
+int find_inline_str(char **begin, char *end, const char *str, int str_len,
+		    int case_sensitive)
+{
+	char *p = *begin;
+	char *q = end - str_len;
+
+	if (!str || str_len == 0)
+		return 1;
+
+	while(p <= q && *p != '\r' && *p != '\n') {
+		if (case_sensitive) {
+			if (strncmp(p, str, str_len) == 0)
+				goto found;
+		} else {
+			if (strnicmp(p, str, str_len) == 0)
+				goto found;
+		}
+		p++;
+	}
+	return 0;
+found:
+	*begin = p + str_len;
+	return 1;
+}
+
+int find_field(char **begin, char *end, int field)
+{
+	const struct sip_header_nfo *hnfo = &ct_sip_hdrs[field];
+	char *p = *begin;
+	char *q = end - hnfo->lnlen;
+
+	while (p <= q) {
+		if (hnfo->lname == NULL ||
+		    (strncmp(p, hnfo->lname, hnfo->lnlen) == 0)) {
+		    	p += hnfo->lnlen;
+		} else {
+			if (hnfo->sname != NULL &&
+			    strncmp(p, hnfo->sname, hnfo->snlen) == 0) {
+			    	p += hnfo->snlen;
+			} else {
+				p++;
+				continue;
+			}
+		}
+		if (!find_inline_str(&p, end, hnfo->ln_str, hnfo->ln_strlen,
+				     hnfo->case_sensitive)) {
+			pr_debug("'%s' not found in '%s'.\n", hnfo->ln_str,
+			       	 hnfo->lname);
+			return 0;
+		}
+		*begin = p;
+		return 1;
+	}
+	return 0;
+}
+
+int parse_digits(char **begin, char *end, int *n)
+{
+	char *p = *begin;
+	char *q;
+	long num;
+
+	/* Skip spaces */
+	while (*p == ' ')
+		p++;
+	
+	if (!isdigit((int)*p))
+		return 0;
+
+	num = simple_strtol(p, &q, 10);
+	if (q == p)
+		return 0;
+	if (n)
+		*n = (int)num;
+	*begin = p;
+	return q - p;
+}
+
+int parse_addr(char **begin, char *end, struct nf_conntrack_man *addr)
+{
+	char *p;
+
+	memset(addr, 0, sizeof(*addr));
+	if (in4_pton((const char *)*begin, end - *begin, (u8 *)&addr->u3.ip,
+		     -1, (const char **)&p))
+		addr->l3num = AF_INET;
+	else if (in6_pton(**begin == '[' ? (const char *)(*begin + 1) : (const char *)*begin, end - *begin,
+			  (u8 *)&addr->u3.ip6, -1, (const char **)&p))
+		addr->l3num = AF_INET6;
+	else
+		return 0;
+
+	addr->u.all = 0;
+
+	return (*p == ']') ? (p - *begin + 1) : (p - *begin);
+}
+
+int parse_sip_uri(char **begin, char *end, struct nf_conntrack_man *addr)
+{
+	char *p = *begin;
+	char *p0;
+	int port;
+	int len;
+
+	/* Search for '@' in this line */
+	while (p < end && *p != '\r' && *p != '\n' && *p != ';') {
+		if (*p == '@')
+			break;
+		p++;
+	}
+
+	/* We found user part */
+	if (*p == '@')
+		p0 = ++p;
+	/* No user part */
+	else 
+		p = p0 = *begin;
+
+	/* Address */
+	if ((len = parse_addr(&p, end, addr)) == 0)
+		return 0;
+
+	/* Port number */
+	if (p[len] == ':') {
+		p += len + 1;
+		if ((len = parse_digits(&p, end, &port)) == 0)
+			return 0;
+		if (port < 1 || port > 65535)
+			return 0;
+		addr->u.all = htons((unsigned short)port);
+	} else {
+		addr->u.all = 0;
+	}
+
+	*begin = p0;
+	return p + len - p0;
+}
+
+static int process_owner(struct sk_buff *skb, unsigned int protoff,
+			 struct nf_conn *ct, enum ip_conntrack_info ctinfo,
+			 char **dptr, int *dlen, struct nf_conntrack_man *addr)
+{
+	enum ip_conntrack_dir dir = CTINFO2DIR(ctinfo);
+	int ret = NF_ACCEPT;
+	char *p = *dptr;
+	int len;
+	struct nf_conntrack_man a;
+	typeof(nf_nat_addr_hook) nf_nat_addr;
+
+	if (!find_field(&p, *dptr+*dlen, POS_OWNER_IP4))
+		goto end;
+	if ((len = parse_addr(&p, *dptr+*dlen, &a)) == 0)
+		goto end;  // brcm: that might be an owner with SIP URL, let him go.
+	pr_debug("nf_conntrack_sip: owner=%.*s\n", len, p);
+	*addr = a;
+
+	/* We care only LAN->WAN situations */
+	if (!memcmp(&ct->tuplehash[dir].tuple.src.u3,
+		    &ct->tuplehash[!dir].tuple.dst.u3,
+		    sizeof(ct->tuplehash[dir].tuple.src.u3)))
+		goto end;
+
+	/* LAN->WAN. Change the LAN IP to WAN. */
+	if (!memcmp(&a.u3, &ct->tuplehash[dir].tuple.src.u3, sizeof(a.u3)) &&
+	    (nf_nat_addr = rcu_dereference(nf_nat_addr_hook))) {
+	    	a.u3 = ct->tuplehash[!dir].tuple.dst.u3;
+	    	ret = nf_nat_addr(skb, protoff, ct, ctinfo, dptr, dlen, &p,
+				  &len, &a);
+	    	pr_debug("nf_conntrack_sip: owner changed to %.*s\n",
+		       	 len, p);
+	}
+	/* LAN->WAN, with firewall's external IP address that has been set by
+	 * some 'smart' UAs. We need to change the parsed IP to LAN. */ 
+	else if (!memcmp(&a.u3, &ct->tuplehash[!dir].tuple.dst.u3,
+			 sizeof(a.u3))) {
+		addr->u3 = ct->tuplehash[dir].tuple.src.u3;
+		pr_debug("nf_conntrack_sip: owner is auto-detected WAN "
+		       	 "address\n");
+	}
+end:
+	return ret;
+}
+
+static int process_connection(struct sk_buff *skb, unsigned int protoff,
+			      struct nf_conn *ct,
+			      enum ip_conntrack_info ctinfo, char **dptr,
+			      int *dlen, struct nf_conntrack_man *addr)
+{
+	enum ip_conntrack_dir dir = CTINFO2DIR(ctinfo);
+	int ret = NF_ACCEPT;
+	char *p = *dptr;
+	int len;
+	struct nf_conntrack_man a;
+	typeof(nf_nat_addr_hook) nf_nat_addr;
+
+	if (!find_field(&p, *dptr+*dlen, POS_CONNECTION_IP4))
+		goto end;
+	if ((len = parse_addr(&p, *dptr+*dlen, &a)) == 0)
+		goto err;
+	pr_debug("nf_conntrack_sip: connection=%.*s\n", len, p);
+	*addr = a;
+	
+	/* We care only LAN->WAN situations */
+	if (!memcmp(&ct->tuplehash[dir].tuple.src.u3,
+		    &ct->tuplehash[!dir].tuple.dst.u3,
+		    sizeof(ct->tuplehash[dir].tuple.src.u3)))
+		goto end;
+
+	/* LAN->WAN. Change the LAN IP to WAN. */
+	if (!memcmp(&a.u3, &ct->tuplehash[dir].tuple.src.u3, sizeof(a.u3)) &&
+	    (nf_nat_addr = rcu_dereference(nf_nat_addr_hook))) {
+	    	a.u3 = ct->tuplehash[!dir].tuple.dst.u3;
+	    	ret = nf_nat_addr(skb, protoff, ct, ctinfo, dptr, dlen, &p,
+				  &len, &a);
+	    	pr_debug("nf_conntrack_sip: connection changed to %.*s\n",
+		       	 len, p);
+	}
+	/* LAN->WAN, with firewall's external IP address that has been set by
+	 * some 'smart' UAs. We need to change the parsed IP to LAN. */ 
+	else if (!memcmp(&a.u3, &ct->tuplehash[!dir].tuple.dst.u3,
+			 sizeof(a.u3))) {
+		addr->u3 = ct->tuplehash[dir].tuple.src.u3;
+		pr_debug("nf_conntrack_sip: connection is auto-detected WAN "
+		       	 "address\n");
+	}
+end:
+	return ret;
+err:
+	return NF_DROP;
+}
+
+static int expect_rtp(struct sk_buff *skb, unsigned int protoff,
+		      struct nf_conn *ct, enum ip_conntrack_info ctinfo,
+		      char **dptr, int *dlen, char **port_begin, int *port_len,
+		      struct nf_conntrack_man *addr, int class)
+{
+	enum ip_conntrack_dir dir = CTINFO2DIR(ctinfo);
+	struct nf_conntrack_expect *exp;
+	typeof(nf_nat_rtp_hook) nf_nat_rtp;
+	typeof(nf_nat_snat_hook) nf_nat_snat;
+	int ret = NF_ACCEPT;
+
+	if ((exp = nf_ct_expect_alloc(ct)) == NULL)
+		return ret;
+	nf_ct_expect_init(exp, class, addr->l3num, NULL, &addr->u3,
+			  IPPROTO_UDP, NULL, &addr->u.all);
+	/* Set the child connection as slave (disconnected when master
+	 * disconnects */
+	exp->flags |= NF_CT_EXPECT_DERIVED_TIMEOUT;
+	exp->derived_timeout = 0xFFFFFFFF;
+	// Don't register the helper such that fc can accelerate the RTP streams.
+	// exp->helper = &nf_conntrack_helper_rtp;
+	pr_debug("nf_conntrack_sip: expect_rtp %pI4:%hu->%pI4:%hu\n",
+	       	 &exp->tuple.src.u3.ip, ntohs(exp->tuple.src.u.udp.port),
+	       	 &exp->tuple.dst.u3.ip, ntohs(exp->tuple.dst.u.udp.port));
+
+	if (memcmp(&ct->tuplehash[dir].tuple.src.u3,
+	    	   &ct->tuplehash[!dir].tuple.dst.u3,
+		   sizeof(ct->tuplehash[dir].tuple.src.u3)) &&
+	    (nf_nat_rtp = rcu_dereference(nf_nat_rtp_hook))) {
+		ret = nf_nat_rtp(skb, protoff, ct, ctinfo, dptr, dlen, exp,
+				 port_begin, port_len);
+	} else if (!memcmp(&ct->tuplehash[dir].tuple.src.u3,
+	    	   	   &ct->tuplehash[!dir].tuple.dst.u3,
+		   	   sizeof(ct->tuplehash[dir].tuple.src.u3)) &&
+	    	   (nf_nat_snat = rcu_dereference(nf_nat_snat_hook))) {
+			ret = nf_nat_snat(ct, ctinfo, exp);
+	} else {
+		if (nf_ct_expect_related(exp) != 0) {
+			pr_debug("nf_conntrack_sip: nf_ct_expect_related() "
+				 "failed\n");
+		}
+	}
+	nf_ct_expect_put(exp);
+
+    /* register the SIP Data RTP ports with ingress QoS classifier */
+    iqos_add_L4port( IPPROTO_UDP, exp->tuple.src.u.udp.port, 
+                                            IQOS_ENT_DYN, IQOS_PRIO_HIGH );
+    iqos_add_L4port( IPPROTO_UDP, exp->tuple.dst.u.udp.port,
+                                            IQOS_ENT_DYN, IQOS_PRIO_HIGH );
+	return ret;
+}
+
+static int process_audio(struct sk_buff *skb, unsigned int protoff,
+			 struct nf_conn *ct, enum ip_conntrack_info ctinfo,
+			 char **dptr, int *dlen, struct nf_conntrack_man *addr)
+{
+	char *p = *dptr;
+	int port;
+	int len;
+
+	if (!find_field(&p, *dptr+*dlen, POS_MEDIA_AUDIO))
+		return NF_ACCEPT;
+	if ((len = parse_digits(&p, *dptr+*dlen, &port)) == 0)
+		return NF_DROP;
+	pr_debug("nf_conntrack_sip: audio=%d\n", port);
+	addr->u.all = htons((u_int16_t)port);
+	len = expect_rtp(skb, protoff, ct, ctinfo, dptr, dlen, &p, &len,
+			 addr, SIP_EXPECT_CLASS_AUDIO);
+	return len;
+}
+
+static int process_video(struct sk_buff *skb, unsigned int protoff,
+			 struct nf_conn *ct, enum ip_conntrack_info ctinfo,
+			 char **dptr, int *dlen, struct nf_conntrack_man *addr)
+{
+	char *p = *dptr;
+	int port;
+	int len;
+
+	if (!find_field(&p, *dptr+*dlen, POS_MEDIA_VIDEO))
+		return NF_ACCEPT;
+	if ((len = parse_digits(&p, *dptr+*dlen, &port)) == 0)
+		return NF_DROP;
+	pr_debug("nf_conntrack_sip: video=%d\n", port);
+	addr->u.all = htons((u_int16_t)port);
+	return expect_rtp(skb, protoff, ct, ctinfo, dptr, dlen, &p, &len,
+			  addr, SIP_EXPECT_CLASS_VIDEO);
+}
+
+static int process_anat(struct sk_buff *skb, unsigned int protoff,
+			struct nf_conn *ct, enum ip_conntrack_info ctinfo,
+			char **dptr, int *dlen)
+{
+	enum ip_conntrack_dir dir = CTINFO2DIR(ctinfo);
+	int ret = NF_ACCEPT;
+	char *p = *dptr;
+	int port;
+	int len;
+	struct nf_conntrack_man addr;
+	typeof(nf_nat_addr_hook) nf_nat_addr;
+
+	while (find_field(&p, *dptr+*dlen, POS_ANAT)) {
+		int count;
+
+		/* There are 5 spaces in the leading parameters */
+		count = 0;
+		while(p < *dptr+*dlen && *p != '\r' && *p != '\n') {
+			if(*p++ == ' ') {
+				if (++count == 5)
+					break;
+			}
+		}
+		if (count < 5)
+			continue;
+
+		if ((len = parse_addr(&p, *dptr+*dlen, &addr)) == 0)
+			continue;
+		pr_debug("nf_conntrack_sip: alt ip=%.*s\n", len, p);
+		if (memcmp(&addr.u3, &ct->tuplehash[dir].tuple.src.u3,
+		    sizeof(addr.u3)))
+	    		continue;
+		if (memcmp(&ct->tuplehash[dir].tuple.src.u3,
+			   &ct->tuplehash[!dir].tuple.dst.u3,
+			   sizeof(ct->tuplehash[dir].tuple.src.u3)) &&
+		    (nf_nat_addr = rcu_dereference(nf_nat_addr_hook))) {
+	    		addr.u3 = ct->tuplehash[!dir].tuple.dst.u3;
+	    		ret = nf_nat_addr(skb, protoff, ct, ctinfo, dptr,
+					  dlen, &p, &len, &addr);
+			if (ret != NF_ACCEPT)
+				break;
+			pr_debug("nf_conntrack_sip: alt ip changed to %.*s\n",
+			       	 len, p);
+		}
+
+		/* Port */
+		p += len + 1;
+		if ((len = parse_digits(&p, *dptr+*dlen, &port)) == 0)
+			return NF_DROP;
+		pr_debug("nf_conntrack_sip: alt port=%.*s\n", len, p);
+		addr.u.all = htons((u_int16_t)port);
+		ret = expect_rtp(skb, protoff, ct, ctinfo, dptr, dlen, &p,
+				 &len, &addr, SIP_EXPECT_CLASS_OTHER);
+		if (ret != NF_ACCEPT)
+			break;
+		pr_debug("nf_conntrack_sip: alt port changed to %.*s\n",
+			 len, p);
+	}
+	return ret;
+}
+
+static int update_content_length(struct sk_buff *skb, unsigned int protoff,
+				 struct nf_conn *ct,
+				 enum ip_conntrack_info ctinfo, char **dptr,
+				 int *dlen)
+{
+	int ret = NF_ACCEPT;
+	int len;
+	int clen;
+	int real_clen;
+	char *p = *dptr;
+	char *clen_start;
+	typeof(nf_nat_addr_hook) nf_nat_addr;
+
+	/* Look for Content-Length field */
+	if (!find_field(&p, *dptr + *dlen, POS_CONTENT))
+		return NF_ACCEPT;
+	if ((len = parse_digits(&p, *dptr+*dlen, &clen)) == 0)
+		return NF_DROP;
+	pr_debug("nf_conntrack_sip: Content-Length=%d\n", clen);
+	clen_start = p;
+
+	/* Look for the end of header fields */
+	while(p < *dptr+*dlen) {
+		if (*p == '\r') {
+			if (memcmp(p, "\r\n\r\n", 4) == 0) {
+				p += 4;
+				break;
+			} else if (p[1] == '\r') {
+				p += 2;
+				break;
+			}
+		} else if (*p == '\n') {
+			if (p[1] == '\n') {
+				p += 2;
+				break;
+			}
+		}
+		p++;
+	}
+
+	/* Calulate real content length */
+	if (p > *dptr+*dlen)
+		return NF_DROP;
+	real_clen = *dlen - (p - *dptr);
+	pr_debug("nf_conntrack_sip: Real content length=%d\n", real_clen);
+	if (real_clen == clen)
+		return NF_ACCEPT;
+	
+	/* Modify content length */
+	if ((nf_nat_addr = rcu_dereference(nf_nat_addr_hook))) {
+		struct nf_conntrack_man addr;
+
+		memset(&addr, 0, sizeof(addr));
+		addr.l3num = AF_INET;
+	    	addr.u.all = htons((u_int16_t)real_clen);
+	    	ret = nf_nat_addr(skb, protoff, ct, ctinfo, dptr, dlen,
+				  &clen_start, &len, &addr);
+		pr_debug("nf_conntrack_sip: Content-Length changed to %.*s\n",
+		       	 len, clen_start);
+	}
+
+	return ret;
+}
+
+static int expect_sip(struct sk_buff *skb, unsigned int protoff,
+		      struct nf_conn *ct, enum ip_conntrack_info ctinfo,
+		      char **dptr, int *dlen, char **addr_begin, int *addr_len,
+		      struct nf_conntrack_man *addr)
+{
+	enum ip_conntrack_dir dir = CTINFO2DIR(ctinfo);
+	struct nf_conntrack_expect *exp;
+	typeof(nf_nat_sip_hook) nf_nat_sip;
+	int ret = NF_ACCEPT;
+
+	if ((exp = nf_ct_expect_alloc(ct)) == NULL)
+		return ret;
+	nf_ct_expect_init(exp, NF_CT_EXPECT_CLASS_DEFAULT, addr->l3num, NULL,
+			  &addr->u3, IPPROTO_UDP, NULL, &addr->u.udp.port);
+	exp->helper = addr->l3num == AF_INET?  &sip[0][0] : &sip[0][1];
+	exp->derived_timeout = 0;
+
+	if (memcmp(&ct->tuplehash[dir].tuple.src.u3,
+	    	   &ct->tuplehash[!dir].tuple.dst.u3,
+		   sizeof(ct->tuplehash[dir].tuple.src.u3)) &&
+	    (nf_nat_sip = rcu_dereference(nf_nat_sip_hook))) {
+		ret = nf_nat_sip(skb, protoff, ct, ctinfo, dptr, dlen, exp,
+				 addr_begin, addr_len);
+	} else {
+		if (nf_ct_expect_related(exp) != 0) {
+			pr_debug("nf_conntrack_sip: nf_ct_expect_related() "
+				 "failed\n");
+		}
+	}
+	nf_ct_expect_put(exp);
+	return ret;
+
+}
+static int process_via(struct sk_buff *skb, unsigned int protoff,
+		       struct nf_conn *ct, enum ip_conntrack_info ctinfo,
+		       char **dptr, int *dlen)
+{
+	enum ip_conntrack_dir dir = CTINFO2DIR(ctinfo);
+	int ret = NF_ACCEPT;
+	char *p = *dptr;
+	struct nf_conntrack_man addr;
+	int len;
+	typeof(nf_nat_addr_hook) nf_nat_addr;
+
+	while (find_field(&p, *dptr + *dlen, POS_VIA)) {
+
+		if ((len = parse_sip_uri(&p, *dptr + *dlen, &addr)) == 0)
+			continue;
+		pr_debug("nf_conntrack_sip: Via=%.*s\n", len, p);
+
+		/* Different SIP port than this one */
+		if (!memcmp(&addr.u3, &ct->tuplehash[dir].tuple.src.u3,
+			    sizeof(addr.u3)) && addr.u.udp.port != htons(0) &&
+		    addr.u.udp.port != ct->tuplehash[dir].tuple.src.u.udp.port){
+		    	pr_debug("nf_conntrack_sip: different message port\n");
+		    	ret = expect_sip(skb, protoff, ct, ctinfo, dptr, dlen,
+					 &p, &len, &addr);
+			break;
+		}
+		/* LAN->WAN. Change the LAN address to WAN address */ 
+		else if (!memcmp(&addr.u3, &ct->tuplehash[dir].tuple.src.u3,
+				 sizeof(addr.u3)) &&
+			 addr.u.all == ct->tuplehash[dir].tuple.src.u.all &&
+			 memcmp(&ct->tuplehash[dir].tuple.src.u3,
+			 	&ct->tuplehash[!dir].tuple.dst.u3,
+				sizeof(ct->tuplehash[dir].tuple.dst.u3)) &&
+			 (nf_nat_addr = rcu_dereference(nf_nat_addr_hook))) {
+			addr.u3 = ct->tuplehash[!dir].tuple.dst.u3;
+			addr.u.all = ct->tuplehash[!dir].tuple.dst.u.all;
+			ret = nf_nat_addr(skb, protoff, ct, ctinfo, dptr,
+					  dlen, &p, &len, &addr);
+		    	pr_debug("nf_conntrack_sip: LAN address in Via "
+			       	 "changed to WAN address %.*s\n", len, p);
+			break;
+		}
+		/* LAN->WAN, with firewall's external IP address that has been
+		 * set by some 'smart' UAs. We need to change the port. */ 
+		else if (!memcmp(&addr.u3, &ct->tuplehash[!dir].tuple.dst.u3,
+				 sizeof(addr.u3)) &&
+			 memcmp(&ct->tuplehash[dir].tuple.src.u3,
+			 	&ct->tuplehash[!dir].tuple.dst.u3,
+				sizeof(ct->tuplehash[dir].tuple.dst.u3)) &&
+			 (nf_nat_addr = rcu_dereference(nf_nat_addr_hook))) {
+			addr.u3 = ct->tuplehash[!dir].tuple.dst.u3;
+			addr.u.all = ct->tuplehash[!dir].tuple.dst.u.all;
+			ret = nf_nat_addr(skb, protoff, ct, ctinfo, dptr,
+					  dlen, &p, &len, &addr);
+		    	pr_debug("nf_conntrack_sip: Auto-detected WAN address "
+			       	 "in Via changed to %.*s\n", len, p);
+			break;
+		}
+		/* WAN->LAN. Change the WAN address to LAN address */ 
+		else if (!memcmp(&addr.u3, &ct->tuplehash[dir].tuple.dst.u3,
+				 sizeof(addr.u3)) &&
+			 addr.u.udp.port ==
+			 ct->tuplehash[dir].tuple.dst.u.udp.port &&
+			 memcmp(&ct->tuplehash[dir].tuple.dst.u3,
+			 	&ct->tuplehash[!dir].tuple.src.u3,
+				sizeof(ct->tuplehash[dir].tuple.dst.u3)) &&
+			 (nf_nat_addr = rcu_dereference(nf_nat_addr_hook))) {
+			addr = ct->tuplehash[!dir].tuple.src;
+			ret = nf_nat_addr(skb, protoff, ct, ctinfo, dptr,
+					  dlen, &p, &len, &addr);
+		    	pr_debug("nf_conntrack_sip: WAN address in Via "
+			       	 "changed to LAN address %.*s\n", len, p);
+			break;
+		}
+		p += len;
+	}
+	return ret;
+}
+
+static int process_contact(struct sk_buff *skb, unsigned int protoff,
+			   struct nf_conn *ct, enum ip_conntrack_info ctinfo,
+			   char **dptr, int *dlen)
+{
+	enum ip_conntrack_dir dir = CTINFO2DIR(ctinfo);
+	int ret = NF_ACCEPT;
+	char *p = *dptr;
+	int len;
+	struct nf_conntrack_man addr;
+	typeof(nf_nat_addr_hook) nf_nat_addr;
+
+	if (!find_field(&p, *dptr+*dlen, POS_CONTACT))
+		return ret;
+	if ((len = parse_sip_uri(&p, *dptr+*dlen, &addr)) == 0)
+		return ret;  // brcm: that might be a contact with SIP URL, let him go.
+	pr_debug("nf_conntrack_sip: Contact=%.*s\n", len, p);
+
+	/* Different SIP port than this one */
+	if (!memcmp(&addr.u3, &ct->tuplehash[dir].tuple.src.u3,
+		    sizeof(addr.u3)) && addr.u.udp.port != htons(0) &&
+	    addr.u.udp.port != ct->tuplehash[dir].tuple.src.u.udp.port) {
+		pr_debug("nf_conntrack_sip: different message port\n");
+	    	ret = expect_sip(skb, protoff, ct, ctinfo, dptr, dlen, &p,
+				 &len, &addr);
+	}
+	/* LAN->WAN. Change the LAN address to WAN address */ 
+	else if (!memcmp(&addr.u3, &ct->tuplehash[dir].tuple.src.u3,
+			 sizeof(addr.u3)) &&
+		 addr.u.all == ct->tuplehash[dir].tuple.src.u.all &&
+		 memcmp(&ct->tuplehash[dir].tuple.src.u3,
+		 	&ct->tuplehash[!dir].tuple.dst.u3,
+			sizeof(ct->tuplehash[dir].tuple.dst.u3)) &&
+		 (nf_nat_addr = rcu_dereference(nf_nat_addr_hook))) {
+		addr.u3 = ct->tuplehash[!dir].tuple.dst.u3;
+		addr.u.all = ct->tuplehash[!dir].tuple.dst.u.all;
+		ret = nf_nat_addr(skb, protoff, ct, ctinfo, dptr, dlen, &p,
+				  &len, &addr);
+		pr_debug("nf_conntrack_sip: LAN address in Contact "
+		       	 "changed to WAN address %.*s\n", len, p);
+	}
+	/* LAN->WAN, with firewall's external IP address that has been
+	 * set by some 'smart' UAs. We need to change the port. */ 
+	else if (!memcmp(&addr.u3, &ct->tuplehash[!dir].tuple.dst.u3,
+			 sizeof(addr.u3)) &&
+		 memcmp(&ct->tuplehash[dir].tuple.src.u3,
+		 	&ct->tuplehash[!dir].tuple.dst.u3,
+			sizeof(ct->tuplehash[dir].tuple.dst.u3)) &&
+		 (nf_nat_addr = rcu_dereference(nf_nat_addr_hook))) {
+		addr.u3 = ct->tuplehash[!dir].tuple.dst.u3;
+		addr.u.all = ct->tuplehash[!dir].tuple.dst.u.all;
+		ret = nf_nat_addr(skb, protoff, ct, ctinfo, dptr, dlen, &p,
+				  &len, &addr);
+		pr_debug("nf_conntrack_sip: Auto-detected WAN address in "
+		       	 "Contact changed to %.*s\n", len, p);
+	}
+	return ret;
+}
+
+static int process_bye(struct sk_buff *skb, struct nf_conn *ct)
+{
+	/* Disconnect after 5 seconds */
+	/* Comment out for now. Cut this connection will cause the future
+	 * incomming calls fail. This is because this connection is also
+	 * used by REGISTER and thus initial incomming INVITEs.
+	 */
+	//ct->derived_timeout = 5 * HZ;
+	//nf_ct_refresh(ct, skb, 5 * HZ);
+	//pr_debug("nf_conntrack_sip: terminate SIP session in 5 seconds\n");
+	return NF_ACCEPT;
+}
+
+static int sip_help(struct sk_buff *skb,
+		    unsigned int protoff,
+		    struct nf_conn *ct,
+		    enum ip_conntrack_info ctinfo)
+{
+	unsigned int dataoff, datalen;
+	char *dptr;
+	int ret = NF_ACCEPT;
+	struct nf_conntrack_man addr;
+
+	/* Owned by local application (FXS), just accept it */
+	if (skb->sk)
+		return NF_ACCEPT;
+	
+	/* No Data ? */
+	dataoff = protoff + sizeof(struct udphdr);
+	if (dataoff >= skb->len)
+		return NF_ACCEPT;
+
+	if (ct->derived_timeout == 0)
+		nf_ct_refresh(ct, skb, sip_timeout * HZ);
+
+	if (!skb_is_nonlinear(skb))
+		dptr = skb->data + dataoff;
+	else {
+		pr_debug("Copy of skbuff not supported yet.\n");
+		goto out;
+	}
+	pr_debug("nf_conntrack_sip: received message \"%.14s\"\n", dptr);
+
+	datalen = skb->len - dataoff;
+	if (datalen < sizeof("SIP/2.0 200") - 1)
+		goto out;
+
+	/* Process Via field */
+	pr_debug("nf_conntrack_sip: process_via\n");
+	ret = process_via(skb, protoff, ct, ctinfo, &dptr, &datalen);
+	if (ret != NF_ACCEPT)
+		goto out;
+
+	/* Process Contact field */
+	pr_debug("nf_conntrack_sip: process_contact\n");
+	ret = process_contact(skb, protoff, ct, ctinfo, &dptr, &datalen);
+	if (ret != NF_ACCEPT)
+		goto out;
+	
+	/* Process BYE and status code 400 (disconnect) */
+	if (memcmp(dptr, "BYE", sizeof("BYE") - 1) == 0 ||
+	    memcmp(dptr, "SIP/2.0 400", sizeof("SIP/2.0 400") - 1) == 0) {
+		pr_debug("nf_conntrack_sip: process_bye\n");
+		ret = process_bye(skb, ct);
+		goto out;
+	}
+
+	/* RTP info only in some SDP pkts */
+	if (memcmp(dptr, "INVITE", sizeof("INVITE") - 1) == 0 ||
+	    memcmp(dptr, "UPDATE", sizeof("UPDATE") - 1) == 0 ||
+	    memcmp(dptr, "SIP/2.0 180", sizeof("SIP/2.0 180") - 1) == 0 ||
+	    memcmp(dptr, "SIP/2.0 183", sizeof("SIP/2.0 183") - 1) == 0 ||
+	    memcmp(dptr, "SIP/2.0 200", sizeof("SIP/2.0 200") - 1) == 0) {
+		pr_debug("nf_conntrack_sip: process_owner\n");
+		ret = process_owner(skb, protoff, ct, ctinfo, &dptr,
+				    &datalen, &addr);
+		if (ret != NF_ACCEPT)
+			goto out;
+		ret = process_connection(skb, protoff, ct, ctinfo, &dptr,
+					 &datalen, &addr);
+		pr_debug("nf_conntrack_sip: process_connection\n");
+		if (ret != NF_ACCEPT)
+			goto out;
+		pr_debug("nf_conntrack_sip: process_audio\n");
+		ret = process_audio(skb, protoff, ct, ctinfo, &dptr,
+				    &datalen, &addr);
+		if (ret != NF_ACCEPT)
+			goto out;
+		pr_debug("nf_conntrack_sip: process_video\n");
+		ret = process_video(skb, protoff, ct, ctinfo, &dptr,
+				    &datalen, &addr);
+		if (ret != NF_ACCEPT)
+			goto out;
+		pr_debug("nf_conntrack_sip: process_anat\n");
+		ret = process_anat(skb, protoff, ct, ctinfo, &dptr, &datalen);
+		if (ret != NF_ACCEPT)
+			goto out;
+		pr_debug("nf_conntrack_sip: update_content_length\n");
+		ret = update_content_length(skb, protoff, ct, ctinfo, &dptr,
+					    &datalen);
+	}
+
+out:
+	pr_debug("nf_conntrack_sip: %s\n", ret == NF_ACCEPT?
+		 "accepted" : "dropped");
+	return ret;
+}
+
+static void nf_conntrack_sip_fini(void)
+{
+	int i, j;
+
+	for (i = 0; i < ports_c; i++) {
+		for (j = 0; j < 2; j++) {
+			if (sip[i][j].me == NULL)
+				continue;
+
+#if defined(CONFIG_BCM_KF_NETFILTER)
+        /* unregister the SIP ports with ingress QoS classifier */
+        iqos_rem_L4port( sip[i][j].tuple.dst.protonum, 
+			              sip[i][j].tuple.src.u.udp.port, IQOS_ENT_STAT );
+#endif
+			nf_conntrack_helper_unregister(&sip[i][j]);
+		}
+	}
+}
+
+static int __init nf_conntrack_sip_init(void)
+{
+	int i, j, ret;
+	char *tmpname;
+
+	if (ports_c == 0)
+		ports[ports_c++] = SIP_PORT;
+
+	for (i = 0; i < ports_c; i++) {
+		memset(&sip[i], 0, sizeof(sip[i]));
+
+		sip[i][0].tuple.src.l3num = AF_INET;
+		sip[i][1].tuple.src.l3num = AF_INET6;
+		for (j = 0; j < 2; j++) {
+			sip[i][j].tuple.dst.protonum = IPPROTO_UDP;
+			sip[i][j].tuple.src.u.udp.port = htons(ports[i]);
+			sip[i][j].me = THIS_MODULE;
+			sip[i][j].help = sip_help;
+			sip[i][j].expect_policy	= &sip_exp_policy[0],
+			sip[i][j].expect_class_max = SIP_EXPECT_CLASS_MAX;
+
+			tmpname = &sip_names[i][j][0];
+			if (ports[i] == SIP_PORT)
+				sprintf(tmpname, "sip");
+			else
+				sprintf(tmpname, "sip-%u", i);
+			sip[i][j].name = tmpname;
+
+			pr_debug("port #%u: %u\n", i, ports[i]);
+
+			ret = nf_conntrack_helper_register(&sip[i][j]);
+			if (ret) {
+				printk("nf_ct_sip: failed to register helper "
+				       "for pf: %u port: %u\n",
+				       sip[i][j].tuple.src.l3num, ports[i]);
+				nf_conntrack_sip_fini();
+				return ret;
+			}
+		}
+        
+        /* register the SIP ports with ingress QoS classifier */
+        iqos_add_L4port( IPPROTO_UDP, ports[i], IQOS_ENT_STAT, IQOS_PRIO_HIGH );
+	}
+	pr_debug("nf_conntrack_sip registered\n");
+	return 0;
+}
+
+module_init(nf_conntrack_sip_init);
+module_exit(nf_conntrack_sip_fini);
+#else /* CONFIG_BCM_KF_NETFILTER */
 static int sip_direct_signalling __read_mostly = 1;
 module_param(sip_direct_signalling, int, 0600);
 MODULE_PARM_DESC(sip_direct_signalling, "expect incoming calls from registrar "
@@ -1608,3 +2550,5 @@ static int __init nf_conntrack_sip_init(void)
 
 module_init(nf_conntrack_sip_init);
 module_exit(nf_conntrack_sip_fini);
+
+#endif

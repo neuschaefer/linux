@@ -63,6 +63,7 @@ static unsigned int
 ebt_in_hook(unsigned int hook, struct sk_buff *skb, const struct net_device *in,
    const struct net_device *out, int (*okfn)(struct sk_buff *))
 {
+
 	return ebt_do_table(hook, skb, in, out, dev_net(in)->xt.frame_filter);
 }
 
@@ -70,6 +71,7 @@ static unsigned int
 ebt_out_hook(unsigned int hook, struct sk_buff *skb, const struct net_device *in,
    const struct net_device *out, int (*okfn)(struct sk_buff *))
 {
+
 	return ebt_do_table(hook, skb, in, out, dev_net(out)->xt.frame_filter);
 }
 

@@ -79,7 +79,11 @@ static struct page *__dma_alloc_buffer(struct device *dev, size_t size, gfp_t gf
 	if (!mask)
 		return NULL;
 
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX) && defined(CONFIG_BCM_ZONE_ACP)
+	if ((mask < 0xffffffffULL) && !(gfp & GFP_ACP))
+#else
 	if (mask < 0xffffffffULL)
+#endif
 		gfp |= GFP_DMA;
 
 	page = alloc_pages(gfp, order);
@@ -326,6 +330,13 @@ static void __dma_free_remap(void *cpu_addr, size_t size)
 
 #endif	/* CONFIG_MMU */
 
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX)
+static void dmac_flush_area(const void * addr, size_t len, int dir)
+{
+	dmac_flush_range(addr, addr + len);
+}
+
+#endif
 static void *
 __dma_alloc(struct device *dev, size_t size, dma_addr_t *handle, gfp_t gfp,
 	    pgprot_t prot, const void *caller)
@@ -580,6 +591,28 @@ void ___dma_page_dev_to_cpu(struct page *page, unsigned long off,
 }
 EXPORT_SYMBOL(___dma_page_dev_to_cpu);
 
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX)
+void ___dma_page_cpu_to_dev_flush(struct page *page, unsigned long off,
+	size_t size, enum dma_data_direction dir)
+{
+#ifdef CONFIG_OUTER_CACHE
+	unsigned long paddr;
+
+	dma_cache_maint_page(page, off, size, dir, dmac_map_area);
+
+	paddr = page_to_phys(page) + off;
+	if (dir == DMA_FROM_DEVICE) {
+		outer_inv_range(paddr, paddr + size);
+	} else {
+		outer_flush_range(paddr, paddr + size);
+	}
+#endif
+
+	dma_cache_maint_page(page, off, size, dir, &dmac_flush_area);
+}
+EXPORT_SYMBOL(___dma_page_cpu_to_dev_flush);
+
+#endif
 /**
  * dma_map_sg - map a set of SG buffers for streaming mode DMA
  * @dev: valid struct device pointer, or NULL for ISA and EISA-like devices

@@ -132,6 +132,10 @@
  */
 #define lower_32_bits(n) ((u32)(n))
 
+#if defined(CONFIG_BCM_KF_PRINTK_INT_ENABLED) && defined(CONFIG_BCM_PRINTK_INT_ENABLED)
+extern int printk_with_interrupt_enabled;
+#endif
+
 struct completion;
 struct pt_regs;
 struct user;
@@ -374,7 +378,7 @@ extern enum system_states {
 	SYSTEM_HALT,
 	SYSTEM_POWER_OFF,
 	SYSTEM_RESTART,
-	SYSTEM_SUSPEND_DISK,
+	SYSTEM_SUSPEND,
 } system_state;
 
 #define TAINT_PROPRIETARY_MODULE	0

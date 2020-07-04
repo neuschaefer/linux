@@ -372,6 +372,10 @@ enum vlan_ioctl_cmds {
 	SET_VLAN_FLAG_CMD,
 	GET_VLAN_REALDEV_NAME_CMD, /* If this works, you know it's a VLAN device, btw */
 	GET_VLAN_VID_CMD /* Get the VID of this VLAN (specified by name) */
+#if defined(CONFIG_BCM_KF_VLAN) && (defined(CONFIG_BCM_VLAN) || defined(CONFIG_BCM_VLAN_MODULE))
+	,
+	SET_VLAN_NFMARK_TO_PRIORITY_CMD
+#endif	
 };
 
 enum vlan_flags {
@@ -399,6 +403,9 @@ struct vlan_ioctl_args {
 		unsigned int name_type;
 		unsigned int bind_type;
 		unsigned int flag; /* Matches vlan_dev_priv flags */
+#if defined(CONFIG_BCM_KF_VLAN) && (defined(CONFIG_BCM_VLAN) || defined(CONFIG_BCM_VLAN_MODULE))
+		int nfmark_to_priority;
+#endif
         } u;
 
 	short vlan_qos;   

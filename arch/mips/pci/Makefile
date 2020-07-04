@@ -18,6 +18,15 @@ obj-$(CONFIG_PCI_TX4927)	+= ops-tx4927.o
 obj-$(CONFIG_BCM47XX)		+= pci-bcm47xx.o
 obj-$(CONFIG_BCM63XX)		+= pci-bcm63xx.o fixup-bcm63xx.o \
 					ops-bcm63xx.o
+ifdef BCM_KF # defined(CONFIG_BCM_KF_PCI_FIXUP)
+ifdef CONFIG_MIPS_BCM963XX
+obj-$(CONFIG_BCM_PCI)		+= pci-bcm963xx.o fixup-bcm963xx.o \
+					ops-bcm963xx.o
+ifneq ($(findstring _$(strip $(BRCM_CHIP))_,,_63381_6838_),)
+EXTRA_CFLAGS += -I$(INC_BRCMSHARED_PUB_PATH)/pmc
+endif
+endif
+endif # BCM_KF
 obj-$(CONFIG_MIPS_ALCHEMY)	+= pci-alchemy.o
 obj-$(CONFIG_SOC_AR724X)	+= pci-ath724x.o
 
@@ -61,3 +70,9 @@ obj-$(CONFIG_CPU_XLR)		+= pci-xlr.o
 ifdef CONFIG_PCI_MSI
 obj-$(CONFIG_CPU_CAVIUM_OCTEON)	+= msi-octeon.o
 endif
+
+ifdef BCM_KF # defined(CONFIG_BCM_KF_PCI_FIXUP)
+ifeq "$(CONFIG_BCM_PCI)" "y"
+EXTRA_CFLAGS += -I$(INC_BRCMDRIVER_PUB_PATH)/$(BRCM_BOARD) -I$(INC_BRCMSHARED_PUB_PATH)/$(BRCM_BOARD)
+endif
+endif # BCM_KF

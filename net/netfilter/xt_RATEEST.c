@@ -82,6 +82,12 @@ xt_rateest_tg(struct sk_buff *skb, const struct xt_action_param *par)
 	const struct xt_rateest_target_info *info = par->targinfo;
 	struct gnet_stats_basic_packed *stats = &info->est->bstats;
 
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG_FEATURE)
+	skb->ipt_check |= IPT_TARGET_RATEEST;
+	if ( skb->ipt_check & IPT_TARGET_CHECK )
+		return XT_CONTINUE;
+#endif
+
 	spin_lock_bh(&info->est->lock);
 	stats->bytes += skb->len;
 	stats->packets++;

@@ -22,6 +22,12 @@
 
 #include "internal.h"
 
+#if defined(CONFIG_BCM_KF_PROC_BCM)
+struct proc_dir_entry *proc_brcm;
+extern void proc_brcm_init(struct proc_dir_entry *pentry);
+#endif
+
+
 static int proc_test_super(struct super_block *sb, void *data)
 {
 	return sb->s_fs_info == data;
@@ -38,12 +44,18 @@ static int proc_set_super(struct super_block *sb, void *data)
 }
 
 enum {
-	Opt_gid, Opt_hidepid, Opt_err,
+	Opt_gid, Opt_hidepid, Opt_err, 
+#if defined(CONFIG_BCM_KF_PROC_DEFAULT)
+	Opt_default
+#endif
 };
 
 static const match_table_t tokens = {
 	{Opt_hidepid, "hidepid=%u"},
 	{Opt_gid, "gid=%u"},
+#if defined(CONFIG_BCM_KF_PROC_DEFAULT)
+	{Opt_default, "defaults"},
+#endif
 	{Opt_err, NULL},
 };
 
@@ -78,6 +90,10 @@ static int proc_parse_options(char *options, struct pid_namespace *pid)
 			}
 			pid->hide_pid = option;
 			break;
+#if defined(CONFIG_BCM_KF_PROC_DEFAULT)
+		case Opt_default:
+			break;
+#endif
 		default:
 			pr_err("proc: unrecognized mount option \"%s\" "
 			       "or missing value\n", p);
@@ -189,6 +205,12 @@ void __init proc_root_init(void)
 	proc_device_tree_init();
 #endif
 	proc_mkdir("bus", NULL);
+
+#if defined(CONFIG_BCM_KF_PROC_BCM)
+	proc_brcm = proc_mkdir("brcm", NULL);
+	proc_brcm_init(proc_brcm);
+#endif
+
 	proc_sys_init();
 }
 

@@ -24,12 +24,428 @@
 #include <net/netfilter/nf_conntrack_expect.h>
 #include <linux/netfilter/nf_conntrack_sip.h>
 
+#if defined(CONFIG_BCM_KF_RUNNER)
+#if defined(CONFIG_BCM_RDPA) || defined(CONFIG_BCM_RDPA_MODULE)
+#include <net/bl_ops.h>
+#endif /* CONFIG_BCM_RUNNER */
+#endif /* CONFIG_BCM_KF_RUNNER */
+
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Christian Hentschel <chentschel@arnet.com.ar>");
 MODULE_DESCRIPTION("SIP NAT helper");
 MODULE_ALIAS("ip_nat_sip");
 
+#if defined(CONFIG_BCM_KF_NETFILTER)
+static void nf_nat_redirect(struct nf_conn *new,
+			    struct nf_conntrack_expect *exp)
+{
+	struct nf_nat_ipv4_range range;
 
+	/* This must be a fresh one. */
+	BUG_ON(new->status & IPS_NAT_DONE_MASK);
+
+	pr_debug("nf_nat_redirect: new ct ");
+	nf_ct_dump_tuple(&new->tuplehash[IP_CT_DIR_ORIGINAL].tuple);
+
+	/* Change src to where new ct comes from */
+	range.flags = NF_NAT_RANGE_MAP_IPS;
+	range.min_ip = range.max_ip =
+		new->tuplehash[IP_CT_DIR_ORIGINAL].tuple.src.u3.ip;
+	nf_nat_setup_info(new, &range, NF_NAT_MANIP_SRC);
+	pr_debug("nf_nat_redirect: setup POSTROUTING map %pI4\n",
+	       	 &range.min_ip);
+
+	/* For DST manip, map ip:port here to where it's expected. */
+	range.flags = (NF_NAT_RANGE_MAP_IPS | NF_NAT_RANGE_PROTO_SPECIFIED);
+	range.min = range.max = exp->saved_proto;
+	range.min_ip = range.max_ip = exp->saved_ip;
+	pr_debug("nf_nat_redirect: setup PREROUTING map %pI4:%hu\n",
+	       	 &range.min_ip, ntohs(range.min.udp.port));
+	nf_nat_setup_info(new, &range, NF_NAT_MANIP_DST);
+}
+
+static void nf_nat_snat_expect(struct nf_conn *new,
+			       struct nf_conntrack_expect *exp)
+{
+	struct nf_nat_ipv4_range range;
+
+	/* This must be a fresh one. */
+	BUG_ON(new->status & IPS_NAT_DONE_MASK);
+
+	pr_debug("nf_nat_snat_expect: new ct ");
+	nf_ct_dump_tuple(&new->tuplehash[IP_CT_DIR_ORIGINAL].tuple);
+
+	/* Change src to previously NATed address */
+	range.flags = (NF_NAT_RANGE_MAP_IPS | NF_NAT_RANGE_PROTO_SPECIFIED);
+	range.min = range.max = exp->saved_proto;
+	range.min_ip = range.max_ip = exp->saved_ip;
+	nf_nat_setup_info(new, &range, NF_NAT_MANIP_SRC);
+	pr_debug("nf_nat_snat_expect: setup POSTROUTING map %pI4:%hu\n",
+	       	 &range.min_ip, ntohs(range.min.udp.port));
+}
+
+static int nf_nat_addr(struct sk_buff *skb, unsigned int protoff,
+		       struct nf_conn *ct, enum ip_conntrack_info ctinfo,
+		       char **dptr, int *dlen, char **addr_begin,
+		       int *addr_len, struct nf_conntrack_man *addr)
+{
+	unsigned int matchoff = *addr_begin - *dptr;
+	unsigned int matchlen = (unsigned int)*addr_len;
+	char new_addr[32];
+	unsigned int new_len = 0;
+
+	if (addr->u3.ip)
+		new_len = sprintf(new_addr, "%pI4", &addr->u3.ip);
+	if (addr->u.all) {
+		if (new_len)
+			new_addr[new_len++] = ':';
+		new_len += sprintf(&new_addr[new_len], "%hu",
+				   ntohs(addr->u.all));
+	}
+	if (new_len == 0)
+		return NF_DROP;
+
+	if (!nf_nat_mangle_udp_packet(skb, ct, ctinfo,
+				      matchoff, matchlen, new_addr, new_len))
+		return NF_DROP;
+	*dptr = skb->data + protoff + sizeof(struct udphdr);
+	*dlen += new_len - matchlen;
+	*addr_begin = *dptr + matchoff;
+	*addr_len = new_len;
+	return NF_ACCEPT;
+}
+
+static int lookup_existing_port(struct nf_conn *ct,
+				enum ip_conntrack_info ctinfo,
+				struct nf_conntrack_expect *exp)
+{
+	enum ip_conntrack_dir dir = CTINFO2DIR(ctinfo);
+	struct nf_conn_help *help = nfct_help(ct);
+	struct nf_conntrack_expect *i;
+	struct hlist_node *n;
+	int found = 0;
+
+	/* Lookup existing connections */
+	pr_debug("nf_nat_sip: looking up existing connections...\n");
+	if (!list_empty(&ct->derived_connections)) {
+		struct nf_conn *child;
+
+		list_for_each_entry(child, &ct->derived_connections,
+				    derived_list) {
+			if (child->tuplehash[dir].tuple.src.u3.ip ==
+			    exp->saved_ip &&
+			    child->tuplehash[dir].tuple.src.u.all ==
+			    exp->saved_proto.all) {
+				pr_debug("nf_nat_sip: found existing "
+				       	 "connection in same direction.\n");
+			    	exp->tuple.dst.u.all =
+					child->tuplehash[!dir].tuple.dst.u.all;
+				return 1;
+			}
+			else if (child->tuplehash[!dir].tuple.src.u3.ip ==
+				 exp->saved_ip &&
+				 child->tuplehash[!dir].tuple.src.u.all ==
+				 exp->saved_proto.all) {
+				pr_debug("nf_nat_sip: found existing "
+				       	 "connection in reverse direction.\n");
+			    	exp->tuple.dst.u.all =
+					child->tuplehash[dir].tuple.dst.u.all;
+				return 1;
+			}
+		}
+	}
+
+	/* Lookup existing expects */
+	pr_debug("nf_nat_sip: looking up existing expectations...\n");
+	hlist_for_each_entry(i, n, &help->expectations, lnode) {
+		if (!memcmp(&i->tuple.dst.u3, &exp->tuple.dst.u3,
+		    	    sizeof(i->tuple.dst.u3)) &&
+		    i->saved_ip == exp->saved_ip &&
+		    i->saved_proto.all == exp->saved_proto.all)  {
+			exp->tuple.dst.u.all = i->tuple.dst.u.all;
+			pr_debug("nf_nat_sip: found existing expectations.\n");
+			found = 1;
+			break;
+		}
+	}
+	return found;
+}
+
+/* Lookup existing expects that belong to the same master. If they have
+ * the same tuple but different saved address, they conflict */
+static int find_conflicting_expect(struct nf_conn *ct,
+				   enum ip_conntrack_info ctinfo,
+				   struct nf_conntrack_expect *exp)
+{
+	enum ip_conntrack_dir dir = CTINFO2DIR(ctinfo);
+	struct nf_conn_help *help = nfct_help(ct);
+	struct nf_conntrack_expect *i;
+	struct hlist_node *n;
+	int found = 0;
+
+	if (exp->tuple.dst.u.all == ct->tuplehash[!dir].tuple.dst.u.all)
+		return 1;
+
+	hlist_for_each_entry(i, n, &help->expectations, lnode) {
+		if (nf_ct_tuple_equal(&i->tuple, &exp->tuple) &&
+		    (i->saved_ip != exp->saved_ip ||
+		     i->saved_proto.all != exp->saved_proto.all))  {
+			pr_debug("nf_nat_sip: found conflicting "
+				 "expectation.\n");
+			found = 1;
+			break;
+		}
+	}
+
+	return found;
+}
+
+static int reexpect_snat_rtp(struct nf_conn *ct, enum ip_conntrack_info ctinfo,
+			     struct nf_conntrack_expect *exp)
+{
+	enum ip_conntrack_dir dir = CTINFO2DIR(ctinfo);
+	struct nf_conn_help *help = nfct_help(ct);
+	struct nf_conntrack_expect *old_exp = NULL;
+	struct nf_conntrack_expect *new_exp;
+	union nf_inet_addr addr;
+	struct hlist_node *n;
+	int found = 0;
+
+	/* Look for reverse expectation */
+	hlist_for_each_entry(old_exp, n, &help->expectations, lnode) {
+		if (old_exp->class == exp->class &&
+		    old_exp->dir == dir) {
+			pr_debug("nf_nat_sip: found reverse expectation.\n");
+			found = 1;
+			break;
+		}
+	}
+
+	/* Not found */
+	if (!found) {
+		pr_debug("nf_nat_sip: not found reverse expectation.\n");
+		return 0;
+	}
+
+	if ((new_exp = nf_ct_expect_alloc(ct)) == NULL) {
+		pr_debug("nf_nat_sip: nf_ct_expect_alloc failed\n");
+		return 0;
+	}
+	addr.ip = exp->saved_ip;
+	nf_ct_expect_init(new_exp, old_exp->class, old_exp->tuple.src.l3num,
+			  &addr, &old_exp->tuple.dst.u3,
+			  old_exp->tuple.dst.protonum, 
+			  &exp->saved_proto.all, &old_exp->tuple.dst.u.all);
+	new_exp->saved_ip = exp->tuple.dst.u3.ip;
+	new_exp->saved_proto.udp.port = exp->tuple.dst.u.udp.port;
+	new_exp->flags = old_exp->flags;
+	new_exp->derived_timeout = old_exp->derived_timeout;
+	new_exp->helper = old_exp->helper;
+	pr_debug("nf_nat_sip: reexpect SNAT RTP %pI4:%hu->%pI4:%hu->%pI4:%hu\n",
+	       	 &new_exp->tuple.src.u3.ip,
+		 ntohs(new_exp->tuple.src.u.udp.port),
+	       	 &new_exp->saved_ip,
+	       	 ntohs(new_exp->saved_proto.udp.port),
+	       	 &new_exp->tuple.dst.u3.ip,
+	       	 ntohs(new_exp->tuple.dst.u.udp.port));
+
+	nf_ct_unexpect_related(old_exp);
+	if (nf_ct_expect_related(new_exp) != 0) {
+		pr_debug("nf_nat_sip: nf_ct_expect_related failed\n");
+	}
+	nf_ct_expect_put(new_exp);
+	
+	return 1;
+}
+
+static int nf_nat_rtp(struct sk_buff *skb, unsigned int protoff,
+		      struct nf_conn *ct, enum ip_conntrack_info ctinfo,
+		      char **dptr, int *dlen, struct nf_conntrack_expect *exp,
+		      char **port_begin, int *port_len)
+{
+	enum ip_conntrack_dir dir = CTINFO2DIR(ctinfo);
+	u_int16_t nated_port, port_limit;
+	unsigned int matchoff = *port_begin - *dptr;
+	unsigned int matchlen = (unsigned int)*port_len;
+	char new_port[32];
+	unsigned int new_len;
+
+	/* Set expectations for NAT */
+	exp->saved_proto.udp.port = exp->tuple.dst.u.udp.port;
+	exp->saved_ip = exp->tuple.dst.u3.ip;
+	exp->tuple.dst.u3.ip = ct->tuplehash[!dir].tuple.dst.u3.ip;
+	exp->expectfn = nf_nat_redirect;
+	exp->dir = !dir;
+
+	if (lookup_existing_port(ct, ctinfo, exp))
+		goto found;
+
+	/* Try to get a RTP ports. */
+	nated_port = ntohs(exp->tuple.dst.u.udp.port) & (~1);
+	if (nated_port < 1024)
+		nated_port = 1024;
+	port_limit = nated_port;
+	do {
+		exp->tuple.dst.u.udp.port = htons(nated_port);
+		if (!find_conflicting_expect(ct, ctinfo, exp)) {
+			if (nf_ct_expect_related(exp) == 0) {
+				reexpect_snat_rtp(ct, ctinfo, exp);
+				goto found;
+			}
+		}
+		nated_port += 2;
+		if (nated_port < 1024)
+			nated_port = 1024;
+	}while(nated_port != port_limit);
+
+	/* No port available */
+	if (net_ratelimit())
+		printk("nf_nat_sip: out of RTP ports\n");
+	return NF_DROP;
+
+found:
+	/* Modify signal */
+	new_len = sprintf(new_port, "%hu", ntohs(exp->tuple.dst.u.udp.port));
+	if (!nf_nat_mangle_udp_packet(skb, ct, ctinfo,
+				      matchoff, matchlen, new_port, new_len)){
+		nf_ct_unexpect_related(exp);
+		return NF_DROP;
+	}
+	*dptr = skb->data + protoff + sizeof(struct udphdr);
+	*dlen += new_len - matchlen;
+	*port_begin = *dptr + matchoff;
+	*port_len = new_len;
+
+	/* Success */
+	pr_debug("nf_nat_sip: expect RTP %pI4:%hu->%pI4:%hu->%pI4:%hu\n",
+	       	 &exp->tuple.src.u3.ip, ntohs(exp->tuple.src.u.udp.port),
+	       	 &exp->tuple.dst.u3.ip, ntohs(exp->tuple.dst.u.udp.port),
+	       	 &exp->saved_ip, ntohs(exp->saved_proto.udp.port));
+
+	return NF_ACCEPT;
+}
+
+static int nf_nat_snat(struct nf_conn *ct, enum ip_conntrack_info ctinfo,
+		       struct nf_conntrack_expect *exp)
+{
+	enum ip_conntrack_dir dir = CTINFO2DIR(ctinfo);
+	struct nf_conn_help *help = nfct_help(ct);
+	struct nf_conntrack_expect *i;
+	struct hlist_node *n;
+
+	hlist_for_each_entry(i, n, &help->expectations, lnode) {
+		if (i->class == exp->class && i->dir == dir) {
+			pr_debug("nf_nat_sip: found reverse expectation.\n");
+			exp->tuple.src.u3.ip = i->saved_ip;
+			exp->tuple.src.u.udp.port = i->saved_proto.all;
+			exp->mask.src.u3.ip = 0xFFFFFFFF;
+			exp->mask.src.u.udp.port = 0xFFFF;
+			exp->saved_ip = i->tuple.dst.u3.ip;
+			exp->saved_proto.udp.port = i->tuple.dst.u.udp.port;
+			exp->expectfn = nf_nat_snat_expect;
+			exp->dir = !dir;
+		}
+	}
+	pr_debug("nf_nat_sip: expect SNAT RTP %pI4:%hu->%pI4:%hu->%pI4:%hu\n",
+ 	       	 &exp->tuple.src.u3.ip, ntohs(exp->tuple.src.u.udp.port),
+	       	 &exp->saved_ip, ntohs(exp->saved_proto.udp.port),
+	       	 &exp->tuple.dst.u3.ip, ntohs(exp->tuple.dst.u.udp.port));
+	if (nf_ct_expect_related(exp) == 0) {
+		pr_debug("nf_nat_sip: nf_ct_expect_related failed\n");
+	}
+
+	return NF_ACCEPT;
+}
+
+static int nf_nat_sip(struct sk_buff *skb, unsigned int protoff,
+		      struct nf_conn *ct, enum ip_conntrack_info ctinfo,
+		      char **dptr, int *dlen, struct nf_conntrack_expect *exp,
+		      char **addr_begin, int *addr_len)
+{
+	enum ip_conntrack_dir dir = CTINFO2DIR(ctinfo);
+	u_int16_t nated_port, port_limit;
+	unsigned int matchoff = *addr_begin - *dptr;
+	unsigned int matchlen = (unsigned int)*addr_len;
+	char new_addr[32];
+	unsigned int new_len;
+
+	/* Set expectations for NAT */
+	exp->saved_proto.udp.port = exp->tuple.dst.u.udp.port;
+	exp->saved_ip = exp->tuple.dst.u3.ip;
+	exp->tuple.dst.u3.ip = ct->tuplehash[!dir].tuple.dst.u3.ip;
+	exp->expectfn = nf_nat_redirect;
+	exp->dir = !dir;
+
+	if (lookup_existing_port(ct, ctinfo, exp))
+		goto found;
+
+	/* Try to get a UDP ports. */
+	nated_port = ntohs(exp->tuple.dst.u.udp.port);
+	if (nated_port < 1024)
+		nated_port = 1024;
+	port_limit = nated_port;
+	do {
+		exp->tuple.dst.u.udp.port = htons(nated_port);
+		if (nf_ct_expect_related(exp) == 0)
+			goto found;
+		nated_port++;
+		if (nated_port < 1024)
+			nated_port = 1024;
+	}while(nated_port != port_limit);
+
+	/* No port available */
+	if (net_ratelimit())
+		printk("nf_nat_sip: out of UDP ports\n");
+	return NF_DROP;
+
+found:
+	/* Modify signal */
+	new_len = sprintf(new_addr, "%pI4:%hu",
+			  &exp->tuple.dst.u3.ip,
+			  ntohs(exp->tuple.dst.u.udp.port));
+	if (!nf_nat_mangle_udp_packet(skb, ct, ctinfo,
+				      matchoff, matchlen, new_addr, new_len)){
+		nf_ct_unexpect_related(exp);
+		return NF_DROP;
+	}
+	*dptr = skb->data + protoff + sizeof(struct udphdr);
+	*dlen += new_len - matchlen;
+	*addr_begin = *dptr + matchoff;
+	*addr_len = new_len;
+
+	/* Success */
+	pr_debug("nf_nat_sip: expect SIP %pI4:%hu->%pI4:%hu\n",
+	       	 &exp->tuple.src.u3.ip, ntohs(exp->tuple.src.u.udp.port),
+	       	 &exp->tuple.dst.u3.ip, ntohs(exp->tuple.dst.u.udp.port));
+
+	return NF_ACCEPT;
+}
+
+static void __exit nf_nat_sip_fini(void)
+{
+	rcu_assign_pointer(nf_nat_sip_hook, NULL);
+	rcu_assign_pointer(nf_nat_rtp_hook, NULL);
+	rcu_assign_pointer(nf_nat_snat_hook, NULL);
+	rcu_assign_pointer(nf_nat_addr_hook, NULL);
+	synchronize_rcu();
+}
+
+static int __init nf_nat_sip_init(void)
+{
+	BUG_ON(rcu_dereference(nf_nat_sip_hook));
+	BUG_ON(rcu_dereference(nf_nat_rtp_hook));
+	BUG_ON(rcu_dereference(nf_nat_snat_hook));
+	BUG_ON(rcu_dereference(nf_nat_addr_hook));
+	rcu_assign_pointer(nf_nat_sip_hook, nf_nat_sip);
+	rcu_assign_pointer(nf_nat_rtp_hook, nf_nat_rtp);
+	rcu_assign_pointer(nf_nat_snat_hook, nf_nat_snat);
+	rcu_assign_pointer(nf_nat_addr_hook, nf_nat_addr);
+	return 0;
+}
+
+module_init(nf_nat_sip_init);
+module_exit(nf_nat_sip_fini);
+#else /* CONFIG_BCM_KF_NETFILTER */
 static unsigned int mangle_packet(struct sk_buff *skb, unsigned int dataoff,
 				  const char **dptr, unsigned int *datalen,
 				  unsigned int matchoff, unsigned int matchlen,
@@ -55,8 +471,8 @@ static unsigned int mangle_packet(struct sk_buff *skb, unsigned int dataoff,
 
 		if (!nf_nat_mangle_udp_packet(skb, ct, ctinfo,
 					      matchoff, matchlen,
-					      buffer, buflen))
-			return 0;
+				      buffer, buflen))
+		return 0;
 	}
 
 	/* Reload data pointer and adjust datalen value */
@@ -502,7 +918,7 @@ static unsigned int ip_nat_sdp_media(struct sk_buff *skb, unsigned int dataoff,
 		if (ret == 0)
 			break;
 		else if (ret != -EBUSY) {
-			nf_ct_unexpect_related(rtp_exp);
+		nf_ct_unexpect_related(rtp_exp);
 			port = 0;
 			break;
 		}
@@ -516,6 +932,12 @@ static unsigned int ip_nat_sdp_media(struct sk_buff *skb, unsigned int dataoff,
 	    !ip_nat_sdp_port(skb, dataoff, dptr, datalen,
 			     mediaoff, medialen, port))
 		goto err2;
+
+#if defined(CONFIG_BCM_KF_RUNNER)
+#if defined(CONFIG_BCM_RDPA) || defined(CONFIG_BCM_RDPA_MODULE)
+	BL_OPS(net_ipv4_netfilter_nf_nat_sip(ct, port, dir));   
+#endif /* CONFIG_BCM_RUNNER */
+#endif /* CONFIG_BCM_KF_RUNNER */
 
 	return NF_ACCEPT;
 
@@ -566,3 +988,4 @@ static int __init nf_nat_sip_init(void)
 
 module_init(nf_nat_sip_init);
 module_exit(nf_nat_sip_fini);
+#endif /* CONFIG_BCM_KF_NETFILTER */

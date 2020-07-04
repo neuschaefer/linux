@@ -1154,6 +1154,24 @@ static int __spi_async(struct spi_device *spi, struct spi_message *message)
  * which are wrappers around this core asynchronous primitive.)
  */
 int spi_async(struct spi_device *spi, struct spi_message *message)
+#if defined(CONFIG_BCM_KF_SPI)
+{
+	struct spi_master *master = spi->master;
+	unsigned long flags;
+
+	/* holding the spinlock and disabling irqs for the duration of the transfer is problematic
+	   the controller driver manages the locking so call __spi_async without the lock */
+
+	spin_lock_irqsave(&master->bus_lock_spinlock, flags);
+	if (master->bus_lock_flag){
+		spin_unlock_irqrestore(&master->bus_lock_spinlock, flags);
+		return -EBUSY;
+        }
+	spin_unlock_irqrestore(&master->bus_lock_spinlock, flags);
+
+	return __spi_async(spi, message);
+}
+#else
 {
 	struct spi_master *master = spi->master;
 	int ret;
@@ -1170,6 +1188,7 @@ int spi_async(struct spi_device *spi, struct spi_message *message)
 
 	return ret;
 }
+#endif
 EXPORT_SYMBOL_GPL(spi_async);
 
 /**

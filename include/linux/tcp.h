@@ -54,7 +54,11 @@ struct tcphdr {
 	__be16	window;
 	__sum16	check;
 	__be16	urg_ptr;
+#if defined(CONFIG_MIPS_BCM963XX) && defined(CONFIG_BCM_KF_UNALIGNED_EXCEPTION)
+} LINUX_NET_PACKED;
+#else
 };
+#endif
 
 /*
  *	The union cast uses a gcc extension to avoid aliasing problems
@@ -64,7 +68,11 @@ struct tcphdr {
 union tcp_word_hdr { 
 	struct tcphdr hdr;
 	__be32 		  words[5];
-}; 
+#if defined(CONFIG_MIPS_BCM963XX) && defined(CONFIG_BCM_KF_UNALIGNED_EXCEPTION)
+} LINUX_NET_PACKED;
+#else
+};
+#endif
 
 #define tcp_flag_word(tp) ( ((union tcp_word_hdr *)(tp))->words [3]) 
 

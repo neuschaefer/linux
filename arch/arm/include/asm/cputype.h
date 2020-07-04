@@ -9,6 +9,9 @@
 #define CPUID_TCM	2
 #define CPUID_TLBTYPE	3
 #define CPUID_MPIDR	5
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX) && defined(CONFIG_BCM_KF_ARM_ERRATA_798181)
+#define CPUID_REVIDR	6
+#endif
 
 #define CPUID_EXT_PFR0	"c1, 0"
 #define CPUID_EXT_PFR1	"c1, 1"

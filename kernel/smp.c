@@ -316,8 +316,26 @@ int smp_call_function_single(int cpu, smp_call_func_t func, void *info,
 	 * send smp call function interrupt to this cpu and as such deadlocks
 	 * can't happen.
 	 */
+#if defined(CONFIG_BCM_KF_BYPASS_SMP_WARNING)
+	/*
+	 * There is a tiny chance that some thread has locked the per-cpu
+	 * csd_data locked but has not called generic_exec_single yet,
+	 * then we come in on an interrupt and also try to lock it, but it
+	 * is already locked.  Hence the warning about deadlock.  The original
+	 * sysrq code played by the rules and deferred the calling of this
+	 * function to a workqueue, which can sleep and allow for the original
+	 * lock holder to complete.  But we want to force stack dump in the
+	 * other cpu from interrupt context instead of from workqueue because
+	 * the bottom half/scheduling on this CPU may be disabled due to
+	 * buggy software.  So pass in a magic cookie in the info variable to
+	 * bypass the warning.
+	 */
+	WARN_ON_ONCE(cpu_online(this_cpu) && irqs_disabled()
+		     && !oops_in_progress && (info != (void *)0xeeee));
+#else
 	WARN_ON_ONCE(cpu_online(this_cpu) && irqs_disabled()
 		     && !oops_in_progress);
+#endif
 
 	if (cpu == this_cpu) {
 		local_irq_save(flags);

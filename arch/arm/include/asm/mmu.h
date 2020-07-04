@@ -5,14 +5,24 @@
 
 typedef struct {
 #ifdef CONFIG_CPU_HAS_ASID
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX) && defined(CONFIG_BCM_KF_ARM_ERRATA_798181)
+	atomic64_t	id;
+#else
 	unsigned int id;
+#endif
 	raw_spinlock_t id_lock;
 #endif
 	unsigned int kvm_seq;
 } mm_context_t;
 
 #ifdef CONFIG_CPU_HAS_ASID
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX) && defined(CONFIG_BCM_KF_ARM_ERRATA_798181)
+#define ASID_BITS	8
+#define ASID_MASK	((~0ULL) << ASID_BITS)
+#define ASID(mm)	((mm)->context.id.counter & ~ASID_MASK)
+#else
 #define ASID(mm)	((mm)->context.id & 255)
+#endif
 
 /* init_mm.context.id_lock should be initialized. */
 #define INIT_MM_CONTEXT(name)                                                 \

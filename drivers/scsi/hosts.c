@@ -34,6 +34,10 @@
 #include <linux/platform_device.h>
 #include <linux/pm_runtime.h>
 
+#if defined(CONFIG_BCM_KF_USB_STORAGE)
+#include <linux/bcm_realtime.h>
+#endif
+
 #include <scsi/scsi_device.h>
 #include <scsi/scsi_host.h>
 #include <scsi/scsi_transport.h>
@@ -435,6 +439,14 @@ struct Scsi_Host *scsi_host_alloc(struct scsi_host_template *sht, int privsize)
 			shost->host_no, PTR_ERR(shost->ehandler));
 		goto fail_kfree;
 	}
+#if defined(CONFIG_BCM_KF_USB_STORAGE)
+    /*convert the thread to realtime RR thread */
+    {
+        struct sched_param param;
+        param.sched_priority = BCM_RTPRIO_DATA;
+        sched_setscheduler(shost->ehandler, SCHED_RR, &param);
+    }
+#endif
 
 	scsi_proc_hostdir_add(shost->hostt);
 	return shost;

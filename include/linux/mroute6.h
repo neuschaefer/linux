@@ -32,6 +32,7 @@
 #define SIOCGETRPF	(SIOCPROTOPRIVATE+2)
 
 #define MAXMIFS		32
+
 typedef unsigned long mifbitmap_t;	/* User mode code depends on this lot */
 typedef unsigned short mifi_t;
 #define ALL_MIFS	((mifi_t)(-1))
@@ -229,8 +230,13 @@ struct mfc6_cache {
 
 #ifdef __KERNEL__
 struct rtmsg;
+#if defined(CONFIG_BCM_KF_IGMP)
+int ip6mr_get_route(struct net *net, struct sk_buff *skb, 
+		    struct rtmsg *rtm, int nowait, unsigned short ifIndex);
+#else
 extern int ip6mr_get_route(struct net *net, struct sk_buff *skb,
 			   struct rtmsg *rtm, int nowait);
+#endif
 
 #ifdef CONFIG_IPV6_MROUTE
 extern struct sock *mroute6_socket(struct net *net, struct sk_buff *skb);

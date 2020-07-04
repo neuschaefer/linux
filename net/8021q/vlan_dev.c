@@ -35,6 +35,14 @@
 #include <linux/if_vlan.h>
 #include <linux/netpoll.h>
 
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+#include <linux/blog.h>
+struct net_device_stats *vlan_dev_get_stats(struct net_device *dev);
+extern struct net_device_stats * vlan_dev_collect_stats(struct net_device * dev_p);
+extern void vlan_dev_update_stats(struct net_device * dev_p, BlogStats_t *blogStats_p);
+extern void vlan_dev_clear_stats(struct net_device * dev_p);
+#endif
+
 /*
  *	Rebuild the Ethernet MAC header. This is called after an ARP
  *	(or in future other address resolution) has completed on this
@@ -358,6 +366,36 @@ out:
 	memcpy(dev->dev_addr, addr->sa_data, ETH_ALEN);
 	return 0;
 }
+
+#if defined(CONFIG_BCM_KF_VLAN) && (defined(CONFIG_BCM_VLAN) || defined(CONFIG_BCM_VLAN_MODULE))
+int vlan_dev_set_nfmark_to_priority(char *dev_name, int nfmark_to_priority)
+{
+	struct net_device *dev = dev_get_by_name(&init_net, dev_name);
+
+	if (dev) {
+        if (dev->priv_flags & IFF_802_1Q_VLAN) {
+            if (nfmark_to_priority>=-1 && nfmark_to_priority <=29) {
+                vlan_dev_priv(dev)->nfmark_to_priority = nfmark_to_priority;
+                dev_put(dev);
+                return 0;
+            }
+            else {
+    		    printk("invalid nfmark_to_priority\n");
+            }
+        }
+        else {
+            printk(KERN_ERR 
+             "%s: %s is not a vlan device, priv_flags: %hX.\n",
+            __FUNCTION__, dev->name, dev->priv_flags);
+        }    
+    }
+    else {
+		printk(KERN_ERR  "%s: Could not find device: %s\n", __FUNCTION__, dev_name);
+    }
+    dev_put(dev);
+    return -EINVAL;
+}
+#endif
 
 static int vlan_dev_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
@@ -748,6 +786,10 @@ static const struct net_device_ops vlan_netdev_ops = {
 	.ndo_netpoll_cleanup	= vlan_dev_netpoll_cleanup,
 #endif
 	.ndo_fix_features	= vlan_dev_fix_features,
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+	.ndo_get_stats = vlan_dev_collect_stats,
+	.ndo_get_stats = vlan_dev_get_stats,
+#endif
 };
 
 void vlan_setup(struct net_device *dev)
@@ -762,5 +804,9 @@ void vlan_setup(struct net_device *dev)
 	dev->destructor		= free_netdev;
 	dev->ethtool_ops	= &vlan_ethtool_ops;
 
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+	dev->put_stats = vlan_dev_update_stats;
+	dev->clr_stats = vlan_dev_clear_stats;
+#endif
 	memset(dev->broadcast, 0, ETH_ALEN);
 }

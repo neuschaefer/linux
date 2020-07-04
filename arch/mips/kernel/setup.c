@@ -70,7 +70,16 @@ static char __initdata builtin_cmdline[COMMAND_LINE_SIZE] = CONFIG_CMDLINE;
  * mips_io_port_base is the begin of the address space to which x86 style
  * I/O ports are mapped.
  */
+#if !defined(CONFIG_BCM_KF_MIPS_BCM9685XX) && defined(CONFIG_BCM_KF_MIPS_IOPORT_BASE)
+/* mips_io_port_base is normally set using set_io_port_base.  The
+   only reason we would need it here is to get around a race condition.
+   I don't know what the race condition is, but some ivestigation can be done
+   later to determine if we can remove it.  For now, leave it in so it
+   doesn't hinder the development. */
+const unsigned long mips_io_port_base = KSEG1;
+#else
 const unsigned long mips_io_port_base = -1;
+#endif
 EXPORT_SYMBOL(mips_io_port_base);
 
 static struct resource code_resource = { .name = "Kernel code", };

@@ -29,7 +29,9 @@ DECLARE_PER_CPU(struct vm_event_state, vm_event_states);
 
 static inline void __count_vm_event(enum vm_event_item item)
 {
+	preempt_disable_rt();
 	__this_cpu_inc(vm_event_states.event[item]);
+	preempt_enable_rt();
 }
 
 static inline void count_vm_event(enum vm_event_item item)
@@ -39,7 +41,9 @@ static inline void count_vm_event(enum vm_event_item item)
 
 static inline void __count_vm_events(enum vm_event_item item, long delta)
 {
+	preempt_disable_rt();
 	__this_cpu_add(vm_event_states.event[item], delta);
+	preempt_enable_rt();
 }
 
 static inline void count_vm_events(enum vm_event_item item, long delta)
@@ -159,6 +163,9 @@ static inline unsigned long node_page_state(int node,
 #endif
 #ifdef CONFIG_ZONE_DMA32
 		zone_page_state(&zones[ZONE_DMA32], item) +
+#endif
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX) && defined(CONFIG_BCM_ZONE_ACP)
+		zone_page_state(&zones[ZONE_ACP], item) +
 #endif
 #ifdef CONFIG_HIGHMEM
 		zone_page_state(&zones[ZONE_HIGHMEM], item) +

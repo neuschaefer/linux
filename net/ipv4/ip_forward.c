@@ -112,6 +112,13 @@ int ip_forward(struct sk_buff *skb)
 
 	skb->priority = rt_tos2priority(iph->tos);
 
+#if defined(CONFIG_BCM_KF_WANDEV)
+	/* Never forward a packet from a WAN intf to the other WAN intf */
+	if( (skb->dev) && (rt->dst.dev) && 
+		((skb->dev->priv_flags & rt->dst.dev->priv_flags) & IFF_WANDEV) )
+		goto drop;
+#endif
+
 	return NF_HOOK(NFPROTO_IPV4, NF_INET_FORWARD, skb, skb->dev,
 		       rt->dst.dev, ip_forward_finish);
 

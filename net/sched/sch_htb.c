@@ -39,6 +39,9 @@
 #include <linux/slab.h>
 #include <net/netlink.h>
 #include <net/pkt_sched.h>
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+#include <linux/blog.h>
+#endif
 
 /* HTB algorithm.
     Author: devik@cdi.cz
@@ -901,7 +904,14 @@ ok:
 			m |= 1 << prio;
 			skb = htb_dequeue_tree(q, prio, level);
 			if (likely(skb != NULL))
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+                        {
+				blog_skip(skb);
+#endif
 				goto ok;
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+                        }
+#endif
 		}
 	}
 	sch->qstats.overlimits++;

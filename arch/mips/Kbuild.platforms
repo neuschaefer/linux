@@ -5,6 +5,7 @@ platforms += ar7
 platforms += ath79
 platforms += bcm47xx
 platforms += bcm63xx
+platforms += bcm963xx
 platforms += cavium-octeon
 platforms += cobalt
 platforms += dec

@@ -55,6 +55,18 @@
 
 #include <linux/netdev_features.h>
 
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+#include <linux/blog.h>
+#endif
+
+#if defined(CONFIG_BCM_KF_MODULE_OWNER)
+#include <linux/version.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 2, 0)
+#define SET_MODULE_OWNER(dev) do { } while (0)
+#endif
+#endif /* CONFIG_BCM_KF_MODULE_OWNER */
+
+
 struct netpoll_info;
 struct device;
 struct phy_device;
@@ -179,6 +191,18 @@ struct net_device_stats {
 	unsigned long	rx_dropped;
 	unsigned long	tx_dropped;
 	unsigned long	multicast;
+
+#if defined(CONFIG_BCM_KF_EXTSTATS)
+    unsigned long   tx_multicast_packets;  /* multicast packets transmitted */
+    unsigned long   rx_multicast_bytes;  /* multicast bytes recieved */ 
+    unsigned long   tx_multicast_bytes;  /* multicast bytes transmitted */
+    unsigned long   rx_broadcast_packets;  /* broadcast packets recieved */
+    unsigned long   tx_broadcast_packets;  /* broadcast packets transmitted */
+    /* NOTE: Unicast packets are not counted but are instead calculated as needed
+       using total - (broadcast + multicast) */
+    unsigned long   rx_unknown_packets;  /* unknown protocol packets recieved */
+#endif
+
 	unsigned long	collisions;
 	unsigned long	rx_length_errors;
 	unsigned long	rx_over_errors;
@@ -524,7 +548,7 @@ enum netdev_queue_state_t {
 #define QUEUE_STATE_ANY_XOFF ((1 << __QUEUE_STATE_DRV_XOFF)		| \
 			      (1 << __QUEUE_STATE_STACK_XOFF))
 #define QUEUE_STATE_ANY_XOFF_OR_FROZEN (QUEUE_STATE_ANY_XOFF		| \
-					(1 << __QUEUE_STATE_FROZEN))
+				    (1 << __QUEUE_STATE_FROZEN))
 };
 /*
  * __QUEUE_STATE_DRV_XOFF is used by drivers to stop the transmit queue.  The
@@ -1004,6 +1028,32 @@ struct net_device_ops {
 	void			(*ndo_neigh_destroy)(struct neighbour *n);
 };
 
+
+#if defined(CONFIG_BCM_KF_NETDEV_PATH)
+#define NETDEV_PATH_HW_SUBPORTS_MAX  CONFIG_BCM_MAX_GEM_PORTS
+struct netdev_path
+{
+        /* this pointer is used to create lists of interfaces that belong
+           to the same interface path in Linux. It points to the next
+           interface towards the physical interface (the root interface) */
+        struct net_device *next_dev;
+        /* this reference counter indicates the number of interfaces
+           referencing this interface */
+        int refcount;
+        /* indicates the hardware port number associated to the
+           interface */
+        unsigned int hw_port;
+        /* hardware port type, must be set to one of the types defined in
+           BlogPhy_t  */
+        unsigned int hw_port_type;
+        /* some device drivers support virtual subports within a hardware
+		   port. hw_subport_mcast is used to map a multicast hw subport
+		   to a hw port. */
+        unsigned int hw_subport_mcast_idx;
+};
+#endif
+
+
 /*
  *	The DEVICE structure.
  *	Actually, this whole structure is a big mistake.  It mixes I/O
@@ -1064,6 +1114,19 @@ struct net_device {
 	int			iflink;
 
 	struct net_device_stats	stats;
+
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+        /* Update the bstats */
+        void (*put_stats)(struct net_device *dev_p, BlogStats_t * bStats_p);
+        /* Clear the stats information */
+        void (*clr_stats)(struct net_device *dev_p);
+#endif
+
+
+#if defined(CONFIG_BCM_KF_NETDEV_PATH)
+    struct netdev_path path;
+#endif
+
 	atomic_long_t		rx_dropped; /* dropped packets by core network
 					     * Do not use this in drivers.
 					     */
@@ -1734,6 +1797,7 @@ struct softnet_data {
 	unsigned		dropped;
 	struct sk_buff_head	input_pkt_queue;
 	struct napi_struct	backlog;
+	struct sk_buff_head	tofree_queue;
 };
 
 static inline void input_queue_head_incr(struct softnet_data *sd)
@@ -2015,7 +2079,7 @@ static inline void netif_stop_subqueue(struct net_device *dev, u16 queue_index)
  * Check individual transmit queue of a device with multiple transmit queues.
  */
 static inline bool __netif_subqueue_stopped(const struct net_device *dev,
-					    u16 queue_index)
+					 u16 queue_index)
 {
 	struct netdev_queue *txq = netdev_get_tx_queue(dev, queue_index);
 
@@ -2023,7 +2087,7 @@ static inline bool __netif_subqueue_stopped(const struct net_device *dev,
 }
 
 static inline bool netif_subqueue_stopped(const struct net_device *dev,
-					  struct sk_buff *skb)
+					 struct sk_buff *skb)
 {
 	return __netif_subqueue_stopped(dev, skb_get_queue_mapping(skb));
 }
@@ -2093,11 +2157,33 @@ static inline int netif_copy_real_num_queues(struct net_device *to_dev,
 #endif
 }
 
+#if (defined(CONFIG_BCM_KF_FAP_GSO_LOOPBACK) && defined(CONFIG_BCM_FAP_GSO_LOOPBACK))
+typedef enum {
+BCM_GSO_LOOPBACK_NONE=0, /*null device for error protection*/
+BCM_GSO_LOOPBACK_WL0,   /* wlan interface 0 */
+BCM_GSO_LOOPBACK_WL1,   /* wlan interface 1 */
+BCM_GSO_LOOPBACK_MAXDEVS
+} gso_loopback_devids;
+
+extern int (*bcm_gso_loopback_hw_offload)(struct sk_buff *skb,  unsigned int txDevId);
+extern inline unsigned int bcm_is_gso_loopback_dev(void *dev);
+extern unsigned int bcm_gso_loopback_devptr2devid(void *dev);
+extern struct net_device * bcm_gso_loopback_devid2devptr(unsigned int devId);
+#endif
+
 /* Use this variant when it is known for sure that it
  * is executing from hardware interrupt context or with hardware interrupts
  * disabled.
  */
 extern void dev_kfree_skb_irq(struct sk_buff *skb);
+
+
+#if defined(CONFIG_BCM_KF_SKB_DEFINES) && defined(CONFIG_SMP)
+/* put the skb on a queue, and wake up the skbfreeTask to free it later,
+ * to save some cyles now
+ */
+extern void dev_kfree_skb_thread(struct sk_buff *skb);
+#endif
 
 /* Use this variant in places where it could be invoked
  * from either hardware interrupt or other context, with hardware interrupts
@@ -2668,6 +2754,57 @@ static inline bool netif_supports_nofcs(struct net_device *dev)
 }
 
 extern struct pernet_operations __net_initdata loopback_net_ops;
+
+#if defined(CONFIG_BCM_KF_NETDEV_PATH)
+
+/* Returns TRUE when _dev is a member of a path, otherwise FALSE */
+#define netdev_path_is_linked(_dev) ( (_dev)->path.next_dev != NULL )
+
+/* Returns TRUE when _dev is the leaf in a path, otherwise FALSE */
+#define netdev_path_is_leaf(_dev) ( (_dev)->path.refcount == 0 )
+
+/* Returns TRUE when _dev is the root of a path, otherwise FALSE. The root
+   device is the physical device */
+#define netdev_path_is_root(_dev) ( (_dev)->path.next_dev == NULL )
+
+/* Returns a pointer to the next device in a path, towards the root
+   (physical) device */
+#define netdev_path_next_dev(_dev) ( (_dev)->path.next_dev )
+
+#define netdev_path_set_hw_port(_dev, _hw_port, _hw_port_type)  \
+    do {                                                        \
+        (_dev)->path.hw_port = (_hw_port);                      \
+        (_dev)->path.hw_port_type = (_hw_port_type);            \
+    } while(0)
+
+#define netdev_path_set_hw_port_only(_dev, _hw_port)            \
+    do {                                                        \
+        (_dev)->path.hw_port = (_hw_port);                      \
+    } while(0)
+
+#define netdev_path_get_hw_port(_dev) ( (_dev)->path.hw_port )
+
+#define netdev_path_get_hw_port_type(_dev) ( (_dev)->path.hw_port_type )
+
+#define netdev_path_get_hw_subport_mcast_idx(_dev) ( (_dev)->path.hw_subport_mcast_idx )
+
+static inline struct net_device *netdev_path_get_root(struct net_device *dev)
+{
+    for (; !netdev_path_is_root(dev); dev = netdev_path_next_dev(dev));
+    return dev;
+}
+
+int netdev_path_add(struct net_device *new_dev, struct net_device *next_dev);
+
+int netdev_path_remove(struct net_device *dev);
+
+void netdev_path_dump(struct net_device *dev);
+
+int netdev_path_set_hw_subport_mcast_idx(struct net_device *dev,
+									 unsigned int subport_idx);
+
+#endif /* CONFIG_BCM_KF_NETDEV_PATH */
+
 
 /* Logging, debugging and troubleshooting/diagnostic helpers. */
 

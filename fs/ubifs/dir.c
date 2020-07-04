@@ -978,6 +978,10 @@ static int ubifs_rename(struct inode *old_dir, struct dentry *old_dentry,
 			.dirtied_ino_d = ALIGN(old_inode_ui->data_len, 8) };
 	struct timespec time;
 	unsigned int saved_nlink;
+#if defined(CONFIG_BCM_KF_KERN_WARNING)
+	/* in order to prevent warning */
+	saved_nlink = 0;
+#endif
 
 	/*
 	 * Budget request settings: deletion direntry, new direntry, removing
@@ -1206,3 +1210,4 @@ const struct file_operations ubifs_dir_operations = {
 	.compat_ioctl   = ubifs_compat_ioctl,
 #endif
 };
+

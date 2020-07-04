@@ -40,11 +40,19 @@
 #include "vlan.h"
 #include "vlanproc.h"
 
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+#include <linux/blog.h>
+#endif
+
 #define DRV_VERSION "1.8"
 
 /* Global VLAN variables */
 
 int vlan_net_id __read_mostly;
+
+#if defined(CONFIG_BCM_KF_VLAN) && (defined(CONFIG_BCM_VLAN) || defined(CONFIG_BCM_VLAN_MODULE))
+int vlan_dev_set_nfmark_to_priority(char *, int);
+#endif
 
 const char vlan_fullname[] = "802.1Q VLAN Support";
 const char vlan_version[] = DRV_VERSION;
@@ -111,6 +119,110 @@ void unregister_vlan_dev(struct net_device *dev, struct list_head *head)
 	/* Get rid of the vlan's reference to real_dev */
 	dev_put(real_dev);
 }
+
+#if defined(CONFIG_BCM_KF_VLAN)
+struct net_device_stats *vlan_dev_get_stats(struct net_device *dev)
+{
+	return &(dev->stats);
+}
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+static inline BlogStats_t *vlan_dev_get_bstats(struct net_device *dev)
+{
+	return &(vlan_dev_priv(dev)->bstats);
+}
+static inline struct net_device_stats *vlan_dev_get_cstats(struct net_device *dev)
+{
+	return &(vlan_dev_priv(dev)->cstats);
+}
+
+struct net_device_stats * vlan_dev_collect_stats(struct net_device * dev_p)
+{
+	BlogStats_t bStats;
+	BlogStats_t * bStats_p;
+	struct net_device_stats *dStats_p;
+	struct net_device_stats *cStats_p;
+
+	if ( dev_p == (struct net_device *)NULL )
+		return (struct net_device_stats *)NULL;
+
+	dStats_p = vlan_dev_get_stats(dev_p);
+	cStats_p = vlan_dev_get_cstats(dev_p);
+	bStats_p = vlan_dev_get_bstats(dev_p);
+
+	memset(&bStats, 0, sizeof(BlogStats_t));
+
+	blog_notify(FETCH_NETIF_STATS, (void*)dev_p,
+				(uint32_t)&bStats, BLOG_PARAM2_NO_CLEAR);
+
+	memcpy( cStats_p, dStats_p, sizeof(struct net_device_stats) );
+	cStats_p->rx_packets += ( bStats.rx_packets + bStats_p->rx_packets );
+	cStats_p->tx_packets += ( bStats.tx_packets + bStats_p->tx_packets );
+
+	/* set byte counts to 0 if the bstat packet counts are non 0 and the
+		octet counts are 0 */
+	if ( ((bStats.rx_bytes + bStats_p->rx_bytes) == 0) &&
+		  ((bStats.rx_packets + bStats_p->rx_packets) > 0) )
+	{
+		cStats_p->rx_bytes = 0;
+	}
+	else
+	{
+		cStats_p->rx_bytes   += ( bStats.rx_bytes   + bStats_p->rx_bytes );
+	}
+
+	if ( ((bStats.tx_bytes + bStats_p->tx_bytes) == 0) &&
+		  ((bStats.tx_packets + bStats_p->tx_packets) > 0) )
+	{
+		cStats_p->tx_bytes = 0;
+	}
+	else
+	{
+		cStats_p->tx_bytes   += ( bStats.tx_bytes   + bStats_p->tx_bytes );
+	}
+	cStats_p->multicast  += ( bStats.multicast  + bStats_p->multicast );
+
+	return cStats_p;
+}
+
+void vlan_dev_update_stats(struct net_device * dev_p, BlogStats_t *blogStats_p)
+{
+	BlogStats_t * bStats_p;
+
+	if ( dev_p == (struct net_device *)NULL )
+		return;
+	bStats_p = vlan_dev_get_bstats(dev_p);
+
+	bStats_p->rx_packets += blogStats_p->rx_packets;
+	bStats_p->tx_packets += blogStats_p->tx_packets;
+	bStats_p->rx_bytes   += blogStats_p->rx_bytes;
+	bStats_p->tx_bytes   += blogStats_p->tx_bytes;
+	bStats_p->multicast  += blogStats_p->multicast;
+	return;
+}
+
+void vlan_dev_clear_stats(struct net_device * dev_p)
+{
+	BlogStats_t * bStats_p;
+	struct net_device_stats *dStats_p;
+	struct net_device_stats *cStats_p;
+
+	if ( dev_p == (struct net_device *)NULL )
+		return;
+
+	dStats_p = vlan_dev_get_stats(dev_p);
+	cStats_p = vlan_dev_get_cstats(dev_p); 
+	bStats_p = vlan_dev_get_bstats(dev_p);
+
+	blog_notify(FETCH_NETIF_STATS, (void*)dev_p, 0, BLOG_PARAM2_DO_CLEAR);
+
+	memset(bStats_p, 0, sizeof(BlogStats_t));
+	memset(dStats_p, 0, sizeof(struct net_device_stats));
+	memset(cStats_p, 0, sizeof(struct net_device_stats));
+
+	return;
+}
+#endif //CONFIG_BLOG
+#endif //CONFIG_VLAN_STATS
 
 int vlan_check_real_dev(struct net_device *real_dev, u16 vlan_id)
 {
@@ -236,6 +348,11 @@ static int register_vlan_device(struct net_device *real_dev, u16 vlan_id)
 
 	if (new_dev == NULL)
 		return -ENOBUFS;
+
+#if defined(CONFIG_BCM_KF_VLAN) && (defined(CONFIG_BCM_VLAN) || defined(CONFIG_BCM_VLAN_MODULE))
+    /* If real device is a hardware switch port, the vlan device must also be */
+    new_dev->priv_flags |= real_dev->priv_flags;
+#endif
 
 	dev_net_set(new_dev, net);
 	/* need 4 bytes for extra VLAN header info,
@@ -543,6 +660,13 @@ static int vlan_ioctl_handler(struct net *net, void __user *arg)
 						   args.u.skb_priority,
 						   args.vlan_qos);
 		break;
+
+#if defined(CONFIG_BCM_KF_VLAN) && (defined(CONFIG_BCM_VLAN) || defined(CONFIG_BCM_VLAN_MODULE))
+	case SET_VLAN_NFMARK_TO_PRIORITY_CMD:
+		err = vlan_dev_set_nfmark_to_priority(args.device1,
+						   args.u.nfmark_to_priority);
+		break;
+#endif  
 
 	case SET_VLAN_FLAG_CMD:
 		err = -EPERM;

@@ -17,6 +17,9 @@
  */
 
 #if defined(CONFIG_SERIAL_8250_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
+#if defined(CONFIG_BCM_KF_CHAR_SYSRQ)
+static char sysrq_start_char='^';
+#endif
 #define SUPPORT_SYSRQ
 #endif
 
@@ -38,6 +41,7 @@
 #include <linux/nmi.h>
 #include <linux/mutex.h>
 #include <linux/slab.h>
+#include <linux/kdb.h>
 #ifdef CONFIG_SPARC
 #include <linux/sunserialcore.h>
 #endif
@@ -80,7 +84,16 @@ static unsigned int skip_txen_test; /* force skip of txen test at init time */
 #define DEBUG_INTR(fmt...)	do { } while (0)
 #endif
 
-#define PASS_LIMIT	512
+/*
+ * On -rt we can have a more delays, and legitimately
+ * so - so don't drop work spuriously and spam the
+ * syslog:
+ */
+#ifdef CONFIG_PREEMPT_RT_FULL
+# define PASS_LIMIT	1000000
+#else
+# define PASS_LIMIT	512
+#endif
 
 #define BOTH_EMPTY 	(UART_LSR_TEMT | UART_LSR_THRE)
 
@@ -1427,6 +1440,20 @@ serial8250_rx_chars(struct uart_8250_port *up, unsigned char lsr)
 			else if (lsr & UART_LSR_FE)
 				flag = TTY_FRAME;
 		}
+#if defined(CONFIG_BCM_KF_CHAR_SYSRQ) && defined(SUPPORT_SYSRQ)
+		/*
+		* Simple hack for substituting a regular ASCII char as the break
+		* char for the start of the Magic Sysrq sequence.  This duplicates
+		* some of the code in uart_handle_break() in serial_core.h
+		*/
+		if (up->port.sysrq == 0)
+		{
+			if (ch == sysrq_start_char) {
+				up->port.sysrq = jiffies + HZ*5;
+				goto ignore_char;
+			}
+		}
+#endif
 		if (uart_handle_sysrq_char(port, ch))
 			goto ignore_char;
 
@@ -1681,6 +1708,9 @@ static void serial_unlink_irq_chain(struct uart_8250_port *up)
 	struct irq_info *i;
 	struct hlist_node *n;
 	struct hlist_head *h;
+#if defined(CONFIG_BCM_KF_KERN_WARNING)
+	i = NULL;
+#endif
 
 	mutex_lock(&hash_mutex);
 
@@ -2808,14 +2838,10 @@ serial8250_console_write(struct console *co, const char *s, unsigned int count)
 
 	touch_nmi_watchdog();
 
-	local_irq_save(flags);
-	if (port->sysrq) {
-		/* serial8250_handle_irq() already took the lock */
-		locked = 0;
-	} else if (oops_in_progress) {
-		locked = spin_trylock(&port->lock);
-	} else
-		spin_lock(&port->lock);
+	if (port->sysrq || oops_in_progress || in_kdb_printk())
+		locked = spin_trylock_irqsave(&port->lock, flags);
+	else
+		spin_lock_irqsave(&port->lock, flags);
 
 	/*
 	 *	First save the IER then disable the interrupts
@@ -2847,8 +2873,7 @@ serial8250_console_write(struct console *co, const char *s, unsigned int count)
 		serial8250_modem_status(up);
 
 	if (locked)
-		spin_unlock(&port->lock);
-	local_irq_restore(flags);
+		spin_unlock_irqrestore(&port->lock, flags);
 }
 
 static int __init serial8250_console_setup(struct console *co, char *options)
@@ -3346,3 +3371,4 @@ module_param_array(probe_rsa, ulong, &probe_rsa_count, 0444);
 MODULE_PARM_DESC(probe_rsa, "Probe I/O ports for RSA");
 #endif
 MODULE_ALIAS_CHARDEV_MAJOR(TTY_MAJOR);
+

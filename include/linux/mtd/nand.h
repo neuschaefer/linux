@@ -229,6 +229,11 @@ typedef enum {
 /* Chip may not exist, so silence any errors in scan */
 #define NAND_SCAN_SILENT_NODEV	0x00040000
 
+#if defined(CONFIG_BCM_KF_MTD_BCMNAND)
+/* For Hynix MLC flashes, the BI are written to last and (last-2) pages. */
+#define NAND_SCAN_BI_3RD_PAGE   0x00100000
+#endif
+
 /* Options set by nand scan */
 /* Nand scan has allocated controller struct */
 #define NAND_CONTROLLER_ALLOC	0x80000000
@@ -559,6 +564,9 @@ struct nand_chip {
 #define NAND_MFR_MICRON		0x2c
 #define NAND_MFR_AMD		0x01
 #define NAND_MFR_MACRONIX	0xc2
+#if defined(CONFIG_BCM_KF_NAND)
+#define NAND_MFR_GIGADEVICE	0xc8
+#endif
 
 /**
  * struct nand_flash_dev - NAND Flash Device ID Structure

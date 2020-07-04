@@ -59,6 +59,10 @@
 #include <linux/mutex.h>
 #include <linux/utsname.h>
 
+#if defined(CONFIG_BCM_KF_USB_STORAGE)
+#include <linux/bcm_realtime.h>
+#endif
+
 #include <scsi/scsi.h>
 #include <scsi/scsi_cmnd.h>
 #include <scsi/scsi_device.h>
@@ -769,6 +773,14 @@ static int usb_stor_acquire_resources(struct us_data *us)
 				"Unable to start control thread\n");
 		return PTR_ERR(th);
 	}
+#if defined(CONFIG_BCM_KF_USB_STORAGE)
+    /*convert the thread to realtime RR thread */
+    {
+        struct sched_param param;
+        param.sched_priority = BCM_RTPRIO_DATA;
+        sched_setscheduler(th, SCHED_RR, &param);
+    }
+#endif
 	us->ctl_thread = th;
 
 	return 0;

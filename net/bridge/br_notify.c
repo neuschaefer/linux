@@ -17,6 +17,16 @@
 
 #include "br_private.h"
 
+#if defined(CONFIG_BCM_KF_IGMP) && defined(CONFIG_BR_IGMP_SNOOP)
+#include "br_igmp.h"
+#endif
+#if defined(CONFIG_BCM_KF_MLD) && defined(CONFIG_BR_MLD_SNOOP)
+#include "br_mld.h"
+#endif
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG) && (defined(CONFIG_BCM_KF_IGMP) || defined(CONFIG_BCM_KF_MLD))
+#include "br_mcast.h"
+#endif
+
 static int br_device_event(struct notifier_block *unused, unsigned long event, void *ptr);
 
 struct notifier_block br_device_notifier = {
@@ -37,9 +47,22 @@ static int br_device_event(struct notifier_block *unused, unsigned long event, v
 	bool changed_addr;
 	int err;
 
+#if (defined(CONFIG_BCM_KF_IGMP) && defined(CONFIG_BR_IGMP_SNOOP))  || (defined(CONFIG_BCM_KF_MLD) &&  defined(CONFIG_BR_MLD_SNOOP))
+	br_mcast_handle_netdevice_events(dev, event);
+#endif
+
 	/* register of bridge completed, add sysfs entries */
 	if ((dev->priv_flags & IFF_EBRIDGE) && event == NETDEV_REGISTER) {
+#if defined(CONFIG_BCM_KF_KERN_WARNING) 
+#if defined(CONFIG_SYSFS)
+		// This was causing a warning: statement with no effect [-Werror=unused-value]
+		// if SYSFS is not defined, br_sysfs_addbr(dev) resolves to (0), so don't call
+		// it if sysfs is not defined
 		br_sysfs_addbr(dev);
+#endif
+#else
+		br_sysfs_addbr(dev);
+#endif
 		return NOTIFY_DONE;
 	}
 

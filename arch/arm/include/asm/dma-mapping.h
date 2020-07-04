@@ -117,6 +117,10 @@ static inline void __dma_page_dev_to_cpu(struct page *page, unsigned long off,
 
 extern int dma_supported(struct device *, u64);
 extern int dma_set_mask(struct device *, u64);
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX)
+extern void ___dma_page_cpu_to_dev_flush(struct page *, unsigned long,
+	size_t, enum dma_data_direction);
+#endif
 
 /*
  * DMA errors are defined by all-bits-set in the DMA address.

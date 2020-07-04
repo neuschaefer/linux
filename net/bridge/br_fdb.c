@@ -24,6 +24,28 @@
 #include <linux/atomic.h>
 #include <asm/unaligned.h>
 #include "br_private.h"
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+#include "br_igmp.h"
+#include <linux/blog.h>
+#endif
+#if defined(CONFIG_BCM_KF_LOG)
+#include <linux/bcm_log.h>
+#endif
+
+#if defined(CONFIG_BCM_KF_RUNNER)
+#if defined(CONFIG_BCM_RDPA) || defined(CONFIG_BCM_RDPA_MODULE)
+#if defined(CONFIG_BCM_RDPA_BRIDGE) || defined(CONFIG_BCM_RDPA_BRIDGE_MODULE)
+#include "br_fp.h"
+#include "br_fp_hooks.h"
+#endif /* CONFIG_BCM_RDPA_BRIDGE || CONFIG_BCM_RDPA_BRIDGE_MODULE */
+#endif /* CONFIG_BCM_RDPA || CONFIG_BCM_RDPA_MODULE */
+#endif /* CONFIG_BCM_KF_RUNNER */
+
+#if defined(CONFIG_BCM_KF_WL)
+#include <linux/module.h>
+int (*fdb_check_expired_wl_hook)(unsigned char *addr) = NULL;
+int (*fdb_check_expired_dhd_hook)(unsigned char *addr) = NULL;
+#endif
 
 static struct kmem_cache *br_fdb_cache __read_mostly;
 static int fdb_insert(struct net_bridge *br, struct net_bridge_port *source,
@@ -51,18 +73,29 @@ void br_fdb_fini(void)
 	kmem_cache_destroy(br_fdb_cache);
 }
 
-
 /* if topology_changing then use forward_delay (default 15 sec)
  * otherwise keep longer (default 5 minutes)
  */
 static inline unsigned long hold_time(const struct net_bridge *br)
 {
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+	/* Seems one timer constant in bridge code can serve several different purposes. As we use forward_delay=0,
+	if the code left unchanged, every entry in fdb will expire immidately after a topology change and every packet
+	will flood the local ports for a period of bridge_max_age. This will result in low throughput after boot up. 
+	So we decoulpe this timer from forward_delay. */
+	return br->topology_change ? (15*HZ) : br->ageing_time;
+#else
 	return br->topology_change ? br->forward_delay : br->ageing_time;
+#endif
 }
 
 static inline int has_expired(const struct net_bridge *br,
 				  const struct net_bridge_fdb_entry *fdb)
 {
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+	if (fdb->fdb_key != BLOG_KEY_NONE)
+		blog_query(QUERY_BRIDGEFDB, (void*)fdb, fdb->fdb_key, 0, 0);
+#endif
 	return !fdb->is_static &&
 		time_before_eq(fdb->updated + hold_time(br), jiffies);
 }
@@ -81,10 +114,70 @@ static void fdb_rcu_free(struct rcu_head *head)
 	kmem_cache_free(br_fdb_cache, ent);
 }
 
+#if defined(CONFIG_BCM_KF_BRIDGE_MAC_FDB_LIMIT) && defined(CONFIG_BCM_BRIDGE_MAC_FDB_LIMIT)
+static int fdb_limit_port_check(struct net_bridge *br, struct net_bridge_port *port)
+{
+	if (port->max_port_fdb_entries != 0) {
+		/* Check per port max limit */
+		if ((port->num_port_fdb_entries+1) > port->max_port_fdb_entries)
+			return -1;
+	}
+	return 0;    
+}
+
+static int fdb_limit_check(struct net_bridge *br, struct net_bridge_port *port)
+{
+	if (br->max_br_fdb_entries != 0) {
+		/* Check per br limit */
+		if ((br->used_br_fdb_entries+1) > br->max_br_fdb_entries)
+			return -1;
+	}
+
+	return fdb_limit_port_check(br, port);
+}
+
+static void fdb_limit_update(struct net_bridge *br, struct net_bridge_port *port, int isAdd)
+{
+	if (isAdd) {
+		port->num_port_fdb_entries++;
+		if (port->num_port_fdb_entries > port->min_port_fdb_entries)
+			br->used_br_fdb_entries++;
+	}
+	else {
+		BUG_ON(!port->num_port_fdb_entries);
+		port->num_port_fdb_entries--;
+		if (port->num_port_fdb_entries >= port->min_port_fdb_entries)
+			br->used_br_fdb_entries--;
+	}        	
+}
+#endif
+
 static void fdb_delete(struct net_bridge *br, struct net_bridge_fdb_entry *f)
 {
+#if defined(CONFIG_BCM_KF_NETFILTER)
+	br->num_fdb_entries--;
+#endif
+
+#if defined(CONFIG_BCM_KF_BRIDGE_MAC_FDB_LIMIT) && defined(CONFIG_BCM_BRIDGE_MAC_FDB_LIMIT)
+	if (f->is_local == 0) {
+		fdb_limit_update(br, f->dst, 0);
+	}
+#endif
+
+#if defined(CONFIG_BCM_KF_RUNNER)
+#if defined(CONFIG_BCM_RDPA) || defined(CONFIG_BCM_RDPA_MODULE)
+#if defined(CONFIG_BCM_RDPA_BRIDGE) || defined(CONFIG_BCM_RDPA_BRIDGE_MODULE)
+	if (!f->is_local) /* Do not remove local MAC to the Runner  */
+		br_fp_hook(BR_FP_FDB_REMOVE, f, NULL);
+#endif /* CONFIG_BCM_RDPA_BRIDGE || CONFIG_BCM_RDPA_BRIDGE_MODULE */
+#endif /* CONFIG_BCM_RDPA || CONFIG_BCM_RDPA_MODULE */
+#endif /* CONFIG_BCM_KF_RUNNER */
 	hlist_del_rcu(&f->hlist);
 	fdb_notify(br, f, RTM_DELNEIGH);
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+	if (f->fdb_key != BLOG_KEY_NONE)
+		blog_notify(DESTROY_BRIDGEFDB, (void*)f, f->fdb_key, 0);
+#endif
 	call_rcu(&f->rcu, fdb_rcu_free);
 }
 
@@ -92,7 +185,7 @@ void br_fdb_changeaddr(struct net_bridge_port *p, const unsigned char *newaddr)
 {
 	struct net_bridge *br = p->br;
 	int i;
-
+	
 	spin_lock_bh(&br->hash_lock);
 
 	/* Search all chains since old address/hash is unknown */
@@ -106,7 +199,7 @@ void br_fdb_changeaddr(struct net_bridge_port *p, const unsigned char *newaddr)
 				/* maybe another port has same hw addr? */
 				struct net_bridge_port *op;
 				list_for_each_entry(op, &br->port_list, list) {
-					if (op != p &&
+					if (op != p && 
 					    !compare_ether_addr(op->dev->dev_addr,
 								f->addr.addr)) {
 						f->dst = op;
@@ -155,9 +248,34 @@ void br_fdb_cleanup(unsigned long _data)
 			unsigned long this_timer;
 			if (f->is_static)
 				continue;
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+			if (f->fdb_key != BLOG_KEY_NONE)
+				blog_query(QUERY_BRIDGEFDB, (void*)f, f->fdb_key, 0, 0);
+#endif
 			this_timer = f->updated + delay;
 			if (time_before_eq(this_timer, jiffies))
+#if defined(CONFIG_BCM_KF_RUNNER) || defined(CONFIG_BCM_KF_WL)
+			{
+				int flag = 0;
+
+#if (defined(CONFIG_BCM_RDPA) || defined(CONFIG_BCM_RDPA_MODULE)) && (defined(CONFIG_BCM_RDPA_BRIDGE) || defined(CONFIG_BCM_RDPA_BRIDGE_MODULE))
+				br_fp_hook(BR_FP_FDB_CHECK_AGE, f, &flag);
+#endif /* CONFIG_BCM_RDPA && CONFIG_BCM_RDPA_BRIDGE && CONFIG_BCM_RDPA_BRIDGE_MODULE */
+				if (flag
+#if defined(CONFIG_BCM_KF_WL)
+				    || (fdb_check_expired_wl_hook && (fdb_check_expired_wl_hook(f->addr.addr) == 0))
+				    || (fdb_check_expired_dhd_hook && (fdb_check_expired_dhd_hook(f->addr.addr) == 0))
+#endif
+				    )
+				{
+					f->updated = jiffies;
+				}
+				else
+					fdb_delete(br, f);
+			}
+#else
 				fdb_delete(br, f);
+#endif
 			else if (time_before(this_timer, next_timer))
 				next_timer = this_timer;
 		}
@@ -178,7 +296,23 @@ void br_fdb_flush(struct net_bridge *br)
 		struct hlist_node *h, *n;
 		hlist_for_each_entry_safe(f, h, n, &br->hash[i], hlist) {
 			if (!f->is_static)
+#if defined(CONFIG_BCM_KF_RUNNER) && (defined(CONFIG_BCM_RDPA) || defined(CONFIG_BCM_RDPA_MODULE)) && (defined(CONFIG_BCM_RDPA_BRIDGE) || defined(CONFIG_BCM_RDPA_BRIDGE_MODULE))
+			{
+				int flag = 0;
+
+				br_fp_hook(BR_FP_FDB_CHECK_AGE, f, &flag);
+				if (flag) {
+					f->updated = jiffies;
+				}
+				else
+				{
+					fdb_delete(br, f);
+				}
+			}
+#else /* CONFIG_BCM_KF_RUNNER && CONFIG_BCM_RUNNER && (CONFIG_BCM_RDPA_BRIDGE || CONFIG_BCM_RDPA_BRIDGE_MODULE) */
 				fdb_delete(br, f);
+#endif /* CONFIG_BCM_KF_RUNNER && CONFIG_BCM_RUNNER && (CONFIG_BCM_RDPA_BRIDGE || CONFIG_BCM_RDPA_BRIDGE_MODULE) */
+
 		}
 	}
 	spin_unlock_bh(&br->hash_lock);
@@ -196,15 +330,27 @@ void br_fdb_delete_by_port(struct net_bridge *br,
 	spin_lock_bh(&br->hash_lock);
 	for (i = 0; i < BR_HASH_SIZE; i++) {
 		struct hlist_node *h, *g;
-
+		
 		hlist_for_each_safe(h, g, &br->hash[i]) {
 			struct net_bridge_fdb_entry *f
 				= hlist_entry(h, struct net_bridge_fdb_entry, hlist);
-			if (f->dst != p)
+			if (f->dst != p) 
 				continue;
 
+#if !defined(CONFIG_BCM_KF_BRIDGE_STATIC_FDB)
 			if (f->is_static && !do_all)
 				continue;
+#else
+			/* do_all - 0: only delete dynamic entries
+						1: delete all entries
+						2: only delete static entries */
+
+			if (f->is_static && (do_all == 0))
+				continue;
+			else if (!f->is_static && (do_all == 2))
+				continue;            
+#endif
+			
 			/*
 			 * if multiple ports all have the same device address
 			 * then when one port is deleted, assign
@@ -213,7 +359,7 @@ void br_fdb_delete_by_port(struct net_bridge *br,
 			if (f->is_local) {
 				struct net_bridge_port *op;
 				list_for_each_entry(op, &br->port_list, list) {
-					if (op != p &&
+					if (op != p && 
 					    !compare_ether_addr(op->dev->dev_addr,
 								f->addr.addr)) {
 						f->dst = op;
@@ -228,6 +374,86 @@ void br_fdb_delete_by_port(struct net_bridge *br,
 	}
 	spin_unlock_bh(&br->hash_lock);
 }
+
+#if defined(CONFIG_BCM_KF_BRIDGE_MAC_FDB_LIMIT) && defined(CONFIG_BCM_BRIDGE_MAC_FDB_LIMIT)
+int br_get_fdb_limit(struct net_bridge *br, 
+						const struct net_bridge_port *p,
+						int is_min)
+{
+	if((br == NULL) && (p == NULL))
+		return -EINVAL;
+
+	if(br != NULL) {
+		if(is_min) 
+			return br->used_br_fdb_entries;
+		else
+			return br->max_br_fdb_entries;
+	}
+	else { 
+		if(is_min)
+			return p->min_port_fdb_entries;
+		else
+			return p->max_port_fdb_entries;
+	}
+}
+/* Set FDB limit
+lmtType 0: Bridge limit
+			1: Port limit
+*/
+int br_set_fdb_limit(struct net_bridge *br, 
+						struct net_bridge_port *p,
+						int lmt_type,
+						int is_min,
+						int fdb_limit)
+{
+	int new_used_fdb;
+	
+	if((br == NULL) || ((p == NULL) && lmt_type))
+		return -EINVAL;
+
+	if(fdb_limit == 0) {
+		/* Disable limit */
+		if(lmt_type == 0) {
+			br->max_br_fdb_entries = 0;
+		}
+		else if(is_min) {
+			if (p->num_port_fdb_entries < p->min_port_fdb_entries) {
+				new_used_fdb = br->used_br_fdb_entries - p->min_port_fdb_entries;
+				new_used_fdb += p->num_port_fdb_entries;
+				br->used_br_fdb_entries = new_used_fdb;
+			}
+			p->min_port_fdb_entries = 0;
+		}
+		else {
+			p->max_port_fdb_entries = 0;
+		}            
+	}
+	else {        
+		if(lmt_type == 0) {
+			if(br->used_br_fdb_entries > fdb_limit) 
+				return -EINVAL;
+			br->max_br_fdb_entries = fdb_limit;
+		}
+		else if(is_min) {
+			new_used_fdb = max(p->num_port_fdb_entries, p->min_port_fdb_entries);
+			new_used_fdb = br->used_br_fdb_entries - new_used_fdb;
+			new_used_fdb += max(p->num_port_fdb_entries, fdb_limit);
+			if ( (br->max_br_fdb_entries != 0) &&
+				(new_used_fdb > br->max_br_fdb_entries) )
+				return -EINVAL;
+				
+			p->min_port_fdb_entries = fdb_limit;   
+			br->used_br_fdb_entries = new_used_fdb;
+		}
+		else {
+			if(p->num_port_fdb_entries > fdb_limit)
+				return -EINVAL;
+			p->max_port_fdb_entries = fdb_limit;
+		}
+	}
+	return 0;
+}
+#endif
 
 /* No locking or refcounting, assumes caller has rcu_read_lock */
 struct net_bridge_fdb_entry *__br_fdb_get(struct net_bridge *br,
@@ -272,7 +498,7 @@ int br_fdb_test_addr(struct net_device *dev, unsigned char *addr)
 #endif /* CONFIG_ATM_LANE */
 
 /*
- * Fill buffer with forwarding table records in
+ * Fill buffer with forwarding table records in 
  * the API format.
  */
 int br_fdb_fillbuf(struct net_bridge *br, void *buf,
@@ -291,7 +517,7 @@ int br_fdb_fillbuf(struct net_bridge *br, void *buf,
 			if (num >= maxnum)
 				goto out;
 
-			if (has_expired(br, f))
+			if (has_expired(br, f)) 
 				continue;
 
 			/* ignore pseudo entry for local MAC address */
@@ -313,6 +539,9 @@ int br_fdb_fillbuf(struct net_bridge *br, void *buf,
 			fe->is_local = f->is_local;
 			if (!f->is_static)
 				fe->ageing_timer_value = jiffies_to_clock_t(jiffies - f->updated);
+#if defined(CONFIG_BCM_KF_VLAN_AGGREGATION) && defined(CONFIG_BCM_VLAN_AGGREGATION)
+			fe->vid = f->vid;
+#endif
 			++fe;
 			++num;
 		}
@@ -338,7 +567,7 @@ static struct net_bridge_fdb_entry *fdb_find(struct hlist_head *head,
 }
 
 static struct net_bridge_fdb_entry *fdb_find_rcu(struct hlist_head *head,
-						 const unsigned char *addr)
+						    const unsigned char *addr)
 {
 	struct hlist_node *h;
 	struct net_bridge_fdb_entry *fdb;
@@ -350,23 +579,130 @@ static struct net_bridge_fdb_entry *fdb_find_rcu(struct hlist_head *head,
 	return NULL;
 }
 
+#if defined(CONFIG_BCM_KF_BRIDGE_STATIC_FDB)
+static struct net_bridge_fdb_entry *fdb_create(struct net_bridge *br, 
+					       struct hlist_head *head,
+					       struct net_bridge_port *source,
+					       const unsigned char *addr,
+#if defined(CONFIG_BCM_KF_VLAN_AGGREGATION) && defined(CONFIG_BCM_VLAN_AGGREGATION)
+					       unsigned int vid,
+#endif
+					       int is_local,
+					       int is_static)
+#else
 static struct net_bridge_fdb_entry *fdb_create(struct hlist_head *head,
 					       struct net_bridge_port *source,
 					       const unsigned char *addr)
+#endif /* CONFIG_BCM_KF_BRIDGE_STATIC_FDB */
 {
 	struct net_bridge_fdb_entry *fdb;
+
+#if defined(CONFIG_BCM_KF_NETFILTER)
+	if (br->num_fdb_entries >= BR_MAX_FDB_ENTRIES)
+		return NULL;
+
+	/* some users want to always flood. */
+	if (hold_time(br) == 0 && !is_static)
+		return NULL;
+#endif
+
+#if defined(CONFIG_BCM_KF_BRIDGE_MAC_FDB_LIMIT) && defined(CONFIG_BCM_BRIDGE_MAC_FDB_LIMIT)
+	if (!is_local && (fdb_limit_check(br, source) != 0))
+		return NULL;
+#endif
 
 	fdb = kmem_cache_alloc(br_fdb_cache, GFP_ATOMIC);
 	if (fdb) {
 		memcpy(fdb->addr.addr, addr, ETH_ALEN);
 		fdb->dst = source;
+#if !defined(CONFIG_BCM_KF_BRIDGE_STATIC_FDB)
 		fdb->is_local = 0;
 		fdb->is_static = 0;
+#else
+		fdb->is_static = is_static;
+		fdb->is_local = is_local;
+#endif
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+		fdb->fdb_key = BLOG_KEY_NONE;
+#endif
+#if defined (CONFIG_BCM_KF_NETFILTER)
+		br->num_fdb_entries++;
+#endif
+
+#if defined(CONFIG_BCM_KF_BRIDGE_MAC_FDB_LIMIT) && defined(CONFIG_BCM_BRIDGE_MAC_FDB_LIMIT)
+		if (!is_local) {
+			fdb_limit_update(br, source, 1);
+		}
+#endif
 		fdb->updated = fdb->used = jiffies;
+#if defined(CONFIG_BCM_KF_VLAN_AGGREGATION) && defined(CONFIG_BCM_VLAN_AGGREGATION)
+		fdb->vid = vid;
+#endif
+
+#if defined(CONFIG_BCM_KF_RUNNER)
+#if defined(CONFIG_BCM_RDPA) || defined(CONFIG_BCM_RDPA_MODULE)
+#if defined(CONFIG_BCM_RDPA_BRIDGE) || defined(CONFIG_BCM_RDPA_BRIDGE_MODULE)
+		if (!is_local) /* Do not add local MAC to the Runner  */
+			br_fp_hook(BR_FP_FDB_ADD, fdb, NULL);
+#endif /* CONFIG_BCM_RDPA_BRIDGE || CONFIG_BCM_RDPA_BRIDGE_MODULE */
+#endif /* CONFIG_BCM_RUNNER */
+#endif /* CONFIG_BCM_KF_RUNNER */
 		hlist_add_head_rcu(&fdb->hlist, head);
 	}
 	return fdb;
 }
+
+#if defined(CONFIG_BCM_KF_BRIDGE_STATIC_FDB)
+/* called with RTNL */
+static int fdb_adddel_static(struct net_bridge *br,
+                             struct net_bridge_port *source,
+                             const unsigned char *addr, 
+                             int addEntry)
+{
+	struct hlist_head *head;
+	struct net_bridge_fdb_entry *fdb;
+
+	if (!is_valid_ether_addr(addr))
+		return -EINVAL;
+
+	head = &br->hash[br_mac_hash(addr)];
+	fdb = fdb_find(head, addr);
+	if (fdb)
+	{
+		/* if the entry exists and it is not static then we will delete it
+		   and then add it back as static. If we are not adding an entry
+		   then just delete it */
+		if ( (0 == addEntry) || (0 == fdb->is_static) )
+		{
+			fdb_delete(br, fdb);
+		}
+		else
+		{ /* add same static mac, do nothing */
+			return 0;
+		}
+	}
+   
+	if ( 1 == addEntry )
+	{
+		struct net_bridge_fdb_entry * fdb;
+#if defined(CONFIG_BCM_KF_BRIDGE_STATIC_FDB)
+#if defined(CONFIG_BCM_KF_VLAN_AGGREGATION) && defined(CONFIG_BCM_VLAN_AGGREGATION)
+		fdb = fdb_create(br, head, source, addr, VLAN_N_VID, 0, 1);
+#else
+		fdb = fdb_create(br, head, source, addr, 0, 1);
+#endif
+#else
+		fdb = fdb_create(head, source, addr);
+#endif
+		if (!fdb)
+			return -ENOMEM;
+	}
+
+	return 0;
+}
+#endif
+
+
 
 static int fdb_insert(struct net_bridge *br, struct net_bridge_port *source,
 		  const unsigned char *addr)
@@ -381,16 +717,24 @@ static int fdb_insert(struct net_bridge *br, struct net_bridge_port *source,
 	if (fdb) {
 		/* it is okay to have multiple ports with same
 		 * address, just use the first one.
-		 */
+				 */
 		if (fdb->is_local)
-			return 0;
+					return 0;
 		br_warn(br, "adding interface %s with same address "
-		       "as a received packet\n",
-		       source->dev->name);
+				       "as a received packet\n",
+				       source->dev->name);
 		fdb_delete(br, fdb);
-	}
+			}
 
+#if defined(CONFIG_BCM_KF_BRIDGE_STATIC_FDB)
+#if defined(CONFIG_BCM_KF_VLAN_AGGREGATION) && defined(CONFIG_BCM_VLAN_AGGREGATION)
+	fdb = fdb_create(br, head, source, addr, VLAN_N_VID, 1, 1);
+#else
+	fdb = fdb_create(br, head, source, addr, 1, 1);
+#endif
+#else
 	fdb = fdb_create(head, source, addr);
+#endif
 	if (!fdb)
 		return -ENOMEM;
 
@@ -410,9 +754,13 @@ int br_fdb_insert(struct net_bridge *br, struct net_bridge_port *source,
 	spin_unlock_bh(&br->hash_lock);
 	return ret;
 }
-
+#if defined(CONFIG_BCM_KF_VLAN_AGGREGATION) && defined(CONFIG_BCM_VLAN_AGGREGATION)
+void br_fdb_update(struct net_bridge *br, struct net_bridge_port *source,
+		   const unsigned char *addr, const unsigned int vid)
+#else
 void br_fdb_update(struct net_bridge *br, struct net_bridge_port *source,
 		   const unsigned char *addr)
+#endif
 {
 	struct hlist_head *head = &br->hash[br_mac_hash(addr)];
 	struct net_bridge_fdb_entry *fdb;
@@ -432,17 +780,82 @@ void br_fdb_update(struct net_bridge *br, struct net_bridge_port *source,
 		if (unlikely(fdb->is_local)) {
 			if (net_ratelimit())
 				br_warn(br, "received packet on %s with "
-					"own address as source address\n",
-					source->dev->name);
+				       " own address as source address\n",
+				       source->dev->name);
 		} else {
+#if defined(CONFIG_BCM_KF_RUNNER)
+#if defined(CONFIG_BCM_RDPA) || defined(CONFIG_BCM_RDPA_MODULE)
+#if defined(CONFIG_BCM_RDPA_BRIDGE) || defined(CONFIG_BCM_RDPA_BRIDGE_MODULE)
+			struct net_bridge_port *fdb_dst = fdb->dst;
+#if defined(CONFIG_BCM_KF_VLAN_AGGREGATION) && defined(CONFIG_BCM_VLAN_AGGREGATION)
+			unsigned int fdb_vid = fdb->vid;
+#endif /* CONFIG_BCM_KF_VLAN_AGGREGATION && CONFIG_BCM_VLAN_AGGREGATION */
+#endif /* CONFIG_BCM_RDPA_BRIDGE || CONFIG_BCM_RDPA_BRIDGE_MODULE */
+#endif /* CONFIG_BCM_RUNNER */
+#endif /* CONFIG_BCM_KF_RUNNER */
+
+#if defined (CONFIG_BCM_KF_NETFILTER) || (defined(CONFIG_BCM_KF_BRIDGE_MAC_FDB_LIMIT) && defined(CONFIG_BCM_BRIDGE_MAC_FDB_LIMIT))
+			/* In case of MAC move - let ethernet driver clear switch ARL */
+			if (fdb->dst && fdb->dst->port_no != source->port_no) {
+#if defined (CONFIG_BCM_KF_NETFILTER)
+				bcmFun_t *ethswClearArlFun;
+#endif
+#if defined(CONFIG_BCM_KF_BRIDGE_MAC_FDB_LIMIT) && defined(CONFIG_BCM_BRIDGE_MAC_FDB_LIMIT)
+				/* Check can be learned on new port */
+				if (fdb_limit_port_check(br, source) != 0)
+					return;
+				/* Modify both of old and new port counter */
+				fdb_limit_update(br, fdb->dst, 0);
+				fdb_limit_update(br, source, 1);
+#endif /* CONFIG_BCM_KF_BRIDGE_MAC_FDB_LIMIT && CONFIG_BCM_BRIDGE_MAC_FDB_LIMIT */
+#if defined (CONFIG_BCM_KF_NETFILTER)
+				/* Get the switch clear ARL function pointer */
+				ethswClearArlFun =  bcmFun_get(BCM_FUN_IN_ENET_CLEAR_ARL_ENTRY);
+				if ( ethswClearArlFun ) {
+					ethswClearArlFun((void*)addr);
+				}
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+				/* Also flush the associated entries in accelerators */
+				if (fdb->fdb_key != BLOG_KEY_NONE)
+					blog_notify(DESTROY_BRIDGEFDB, (void*)fdb, fdb->fdb_key, 0);
+#endif
+#endif
+			}
+#endif /* CONFIG_BCM_KF_NETFILTER || (CONFIG_BCM_KF_BRIDGE_MAC_FDB_LIMIT && CONFIG_BCM_BRIDGE_MAC_FDB_LIMIT */
 			/* fastpath: update of existing entry */
 			fdb->dst = source;
 			fdb->updated = jiffies;
+#if defined(CONFIG_BCM_KF_VLAN_AGGREGATION) && defined(CONFIG_BCM_VLAN_AGGREGATION)
+			fdb->vid = vid;
+#endif
+#if defined(CONFIG_BCM_KF_RUNNER)
+#if defined(CONFIG_BCM_RDPA) || defined(CONFIG_BCM_RDPA_MODULE)
+#if defined(CONFIG_BCM_RDPA_BRIDGE) || defined(CONFIG_BCM_RDPA_BRIDGE_MODULE)
+#if defined(CONFIG_BCM_KF_VLAN_AGGREGATION) && defined(CONFIG_BCM_VLAN_AGGREGATION)
+			/*  Do not update FastPath if the the source still == dst and vid is same */
+			if (fdb_dst != source || fdb_vid != vid)
+				br_fp_hook(BR_FP_FDB_MODIFY, fdb, NULL);
+#else
+			/*  Do not update FastPath if the the source still == dst */
+			if (fdb_dst != source)
+				br_fp_hook(BR_FP_FDB_MODIFY, fdb, NULL);
+#endif /* CONFIG_BCM_KF_VLAN_AGGREGATION && CONFIG_BCM_VLAN_AGGREGATION */
+#endif /* CONFIG_BCM_RDPA_BRIDGE || CONFIG_BCM_RDPA_BRIDGE_MODULE */
+#endif /* CONFIG_BCM_RUNNER */
+#endif /* CONFIG_BCM_KF_RUNNER */
 		}
 	} else {
 		spin_lock(&br->hash_lock);
 		if (likely(!fdb_find(head, addr))) {
+#if defined(CONFIG_BCM_KF_BRIDGE_STATIC_FDB)
+#if defined(CONFIG_BCM_KF_VLAN_AGGREGATION) && defined(CONFIG_BCM_VLAN_AGGREGATION)
+			fdb = fdb_create(br, head, source, addr, vid, 0, 0);
+#else
+			fdb = fdb_create(br, head, source, addr, 0, 0);
+#endif
+#else
 			fdb = fdb_create(head, source, addr);
+#endif
 			if (fdb)
 				fdb_notify(br, fdb, RTM_NEWNEIGH);
 		}
@@ -452,6 +865,33 @@ void br_fdb_update(struct net_bridge *br, struct net_bridge_port *source,
 		spin_unlock(&br->hash_lock);
 	}
 }
+
+#if defined(CONFIG_BCM_KF_NETFILTER)
+extern void br_fdb_refresh( struct net_bridge_fdb_entry *fdb );
+void br_fdb_refresh( struct net_bridge_fdb_entry *fdb )
+{
+	fdb->updated = jiffies;
+	return;
+}
+#endif
+
+
+#if defined(CONFIG_BCM_KF_BRIDGE_STATIC_FDB)
+int br_fdb_adddel_static(struct net_bridge *br, struct net_bridge_port *source,
+                         const unsigned char *addr, int bInsert)
+{
+	int ret = 0;
+
+	spin_lock_bh(&br->hash_lock);
+
+	ret = fdb_adddel_static(br, source, addr, bInsert);
+
+	spin_unlock_bh(&br->hash_lock);
+   
+	return ret;
+}
+#endif
+
 
 static int fdb_to_nud(const struct net_bridge_fdb_entry *fdb)
 {
@@ -491,6 +931,10 @@ static int fdb_fill_info(struct sk_buff *skb, const struct net_bridge *br,
 
 	ci.ndm_used	 = jiffies_to_clock_t(now - fdb->used);
 	ci.ndm_confirmed = 0;
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+	if (fdb->fdb_key != BLOG_KEY_NONE)
+		blog_query(QUERY_BRIDGEFDB, (void*)fdb, fdb->fdb_key, 0, 0);
+#endif
 	ci.ndm_updated	 = jiffies_to_clock_t(now - fdb->updated);
 	ci.ndm_refcnt	 = 0;
 	NLA_PUT(skb, NDA_CACHEINFO, sizeof(ci), &ci);
@@ -588,7 +1032,15 @@ static int fdb_add_entry(struct net_bridge_port *source, const __u8 *addr,
 		if (!(flags & NLM_F_CREATE))
 			return -ENOENT;
 
+#if defined(CONFIG_BCM_KF_BRIDGE_STATIC_FDB)
+#if defined(CONFIG_BCM_KF_VLAN_AGGREGATION) && defined(CONFIG_BCM_VLAN_AGGREGATION)
+		fdb = fdb_create(br, head, source, addr, VLAN_N_VID, 0, 0);
+#else
+		fdb = fdb_create(br, head, source, addr, 0, 0);
+#endif
+#else
 		fdb = fdb_create(head, source, addr);
+#endif
 		if (!fdb)
 			return -ENOMEM;
 		fdb_notify(br, fdb, RTM_NEWNEIGH);
@@ -598,11 +1050,11 @@ static int fdb_add_entry(struct net_bridge_port *source, const __u8 *addr,
 	}
 
 	if (fdb_to_nud(fdb) != state) {
-		if (state & NUD_PERMANENT)
-			fdb->is_local = fdb->is_static = 1;
+	if (state & NUD_PERMANENT)
+		fdb->is_local = fdb->is_static = 1;
 		else if (state & NUD_NOARP) {
 			fdb->is_local = 0;
-			fdb->is_static = 1;
+		fdb->is_static = 1;
 		} else
 			fdb->is_local = fdb->is_static = 0;
 
@@ -666,12 +1118,16 @@ int br_fdb_add(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)
 
 	if (ndm->ndm_flags & NTF_USE) {
 		rcu_read_lock();
+#if defined(CONFIG_BCM_KF_VLAN_AGGREGATION) && defined(CONFIG_BCM_VLAN_AGGREGATION)
+		br_fdb_update(p->br, p, addr, VLAN_N_VID);
+#else
 		br_fdb_update(p->br, p, addr);
+#endif
 		rcu_read_unlock();
 	} else {
-		spin_lock_bh(&p->br->hash_lock);
-		err = fdb_add_entry(p, addr, ndm->ndm_state, nlh->nlmsg_flags);
-		spin_unlock_bh(&p->br->hash_lock);
+	spin_lock_bh(&p->br->hash_lock);
+	err = fdb_add_entry(p, addr, ndm->ndm_state, nlh->nlmsg_flags);
+	spin_unlock_bh(&p->br->hash_lock);
 	}
 
 	return err;
@@ -739,3 +1195,40 @@ int br_fdb_delete(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)
 
 	return err;
 }
+
+#if defined(CONFIG_BCM_KF_VLAN_AGGREGATION) && defined(CONFIG_BCM_VLAN_AGGREGATION)
+int br_fdb_get_vid(const unsigned char *addr)
+{
+	struct net_bridge *br = NULL;
+	struct hlist_node *h;
+	struct net_bridge_fdb_entry *fdb;
+	struct net_device *br_dev;
+	int addr_hash = br_mac_hash(addr);
+	int vid = -1;
+
+	rcu_read_lock();
+
+	for_each_netdev(&init_net, br_dev){
+		if (br_dev->priv_flags & IFF_EBRIDGE) {
+			br = netdev_priv(br_dev);
+			hlist_for_each_entry_rcu(fdb, h, &br->hash[addr_hash], hlist) {
+				if (!compare_ether_addr(fdb->addr.addr, addr)) {
+					if (unlikely(!has_expired(br, fdb)))
+						vid = (int)fdb->vid;
+					break;
+				}
+			}
+		}          
+	}
+	
+	rcu_read_unlock();
+	return vid;
+}
+EXPORT_SYMBOL(br_fdb_get_vid);
+#endif //defined(CONFIG_BCM_KF_VLAN_AGGREGATION) && defined(CONFIG_BCM_VLAN_AGGREGATION)
+
+
+#if defined(CONFIG_BCM_KF_WL)
+EXPORT_SYMBOL(fdb_check_expired_wl_hook);
+EXPORT_SYMBOL(fdb_check_expired_dhd_hook);
+#endif

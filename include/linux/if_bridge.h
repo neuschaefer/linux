@@ -43,6 +43,53 @@
 #define BRCTL_SET_PATH_COST 17
 #define BRCTL_GET_FDB_ENTRIES 18
 
+#if !defined(CONFIG_BCM_IN_KERNEL) || defined(CONFIG_BCM_KF_IGMP)
+#define BRCTL_ENABLE_SNOOPING                   21
+#define BRCTL_ENABLE_PROXY_MODE                 22
+#endif
+#if !defined(CONFIG_BCM_IN_KERNEL) || defined(CONFIG_BCM_KF_IGMP_RATE_LIMIT)
+#define BRCTL_ENABLE_IGMP_RATE_LIMIT            23
+#endif
+#if !defined(CONFIG_BCM_IN_KERNEL) || defined(CONFIG_BCM_KF_MLD)
+#define BRCTL_MLD_ENABLE_SNOOPING               24
+#define BRCTL_MLD_ENABLE_PROXY_MODE             25
+#endif
+#if !defined(CONFIG_BCM_IN_KERNEL) || defined(CONFIG_BCM_KF_BRIDGE_STATIC_FDB)
+#define BRCTL_ADD_FDB_ENTRIES                   26
+#define BRCTL_DEL_FDB_ENTRIES                   27
+#endif
+#if !defined(CONFIG_BCM_IN_KERNEL) || defined(CONFIG_BCM_KF_BRIDGE_DYNAMIC_FDB)
+#define BRCTL_DEL_DYN_FDB_ENTRIES               28
+#endif
+#if !defined(CONFIG_BCM_IN_KERNEL) || defined(CONFIG_BCM_KF_NETFILTER)
+#define BRCTL_SET_FLOWS                         29
+#endif
+#if !defined(CONFIG_BCM_IN_KERNEL) || defined(CONFIG_BCM_KF_UNI_UNI)
+#define BRCTL_SET_UNI_UNI_CTRL                  30
+#endif
+#if !defined(CONFIG_BCM_IN_KERNEL) || defined(CONFIG_BCM_KF_IGMP)
+#define BRCTL_ENABLE_IGMP_LAN2LAN_MC            31
+#endif
+#if !defined(CONFIG_BCM_IN_KERNEL) || defined(CONFIG_BCM_KF_MLD)
+#define BRCTL_ENABLE_MLD_LAN2LAN_MC             32
+#endif
+#if !defined(CONFIG_BCM_IN_KERNEL) || defined(CONFIG_BCM_KF_IGMP)
+#define BRCTL_GET_IGMP_LAN_TO_LAN_MCAST_ENABLED 33
+#endif
+#if !defined(CONFIG_BCM_IN_KERNEL) || defined(CONFIG_BCM_KF_MLD)
+#define BRCTL_GET_MLD_LAN_TO_LAN_MCAST_ENABLED  34
+#endif
+#if !defined(CONFIG_BCM_IN_KERNEL) || defined(CONFIG_BCM_KF_BRIDGE_STATIC_FDB)
+#define BRCTL_DEL_STATIC_FDB_ENTRIES            35
+#endif
+#if !defined(CONFIG_BCM_IN_KERNEL) || defined(CONFIG_BCM_KF_BRIDGE_DYNAMIC_FDB)
+#define BRCTL_ADD_FDB_DYNAMIC_ENTRIES           36
+#endif
+#if !defined(CONFIG_BCM_IN_KERNEL) || (defined(CONFIG_BCM_KF_BRIDGE_MAC_FDB_LIMIT) && defined(CONFIG_BCM_BRIDGE_MAC_FDB_LIMIT))
+#define BRCTL_GET_BR_FDB_LIMIT                  37
+#define BRCTL_SET_BR_FDB_LIMIT                  38
+#endif
+
 #define BR_STATE_DISABLED 0
 #define BR_STATE_LISTENING 1
 #define BR_STATE_LEARNING 2
@@ -94,17 +141,48 @@ struct __fdb_entry {
 	__u32 ageing_timer_value;
 	__u8 port_hi;
 	__u8 pad0;
+#if defined(CONFIG_BCM_KF_VLAN_AGGREGATION) && defined(CONFIG_BCM_VLAN_AGGREGATION)
+	__u16 vid;
+#else
 	__u16 unused;
+#endif
 };
 
 #ifdef __KERNEL__
 
 #include <linux/netdevice.h>
 
+#if defined(CONFIG_BCM_KF_BRIDGE_PORT_ISOLATION) || defined(CONFIG_BCM_KF_BRIDGE_STP)
+enum {
+	BREVT_IF_CHANGED,
+	BREVT_STP_STATE_CHANGED
+};
+#endif
+
+#if defined(CONFIG_BCM_KF_BRIDGE_PORT_ISOLATION)
+extern struct net_device *bridge_get_next_port(char *brName, unsigned int *portNum);
+extern int register_bridge_notifier(struct notifier_block *nb);
+extern int unregister_bridge_notifier(struct notifier_block *nb);
+#endif
+
+#if defined(CONFIG_BCM_KF_BRIDGE_STP)
+struct stpPortInfo {
+	char portName[IFNAMSIZ];
+	unsigned char stpState;
+};
+extern int register_bridge_stp_notifier(struct notifier_block *nb);
+extern int unregister_bridge_stp_notifier(struct notifier_block *nb);
+#endif
+
 extern void brioctl_set(int (*ioctl_hook)(struct net *, unsigned int, void __user *));
 
 typedef int br_should_route_hook_t(struct sk_buff *skb);
 extern br_should_route_hook_t __rcu *br_should_route_hook;
+
+#if defined(CONFIG_BCM_KF_FBOND) && (defined(CONFIG_BCM_FBOND) || defined(CONFIG_BCM_FBOND_MODULE))
+typedef struct net_device *(* br_fb_process_hook_t)(struct sk_buff *skb_p, uint16_t h_proto, struct net_device *txDev );
+extern void br_fb_bind(br_fb_process_hook_t brFbProcessHook);
+#endif
 
 #endif
 

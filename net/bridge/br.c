@@ -21,6 +21,15 @@
 #include <net/stp.h>
 
 #include "br_private.h"
+#if defined(CONFIG_BCM_KF_IGMP) && defined(CONFIG_BR_IGMP_SNOOP)
+#include "br_igmp.h"
+#endif
+#if defined(CONFIG_BCM_KF_MLD) && defined(CONFIG_BR_MLD_SNOOP)
+#include "br_mld.h"
+#endif
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG) && (defined(CONFIG_BCM_KF_IGMP) || defined(CONFIG_BCM_KF_MLD))
+#include "br_mcast.h"
+#endif
 
 static const struct stp_proto br_stp_proto = {
 	.rcv	= br_stp_rcv,
@@ -62,8 +71,28 @@ static int __init br_init(void)
 
 	brioctl_set(br_ioctl_deviceless_stub);
 
+#if defined(CONFIG_BCM_KF_IGMP) && defined(CONFIG_BR_IGMP_SNOOP)
+	err = br_igmp_snooping_init();
+    if(err)
+        goto err_out4;
+#endif
+
+#if defined(CONFIG_BCM_KF_MLD) && defined(CONFIG_BR_MLD_SNOOP)
+	err = br_mld_snooping_init();
+    if(err)
+        goto err_out4;
+#endif
+
+
 #if IS_ENABLED(CONFIG_ATM_LANE)
 	br_fdb_test_addr_hook = br_fdb_test_addr;
+#endif
+
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG) \
+    && (defined(CONFIG_BCM_KF_IGMP) && defined(CONFIG_BR_IGMP_SNOOP) || defined(CONFIG_BCM_KF_MLD) && defined(CONFIG_BR_MLD_SNOOP)) \
+    && (defined(CONFIG_BCM_KF_VLAN) && (defined(CONFIG_BCM_VLAN) || defined(CONFIG_BCM_VLAN_MODULE)))
+    
+    blogRuleVlanNotifyHook = br_mcast_vlan_notify_for_blog_update;
 #endif
 
 	return 0;
@@ -75,6 +104,12 @@ err_out2:
 	unregister_pernet_subsys(&br_net_ops);
 err_out1:
 	br_fdb_fini();
+#if defined(CONFIG_BCM_KF_IGMP) && defined(CONFIG_BR_IGMP_SNOOP)
+    br_igmp_snooping_fini();
+#endif
+#if defined(CONFIG_BCM_KF_MLD) && defined(CONFIG_BR_MLD_SNOOP)
+    br_mld_snooping_fini();
+#endif
 err_out:
 	stp_proto_unregister(&br_stp_proto);
 	return err;

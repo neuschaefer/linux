@@ -54,6 +54,10 @@
 #include <net/net_namespace.h>
 #include <net/netns/generic.h>
 
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+#include <linux/blog.h>
+#endif
+
 MODULE_AUTHOR("Ville Nuorvala");
 MODULE_DESCRIPTION("IPv6 tunneling device");
 MODULE_LICENSE("GPL");
@@ -76,6 +80,9 @@ MODULE_ALIAS_NETDEV("ip6tnl0");
 
 static int ip6_tnl_dev_init(struct net_device *dev);
 static void ip6_tnl_dev_setup(struct net_device *dev);
+#if defined(CONFIG_BCM_KF_IP)
+extern int ip6_fragment(struct sk_buff *skb, int (*output)(struct sk_buff *));
+#endif
 
 static int ip6_tnl_net_id __read_mostly;
 struct ip6_tnl_net {
@@ -763,6 +770,11 @@ static int ip6_tnl_rcv(struct sk_buff *skb, __u16 protocol,
 		tstats->rx_packets++;
 		tstats->rx_bytes += skb->len;
 
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+		blog_link(TOS_MODE, blog_ptr(skb), NULL, DIR_RX, 
+			(t->parms.flags & IP6_TNL_F_RCV_DSCP_COPY) ?
+				BLOG_TOS_INHERIT : BLOG_TOS_FIXED);
+#endif
 		__skb_tunnel_rx(skb, t->dev);
 
 		dscp_ecn_decapsulate(t, ipv6h, skb);
@@ -898,7 +910,10 @@ static int ip6_tnl_xmit2(struct sk_buff *skb,
 	u8 proto;
 	int err = -1;
 	int pkt_len;
-
+#if defined(CONFIG_BCM_KF_IP)
+	u8 needFrag = 0;
+#endif
+   
 	if (!fl6->flowi6_mark)
 		dst = ip6_tnl_dst_check(t);
 	if (!dst) {
@@ -936,8 +951,12 @@ static int ip6_tnl_xmit2(struct sk_buff *skb,
 		skb_dst(skb)->ops->update_pmtu(skb_dst(skb), mtu);
 	if (skb->len > mtu) {
 		*pmtu = mtu;
+#if defined(CONFIG_BCM_KF_IP)
+		needFrag = 1;
+#else      
 		err = -EMSGSIZE;
 		goto tx_err_dst_release;
+#endif
 	}
 
 	/*
@@ -983,7 +1002,17 @@ static int ip6_tnl_xmit2(struct sk_buff *skb,
 	ipv6h->daddr = fl6->daddr;
 	nf_reset(skb);
 	pkt_len = skb->len;
+#if defined(CONFIG_BCM_KF_IP)
+	if (needFrag) {
+		skb->local_df = 1;
+		ip6_fragment(skb, ip6_local_out);
+	}
+	else {
+		err = ip6_local_out(skb);
+	}
+#else
 	err = ip6_local_out(skb);
+#endif            
 
 	if (net_xmit_eval(err) == 0) {
 		struct pcpu_tstats *tstats = this_cpu_ptr(t->dev->tstats);
@@ -1033,6 +1062,12 @@ ip4ip6_tnl_xmit(struct sk_buff *skb, struct net_device *dev)
 					  & IPV6_TCLASS_MASK;
 	if (t->parms.flags & IP6_TNL_F_USE_ORIG_FWMARK)
 		fl6.flowi6_mark = skb->mark;
+
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+	blog_link(TOS_MODE, blog_ptr(skb), NULL, DIR_TX,
+		(t->parms.flags & IP6_TNL_F_USE_ORIG_TCLASS) ?
+			BLOG_TOS_INHERIT : BLOG_TOS_FIXED);
+#endif
 
 	err = ip6_tnl_xmit2(skb, dev, dsfield, &fl6, encap_limit, &mtu);
 	if (err != 0) {

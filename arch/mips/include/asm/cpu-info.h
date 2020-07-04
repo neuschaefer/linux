@@ -82,7 +82,11 @@ struct cpuinfo_mips {
 } __attribute__((aligned(SMP_CACHE_BYTES)));
 
 extern struct cpuinfo_mips cpu_data[];
+#if defined(CONFIG_BCM_KF_CPU_DATA_CPUID)
+#define current_cpu_data cpu_data[raw_smp_processor_id()]
+#else
 #define current_cpu_data cpu_data[smp_processor_id()]
+#endif
 #define raw_current_cpu_data cpu_data[raw_smp_processor_id()]
 
 extern void cpu_probe(void);

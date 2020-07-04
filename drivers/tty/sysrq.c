@@ -199,12 +199,24 @@ static struct sysrq_key_op sysrq_showlocks_op = {
 #define sysrq_showlocks_op (*(struct sysrq_key_op *)NULL)
 #endif
 
-#ifdef CONFIG_SMP
+#if defined(CONFIG_SMP) || defined(CONFIG_BCM_KF_CHAR_SYSRQ)
+/* IGNORE_BCM_KF_EXCEPTION */
 static DEFINE_SPINLOCK(show_lock);
 
 static void showacpu(void *dummy)
 {
 	unsigned long flags;
+#if defined(CONFIG_BCM_KF_CHAR_SYSRQ)
+	struct pt_regs *regs = get_irq_regs();
+
+	printk("=>entered showacpu on CPU %d: (idle=%d)\n",
+	       smp_processor_id(), idle_cpu(smp_processor_id()));
+
+	if (regs) {
+		printk(KERN_INFO "=>calling show_regs:\n");
+		show_regs(regs);
+	}
+#endif
 
 	/* Idle CPUs have no interesting backtrace. */
 	if (idle_cpu(smp_processor_id()))
@@ -212,7 +224,18 @@ static void showacpu(void *dummy)
 
 	spin_lock_irqsave(&show_lock, flags);
 	printk(KERN_INFO "CPU%d:\n", smp_processor_id());
+#if defined(CONFIG_BCM_KF_CHAR_SYSRQ)
+	printk(KERN_INFO "=>calling show_stack, current=%p ", current);
+	if (current)
+		printk(" (comm=%s)\n", current->comm);
+	else
+		printk("\n");
+
+	show_stack(current, NULL);
+#else
 	show_stack(NULL, NULL);
+#endif
+
 	spin_unlock_irqrestore(&show_lock, flags);
 }
 
@@ -225,6 +248,21 @@ static DECLARE_WORK(sysrq_showallcpus, sysrq_showregs_othercpus);
 
 static void sysrq_handle_showallcpus(int key)
 {
+#if defined(CONFIG_BCM_KF_CHAR_SYSRQ)
+
+
+	showacpu(NULL);
+
+#ifdef CONFIG_SMP
+	{
+		int othercpu;
+		othercpu = (0 == smp_processor_id()) ? 1 : 0;
+		printk("=== Now call other CPU (%d)\n", othercpu);
+		smp_call_function_single(othercpu, showacpu, (void *) 0xeeee, 0);
+	}
+#endif /* CONFIG_SMP */
+
+#else /* CONFIG_BCM_KF_CHAR_SYSRQ */
 	/*
 	 * Fall back to the workqueue based printing if the
 	 * backtrace printing did not succeed or the
@@ -239,6 +277,7 @@ static void sysrq_handle_showallcpus(int key)
 		}
 		schedule_work(&sysrq_showallcpus);
 	}
+#endif /* CONFIG_BCM_KF_CHAR_SYSRQ */
 }
 
 static struct sysrq_key_op sysrq_showallcpus_op = {
@@ -398,6 +437,85 @@ static struct sysrq_key_op sysrq_unrt_op = {
 	.enable_mask	= SYSRQ_ENABLE_RTNICE,
 };
 
+#ifdef CONFIG_BCM_KF_CHAR_SYSRQ
+
+/*
+ * This function is a "safe" function to call at anytime.  It should only
+ * read data that do not require a lock and will not cause exceptions,
+ * i.e. reading statistics but not dereferencing pointers.  It should not
+ * assume interrupts are working on any of the CPU's.
+ * The 'L' option is also good.
+ */
+static void sysrq_handle_cpu_summary(int key)
+{
+	int cpu;
+	int max_cpu=1;
+#ifdef CONFIG_SMP
+	max_cpu=2;
+#endif
+
+
+	printk("CPU summary invoked on cpu %d\n", smp_processor_id());
+	for (cpu=0; cpu < max_cpu; cpu++) {
+		if (cpu_online(cpu)) {
+			printk("  cpu %d is online.\n", cpu);
+		}
+		else {
+			printk("  WARNING: cpu %d is offline!\n", cpu);
+		}
+	}
+	printk("\n\n");
+	// dump interrupt statistics
+	// print other CPU info that does not require getting a lock or
+	// interrupts to be enabled on that CPU
+}
+
+static struct sysrq_key_op sysrq_cpu_summary_op = {
+	.handler	= sysrq_handle_cpu_summary,
+	.help_msg	= "BRCM: show summary status on all CPUs(A)",
+	.action_msg	= "CPU Summary Status",
+	.enable_mask	= 0x4000,   /* typically all flags will be enabled */
+};
+
+
+#include <linux/seq_file.h>
+#include <linux/interrupt.h>
+
+static char intrs_output_buf[1024];
+
+static void sysrq_handle_show_intrs(int key)
+{
+	struct seq_file intrs_seq_file;
+	loff_t pos=0;
+
+	// Just initialize the parts of seq_file that seq_printf needs
+	memset(&intrs_seq_file, 0, sizeof(intrs_seq_file));
+	intrs_seq_file.buf = intrs_output_buf;
+	intrs_seq_file.size = sizeof(intrs_output_buf);
+
+	/*
+	 * Leverage the show_interrupts() function in kernel/mips/irq.c to dump
+	 * to our buffer.
+	 */
+	while (pos <= NR_IRQS)
+	{
+		memset(intrs_output_buf, 0, sizeof(intrs_output_buf));
+		intrs_seq_file.count = 0;
+		show_interrupts(&intrs_seq_file, &pos);
+		printk("%s", intrs_output_buf);
+		pos++;
+	}
+}
+
+static struct sysrq_key_op sysrq_show_intrs_op = {
+	.handler	= sysrq_handle_show_intrs,
+	.help_msg	= "BRCM: show interrupt counts on all CPUs(Y)",
+	.action_msg	= "Interrupt Counts",
+	.enable_mask	= 0x4000,   /* typically all flags will be enabled */
+};
+
+#endif /* CONFIG_BCM_KF_CHAR_SYSRQ */
+
 /* Key Operations table and lock */
 static DEFINE_SPINLOCK(sysrq_key_table_lock);
 
@@ -413,11 +531,15 @@ static struct sysrq_key_op *sysrq_key_table[36] = {
 	&sysrq_loglevel_op,		/* 8 */
 	&sysrq_loglevel_op,		/* 9 */
 
+#if defined(CONFIG_BCM_KF_CHAR_SYSRQ)
+	&sysrq_cpu_summary_op,	/* a*/
+#else
 	/*
 	 * a: Don't use for system provided sysrqs, it is handled specially on
 	 * sparc and will never arrive.
 	 */
 	NULL,				/* a */
+#endif
 	&sysrq_reboot_op,		/* b */
 	&sysrq_crash_op,		/* c & ibm_emac driver debug */
 	&sysrq_showlocks_op,		/* d */
@@ -433,7 +555,7 @@ static struct sysrq_key_op *sysrq_key_table[36] = {
 	NULL,				/* j */
 #endif
 	&sysrq_SAK_op,			/* k */
-#ifdef CONFIG_SMP
+#if defined(CONFIG_SMP) || defined(CONFIG_BCM_KF_CHAR_SYSRQ)
 	&sysrq_showallcpus_op,		/* l */
 #else
 	NULL,				/* l */
@@ -453,8 +575,12 @@ static struct sysrq_key_op *sysrq_key_table[36] = {
 	&sysrq_showstate_blocked_op,	/* w */
 	/* x: May be registered on ppc/powerpc for xmon */
 	NULL,				/* x */
+#if defined(CONFIG_BCM_KF_CHAR_SYSRQ)
+	&sysrq_show_intrs_op,	/* y */
+#else
 	/* y: May be registered on sparc64 for global register dump */
 	NULL,				/* y */
+#endif
 	&sysrq_ftrace_dump_op,		/* z */
 };
 
@@ -467,6 +593,10 @@ static int sysrq_key_table_key2index(int key)
 		retval = key - '0';
 	else if ((key >= 'a') && (key <= 'z'))
 		retval = key + 10 - 'a';
+#if defined(CONFIG_BCM_KF_CHAR_SYSRQ)
+	else if ((key >= 'A') && (key <= 'Z'))
+		retval = key + 10 - 'A';
+#endif
 	else
 		retval = -1;
 	return retval;
@@ -501,6 +631,10 @@ void __handle_sysrq(int key, bool check_mask)
 	int orig_log_level;
 	int i;
 	unsigned long flags;
+
+#if defined(CONFIG_BCM_KF_CHAR_SYSRQ)
+	printk("SysRq: intr handled on CPU %d\n", smp_processor_id());
+#endif
 
 	spin_lock_irqsave(&sysrq_key_table_lock, flags);
 	/*
@@ -542,6 +676,9 @@ void __handle_sysrq(int key, bool check_mask)
 			}
 		}
 		printk("\n");
+#if defined(CONFIG_BCM_KF_CHAR_SYSRQ)
+		printk("All commands are case insensitive.\n");
+#endif
 		console_loglevel = orig_log_level;
 	}
 	spin_unlock_irqrestore(&sysrq_key_table_lock, flags);

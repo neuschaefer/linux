@@ -30,6 +30,9 @@ struct map_desc {
 #define MT_MEMORY_DTCM		12
 #define MT_MEMORY_ITCM		13
 #define MT_MEMORY_SO		14
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX) && defined(CONFIG_PLAT_BCM63XX_ACP)
+#define MT_MEMORY_NONSECURED	16
+#endif /* CONFIG_BCM_KF_ARM_BCM963XX && CONFIG_PLAT_BCM63XX_ACP */
 
 #ifdef CONFIG_MMU
 extern void iotable_init(struct map_desc *, int);

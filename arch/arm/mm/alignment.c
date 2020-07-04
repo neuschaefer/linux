@@ -756,6 +756,9 @@ do_alignment(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
 	int isize = 4;
 	int thumb2_32b = 0;
 
+#if defined(CONFIG_BCM_KF_KERN_WARNING)
+	offset.un = 0;
+#endif /* CONFIG_BCM_KF_KERN_WARNING */
 	if (interrupts_enabled(regs))
 		local_irq_enable();
 

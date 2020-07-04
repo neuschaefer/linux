@@ -98,6 +98,64 @@ static inline __sum16 csum_fold(__wsum sum)
  *	By Jorge Cwik <jorge@laser.satlink.net>, adapted for linux by
  *	Arnt Gulbrandsen.
  */
+
+#if defined(CONFIG_BCM_KF_CSUM_UNALIGNED)
+
+/* Brcm version can handle unaligned data. Merged from brcm 2.6.8 kernel.*/
+static inline __sum16 ip_fast_csum(const void *iph, unsigned int ihl)
+{
+	if (((__u32)iph&0x3) == 0) {
+		unsigned int *word = (unsigned int *) iph;
+		unsigned int *stop = word + ihl;
+		unsigned int csum;
+		int carry;
+
+		csum = word[0];
+		csum += word[1];
+		carry = (csum < word[1]);
+		csum += carry;
+
+		csum += word[2];
+		carry = (csum < word[2]);
+		csum += carry;
+
+		csum += word[3];
+		carry = (csum < word[3]);
+		csum += carry;
+
+		word += 4;
+		do {
+			csum += *word;
+			carry = (csum < *word);
+			csum += carry;
+			word++;
+		} while ((unsigned int) word < (unsigned int) stop);
+
+		return csum_fold(csum);
+	} else {
+	        __u16 * buff = (__u16 *) iph;
+	        __u32 sum=0;
+	        __u16 i;
+
+	        // make 16 bit words out of every two adjacent 8 bit words in the packet
+	        // and add them up
+	        for (i=0;i<ihl*2;i++){
+	                sum = sum + (__u32) buff[i];
+	        }
+
+	        // take only 16 bits out of the 32 bit sum and add up the carries
+	        while (sum>>16)
+	          sum = (sum & 0xFFFF)+(sum >> 16);
+
+	        // one's complement the result
+	        sum = ~sum;
+
+	        return ((__sum16) sum);
+	}
+}
+
+#else
+
 static inline __sum16 ip_fast_csum(const void *iph, unsigned int ihl)
 {
 	const unsigned int *word = iph;
@@ -128,6 +186,8 @@ static inline __sum16 ip_fast_csum(const void *iph, unsigned int ihl)
 
 	return csum_fold(csum);
 }
+
+#endif
 
 static inline __wsum csum_tcpudp_nofold(__be32 saddr,
 	__be32 daddr, unsigned short len, unsigned short proto,

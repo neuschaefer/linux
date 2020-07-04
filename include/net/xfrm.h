@@ -1146,6 +1146,10 @@ static inline void xfrm_sk_free_policy(struct sock *sk)
 	}
 }
 
+#if defined(CONFIG_BCM_KF_SPU) && (defined(CONFIG_BCM_SPU) || defined(CONFIG_BCM_SPU_MODULE))
+extern void xfrm_garbage_collect(struct net *net);
+#endif
+
 #else
 
 static inline void xfrm_sk_free_policy(struct sock *sk) {}

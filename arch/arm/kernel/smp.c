@@ -157,7 +157,15 @@ int __cpu_disable(void)
 	 * Flush user cache and TLB mappings, and then remove this CPU
 	 * from the vm mask set of all processes.
 	 */
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX)
+	 /*
+	 * Caches are flushed to the Level of Unification Inner Shareable
+	 * to write-back dirty lines to unified caches shared by all CPUs.
+	 */
+	flush_cache_louis();
+#else
 	flush_cache_all();
+#endif
 	local_flush_tlb_all();
 
 	read_lock(&tasklist_lock);
@@ -205,8 +213,28 @@ void __ref cpu_die(void)
 	local_irq_disable();
 	mb();
 
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX)
+	/*
+	 * Flush the data out of the L1 cache for this CPU.  This must be
+	 * before the completion to ensure that data is safely written out
+	 * before platform_cpu_kill() gets called - which may disable
+	 * *this* CPU and power down its cache.
+	 */
+	flush_cache_louis();
+#endif
+
 	/* Tell __cpu_die() that this CPU is now safe to dispose of */
 	complete(&cpu_died);
+
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX)
+	/*
+	 * Ensure that the cache lines associated with that completion are
+	 * written out.  This covers the case where _this_ CPU is doing the
+	 * powering down, to ensure that the completion is visible to the
+	 * CPU waiting for this one.
+	 */
+	flush_cache_louis();
+#endif
 
 	/*
 	 * actual CPU shutdown procedure is at least platform (if not
@@ -249,22 +277,47 @@ static void percpu_timer_setup(void);
 asmlinkage void __cpuinit secondary_start_kernel(void)
 {
 	struct mm_struct *mm = &init_mm;
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX)
+	unsigned int cpu;
+
+	/*
+	 * The identity mapping is uncached (strongly ordered), so
+	 * switch away from it before attempting any exclusive accesses.
+	 */
+	cpu_switch_mm(mm->pgd, mm);
+#if defined(CONFIG_BCM_KF_ARM_ERRATA_798181)
+	local_flush_bp_all();
+#endif
+	enter_lazy_tlb(mm, current);
+	local_flush_tlb_all();
+#else
 	unsigned int cpu = smp_processor_id();
+#endif /* CONFIG_BCM_KF_ARM_BCM963XX */
 
 	/*
 	 * All kernel threads share the same mm context; grab a
 	 * reference and switch to it.
 	 */
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX)
+	cpu = smp_processor_id();
+#endif
 	atomic_inc(&mm->mm_count);
 	current->active_mm = mm;
 	cpumask_set_cpu(cpu, mm_cpumask(mm));
+#if !defined(CONFIG_BCM_KF_ARM_BCM963XX)
 	cpu_switch_mm(mm->pgd, mm);
 	enter_lazy_tlb(mm, current);
 	local_flush_tlb_all();
+#endif /* CONFIG_BCM_KF_ARM_BCM963XX */
 
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX)
+	cpu_init();
+#endif
 	printk("CPU%u: Booted secondary processor\n", cpu);
 
+#if !defined(CONFIG_BCM_KF_ARM_BCM963XX)
 	cpu_init();
+#endif
 	preempt_disable();
 	trace_hardirqs_off();
 

@@ -61,6 +61,12 @@ struct nf_conntrack_tuple {
 			struct {
 				__be16 key;
 			} gre;
+#if defined(CONFIG_BCM_KF_PROTO_ESP) && \
+	(defined(CONFIG_NF_CT_PROTO_ESP) || defined(CONFIG_NF_CT_PROTO_ESP_MODULE))
+			struct {
+				__be32 spi;
+			} esp;
+#endif
 		} u;
 
 		/* The protocol. */

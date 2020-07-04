@@ -2,6 +2,10 @@
 # Makefile for USB Network drivers
 #
 
+ifdef CONFIG_BCM_KF_USBNET 
+EXTRA_CFLAGS	+= -I$(INC_BRCMSHARED_PUB_PATH)/$(BRCM_BOARD)
+endif
+
 obj-$(CONFIG_USB_CATC)		+= catc.o
 obj-$(CONFIG_USB_KAWETH)	+= kaweth.o
 obj-$(CONFIG_USB_PEGASUS)	+= pegasus.o

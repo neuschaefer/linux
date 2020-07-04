@@ -766,8 +766,13 @@ proc_types:
 @		b	__arm6_mmu_cache_off
 @		b	__armv3_mmu_cache_flush
 
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX) && defined(CONFIG_PLAT_B15_CORE)
+		.word	0x41000000		@ old ARM ID
+		.word	0xff00f000
+#else
 		.word	0x00000000		@ old ARM ID
 		.word	0x0000f000
+#endif /* CONFIG_BCM_KF_ARM_BCM963XX) && defined(CONFIG_PLAT_B15_CORE) */
 		mov	pc, lr
  THUMB(		nop				)
 		mov	pc, lr

@@ -373,6 +373,8 @@
  */
 #define __NR_Linux_syscalls		346
 
+
+
 #endif /* _MIPS_SIM == _MIPS_SIM_ABI32 */
 
 #define __NR_O32_Linux			4000

@@ -72,6 +72,55 @@ config INET
 
 	  Short answer: say Y.
 
+config BLOG
+	bool "Enable Network Buffer Logging"
+	depends on BCM_KF_BLOG
+	---help---
+	  Debug logging of protocol header information of a network packet
+	  buffer as it traverses the Linux networking stack.
+
+	  Say N unless you wish to debug kernel networking stack.
+
+config BLOG_IPV6
+	bool "Enable Network Buffer Logging of IPv6 packets"
+	depends on BCM_KF_BLOG
+	---help---
+	  Debug logging of IPv6 protocol header information of a network packet
+	  buffer as it traverses the Linux networking stack.
+
+	  Say N unless you wish to debug IPv6 kernel networking stack.
+
+config BLOG_MCAST
+	bool "Enable Network Buffer Logging support for Multicast packets"
+	depends on BCM_KF_BLOG
+	---help---
+	  Debug logging of Multicast packet replication in Linux networking stack.
+
+	  Say N unless you wish to debug Multicast in networking stack.
+
+config BLOG_GRE
+	bool "Enable GRE support"
+	depends on BCM_KF_BLOG
+	---help---
+	  Debug logging of GRE protocol header information of a network packet
+	  buffer as it traverses the Linux networking stack.
+
+	  Say N unless you wish to debug GRE in networking stack.
+
+config BLOG_FEATURE
+	bool "Enable Per Packet Modification support for packet flow"
+	depends on BCM_KF_BLOG
+	---help---
+	  Enhance the flow cache to be able to modify the packets on the fly.
+
+config BRCM_DPI
+	bool "Enable Deep Packet Inspection"
+	---help---
+	  Deep packet inspection support
+
+	  Say N unless you wish to peek deeper.
+
+
 if INET
 source "net/ipv4/Kconfig"
 source "net/ipv6/Kconfig"
@@ -337,6 +386,5 @@ source "net/9p/Kconfig"
 source "net/caif/Kconfig"
 source "net/ceph/Kconfig"
 source "net/nfc/Kconfig"
-
 
 endif   # if NET

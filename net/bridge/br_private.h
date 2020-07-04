@@ -19,8 +19,34 @@
 #include <linux/u64_stats_sync.h>
 #include <net/route.h>
 
+#if defined(CONFIG_BCM_KF_IGMP) && defined(CONFIG_BR_IGMP_SNOOP)
+#include <linux/igmp.h>
+#include <linux/in.h>
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+#include <linux/blog.h>
+#endif
+#include <linux/ktime.h>
+#endif
+
+#if defined(CONFIG_BCM_KF_RUNNER)
+#if defined(CONFIG_BCM_RDPA) || defined(CONFIG_BCM_RDPA_MODULE)
+#if defined(CONFIG_BCM_RDPA_BRIDGE) || defined(CONFIG_BCM_RDPA_BRIDGE_MODULE)
+#include "br_fp.h"
+#endif /* CONFIG_BCM_RDPA_BRIDGE || CONFIG_BCM_RDPA_BRIDGE_MODULE */
+#endif /* CONFIG_BCM_RUNNER */
+#endif /* CONFIG_BCM_KF_RUNNER */
+
+
+
 #define BR_HASH_BITS 8
 #define BR_HASH_SIZE (1 << BR_HASH_BITS)
+
+#if defined(CONFIG_BCM_KF_IGMP) && defined(CONFIG_BR_IGMP_SNOOP)
+#define BR_IGMP_HASH_SIZE BR_HASH_SIZE
+#endif
+#if defined(CONFIG_BCM_KF_MLD) && defined(CONFIG_BR_MLD_SNOOP)
+#define BR_MLD_HASH_SIZE BR_HASH_SIZE
+#endif
 
 #define BR_HOLD_TIME (1*HZ)
 
@@ -28,6 +54,10 @@
 #define BR_MAX_PORTS	(1<<BR_PORT_BITS)
 
 #define BR_VERSION	"2.3"
+
+#if defined(CONFIG_BCM_KF_NETFILTER)
+#define BR_MAX_FDB_ENTRIES 4096
+#endif
 
 /* Control of forwarding link local multicast */
 #define BR_GROUPFWD_DEFAULT	0
@@ -74,7 +104,28 @@ struct net_bridge_fdb_entry
 	mac_addr			addr;
 	unsigned char			is_local;
 	unsigned char			is_static;
+
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+	unsigned int			fdb_key;
+#endif
+#if defined(CONFIG_BCM_KF_VLAN_AGGREGATION) && defined(CONFIG_BCM_VLAN_AGGREGATION)
+	unsigned int            vid;
+#endif
 };
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+	struct br_blog_rule_id
+	{
+		u32                     id;
+		struct br_blog_rule_id *next_p;
+	};
+
+	struct br_flow_path
+	{
+		struct net_device       *rxDev_p;   ////*txDev_p;
+		struct br_blog_rule_id  *blogRuleId_p;
+		struct br_flow_path     *next_p;
+	};
+#endif
 
 struct net_bridge_port_group {
 	struct net_bridge_port		*port;
@@ -126,7 +177,12 @@ struct net_bridge_port
 	u32				path_cost;
 	u32				designated_cost;
 	unsigned long			designated_age;
-
+#if defined(CONFIG_BCM_KF_IP)
+#if defined(CONFIG_BCM_KF_IGMP) && defined(CONFIG_BR_IGMP_SNOOP) || (defined(CONFIG_BCM_KF_MLD) && defined(CONFIG_BR_MLD_SNOOP))
+	int                  dirty;
+#endif
+	struct br_flow_path  *flowPath_p;
+#endif
 	struct timer_list		forward_delay_timer;
 	struct timer_list		hold_timer;
 	struct timer_list		message_age_timer;
@@ -152,6 +208,12 @@ struct net_bridge_port
 #ifdef CONFIG_NET_POLL_CONTROLLER
 	struct netpoll			*np;
 #endif
+
+#if defined(CONFIG_BCM_KF_BRIDGE_MAC_FDB_LIMIT) && defined(CONFIG_BCM_BRIDGE_MAC_FDB_LIMIT)
+	int                     num_port_fdb_entries;
+	int                     max_port_fdb_entries;
+	int                     min_port_fdb_entries;
+#endif
 };
 
 #define br_port_exists(dev) (dev->priv_flags & IFF_BRIDGE_PORT)
@@ -176,6 +238,20 @@ struct br_cpu_netstats {
 	struct u64_stats_sync	syncp;
 };
 
+#if (defined(CONFIG_BCM_KF_IGMP) && defined(CONFIG_BR_IGMP_SNOOP)) || (defined(CONFIG_BCM_KF_MLD) && defined(CONFIG_BR_MLD_SNOOP))
+typedef enum {
+	BR_MC_LAN2LAN_STATUS_DEFAULT = 0,
+	BR_MC_LAN2LAN_STATUS_DISABLE = 0,
+	BR_MC_LAN2LAN_STATUS_ENABLE = 1
+} t_BR_MC_LAN2LAN_STATUS;
+
+#define MCPD_MAX_DELAYED_SKB_COUNT 16
+typedef struct {
+    struct sk_buff *skb;
+    unsigned long expiryTime;
+} t_DELAYED_SKB;
+#endif
+
 struct net_bridge
 {
 	spinlock_t			lock;
@@ -183,6 +259,10 @@ struct net_bridge
 	struct net_device		*dev;
 
 	struct br_cpu_netstats __percpu *stats;
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+	BlogStats_t bstats; /* stats when the blog promiscuous layer has consumed packets */
+	struct net_device_stats cstats; /* Cummulative Device stats (rx-bytes, tx-pkts, etc...) */
+#endif
 	spinlock_t			hash_lock;
 	struct hlist_head		hash[BR_HASH_SIZE];
 #ifdef CONFIG_BRIDGE_NETFILTER
@@ -193,6 +273,43 @@ struct net_bridge
 #endif
 	unsigned long			flags;
 #define BR_SET_MAC_ADDR		0x00000001
+
+#if defined(CONFIG_BCM_KF_NETFILTER) 
+	int                     num_fdb_entries;
+#endif
+
+#if defined(CONFIG_BCM_KF_BRIDGE_MAC_FDB_LIMIT) && defined(CONFIG_BCM_BRIDGE_MAC_FDB_LIMIT)
+	int                     max_br_fdb_entries;
+	int                     used_br_fdb_entries;
+#endif
+
+#if defined(CONFIG_BCM_KF_IGMP) && defined(CONFIG_BR_IGMP_SNOOP)
+	struct timer_list 		igmp_timer;
+	int                     igmp_proxy;
+	int                     igmp_snooping;
+	spinlock_t              mcl_lock;
+	struct hlist_head       mc_hash[BR_IGMP_HASH_SIZE];
+	t_BR_MC_LAN2LAN_STATUS	igmp_lan2lan_mc_enable;
+	t_DELAYED_SKB           igmp_delayed_skb[MCPD_MAX_DELAYED_SKB_COUNT];
+#endif
+
+#if defined(CONFIG_BCM_KF_IGMP_RATE_LIMIT)
+  /* for igmp packet rate limit */
+	unsigned int            igmp_rate_limit;
+	unsigned int            igmp_rate_bucket;
+	ktime_t                 igmp_rate_last_packet;
+	unsigned int            igmp_rate_rem_time;
+#endif
+
+#if defined(CONFIG_BCM_KF_MLD) && defined(CONFIG_BR_MLD_SNOOP)
+	struct timer_list 		mld_timer;
+	int                     mld_proxy;
+	int                     mld_snooping;
+	spinlock_t              mld_mcl_lock;
+	struct hlist_head       mld_mc_hash[BR_MLD_HASH_SIZE];
+	t_BR_MC_LAN2LAN_STATUS	mld_lan2lan_mc_enable;
+	t_DELAYED_SKB           mld_delayed_skb[MCPD_MAX_DELAYED_SKB_COUNT];
+#endif
 
 	u16				group_fwd_mask;
 
@@ -253,7 +370,28 @@ struct net_bridge
 	struct timer_list		topology_change_timer;
 	struct timer_list		gc_timer;
 	struct kobject			*ifobj;
+
+#if defined(CONFIG_BCM_KF_RUNNER)
+#if defined(CONFIG_BCM_RDPA) || defined(CONFIG_BCM_RDPA_MODULE)
+#if defined(CONFIG_BCM_RDPA_BRIDGE) || defined(CONFIG_BCM_RDPA_BRIDGE_MODULE)
+	struct br_fp_data		fp_hooks;
+#endif /* CONFIG_BCM_RDPA_BRIDGE || CONFIG_BCM_RDPA_BRIDGE_MODULE */
+#endif /* CONFIG_BCM_RUNNER */
+#endif /* CONFIG_BCM_KF_RUNNER */
+    
 };
+
+#if defined(CONFIG_BCM_KF_IGMP) && defined(CONFIG_BR_IGMP_SNOOP) || (defined(CONFIG_BCM_KF_MLD) && defined(CONFIG_BR_MLD_SNOOP))
+/* these definisions are also there igmprt/hmld.h */
+#define SNOOP_IN_ADD		1
+#define SNOOP_IN_CLEAR		2
+#define SNOOP_EX_ADD		3
+#define SNOOP_EX_CLEAR		4
+
+/* br_netlink_mcpd.c */
+int is_multicast_switching_mode_host_control(void);
+#endif
+
 
 struct br_input_skb_cb {
 	struct net_device *brdev;
@@ -356,12 +494,38 @@ extern int br_fdb_fillbuf(struct net_bridge *br, void *buf,
 extern int br_fdb_insert(struct net_bridge *br,
 			 struct net_bridge_port *source,
 			 const unsigned char *addr);
+#if defined(CONFIG_BCM_KF_VLAN_AGGREGATION) && defined(CONFIG_BCM_VLAN_AGGREGATION)
+void br_fdb_update(struct net_bridge *br, 
+			  struct net_bridge_port *source,
+			  const unsigned char *addr, 
+			  const unsigned int vid);
+#else
 extern void br_fdb_update(struct net_bridge *br,
 			  struct net_bridge_port *source,
 			  const unsigned char *addr);
+#endif
 extern int br_fdb_dump(struct sk_buff *skb, struct netlink_callback *cb);
 extern int br_fdb_add(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg);
 extern int br_fdb_delete(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg);
+
+#if defined(CONFIG_BCM_KF_BRIDGE_STATIC_FDB)
+extern int br_fdb_adddel_static(struct net_bridge *br, 
+                                struct net_bridge_port *source,
+                                const unsigned char *addr, int bInsert);
+#endif
+
+#if defined(CONFIG_BCM_KF_BRIDGE_MAC_FDB_LIMIT) && defined(CONFIG_BCM_BRIDGE_MAC_FDB_LIMIT)
+int br_get_fdb_limit(struct net_bridge *br, 
+						const struct net_bridge_port *p,
+						int is_min);
+
+
+int br_set_fdb_limit(struct net_bridge *br, 
+						struct net_bridge_port *p,
+						int lmt_type,
+						int is_min,
+						int fdb_limit);
+#endif
 
 /* br_forward.c */
 extern void br_deliver(const struct net_bridge_port *to,
@@ -560,5 +724,26 @@ extern void br_sysfs_delbr(struct net_device *dev);
 #define br_sysfs_addbr(dev)	(0)
 #define br_sysfs_delbr(dev)	do { } while(0)
 #endif /* CONFIG_SYSFS */
+
+#if defined(CONFIG_BCM_KF_BRIDGE_STP)
+/* br_notifier.c */
+extern void br_stp_notify_state_port(const struct net_bridge_port *p);
+extern void br_stp_notify_state_bridge(const struct net_bridge *br);
+#endif
+#if defined(CONFIG_BCM_KF_BRIDGE_PORT_ISOLATION)
+extern void br_dev_notify_if_change(char *brName);
+#endif
+
+#if defined(CONFIG_BCM_KF_IGMP) && defined(CONFIG_BR_IGMP_SNOOP)
+/* br_igmp.c */
+void br_igmp_snooping_br_init( struct net_bridge *br );
+void br_igmp_snooping_br_fini( struct net_bridge *br );
+#endif
+
+#if defined(CONFIG_BCM_KF_MLD) && defined(CONFIG_BR_MLD_SNOOP)
+/* br_mld.c */
+void br_mld_snooping_br_init( struct net_bridge *br );
+void br_mld_snooping_br_fini( struct net_bridge *br );
+#endif
 
 #endif

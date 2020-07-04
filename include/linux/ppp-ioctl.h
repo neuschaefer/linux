@@ -77,6 +77,11 @@ struct pppol2tp_ioc_stats {
 	__aligned_u64	rx_errors;
 };
 
+#if defined(CONFIG_BCM_KF_PPP)
+/* PPP device name type */
+typedef char	ppp_real_dev_name[IFNAMSIZ];
+#endif
+
 /*
  * Ioctl definitions.
  */
@@ -111,6 +116,9 @@ struct pppol2tp_ioc_stats {
 #define PPPIOCATTCHAN	_IOW('t', 56, int)	/* attach to ppp channel */
 #define PPPIOCGCHAN	_IOR('t', 55, int)	/* get ppp channel number */
 #define PPPIOCGL2TPSTATS _IOR('t', 54, struct pppol2tp_ioc_stats)
+#if defined(CONFIG_BCM_KF_PPP)
+#define	PPPIOCSREALDEV	_IOW('t', 53, ppp_real_dev_name) /* set real device name */
+#endif
 
 #define SIOCGPPPSTATS   (SIOCDEVPRIVATE + 0)
 #define SIOCGPPPVER     (SIOCDEVPRIVATE + 1)	/* NEVER change this!! */

@@ -256,5 +256,15 @@ struct rcu_head {
 };
 
 #endif	/* __KERNEL__ */
+
+
+#if defined(CONFIG_BCM_KF_UNALIGNED_EXCEPTION)
+#if defined(CONFIG_MIPS_BCM963XX)
+#define LINUX_NET_PACKED __attribute__((packed))
+#else
+#define LINUX_NET_PACKED 
+#endif /* CONFIG_MIPS_BCM963XX */
+#endif /* CONFIG_BCM_KF_UNALIGNED_EXCEPTION  */
+
 #endif /*  __ASSEMBLY__ */
 #endif /* _LINUX_TYPES_H */

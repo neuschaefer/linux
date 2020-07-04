@@ -13,6 +13,31 @@
 #define wfi()	__asm__ __volatile__ ("wfi" : : : "memory")
 #endif
 
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX) && defined(CONFIG_BCM_KF_ARM_ERRATA_798181)
+#if __LINUX_ARM_ARCH__ >= 7
+#define isb(option) __asm__ __volatile__ ("isb " #option : : : "memory")
+#define dsb(option) __asm__ __volatile__ ("dsb " #option : : : "memory")
+#define dmb(option) __asm__ __volatile__ ("dmb " #option : : : "memory")
+#elif defined(CONFIG_CPU_XSC3) || __LINUX_ARM_ARCH__ == 6
+#define isb(x) __asm__ __volatile__ ("mcr p15, 0, %0, c7, c5, 4" \
+				    : : "r" (0) : "memory")
+#define dsb(x) __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 4" \
+				    : : "r" (0) : "memory")
+#define dmb(x) __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 5" \
+				    : : "r" (0) : "memory")
+#elif defined(CONFIG_CPU_FA526)
+#define isb(x) __asm__ __volatile__ ("mcr p15, 0, %0, c7, c5, 4" \
+				    : : "r" (0) : "memory")
+#define dsb(x) __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 4" \
+				    : : "r" (0) : "memory")
+#define dmb(x) __asm__ __volatile__ ("" : : : "memory")
+#else
+#define isb(x) __asm__ __volatile__ ("" : : : "memory")
+#define dsb(x) __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 4" \
+				    : : "r" (0) : "memory")
+#define dmb(x) __asm__ __volatile__ ("" : : : "memory")
+#endif
+#else
 #if __LINUX_ARM_ARCH__ >= 7
 #define isb() __asm__ __volatile__ ("isb" : : : "memory")
 #define dsb() __asm__ __volatile__ ("dsb" : : : "memory")
@@ -36,13 +61,18 @@
 				    : : "r" (0) : "memory")
 #define dmb() __asm__ __volatile__ ("" : : : "memory")
 #endif
+#endif /* defined(CONFIG_BCM_KF_ARM_BCM963XX) && defined(CONFIG_BCM_KF_ARM_ERRATA_798181) */
 
 #ifdef CONFIG_ARCH_HAS_BARRIERS
 #include <mach/barriers.h>
 #elif defined(CONFIG_ARM_DMA_MEM_BUFFERABLE) || defined(CONFIG_SMP)
 #define mb()		do { dsb(); outer_sync(); } while (0)
 #define rmb()		dsb()
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX) && defined(CONFIG_BCM_KF_ARM_ERRATA_798181)
+#define wmb()		do { dsb(st); outer_sync(); } while (0)
+#else
 #define wmb()		mb()
+#endif
 #else
 #include <asm/memory.h>
 #define mb()	do { if (arch_is_coherent()) dmb(); else barrier(); } while (0)
@@ -55,9 +85,15 @@
 #define smp_rmb()	barrier()
 #define smp_wmb()	barrier()
 #else
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX) && defined(CONFIG_BCM_KF_ARM_ERRATA_798181)
+#define smp_mb()	dmb(ish)
+#define smp_rmb()	smp_mb()
+#define smp_wmb()	dmb(ishst)
+#else
 #define smp_mb()	dmb()
 #define smp_rmb()	dmb()
 #define smp_wmb()	dmb()
+#endif
 #endif
 
 #define read_barrier_depends()		do { } while(0)

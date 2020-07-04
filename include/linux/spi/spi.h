@@ -507,6 +507,39 @@ struct spi_transfer {
 	u16		delay_usecs;
 	u32		speed_hz;
 
+#if defined(CONFIG_BCM_KF_SPI)
+    /* added for controllers that support an ignore count for read
+       operations. This is useful if the read requires command bytes
+       and you want to ignore the read data on the bus during the 
+       transmission of those bytes. Note that only prepend_cnt bytes
+       of data will be written from tx_buf.
+    */
+    u8  prepend_cnt;
+    
+    /* added for multibit support 
+       @multi_bit_en - enable multibit operation for this transfer
+       @multi_bit_start_offset - start offset for multibit data
+    */
+    u8  multi_bit_en;
+    u8  multi_bit_start_offset;
+    
+    /* added for controllers that do not support large transfers
+       the controller will break up the transfer into smaller
+       transfers to avoid additional data copies
+       Note that hdr_len should not be included in len
+       @hdr_len - length of header
+       @unit_size - data for each transfer will be divided into multiples of 
+                   unit_size
+       @adr_len - length of address field (max 4 bytes)
+       @adr_offset - offset of first addr byte in header
+    */
+    u8  hdr_len;
+    u8  unit_size;
+    u8  addr_len;
+    u8  addr_offset;
+#endif
+
+
 	struct list_head transfer_list;
 };
 

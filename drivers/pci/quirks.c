@@ -1633,7 +1633,7 @@ static void quirk_reroute_to_boot_interrupts_intel(struct pci_dev *dev)
 
 	dev->irq_reroute_variant = INTEL_IRQ_REROUTE_VARIANT;
 	dev_info(&dev->dev, "rerouting interrupts for [%04x:%04x]\n",
-		 dev->vendor, dev->device);
+			dev->vendor, dev->device);
 }
 DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_80333_0,	quirk_reroute_to_boot_interrupts_intel);
 DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_80333_1,	quirk_reroute_to_boot_interrupts_intel);
@@ -1676,7 +1676,7 @@ static void quirk_disable_intel_boot_interrupt(struct pci_dev *dev)
 	pci_write_config_word(dev, INTEL_6300_IOAPIC_ABAR, pci_config_word);
 
 	dev_info(&dev->dev, "disabled boot interrupts on device [%04x:%04x]\n",
-		 dev->vendor, dev->device);
+		dev->vendor, dev->device);
 }
 DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL,   PCI_DEVICE_ID_INTEL_ESB_10, 	quirk_disable_intel_boot_interrupt);
 DECLARE_PCI_FIXUP_RESUME(PCI_VENDOR_ID_INTEL,   PCI_DEVICE_ID_INTEL_ESB_10, 	quirk_disable_intel_boot_interrupt);
@@ -1744,10 +1744,10 @@ static void quirk_disable_amd_813x_boot_interrupt(struct pci_dev *dev)
 	dev_info(&dev->dev, "disabled boot interrupts on device [%04x:%04x]\n",
 		 dev->vendor, dev->device);
 }
-DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_AMD,	PCI_DEVICE_ID_AMD_8131_BRIDGE,	quirk_disable_amd_813x_boot_interrupt);
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_AMD,   PCI_DEVICE_ID_AMD_8131_BRIDGE, 	quirk_disable_amd_813x_boot_interrupt);
 DECLARE_PCI_FIXUP_RESUME(PCI_VENDOR_ID_AMD,	PCI_DEVICE_ID_AMD_8131_BRIDGE,	quirk_disable_amd_813x_boot_interrupt);
 DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_AMD,	PCI_DEVICE_ID_AMD_8132_BRIDGE,	quirk_disable_amd_813x_boot_interrupt);
-DECLARE_PCI_FIXUP_RESUME(PCI_VENDOR_ID_AMD,	PCI_DEVICE_ID_AMD_8132_BRIDGE,	quirk_disable_amd_813x_boot_interrupt);
+DECLARE_PCI_FIXUP_RESUME(PCI_VENDOR_ID_AMD,   PCI_DEVICE_ID_AMD_8132_BRIDGE, 	quirk_disable_amd_813x_boot_interrupt);
 
 #define AMD_8111_PCI_IRQ_ROUTING	0x56
 
@@ -2833,7 +2833,7 @@ static void __devinit quirk_intel_mc_errata(struct pci_dev *dev)
 		dev_err(&dev->dev, "Error attempting to write the read "
 			"completion coalescing register.\n");
 		return;
-	}
+}
 
 	pr_info_once("Read completion coalescing disabled due to hardware "
 		     "errata relating to 256B MPS.\n");
@@ -2865,7 +2865,6 @@ DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, 0x65f7, quirk_intel_mc_errata);
 DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, 0x65f8, quirk_intel_mc_errata);
 DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, 0x65f9, quirk_intel_mc_errata);
 DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, 0x65fa, quirk_intel_mc_errata);
-
 
 static void do_one_fixup_debug(void (*fn)(struct pci_dev *dev), struct pci_dev *dev)
 {
@@ -2916,6 +2915,7 @@ static void __devinit disable_igfx_irq(struct pci_dev *dev)
 }
 DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL, 0x0102, disable_igfx_irq);
 DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL, 0x010a, disable_igfx_irq);
+
 
 static void pci_do_fixups(struct pci_dev *dev, struct pci_fixup *f,
 			  struct pci_fixup *end)
@@ -3028,12 +3028,12 @@ static int __init pci_apply_final_quirks(void)
 			       pci_dfl_cache_line_size << 2);
 			pci_cache_line_size = pci_dfl_cache_line_size;
 		}
-	}
+                }
 	if (!pci_cache_line_size) {
 		printk(KERN_DEBUG "PCI: CLS %u bytes, default %u\n",
 		       cls << 2, pci_dfl_cache_line_size << 2);
 		pci_cache_line_size = cls ? cls : pci_dfl_cache_line_size;
-	}
+        }
 
 	return 0;
 }
@@ -3083,7 +3083,7 @@ static int reset_intel_82599_sfp_virtfn(struct pci_dev *dev, int probe)
 	msleep(100);
 
 	return 0;
-}
+        }
 
 #define PCI_DEVICE_ID_INTEL_82599_SFP_VF   0x10ed
 
@@ -3105,7 +3105,7 @@ int pci_dev_specific_reset(struct pci_dev *dev, int probe)
 		    (i->device == dev->device ||
 		     i->device == (u16)PCI_ANY_ID))
 			return i->reset(dev, probe);
-	}
+}
 
 	return -ENOTTY;
 }

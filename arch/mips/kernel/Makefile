@@ -8,6 +8,8 @@ obj-y		+= cpu-probe.o branch.o entry.o genex.o irq.o process.o \
 		   ptrace.o reset.o setup.o signal.o syscall.o \
 		   time.o topology.o traps.o unaligned.o watch.o vdso.o
 
+obj-$(CONFIG_BCM_KF_TSTAMP)	+= bcm_tstamp.o
+
 ifdef CONFIG_FUNCTION_TRACER
 CFLAGS_REMOVE_ftrace.o = -pg
 CFLAGS_REMOVE_early_printk.o = -pg
@@ -16,7 +18,17 @@ CFLAGS_REMOVE_perf_event_mipsxx.o = -pg
 endif
 
 obj-$(CONFIG_CEVT_BCM1480)	+= cevt-bcm1480.o
+
+ifdef BCM_KF # defined (CONFIG_BCM_KF_POWER_SAVE)
+ifneq ($(strip $(CONFIG_BCM_HOSTMIPS_PWRSAVE_TIMERS)),)
+obj-$(CONFIG_CEVT_R4K_LIB)	+= cevt-r4k-bcm-pwr.o
+else
 obj-$(CONFIG_CEVT_R4K_LIB)	+= cevt-r4k.o
+endif
+else # BCM_KF
+obj-$(CONFIG_CEVT_R4K_LIB)	+= cevt-r4k.o
+endif # BCM_KF
+
 obj-$(CONFIG_MIPS_MT_SMTC)	+= cevt-smtc.o
 obj-$(CONFIG_CEVT_DS1287)	+= cevt-ds1287.o
 obj-$(CONFIG_CEVT_GT641XX)	+= cevt-gt641xx.o
@@ -25,7 +37,17 @@ obj-$(CONFIG_CEVT_TXX9)		+= cevt-txx9.o
 obj-$(CONFIG_CSRC_BCM1480)	+= csrc-bcm1480.o
 obj-$(CONFIG_CSRC_IOASIC)	+= csrc-ioasic.o
 obj-$(CONFIG_CSRC_POWERTV)	+= csrc-powertv.o
+
+ifdef BCM_KF # defined (CONFIG_BCM_KF_POWER_SAVE)
+ifneq ($(strip $(CONFIG_BCM_HOSTMIPS_PWRSAVE_TIMERS)),)
+obj-$(CONFIG_CSRC_R4K_LIB)	+= csrc-r4k-bcm-pwr.o
+else
 obj-$(CONFIG_CSRC_R4K_LIB)	+= csrc-r4k.o
+endif
+else # BCM_KF
+obj-$(CONFIG_CSRC_R4K_LIB)	+= csrc-r4k.o
+endif # BCM_KF
+
 obj-$(CONFIG_CSRC_SB1250)	+= csrc-sb1250.o
 obj-$(CONFIG_SYNC_R4K)		+= sync-r4k.o
 

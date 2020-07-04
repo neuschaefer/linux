@@ -38,6 +38,10 @@
 #include <net/protocol.h>
 #include <net/xfrm.h>
 
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+#include <linux/blog.h>
+#endif
+
 #define IPV6HDR_BASELEN 8
 
 struct tmp_ext {
@@ -345,6 +349,10 @@ static int ah6_output(struct xfrm_state *x, struct sk_buff *skb)
 	struct ah_data *ahp;
 	struct tmp_ext *iph_ext;
 
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+	blog_skip(skb);
+#endif
+
 	ahp = x->data;
 	ahash = ahp->ahash;
 
@@ -416,6 +424,21 @@ static int ah6_output(struct xfrm_state *x, struct sk_buff *skb)
 	ahash_request_set_callback(req, 0, ah6_output_done, skb);
 
 	AH_SKB_CB(skb)->tmp = iph_base;
+
+#if defined(CONFIG_BCM_KF_SPU) && defined(CONFIG_BCM_SPU)
+	if((skb_headroom(skb) < 12) ||
+	   (skb_tailroom(skb) < 20))
+	{
+		req->alloc_buff_spu = 1;
+	}
+	else
+	{
+        req->alloc_buff_spu = 0;
+	}
+
+	/* not used for output */   
+	req->headerLen = 0;
+#endif
 
 	err = crypto_ahash_digest(req);
 	if (err) {
@@ -510,6 +533,10 @@ static int ah6_input(struct xfrm_state *x, struct sk_buff *skb)
 	int nfrags;
 	int err = -ENOMEM;
 
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+	blog_skip(skb);
+#endif
+
 	if (!pskb_may_pull(skb, sizeof(struct ip_auth_hdr)))
 		goto out;
 
@@ -575,6 +602,21 @@ static int ah6_input(struct xfrm_state *x, struct sk_buff *skb)
 	ahash_request_set_callback(req, 0, ah6_input_done, skb);
 
 	AH_SKB_CB(skb)->tmp = work_iph;
+
+#if defined(CONFIG_BCM_KF_SPU) && defined(CONFIG_BCM_SPU)
+	if((skb_headroom(skb) < 12) ||
+	   (skb_tailroom(skb) < 20))
+	{
+		req->alloc_buff_spu = 1;
+	}
+	else
+	{
+		req->alloc_buff_spu = 0;
+	}
+
+	/* offset to icv */
+	req->headerLen = &ah->auth_data[0] - skb->data;
+#endif
 
 	err = crypto_ahash_digest(req);
 	if (err) {

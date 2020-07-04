@@ -242,6 +242,8 @@ unsigned int oom_badness(struct task_struct *p, struct mem_cgroup *memcg,
 /*
  * Determine the type of allocation constraint.
  */
+#if !defined(CONFIG_BCM_KF_OOM_REBOOT)
+
 #ifdef CONFIG_NUMA
 static enum oom_constraint constrained_alloc(struct zonelist *zonelist,
 				gfp_t gfp_mask, nodemask_t *nodemask,
@@ -376,6 +378,7 @@ static struct task_struct *select_bad_process(unsigned int *ppoints,
 	return chosen;
 }
 
+#endif
 /**
  * dump_tasks - dump current memory state of all system tasks
  * @mem: current's memory controller, if constrained
@@ -418,6 +421,9 @@ static void dump_tasks(const struct mem_cgroup *memcg, const nodemask_t *nodemas
 	}
 }
 
+#if !defined(CONFIG_BCM_KF_OOM_REBOOT)
+
+
 static void dump_header(struct task_struct *p, gfp_t gfp_mask, int order,
 			struct mem_cgroup *memcg, const nodemask_t *nodemask)
 {
@@ -434,6 +440,8 @@ static void dump_header(struct task_struct *p, gfp_t gfp_mask, int order,
 	if (sysctl_oom_dump_tasks)
 		dump_tasks(memcg, nodemask);
 }
+
+
 
 #define K(x) ((x) << (PAGE_SHIFT-10))
 static void oom_kill_process(struct task_struct *p, gfp_t gfp_mask, int order,
@@ -529,6 +537,8 @@ static void oom_kill_process(struct task_struct *p, gfp_t gfp_mask, int order,
 }
 #undef K
 
+
+
 /*
  * Determines whether the kernel must panic because of the panic_on_oom sysctl.
  */
@@ -552,6 +562,9 @@ static void check_panic_on_oom(enum oom_constraint constraint, gfp_t gfp_mask,
 	panic("Out of memory: %s panic_on_oom is enabled\n",
 		sysctl_panic_on_oom == 2 ? "compulsory" : "system-wide");
 }
+
+
+#endif
 
 #ifdef CONFIG_CGROUP_MEM_RES_CTLR
 void mem_cgroup_out_of_memory(struct mem_cgroup *memcg, gfp_t gfp_mask,
@@ -699,6 +712,13 @@ static void clear_system_oom(void)
 void out_of_memory(struct zonelist *zonelist, gfp_t gfp_mask,
 		int order, nodemask_t *nodemask, bool force_kill)
 {
+#if defined(CONFIG_BCM_KF_OOM_REBOOT)
+#define OOM_REBOOT_DELAY (5)
+#define OOM_REBOOT_INTERVAL (HZ*120)
+	static int oom_count=0;
+	static unsigned long oom_timestamp=0;
+	unsigned long freed = 0;
+#else
 	const nodemask_t *mpol_mask;
 	struct task_struct *p;
 	unsigned long totalpages;
@@ -706,6 +726,7 @@ void out_of_memory(struct zonelist *zonelist, gfp_t gfp_mask,
 	unsigned int points;
 	enum oom_constraint constraint = CONSTRAINT_NONE;
 	int killed = 0;
+#endif
 
 	blocking_notifier_call_chain(&oom_notify_list, 0, &freed);
 	if (freed > 0)
@@ -721,6 +742,40 @@ void out_of_memory(struct zonelist *zonelist, gfp_t gfp_mask,
 		set_thread_flag(TIF_MEMDIE);
 		return;
 	}
+
+#if defined(CONFIG_BCM_KF_OOM_REBOOT)
+
+	/* For our embedded system, most of the processes are considered essential. */
+	/* Randomly killing a process is no better than a reboot so we won't kill process here*/
+	
+	printk(KERN_WARNING "\n\n%s triggered out of memory codition (oom killer not called): "
+		"gfp_mask=0x%x, order=%d, oom_adj=%d\n\n",
+		current->comm, gfp_mask, order, current->signal->oom_adj);
+	dump_stack();
+	show_mem(0);
+	printk("\n");
+	/*
+	 * The process that triggered the oom is not necessarily the one that
+	 * caused it.  dump_tasks shows all tasks and their memory usage.
+	 */
+	read_lock(&tasklist_lock);
+	dump_tasks(NULL, nodemask);
+	read_unlock(&tasklist_lock);
+
+	/* Reboot if OOM, but don't do it immediately - just in case this can be too sensitive */
+	if ((jiffies - oom_timestamp) > OOM_REBOOT_INTERVAL) {
+		oom_timestamp = jiffies;
+		oom_count = 0;		
+	}
+	else {
+		oom_count++;
+		if (oom_count >= OOM_REBOOT_DELAY) {
+			panic("Reboot due to persistent out of memory codition..");
+		}
+	}
+	schedule_timeout_interruptible(HZ*5);
+
+#else
 
 	/*
 	 * Check if there were limitations on the allocation (only relevant for
@@ -763,6 +818,8 @@ out:
 	 */
 	if (killed && !test_thread_flag(TIF_MEMDIE))
 		schedule_timeout_uninterruptible(1);
+
+#endif
 }
 
 /*

@@ -42,6 +42,12 @@ struct nf_conntrack_expect {
 	/* Expectation class */
 	unsigned int class;
 
+#if defined(CONFIG_BCM_KF_NETFILTER)
+	unsigned derived_timeout; /* 0 means no derived_timeout, 0xFFFFFFFF
+				   * means never timeout until master ct is
+				   * disconnected, others means timeout secs */
+#endif
+
 #ifdef CONFIG_NF_NAT_NEEDED
 	__be32 saved_ip;
 	/* This is the original per-proto part, used to map the
@@ -66,6 +72,10 @@ struct nf_conntrack_expect_policy {
 };
 
 #define NF_CT_EXPECT_CLASS_DEFAULT	0
+
+#if defined(CONFIG_BCM_KF_NETFILTER)
+#define NF_CT_EXPECT_DERIVED_TIMEOUT 0x80
+#endif
 
 int nf_conntrack_expect_init(struct net *net);
 void nf_conntrack_expect_fini(struct net *net);

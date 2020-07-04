@@ -61,4 +61,19 @@ static inline void prefetch_range(void *addr, size_t len)
 #endif
 }
 
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX) && defined(CONFIG_BCM_KF_ARM_PLD)
+#if defined(CONFIG_BCM963138) || defined(CONFIG_BCM963148)
+static inline void bcm_prefetch(const void * addr, const int cachelines)
+{
+    switch (cachelines) {
+        case 4: __asm__ __volatile__("pld\t%a0" : : "p"(addr + ((0x1 << CONFIG_ARM_L1_CACHE_SHIFT) * 3)) : "cc");
+        case 3: __asm__ __volatile__("pld\t%a0" : : "p"(addr + ((0x1 << CONFIG_ARM_L1_CACHE_SHIFT) * 2)) : "cc");
+        case 2: __asm__ __volatile__("pld\t%a0" : : "p"(addr + ((0x1 << CONFIG_ARM_L1_CACHE_SHIFT) * 1)) : "cc");
+        case 1: __asm__ __volatile__("pld\t%a0" : : "p"(addr + ((0x1 << CONFIG_ARM_L1_CACHE_SHIFT) * 0)) : "cc");
+    }
+}
+#else
+static inline void bcm_prefetch(const void * addr, const int cachelines) { }
+#endif /* CONFIG_BCM963138 || defined(CONFIG_BCM963148) */
+#endif
 #endif

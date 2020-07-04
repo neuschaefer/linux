@@ -80,7 +80,11 @@ struct icmphdr {
 		__be16	mtu;
 	} frag;
   } un;
+#if defined(CONFIG_MIPS_BCM963XX) && defined(CONFIG_BCM_KF_UNALIGNED_EXCEPTION)
+} LINUX_NET_PACKED;
+#else
 };
+#endif
 
 #ifdef __KERNEL__
 #include <linux/skbuff.h>

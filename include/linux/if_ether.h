@@ -92,6 +92,13 @@
 #define ETH_P_EDSA	0xDADA		/* Ethertype DSA [ NOT AN OFFICIALLY REGISTERED ID ] */
 #define ETH_P_AF_IUCV   0xFBFB		/* IBM af_iucv [ NOT AN OFFICIALLY REGISTERED ID ] */
 
+#if defined(CONFIG_BCM_KF_P8021AG)
+#define ETH_P_8021AG	0x8902		/* 802.1ag Connectivity Fault Mgmt */
+#endif
+#if defined(CONFIG_BCM_KF_VLAN)
+#define	ETH_P_8023AH	0x8809      /* 802.3ah Ethernet OAM */
+#endif
+
 /*
  *	Non DIX types. Won't clash for 1500 types.
  */

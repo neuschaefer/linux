@@ -33,6 +33,10 @@ struct ahash_request {
 
 	/* This field may only be used by the ahash API code. */
 	void *priv;
+#if defined(CONFIG_BCM_KF_SPU) && (defined(CONFIG_BCM_SPU) || defined (CONFIG_BCM_SPU_MODULE))
+    int alloc_buff_spu;
+    int headerLen;
+#endif
 
 	void *__ctx[] CRYPTO_MINALIGN_ATTR;
 };

@@ -125,6 +125,34 @@ static int __init set_raw_show_trace(char *str)
 __setup("raw_show_trace", set_raw_show_trace);
 #endif
 
+#if defined(CONFIG_BCM_KF_FAP) && (defined(CONFIG_BCM_FAP) || defined(CONFIG_BCM_FAP_MODULE))
+
+long * traps_fap0DbgVals = NULL;
+long * traps_fap1DbgVals = NULL;
+EXPORT_SYMBOL(traps_fap0DbgVals);
+EXPORT_SYMBOL(traps_fap1DbgVals);
+
+static void dumpFapInfo(void)
+{
+    int i;
+    printk("FAP0: ");
+    if (traps_fap0DbgVals != NULL)
+        for (i = 0; i < 10; i++)
+        {
+            printk("[%d]:%08lx ", i, traps_fap0DbgVals[i]);
+        }
+    printk("\n");
+    
+    printk("FAP1: ");
+    if (traps_fap1DbgVals != NULL)
+        for (i = 0; i < 10; i++)
+        {
+            printk("[%d]:%08lx ", i, traps_fap1DbgVals[i]);
+        }
+    printk("\n");
+}
+#endif
+
 static void show_backtrace(struct task_struct *task, const struct pt_regs *regs)
 {
 	unsigned long sp = regs->regs[29];
@@ -135,12 +163,29 @@ static void show_backtrace(struct task_struct *task, const struct pt_regs *regs)
 		show_raw_backtrace(sp);
 		return;
 	}
+
+#if defined(CONFIG_BCM_KF_SHOW_RAW_BACKTRACE)&&defined(CONFIG_KALLSYMS)
+	/*
+	 * Always print the raw backtrace, this will be helpful
+	 * if unwind_stack fails before giving a proper decoded backtrace
+	 */ 
+	show_raw_backtrace(sp);
+	printk("\n");
+#endif
+
 	printk("Call Trace:\n");
 	do {
 		print_ip_sym(pc);
 		pc = unwind_stack(task, &sp, pc, &ra);
 	} while (pc);
 	printk("\n");
+    
+#if defined(CONFIG_BCM_KF_FAP) && (defined(CONFIG_BCM_FAP) || defined(CONFIG_BCM_FAP_MODULE))
+        printk("FAP Information:\n");
+        dumpFapInfo();
+        printk("\n");
+#endif
+    
 }
 
 /*
@@ -207,6 +252,11 @@ void show_stack(struct task_struct *task, unsigned long *sp)
 void dump_stack(void)
 {
 	struct pt_regs regs;
+
+#if (defined(CONFIG_BCM_KF_BOUNCE) && defined(CONFIG_BRCM_BOUNCE))
+	extern void bounce_panic(void);
+	bounce_panic();
+#endif
 
 	prepare_frametrace(&regs);
 	show_backtrace(current, &regs);

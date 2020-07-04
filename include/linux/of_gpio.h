@@ -64,6 +64,9 @@ extern int of_gpio_simple_xlate(struct gpio_chip *gc,
 				u32 *flags);
 
 #else /* CONFIG_OF_GPIO */
+#if defined(CONFIG_BCM_KF_KERN_WARNING)
+struct gpio_chip;
+#endif
 
 /* Drivers may not strictly depend on the GPIO support, so let them link. */
 static inline int of_get_named_gpio_flags(struct device_node *np,

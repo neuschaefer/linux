@@ -411,6 +411,10 @@ int ubi_remove_volume(struct ubi_volume_desc *desc, int no_vtbl)
 	struct ubi_device *ubi = vol->ubi;
 	int i, err, vol_id = vol->vol_id, reserved_pebs = vol->reserved_pebs;
 
+#if defined(CONFIG_BCM_KF_KERN_WARNING)
+	err = -EPERM;
+#endif
+
 	dbg_gen("remove device %d, volume %d", ubi->ubi_num, vol_id);
 	ubi_assert(desc->mode == UBI_EXCLUSIVE);
 	ubi_assert(vol == ubi->volumes[vol_id]);
@@ -464,6 +468,11 @@ int ubi_remove_volume(struct ubi_volume_desc *desc, int no_vtbl)
 	if (!no_vtbl && paranoid_check_volumes(ubi))
 		dbg_err("check failed while removing volume %d", vol_id);
 
+#if defined(CONFIG_BCM_KF_KERN_WARNING)
+	if (err == -EPERM) {
+		printk("vmt.c: ubi_remove_volume really returned an undefined error\n");
+	}
+#endif
 	return err;
 
 out_err:

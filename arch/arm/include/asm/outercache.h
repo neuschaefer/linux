@@ -35,6 +35,13 @@ struct outer_cache_fns {
 #endif
 	void (*set_debug)(unsigned long);
 	void (*resume)(void);
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX)
+	void (*spin_lock_irqsave)(void);
+	void (*spin_unlock_irqrestore)(void);
+	void (*sync_no_lock)(void);
+	void (*flush_line_no_lock)(unsigned long);
+	void (*inv_line_no_lock)(unsigned long);
+#endif
 };
 
 #ifdef CONFIG_OUTER_CACHE
@@ -81,6 +88,32 @@ static inline void outer_resume(void)
 		outer_cache.resume();
 }
 
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX)
+static inline void outer_spin_lock_irqsave(void)
+{
+	outer_cache.spin_lock_irqsave();
+}
+
+static inline void outer_spin_unlock_irqrestore(void)
+{
+	outer_cache.spin_unlock_irqrestore();
+}
+
+static inline void outer_sync_no_lock(void)
+{
+	outer_cache.sync_no_lock();
+}
+
+static inline void outer_flush_line_no_lock(phys_addr_t addr)
+{
+	outer_cache.flush_line_no_lock(addr);
+}
+
+static inline void outer_inv_line_no_lock(phys_addr_t addr)
+{
+	outer_cache.inv_line_no_lock(addr);
+}
+#endif
 #else
 
 static inline void outer_inv_range(phys_addr_t start, phys_addr_t end)

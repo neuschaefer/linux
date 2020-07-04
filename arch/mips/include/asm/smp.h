@@ -38,6 +38,11 @@ extern int __cpu_logical_map[NR_CPUS];
 
 #define SMP_RESCHEDULE_YOURSELF	0x1	/* XXX braindead */
 #define SMP_CALL_FUNCTION	0x2
+
+#if defined(CONFIG_BCM_KF_MIPS_BCM963XX) && defined(CONFIG_BCM_HOSTMIPS_PWRSAVE_TIMERS)
+#define SMP_BCM_PWRSAVE_TIMER   0x3
+#endif
+
 /* Octeon - Tell another core to flush its icache */
 #define SMP_ICACHE_FLUSH	0x4
 

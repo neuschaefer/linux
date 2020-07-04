@@ -306,6 +306,37 @@ static void l2x0_unlock(u32 cache_id)
 	}
 }
 
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX)
+static unsigned long gb_flags;
+
+static void l2x0_spin_lock_irqsave(void)
+{
+	raw_spin_lock_irqsave(&l2x0_lock, gb_flags);
+}
+
+static void l2x0_spin_unlock_irqrestore(void)
+{
+	raw_spin_unlock_irqrestore(&l2x0_lock, gb_flags);
+}
+
+static void l2x0_cache_sync_no_lock(void)
+{
+	cache_sync();
+}
+
+static void l2x0_flush_line_no_lock(unsigned long addr)
+{
+	debug_writel(0x03);
+	l2x0_flush_line(addr);
+	debug_writel(0x00);
+}
+
+static void l2x0_inv_line_no_lock(unsigned long addr)
+{
+	l2x0_inv_line(addr);
+}
+#endif
+
 void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
 {
 	u32 aux;
@@ -383,6 +414,13 @@ void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
 	outer_cache.flush_all = l2x0_flush_all;
 	outer_cache.inv_all = l2x0_inv_all;
 	outer_cache.disable = l2x0_disable;
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX)
+	outer_cache.spin_lock_irqsave = l2x0_spin_lock_irqsave;
+	outer_cache.spin_unlock_irqrestore = l2x0_spin_unlock_irqrestore;
+	outer_cache.sync_no_lock = l2x0_cache_sync_no_lock;
+	outer_cache.flush_line_no_lock = l2x0_flush_line_no_lock;
+	outer_cache.inv_line_no_lock = l2x0_inv_line_no_lock;
+#endif
 
 	printk(KERN_INFO "%s cache controller enabled\n", type);
 	printk(KERN_INFO "l2x0: %d ways, CACHE_ID 0x%08x, AUX_CTRL 0x%08x, Cache size: %d B\n",

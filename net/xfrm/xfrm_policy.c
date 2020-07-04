@@ -2291,7 +2291,11 @@ static void __xfrm_garbage_collect(struct net *net)
 	}
 }
 
+#if defined(CONFIG_BCM_KF_SPU) && (defined(CONFIG_BCM_SPU) || defined(CONFIG_BCM_SPU_MODULE))
+void xfrm_garbage_collect(struct net *net)
+#else
 static void xfrm_garbage_collect(struct net *net)
+#endif
 {
 	flow_cache_flush();
 	__xfrm_garbage_collect(net);

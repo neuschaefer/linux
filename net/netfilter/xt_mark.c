@@ -28,6 +28,15 @@ static unsigned int
 mark_tg(struct sk_buff *skb, const struct xt_action_param *par)
 {
 	const struct xt_mark_tginfo2 *info = par->targinfo;
+    
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG_FEATURE)
+	skb->ipt_check |= IPT_TARGET_MARK;
+	skb->ipt_log.u32[BLOG_ORIGINAL_MARK_INDEX] = skb->mark;
+	skb->ipt_log.u32[BLOG_TARGET_MARK_INDEX] = (skb->mark & ~info->mask) ^
+	   info->mark;
+	if ( skb->ipt_check & IPT_TARGET_CHECK )
+		return XT_CONTINUE;
+#endif
 
 	skb->mark = (skb->mark & ~info->mask) ^ info->mark;
 	return XT_CONTINUE;

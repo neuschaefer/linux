@@ -2,13 +2,19 @@
 # Makefile for the linux kernel.
 #
 
+ifdef BCM_KF # defined(CONFIG_BCM_KF_BOUNCE)
+ifdef CONFIG_BCM_BOUNCE_DATAPATH
+EXTRA_CFLAGS += -O0 -finstrument-functions
+endif
+endif # BCM_KF
+
 obj-y     = fork.o exec_domain.o panic.o printk.o \
 	    cpu.o exit.o itimer.o time.o softirq.o resource.o \
 	    sysctl.o sysctl_binary.o capability.o ptrace.o timer.o user.o \
 	    signal.o sys.o kmod.o workqueue.o pid.o \
 	    rcupdate.o extable.o params.o posix-timers.o \
-	    kthread.o wait.o kfifo.o sys_ni.o posix-cpu-timers.o mutex.o \
-	    hrtimer.o rwsem.o nsproxy.o srcu.o semaphore.o \
+	    kthread.o wait.o kfifo.o sys_ni.o posix-cpu-timers.o \
+	    hrtimer.o nsproxy.o srcu.o semaphore.o \
 	    notifier.o ksysfs.o cred.o \
 	    async.o range.o groups.o
 
@@ -29,7 +35,11 @@ obj-$(CONFIG_FREEZER) += freezer.o
 obj-$(CONFIG_PROFILING) += profile.o
 obj-$(CONFIG_STACKTRACE) += stacktrace.o
 obj-y += time/
+ifneq ($(CONFIG_PREEMPT_RT_FULL),y)
+obj-y += mutex.o
 obj-$(CONFIG_DEBUG_MUTEXES) += mutex-debug.o
+obj-y += rwsem.o
+endif
 obj-$(CONFIG_LOCKDEP) += lockdep.o
 ifeq ($(CONFIG_PROC_FS),y)
 obj-$(CONFIG_LOCKDEP) += lockdep_proc.o
@@ -41,6 +51,7 @@ endif
 obj-$(CONFIG_RT_MUTEXES) += rtmutex.o
 obj-$(CONFIG_DEBUG_RT_MUTEXES) += rtmutex-debug.o
 obj-$(CONFIG_RT_MUTEX_TESTER) += rtmutex-tester.o
+obj-$(CONFIG_PREEMPT_RT_FULL) += rt.o
 obj-$(CONFIG_GENERIC_ISA_DMA) += dma.o
 obj-$(CONFIG_SMP) += smp.o
 ifneq ($(CONFIG_SMP),y)
@@ -99,6 +110,10 @@ obj-$(CONFIG_RING_BUFFER) += trace/
 obj-$(CONFIG_TRACEPOINTS) += trace/
 obj-$(CONFIG_IRQ_WORK) += irq_work.o
 obj-$(CONFIG_CPU_PM) += cpu_pm.o
+
+ifdef BCM_KF # defined(CONFIG_BCM_KF_LOG)
+obj-$(CONFIG_BCM_LOG) += bcm_log.o
+endif # BCM_KF
 
 obj-$(CONFIG_PERF_EVENTS) += events/
 

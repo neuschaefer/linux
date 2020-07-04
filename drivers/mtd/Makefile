@@ -32,4 +32,7 @@ inftl-objs		:= inftlcore.o inftlmount.o
 
 obj-y		+= chips/ lpddr/ maps/ devices/ nand/ onenand/ tests/
 
+#if defined(CONFIG_BCM_KF_MTD_BCMNAND)
+obj-$(CONFIG_MTD_BRCMNAND)	+= brcmnand/
+#endif # BCM_KF
 obj-$(CONFIG_MTD_UBI)		+= ubi/

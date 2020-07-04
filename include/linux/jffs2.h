@@ -26,6 +26,11 @@
 #define KSAMTIB_CIGAM_2SFFJ 0x8519 /* For detecting wrong-endian fs */
 #define JFFS2_EMPTY_BITMASK 0xffff
 #define JFFS2_DIRTY_BITMASK 0x0000
+#if defined(CONFIG_BCM_KF_JFFS) || !defined(CONFIG_BCM_IN_KERNEL)
+#define JFFS2_EBH_COMPAT_FSET 0x00
+#define JFFS2_EBH_INCOMPAT_FSET 0x00
+#define JFFS2_EBH_ROCOMPAT_FSET 0x00
+#endif
 
 /* Summary node MAGIC marker */
 #define JFFS2_SUM_MAGIC	0x02851885
@@ -67,6 +72,10 @@
 
 #define JFFS2_NODETYPE_XATTR (JFFS2_FEATURE_INCOMPAT | JFFS2_NODE_ACCURATE | 8)
 #define JFFS2_NODETYPE_XREF (JFFS2_FEATURE_INCOMPAT | JFFS2_NODE_ACCURATE | 9)
+
+#if defined(CONFIG_BCM_KF_JFFS) || !defined(CONFIG_BCM_IN_KERNEL)
+#define JFFS2_NODETYPE_ERASEBLOCK_HEADER (JFFS2_FEATURE_RWCOMPAT_DELETE | JFFS2_NODE_ACCURATE | 5)
+#endif
 
 /* XATTR Related */
 #define JFFS2_XPREFIX_USER		1	/* for "user." */
@@ -203,6 +212,22 @@ struct jffs2_raw_summary
 	jint32_t node_crc; 	/* node crc */
 	jint32_t sum[0]; 	/* inode summary info */
 };
+#if defined(CONFIG_BCM_KF_JFFS) || !defined(CONFIG_BCM_IN_KERNEL)
+struct jffs2_raw_ebh
+{
+	jint16_t magic;
+	jint16_t nodetype; /* == JFFS2_NODETYPE_ERASEBLOCK_HEADER */
+	jint32_t totlen;
+	jint32_t hdr_crc;
+	jint32_t node_crc;
+	uint8_t  reserved; /* reserved for future use and alignment */
+	uint8_t  compat_fset;
+	uint8_t  incompat_fset;
+	uint8_t  rocompat_fset;
+	jint32_t erase_count; /* the erase count of this erase block */
+	jint32_t data[0];
+} __attribute__((packed));
+#endif
 
 union jffs2_node_union
 {
@@ -211,6 +236,9 @@ union jffs2_node_union
 	struct jffs2_raw_xattr x;
 	struct jffs2_raw_xref r;
 	struct jffs2_raw_summary s;
+#if defined(CONFIG_BCM_KF_JFFS) || !defined(CONFIG_BCM_IN_KERNEL)
+	struct jffs2_raw_ebh eh;
+#endif
 	struct jffs2_unknown_node u;
 };
 

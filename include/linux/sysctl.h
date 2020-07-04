@@ -153,6 +153,9 @@ enum
 	KERN_MAX_LOCK_DEPTH=74, /* int: rtmutex's maximum lock depth */
 	KERN_NMI_WATCHDOG=75, /* int: enable/disable nmi watchdog */
 	KERN_PANIC_ON_NMI=76, /* int: whether we will panic on an unrecovered */
+#if defined(CONFIG_BCM_KF_PRINTK_INT_ENABLED) && defined(CONFIG_BCM_PRINTK_INT_ENABLED)
+	KERN_PRINTK_WITH_INTERRUPTS_ENABLED=77, /* int: print with interrupts enabled */
+#endif
 };
 
 
@@ -933,6 +936,7 @@ enum
 #include <linux/rcupdate.h>
 #include <linux/wait.h>
 #include <linux/rbtree.h>
+#include <linux/atomic.h>
 
 /* For the /proc/sys support */
 struct ctl_table;

@@ -25,6 +25,10 @@
 #include <net/netfilter/ipv4/nf_conntrack_ipv4.h>
 #include <net/netfilter/ipv6/nf_conntrack_ipv6.h>
 
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+#include <linux/blog.h>
+#endif
+
 enum udp_conntrack {
 	UDP_CT_UNREPLIED,
 	UDP_CT_REPLIED,
@@ -88,8 +92,18 @@ static int udp_packet(struct nf_conn *ct,
 	/* If we've seen traffic both ways, this is some kind of UDP
 	   stream.  Extend timeout. */
 	if (test_bit(IPS_SEEN_REPLY_BIT, &ct->status)) {
+#if defined(CONFIG_BCM_KF_NETFILTER)
+                unsigned timeout = udp_timeouts[UDP_CT_REPLIED];
+                if (ct->derived_timeout == 0xFFFFFFFF){
+                        timeout = 60*60*HZ;
+                } else if(ct->derived_timeout > 0) {
+                        timeout = ct->derived_timeout;
+                }
+                nf_ct_refresh_acct(ct, ctinfo, skb, timeout);
+#else
 		nf_ct_refresh_acct(ct, ctinfo, skb,
 				   timeouts[UDP_CT_REPLIED]);
+#endif
 		/* Also, more likely to be important, and not a probe */
 		if (!test_and_set_bit(IPS_ASSURED_BIT, &ct->status))
 			nf_conntrack_event_cache(IPCT_ASSURED, ct);

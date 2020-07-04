@@ -103,6 +103,9 @@ struct cache_sizes {
 #ifdef CONFIG_ZONE_DMA
 	struct kmem_cache	*cs_dmacachep;
 #endif
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX) && defined(CONFIG_BCM_ZONE_ACP)
+	struct kmem_cache	*cs_acpcachep;
+#endif
 };
 extern struct cache_sizes malloc_sizes[];
 
@@ -145,6 +148,11 @@ static __always_inline void *kmalloc(size_t size, gfp_t flags)
 #undef CACHE
 		return NULL;
 found:
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX) && defined(CONFIG_BCM_ZONE_ACP)
+		if (flags & GFP_ACP)
+			cachep = malloc_sizes[i].cs_acpcachep;
+		else
+#endif
 #ifdef CONFIG_ZONE_DMA
 		if (flags & GFP_DMA)
 			cachep = malloc_sizes[i].cs_dmacachep;
@@ -198,6 +206,11 @@ static __always_inline void *kmalloc_node(size_t size, gfp_t flags, int node)
 #undef CACHE
 		return NULL;
 found:
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX) && defined(CONFIG_BCM_ZONE_ACP)
+		if (flags & GFP_ACP)
+			cachep = malloc_sizes[i].cs_acpcachep;
+		else
+#endif
 #ifdef CONFIG_ZONE_DMA
 		if (flags & GFP_DMA)
 			cachep = malloc_sizes[i].cs_dmacachep;

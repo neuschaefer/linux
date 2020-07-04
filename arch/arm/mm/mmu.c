@@ -233,6 +233,15 @@ static struct mem_type mem_types[] = {
 		.prot_sect = PMD_TYPE_SECT | PMD_SECT_XN,
 		.domain    = DOMAIN_KERNEL,
 	},
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX) && defined(CONFIG_PLAT_BCM63XX_ACP)
+	[MT_DEVICE_NONSECURED] = {
+		.prot_pte	= PROT_PTE_DEVICE | L_PTE_MT_DEV_SHARED |
+				  L_PTE_SHARED,
+		.prot_l1	= PMD_TYPE_TABLE,
+		.prot_sect	= PROT_SECT_DEVICE | PMD_SECT_S | PMD_SECT_NS,
+		.domain		= DOMAIN_IO,
+	},
+#endif /* CONFIG_BCM_KF_ARM_BCM963XX && CONFIG_PLAT_BCM63XX_ACP */
 #ifndef CONFIG_ARM_LPAE
 	[MT_MINICLEAN] = {
 		.prot_sect = PMD_TYPE_SECT | PMD_SECT_XN | PMD_SECT_MINICACHE,
@@ -288,6 +297,14 @@ static struct mem_type mem_types[] = {
 				PMD_SECT_UNCACHED | PMD_SECT_XN,
 		.domain    = DOMAIN_KERNEL,
 	},
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX) && defined(CONFIG_PLAT_BCM63XX_ACP)
+	[MT_MEMORY_NONSECURED] = {
+		.prot_pte  = L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY,
+		.prot_l1   = PMD_TYPE_TABLE,
+		.prot_sect = PMD_TYPE_SECT | PMD_SECT_AP_WRITE | PMD_SECT_NS,
+		.domain    = DOMAIN_KERNEL,
+	},
+#endif /* CONFIG_BCM_KF_ARM_BCM963XX && CONFIG_PLAT_BCM63XX_ACP */
 };
 
 const struct mem_type *get_mem_type(unsigned int type)
@@ -462,6 +479,10 @@ static void __init build_mem_type_table(void)
 			mem_types[MT_MEMORY].prot_pte |= L_PTE_SHARED;
 			mem_types[MT_MEMORY_NONCACHED].prot_sect |= PMD_SECT_S;
 			mem_types[MT_MEMORY_NONCACHED].prot_pte |= L_PTE_SHARED;
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX) && defined(CONFIG_PLAT_BCM63XX_ACP)
+			mem_types[MT_MEMORY_NONSECURED].prot_sect |= PMD_SECT_S;
+			mem_types[MT_MEMORY_NONSECURED].prot_pte |= L_PTE_SHARED;
+#endif /* CONFIG_BCM_KF_ARM_BCM963XX && CONFIG_PLAT_BCM63XX_ACP */
 		}
 	}
 
@@ -514,6 +535,10 @@ static void __init build_mem_type_table(void)
 	mem_types[MT_MEMORY].prot_pte |= kern_pgprot;
 	mem_types[MT_MEMORY_NONCACHED].prot_sect |= ecc_mask;
 	mem_types[MT_ROM].prot_sect |= cp->pmd;
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX) && defined(CONFIG_PLAT_BCM63XX_ACP)
+	mem_types[MT_MEMORY_NONSECURED].prot_sect |= ecc_mask | cp->pmd;
+	mem_types[MT_MEMORY_NONSECURED].prot_pte |= kern_pgprot;
+#endif /* CONFIG_BCM_KF_ARM_BCM963XX && CONFIG_PLAT_BCM63XX_ACP */
 
 	switch (cp->pmd) {
 	case PMD_SECT_WT:

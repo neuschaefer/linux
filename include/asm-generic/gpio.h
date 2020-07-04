@@ -196,6 +196,10 @@ extern void gpio_unexport(unsigned gpio);
 #endif	/* CONFIG_GPIO_SYSFS */
 
 #else	/* !CONFIG_GPIOLIB */
+#if defined(CONFIG_BCM_KF_KERN_WARNING)
+extern int __gpio_get_value(unsigned gpio);
+extern void __gpio_set_value(unsigned gpio, int value);
+#endif
 
 static inline bool gpio_is_valid(int number)
 {

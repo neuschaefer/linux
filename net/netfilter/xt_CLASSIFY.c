@@ -33,6 +33,12 @@ classify_tg(struct sk_buff *skb, const struct xt_action_param *par)
 {
 	const struct xt_classify_target_info *clinfo = par->targinfo;
 
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG_FEATURE)
+	skb->ipt_check |= IPT_TARGET_CLASSIFY;
+	if ( skb->ipt_check & IPT_TARGET_CHECK )
+		return XT_CONTINUE;
+#endif
+
 	skb->priority = clinfo->priority;
 	return XT_CONTINUE;
 }

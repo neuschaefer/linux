@@ -1386,7 +1386,11 @@ ctnetlink_create_conntrack(struct net *net, u16 zone,
 	struct nf_conntrack_helper *helper;
 	struct nf_conn_tstamp *tstamp;
 
+#if defined(CONFIG_BCM_KF_NETFILTER)
+	ct = nf_conntrack_alloc(net, zone, NULL, otuple, rtuple, GFP_ATOMIC);
+#else
 	ct = nf_conntrack_alloc(net, zone, otuple, rtuple, GFP_ATOMIC);
+#endif	
 	if (IS_ERR(ct))
 		return ERR_PTR(-ENOMEM);
 

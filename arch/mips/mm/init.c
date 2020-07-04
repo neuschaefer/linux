@@ -133,7 +133,7 @@ void *kmap_coherent(struct page *page, unsigned long addr)
 	idx = (addr >> PAGE_SHIFT) & (FIX_N_COLOURS - 1);
 #ifdef CONFIG_MIPS_MT_SMTC
 	idx += FIX_N_COLOURS * smp_processor_id() +
-		(in_interrupt() ? (FIX_N_COLOURS * NR_CPUS) : 0);
+			(in_interrupt() ? (FIX_N_COLOURS * NR_CPUS) : 0);
 #else
 	idx += in_interrupt() ? FIX_N_COLOURS : 0;
 #endif

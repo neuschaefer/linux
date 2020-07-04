@@ -54,6 +54,10 @@
 #include <net/net_namespace.h>
 #include <net/netns/generic.h>
 
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+#include <linux/blog.h>
+#endif
+
 /*
    This version of net/ipv6/sit.c is cloned of net/ipv4/ip_gre.c
 
@@ -66,6 +70,10 @@
 static int ipip6_tunnel_init(struct net_device *dev);
 static void ipip6_tunnel_setup(struct net_device *dev);
 static void ipip6_dev_free(struct net_device *dev);
+#if defined(CONFIG_BCM_KF_IPV6RD_SECURITY)
+static bool check_6rd(struct ip_tunnel *tunnel, const struct in6_addr *v6dst,
+                      __be32 *v4dst);
+#endif
 
 static int sit_net_id __read_mostly;
 struct sit_net {
@@ -556,6 +564,22 @@ static inline void ipip6_ecn_decapsulate(const struct iphdr *iph, struct sk_buff
 		IP6_ECN_set_ce(ipv6_hdr(skb));
 }
 
+#if defined(CONFIG_BCM_KF_IPV6RD_SECURITY)
+static inline bool is_spoofed_6rd(struct ip_tunnel *tunnel, const __be32 v4addr,
+                                  const struct in6_addr *v6addr)
+{
+	__be32 v4embed = 0;
+	if (check_6rd(tunnel, v6addr, &v4embed)) {
+		if (v4addr != v4embed)
+			return true;
+	} else {
+		if (v4addr != tunnel->ip6rd.br_addr)
+			return true;
+	}
+	return false;
+}
+#endif
+
 static int ipip6_rcv(struct sk_buff *skb)
 {
 	const struct iphdr *iph;
@@ -586,11 +610,27 @@ static int ipip6_rcv(struct sk_buff *skb)
 			kfree_skb(skb);
 			return 0;
 		}
+#if defined(CONFIG_BCM_KF_IPV6RD_SECURITY)
+		else {
+			if (is_spoofed_6rd(tunnel, iph->saddr,
+					&ipv6_hdr(skb)->saddr) ||
+			    is_spoofed_6rd(tunnel, iph->daddr,
+					&ipv6_hdr(skb)->daddr)) {
+				tunnel->dev->stats.rx_errors++;
+				rcu_read_unlock();
+				kfree_skb(skb);
+				return 0;
+			}
+		}
+#endif
 
 		tstats = this_cpu_ptr(tunnel->dev->tstats);
 		tstats->rx_packets++;
 		tstats->rx_bytes += skb->len;
 
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+		blog_link(TOS_MODE, blog_ptr(skb), tunnel, DIR_RX, BLOG_TOS_FIXED);
+#endif
 		__skb_tunnel_rx(skb, tunnel->dev);
 
 		ipip6_ecn_decapsulate(iph, skb);
@@ -608,6 +648,46 @@ out:
 	kfree_skb(skb);
 	return 0;
 }
+
+#if defined(CONFIG_BCM_KF_IPV6RD_SECURITY)
+/*
+ * If the IPv6 address comes from 6rd / 6to4 (RFC 3056) addr space this function
+ * stores the embedded IPv4 address in v4dst and returns true.
+ */
+static bool check_6rd(struct ip_tunnel *tunnel, const struct in6_addr *v6dst,
+                      __be32 *v4dst)
+{
+#ifdef CONFIG_IPV6_SIT_6RD
+	if (ipv6_prefix_equal(v6dst, &tunnel->ip6rd.prefix,
+                              tunnel->ip6rd.prefixlen)) {
+		unsigned int pbw0, pbi0;
+		int pbi1;
+		u32 d;
+
+		pbw0 = tunnel->ip6rd.prefixlen >> 5;
+		pbi0 = tunnel->ip6rd.prefixlen & 0x1f;
+
+		d = (ntohl(v6dst->s6_addr32[pbw0]) << pbi0) >>
+			tunnel->ip6rd.relay_prefixlen;
+
+		pbi1 = pbi0 - tunnel->ip6rd.relay_prefixlen;
+		if (pbi1 > 0)
+			d |= ntohl(v6dst->s6_addr32[pbw0 + 1]) >>
+				(32 - pbi1);
+
+		*v4dst = tunnel->ip6rd.relay_prefix | htonl(d);
+		return true;
+	}
+#else
+	if (v6dst->s6_addr16[0] == htons(0x2002)) {
+		/* 6to4 v6 addr has 16 bits prefix, 32 v4addr, 16 SLA, ... */
+		memcpy(v4dst, &v6dst->s6_addr16[1], 4);
+		return true;
+	}
+#endif
+	return false;
+}
+#endif
 
 /*
  * Returns the embedded IPv4 address if the IPv6 address
@@ -830,11 +910,33 @@ static netdev_tx_t ipip6_tunnel_xmit(struct sk_buff *skb,
 	iph 			=	ip_hdr(skb);
 	iph->version		=	4;
 	iph->ihl		=	sizeof(struct iphdr)>>2;
+#if defined(CONFIG_BCM_KF_IP)
+	/*
+	 *	cd-router #1329: DF flag should not be set
+	 *	RFC 3056 sec 4: DF flag should not be set
+	 *	RFC 4213 sec 3.2.1: DF flag MUST NOT be set for static MTU cases.
+	 *	RFC 4213 sec 3.2.2: For dynamic MTU cases, the algorithm should be:
+	 *	if ( (v4MTU-20) < 1280 ) {
+	 *	    if ( v6Pkt > 1280 ) send ICMPv6 "TooBig" with MTU=1280;
+	 *	    else encapsulate to v4 packet and DF flag MUST NOT be set
+	 *	}
+	 *	else {
+	 *	    if ( v6Pkt > (v4MTU-20) ) send ICMPv6 "TooBig" with MTU=(v4MTU-20);
+	 *	    else encapsulate to v4 packet and DF flag MUST be set
+	 *	}
+	 */
+	iph->frag_off		=	0;
+#else
 	iph->frag_off		=	df;
+#endif
 	iph->protocol		=	IPPROTO_IPV6;
 	iph->tos		=	INET_ECN_encapsulate(tos, ipv6_get_dsfield(iph6));
 	iph->daddr		=	fl4.daddr;
 	iph->saddr		=	fl4.saddr;
+
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+	blog_link(TOS_MODE, blog_ptr(skb), tunnel, DIR_TX, tunnel->parms.iph.tos);
+#endif
 
 	if ((iph->ttl = tiph->ttl) == 0)
 		iph->ttl	=	iph6->hop_limit;
@@ -1098,6 +1200,9 @@ ipip6_tunnel_ioctl (struct net_device *dev, struct ifreq *ifr, int cmd)
 			t->ip6rd.relay_prefix = relay_prefix;
 			t->ip6rd.prefixlen = ip6rd.prefixlen;
 			t->ip6rd.relay_prefixlen = ip6rd.relay_prefixlen;
+#if defined(CONFIG_BCM_KF_IPV6RD_SECURITY)
+			t->ip6rd.br_addr = ip6rd.br_addr;
+#endif
 		} else
 			ipip6_tunnel_clone_6rd(dev, sitn);
 

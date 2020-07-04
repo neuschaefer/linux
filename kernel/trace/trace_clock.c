@@ -68,6 +68,11 @@ u64 notrace trace_clock(void)
  * Used by plugins that need globally coherent timestamps.
  */
 
+#if defined(CONFIG_BCM_KF_TRACE_CUSTOM)
+#include <linux/bcm_tstamp.h>
+static u64 bcm_tstamp_rollover_base[NR_CPUS];
+static u32 bcm_tstamp_last[NR_CPUS];
+#else
 /* keep prev_time and lock in the same cacheline. */
 static struct {
 	u64 prev_time;
@@ -76,9 +81,37 @@ static struct {
 	{
 		.lock = (arch_spinlock_t)__ARCH_SPIN_LOCK_UNLOCKED,
 	};
+#endif
+
 
 u64 notrace trace_clock_global(void)
 {
+#if defined(CONFIG_BCM_KF_TRACE_CUSTOM)
+	u64 ns;
+	u32 tstamp = bcm_tstamp_read();
+	int cpuid = smp_processor_id();
+
+	if (tstamp < bcm_tstamp_last[cpuid]) {
+		// 32 bit counter has wrapped, add to our 64bit base
+		bcm_tstamp_rollover_base[cpuid] += bcm_tstamp2ns(0xffffffff);
+	}
+	bcm_tstamp_last[cpuid] = tstamp;
+
+	/*
+	 * The base value is updated independently on each CPU, but we want
+	 * to report a consistent base from any CPU, so take the larger base.
+	 * The trace buffers seem to require increasing timestamps (no rollover),
+	 * so unfortunately I have to add all this extra code.
+	 */
+#if NR_CPUS > 1
+	ns = (bcm_tstamp_rollover_base[0] > bcm_tstamp_rollover_base[1]) ?
+	      bcm_tstamp_rollover_base[0] : bcm_tstamp_rollover_base[1];
+#else
+	ns = bcm_tstamp_rollover_base[0];
+#endif
+	ns += bcm_tstamp2ns(tstamp);
+	return ns;
+#else /* CONFIG_BCM_KF_TRACE_CUSTOM */
 	unsigned long flags;
 	int this_cpu;
 	u64 now;
@@ -112,6 +145,7 @@ u64 notrace trace_clock_global(void)
 	local_irq_restore(flags);
 
 	return now;
+#endif /* else CONFIG_BCM_KF_TRACE_CUSTOM */
 }
 
 static atomic64_t trace_counter;

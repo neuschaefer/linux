@@ -29,10 +29,18 @@
 #include <net/netfilter/ipv4/nf_conntrack_ipv4.h>
 #include <net/netfilter/ipv6/nf_conntrack_ipv6.h>
 
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+#include <linux/blog.h>
+#endif
+
+#if defined(CONFIG_BCM_KF_NETFILTER)
+static int nf_ct_tcp_be_liberal __read_mostly = 1;
+#else
 /* "Be conservative in what you do,
     be liberal in what you accept from others."
     If it's non-zero, we mark only out of window RST segments as INVALID. */
 static int nf_ct_tcp_be_liberal __read_mostly = 0;
+#endif
 
 /* If it is set to zero, we disable picking up already established
    connections. */
@@ -67,7 +75,11 @@ static const char *const tcp_conntrack_names[] = {
 static unsigned int tcp_timeouts[TCP_CONNTRACK_TIMEOUT_MAX] __read_mostly = {
 	[TCP_CONNTRACK_SYN_SENT]	= 2 MINS,
 	[TCP_CONNTRACK_SYN_RECV]	= 60 SECS,
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+	[TCP_CONNTRACK_ESTABLISHED] = BLOG_NAT_TCP_DEFAULT_IDLE_TIMEOUT,
+#else
 	[TCP_CONNTRACK_ESTABLISHED]	= 5 DAYS,
+#endif
 	[TCP_CONNTRACK_FIN_WAIT]	= 2 MINS,
 	[TCP_CONNTRACK_CLOSE_WAIT]	= 60 SECS,
 	[TCP_CONNTRACK_LAST_ACK]	= 30 SECS,
@@ -881,6 +893,10 @@ static int tcp_packet(struct nf_conn *ct,
 		}
 		/* Fall through */
 	case TCP_CONNTRACK_IGNORE:
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+		blog_skip((struct sk_buff *)skb); /* abort blogging this packet */
+#endif
+
 		/* Ignored packets:
 		 *
 		 * Our connection entry may be out of sync, so ignore
@@ -1015,6 +1031,31 @@ static int tcp_packet(struct nf_conn *ct,
 		 old_state, new_state);
 
 	ct->proto.tcp.state = new_state;
+
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+	if( th->fin )       /* Abort and make this conntrack not BLOG eligible */
+	{
+		if ( (ct->blog_key[IP_CT_DIR_ORIGINAL] != BLOG_KEY_NONE) ||
+			 (ct->blog_key[IP_CT_DIR_REPLY] != BLOG_KEY_NONE) )
+		{
+			blog_notify(DESTROY_FLOWTRACK, (void*)ct,
+						(uint32_t)ct->blog_key[IP_CT_DIR_ORIGINAL],
+						(uint32_t)ct->blog_key[IP_CT_DIR_REPLY]);
+
+			/* Safe: In case blog client does not set key to 0 explicilty */
+			ct->blog_key[IP_CT_DIR_ORIGINAL] = BLOG_KEY_NONE;
+			ct->blog_key[IP_CT_DIR_REPLY]    = BLOG_KEY_NONE;
+		}
+
+		clear_bit(IPS_BLOG_BIT, &ct->status);
+
+	}
+	if ( ct->proto.tcp.state !=  TCP_CONNTRACK_ESTABLISHED )
+	{
+		blog_skip((struct sk_buff *)skb); /* abort blogging this packet */
+	}
+#endif
+
 	if (old_state != new_state
 	    && new_state == TCP_CONNTRACK_FIN_WAIT)
 		ct->proto.tcp.seen[dir].flags |= IP_CT_TCP_FLAG_CLOSE_INIT;
@@ -1052,6 +1093,15 @@ static int tcp_packet(struct nf_conn *ct,
 		set_bit(IPS_ASSURED_BIT, &ct->status);
 		nf_conntrack_event_cache(IPCT_ASSURED, ct);
 	}
+#if defined(CONFIG_BCM_KF_NETFILTER)
+        if (new_state == TCP_CONNTRACK_ESTABLISHED) {
+                if (ct->derived_timeout == 0xFFFFFFFF){
+                        timeout = 0xFFFFFFFF - jiffies;
+                } else if(ct->derived_timeout > 0) {
+                        timeout = ct->derived_timeout;
+                }
+        }
+#endif
 	nf_ct_refresh_acct(ct, ctinfo, skb, timeout);
 
 	return NF_ACCEPT;
@@ -1351,6 +1401,19 @@ static const struct nla_policy tcp_timeout_nla_policy[CTA_TIMEOUT_TCP_MAX+1] = {
 };
 #endif /* CONFIG_NF_CT_NETLINK_TIMEOUT */
 
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+int tcp_timeout_estd_proc_hndlr(struct ctl_table *table, int write,
+		void __user *buffer, size_t *lenp, loff_t *ppos)
+{
+	int ret;
+	ret = proc_dointvec_jiffies(table, write, buffer, lenp, ppos);
+	/* on success update the blog time out to be same as tcp_timeout_established */
+	if(!ret )
+		blog_nat_tcp_def_idle_timeout = tcp_timeouts[TCP_CONNTRACK_ESTABLISHED];
+	return ret;
+}
+#endif
+
 #ifdef CONFIG_SYSCTL
 static unsigned int tcp_sysctl_table_users;
 static struct ctl_table_header *tcp_sysctl_header;
@@ -1374,7 +1437,11 @@ static struct ctl_table tcp_sysctl_table[] = {
 		.data		= &tcp_timeouts[TCP_CONNTRACK_ESTABLISHED],
 		.maxlen		= sizeof(unsigned int),
 		.mode		= 0644,
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+		.proc_handler	= tcp_timeout_estd_proc_hndlr,
+#else
 		.proc_handler	= proc_dointvec_jiffies,
+#endif
 	},
 	{
 		.procname	= "nf_conntrack_tcp_timeout_fin_wait",
@@ -1477,7 +1544,11 @@ static struct ctl_table tcp_compat_sysctl_table[] = {
 		.data		= &tcp_timeouts[TCP_CONNTRACK_ESTABLISHED],
 		.maxlen		= sizeof(unsigned int),
 		.mode		= 0644,
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+		.proc_handler	= tcp_timeout_estd_proc_hndlr,
+#else
 		.proc_handler	= proc_dointvec_jiffies,
+#endif
 	},
 	{
 		.procname	= "ip_conntrack_tcp_timeout_fin_wait",

@@ -102,7 +102,11 @@ struct iphdr {
 	__be32	saddr;
 	__be32	daddr;
 	/*The options start here. */
+#if defined(CONFIG_MIPS_BCM963XX) && defined(CONFIG_BCM_KF_UNALIGNED_EXCEPTION)
+} LINUX_NET_PACKED;
+#else
 };
+#endif
 
 #ifdef __KERNEL__
 #include <linux/skbuff.h>

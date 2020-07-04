@@ -866,6 +866,9 @@ int ipv6_dev_mc_inc(struct net_device *dev, const struct in6_addr *addr)
 	spin_lock_init(&mc->mca_lock);
 
 	/* initial mode is (EX, empty) */
+#if defined(CONFIG_BCM_KF_MLD) && defined(CC_BRCM_KF_MULTI_MLD_GR_SUPPRESSION)
+	mc->mca_osfmode = MCAST_INCLUDE;
+#endif
 	mc->mca_sfmode = MCAST_EXCLUDE;
 	mc->mca_sfcount[MCAST_EXCLUDE] = 1;
 
@@ -1681,24 +1684,41 @@ static void mld_send_cr(struct inet6_dev *idev)
 	/* change recs */
 	for (pmc=idev->mc_list; pmc; pmc=pmc->next) {
 		spin_lock_bh(&pmc->mca_lock);
-		if (pmc->mca_sfcount[MCAST_EXCLUDE]) {
-			type = MLD2_BLOCK_OLD_SOURCES;
-			dtype = MLD2_ALLOW_NEW_SOURCES;
-		} else {
-			type = MLD2_ALLOW_NEW_SOURCES;
-			dtype = MLD2_BLOCK_OLD_SOURCES;
+#if defined(CONFIG_BCM_KF_MLD) && defined(CC_BRCM_KF_MULTI_MLD_GR_SUPPRESSION)
+		if ( pmc->mca_osfmode == pmc->mca_sfmode ) {
+#endif
+			if (pmc->mca_sfcount[MCAST_EXCLUDE]) {
+				type = MLD2_BLOCK_OLD_SOURCES;
+				dtype = MLD2_ALLOW_NEW_SOURCES;
+			} else {
+				type = MLD2_ALLOW_NEW_SOURCES;
+				dtype = MLD2_BLOCK_OLD_SOURCES;
+			}
+			skb = add_grec(skb, pmc, type, 0, 0);
+			skb = add_grec(skb, pmc, dtype, 0, 1);	/* deleted sources */
+#if defined(CONFIG_BCM_KF_MLD) && defined(CC_BRCM_KF_MULTI_MLD_GR_SUPPRESSION)
 		}
-		skb = add_grec(skb, pmc, type, 0, 0);
-		skb = add_grec(skb, pmc, dtype, 0, 1);	/* deleted sources */
+#endif
 
 		/* filter mode changes */
 		if (pmc->mca_crcount) {
-			if (pmc->mca_sfmode == MCAST_EXCLUDE)
-				type = MLD2_CHANGE_TO_EXCLUDE;
-			else
-				type = MLD2_CHANGE_TO_INCLUDE;
-			skb = add_grec(skb, pmc, type, 0, 0);
+#if defined(CONFIG_BCM_KF_MLD) && defined(CC_BRCM_KF_MULTI_MLD_GR_SUPPRESSION)
+			if ( pmc->mca_osfmode != pmc->mca_sfmode ) {
+#endif
+				if (pmc->mca_sfmode == MCAST_EXCLUDE)
+					type = MLD2_CHANGE_TO_EXCLUDE;
+				else
+					type = MLD2_CHANGE_TO_INCLUDE;
+				skb = add_grec(skb, pmc, type, 0, 0);
+#if defined(CONFIG_BCM_KF_MLD) && defined(CC_BRCM_KF_MULTI_MLD_GR_SUPPRESSION)
+			}
+#endif
 			pmc->mca_crcount--;
+#if defined(CONFIG_BCM_KF_MLD) && defined(CC_BRCM_KF_MULTI_MLD_GR_SUPPRESSION)
+			if ( pmc->mca_crcount == 0 ) {
+				pmc->mca_osfmode = pmc->mca_sfmode;
+			}
+#endif
 		}
 		spin_unlock_bh(&pmc->mca_lock);
 	}

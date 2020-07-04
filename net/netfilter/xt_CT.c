@@ -101,7 +101,11 @@ static int xt_ct_tg_check_v0(const struct xt_tgchk_param *par)
 		goto err1;
 
 	memset(&t, 0, sizeof(t));
+#if defined(CONFIG_BCM_KF_NETFILTER)
+	ct = nf_conntrack_alloc(par->net, info->zone, NULL, &t, &t, GFP_KERNEL);
+#else
 	ct = nf_conntrack_alloc(par->net, info->zone, &t, &t, GFP_KERNEL);
+#endif
 	ret = PTR_ERR(ct);
 	if (IS_ERR(ct))
 		goto err2;
@@ -191,7 +195,11 @@ static int xt_ct_tg_check_v1(const struct xt_tgchk_param *par)
 		goto err1;
 
 	memset(&t, 0, sizeof(t));
+#if defined(CONFIG_BCM_KF_NETFILTER)
+	ct = nf_conntrack_alloc(par->net, info->zone, NULL, &t, &t, GFP_KERNEL);
+#else
 	ct = nf_conntrack_alloc(par->net, info->zone, &t, &t, GFP_KERNEL);
+#endif
 	ret = PTR_ERR(ct);
 	if (IS_ERR(ct))
 		goto err2;

@@ -35,6 +35,7 @@
 #define SIOCGETRPF	(SIOCPROTOPRIVATE+2)
 
 #define MAXVIFS		32	
+
 typedef unsigned long vifbitmap_t;	/* User mode code depends on this lot */
 typedef unsigned short vifi_t;
 #define ALL_VIFS	((vifi_t)(-1))
@@ -243,9 +244,15 @@ struct mfc_cache {
 
 #ifdef __KERNEL__
 struct rtmsg;
+#if defined(CONFIG_BCM_KF_IGMP)
+int ipmr_get_route(struct net *net, struct sk_buff *skb,
+		   __be32 saddr, __be32 daddr,
+		   struct rtmsg *rtm, int nowait, unsigned short ifIndex);
+#else
 extern int ipmr_get_route(struct net *net, struct sk_buff *skb,
 			  __be32 saddr, __be32 daddr,
 			  struct rtmsg *rtm, int nowait);
+#endif
 #endif
 
 #endif

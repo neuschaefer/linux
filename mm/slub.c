@@ -3222,6 +3222,9 @@ static struct kmem_cache *kmem_cache;
 #ifdef CONFIG_ZONE_DMA
 static struct kmem_cache *kmalloc_dma_caches[SLUB_PAGE_SHIFT];
 #endif
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX) && defined(CONFIG_BCM_ZONE_ACP)
+static struct kmem_cache *kmalloc_acp_caches[SLUB_PAGE_SHIFT];
+#endif
 
 static int __init setup_slub_min_order(char *str)
 {
@@ -3334,6 +3337,11 @@ static struct kmem_cache *get_slab(size_t size, gfp_t flags)
 
 #ifdef CONFIG_ZONE_DMA
 	if (unlikely((flags & SLUB_DMA)))
+		return kmalloc_dma_caches[index];
+
+#endif
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX) && defined(CONFIG_BCM_ZONE_ACP)
+	if (unlikely((flags & SLUB_ACP)))
 		return kmalloc_dma_caches[index];
 
 #endif
@@ -3850,6 +3858,19 @@ void __init kmem_cache_init(void)
 				s->objsize, SLAB_CACHE_DMA);
 		}
 	}
+#endif
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX) && defined(CONFIG_BCM_ZONE_ACP)
+	for (i = 0; i < SLUB_PAGE_SHIFT; i++) {
+		struct kmem_cache *s = kmalloc_caches[i];
+
+		if (s && s->size) {
+			char *name = kasprintf(GFP_NOWAIT,
+				 "dma-kmalloc-%d", s->objsize);
+
+			BUG_ON(!name);
+			kmalloc_acp_caches[i] = create_kmalloc_cache(name,
+				s->objsize, SLAB_CACHE_ACP);
+		}
 #endif
 	printk(KERN_INFO
 		"SLUB: Genslabs=%d, HWalign=%d, Order=%d-%d, MinObjects=%d,"
@@ -4796,6 +4817,13 @@ static ssize_t cache_dma_show(struct kmem_cache *s, char *buf)
 }
 SLAB_ATTR_RO(cache_dma);
 #endif
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX) && defined(CONFIG_BCM_ZONE_ACP)
+static ssize_t cache_acp_show(struct kmem_cache *s, char *buf)
+{
+	return sprintf(buf, "%d\n", !!(s->flags & SLAB_CACHE_ACP));
+}
+SLAB_ATTR_RO(cache_acp);
+#endif
 
 static ssize_t destroy_by_rcu_show(struct kmem_cache *s, char *buf)
 {
@@ -5130,6 +5158,9 @@ static struct attribute *slab_attrs[] = {
 #endif
 #ifdef CONFIG_ZONE_DMA
 	&cache_dma_attr.attr,
+#endif
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX) && defined(CONFIG_BCM_ZONE_ACP)
+	&cache_acp_attr.attr,
 #endif
 #ifdef CONFIG_NUMA
 	&remote_node_defrag_ratio_attr.attr,

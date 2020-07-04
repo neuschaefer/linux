@@ -45,6 +45,23 @@
  * Force always-inline if the user requests it so via the .config,
  * or if gcc is too old:
  */
+#if defined(CONFIG_BCM_KF_BOUNCE)
+
+#if !defined(CONFIG_ARCH_SUPPORTS_OPTIMIZED_INLINING) || \
+    !defined(CONFIG_OPTIMIZE_INLINING) || (__GNUC__ < 4) || \
+    !defined(CONFIG_BRCM_BOUNCE)
+# define inline		inline		__attribute__((always_inline))
+# define __inline__	__inline__	__attribute__((always_inline))
+# define __inline	__inline	__attribute__((always_inline))
+#else
+/* A lot of inline functions can cause havoc with function tracing */
+# define inline		inline		notrace
+# define __inline__	__inline__	notrace
+# define __inline	__inline	notrace
+#endif
+
+#else 
+
 #if !defined(CONFIG_ARCH_SUPPORTS_OPTIMIZED_INLINING) || \
     !defined(CONFIG_OPTIMIZE_INLINING) || (__GNUC__ < 4)
 # define inline		inline		__attribute__((always_inline))
@@ -56,6 +73,8 @@
 # define __inline__	__inline__	notrace
 # define __inline	__inline	notrace
 #endif
+
+#endif /* CONFIG_BRCM_BOUNCE */
 
 #define __deprecated			__attribute__((deprecated))
 #define __packed			__attribute__((packed))

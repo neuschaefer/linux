@@ -83,7 +83,11 @@
 #endif
 
 #ifndef FIXADDR_TOP
+#if defined(CONFIG_BCM_KF_FIXADDR_TOP)
+#define FIXADDR_TOP     ((unsigned long)(long)(int)0xff000000)
+#else
 #define FIXADDR_TOP		((unsigned long)(long)(int)0xfffe0000)
+#endif
 #endif
 
 #endif /* __ASM_MACH_GENERIC_SPACES_H */

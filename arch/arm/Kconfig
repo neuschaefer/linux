@@ -31,6 +31,7 @@ config ARM
 	select HAVE_C_RECORDMCOUNT
 	select HAVE_GENERIC_HARDIRQS
 	select GENERIC_IRQ_SHOW
+	select IRQ_FORCED_THREADING
 	select CPU_PM if (SUSPEND || CPU_IDLE)
 	select GENERIC_PCI_IOMAP
 	select HAVE_BPF_JIT if NET
@@ -71,7 +72,6 @@ config GENERIC_CLOCKEVENTS_BROADCAST
 
 config KTIME_SCALAR
 	bool
-	default y
 
 config HAVE_TCM
 	bool
@@ -1009,7 +1009,38 @@ config ARCH_ZYNQ
 	select USE_OF
 	help
 	  Support for Xilinx Zynq ARM Cortex A9 Platform
+
+config ARCH_BCM63XX
+	bool "Broadcom 63XX Architecture"
+	depends on BCM_KF_ARM_BCM963XX
+	help
+	  Support for Broadcome 63XX series architecture
+
 endchoice
+
+config BUZZZ
+	bool "Broadcom BUZZZ Tool Framework"
+	default n
+	help
+	  Enable kernel tools framework: event/performance/function call tracing
+
+config BUZZZ_FUNC
+	bool "Broadcom BUZZZ Func Tool"
+	default n
+	help
+	  Enable Function tracing tool
+
+config BUZZZ_PMON
+	bool "Broadcom BUZZZ PMON Tool"
+	default n
+	help
+	  Enable performance monitoring tool
+
+config BUZZZ_KEVT
+	bool "Broadcom BUZZZ Kernel Event Tracing Tool"
+	default n
+	help
+	  Enable Kernel Event Tracing tool
 
 #
 # This is sorted alphabetically by mach-* pathname.  However, plat-*
@@ -1126,6 +1157,9 @@ source "arch/arm/plat-versatile/Kconfig"
 source "arch/arm/mach-vt8500/Kconfig"
 
 source "arch/arm/mach-w90x900/Kconfig"
+if BCM_KF_ARM_BCM963XX
+source "arch/arm/plat-bcm63xx/Kconfig"
+endif
 
 # Definitions to make life easier
 config ARCH_ACORN
@@ -1405,6 +1439,18 @@ config PL310_ERRATA_769419
 	  on systems with an outer cache, the store buffer is drained
 	  explicitly.
 
+if BCM_KF_ARM_BCM963XX
+config ARM_ERRATA_798181
+	bool "ARM errata: TLBI/DSB failure on Cortex-A15"
+	depends on CPU_V7 && SMP
+	help
+	  On Cortex-A15 (r0p0..r3p2) the TLBI*IS/DSB operations are not
+	  adequately shooting down all use of the old entries. This
+	  option enables the Linux kernel workaround for this erratum
+	  which sends an IPI to the CPUs that are running the same ASID
+	  as the one being invalidated.
+endif
+
 endmenu
 
 source "arch/arm/common/Kconfig"
@@ -1466,6 +1512,10 @@ config PCI_HOST_ITE8152
 	select DMABOUNCE
 
 source "drivers/pci/Kconfig"
+
+if BCM_KF_ARM_BCM963XX
+source "drivers/pci/pcie/Kconfig"
+endif
 
 source "drivers/pcmcia/Kconfig"
 
@@ -1724,7 +1774,7 @@ config HAVE_ARCH_PFN_VALID
 
 config HIGHMEM
 	bool "High Memory Support"
-	depends on MMU
+	depends on MMU && !PREEMPT_RT_FULL
 	help
 	  The address space of ARM processors is only 4 Gigabytes large
 	  and it has to accommodate user address space, kernel address

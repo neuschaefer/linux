@@ -61,6 +61,9 @@ struct ip_tunnel_6rd {
 	__be32			relay_prefix;
 	__u16			prefixlen;
 	__u16			relay_prefixlen;
+#if defined(CONFIG_BCM_KF_IPV6RD_SECURITY)
+	__be32			br_addr;
+#endif
 };
 
 enum {

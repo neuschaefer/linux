@@ -54,6 +54,11 @@
  * that the pattern and the version count are always located in the oob area
  * of the first block.
  */
+
+#if defined(CONFIG_BCM_KF_MTD_BCMNAND)
+#define BBT_NULL_PAGE (-1LL)
+#endif
+ 
 struct nand_bbt_descr {
 	int options;
 	int pages[NAND_MAX_CHIPS];

@@ -19,6 +19,10 @@
 #include <linux/types.h>
 #include <asm/byteorder.h>
 
+#if defined(CONFIG_BCM_KF_IGMP)
+#define CC_BRCM_KF_MULTI_IGMP_GR_SUPPRESSION
+#endif
+
 /*
  *	IGMP protocol structures
  */
@@ -32,7 +36,11 @@ struct igmphdr {
 	__u8 code;		/* For newer IGMP */
 	__sum16 csum;
 	__be32 group;
+#if defined(CONFIG_MIPS_BCM963XX) && defined(CONFIG_BCM_KF_UNALIGNED_EXCEPTION)
+} LINUX_NET_PACKED;
+#else
 };
+#endif
 
 /* V3 group record types [grec_type] */
 #define IGMPV3_MODE_IS_INCLUDE		1
@@ -48,7 +56,11 @@ struct igmpv3_grec {
 	__be16	grec_nsrcs;
 	__be32	grec_mca;
 	__be32	grec_src[0];
-};
+#if defined(CONFIG_MIPS_BCM963XX) && defined(CONFIG_BCM_KF_UNALIGNED_EXCEPTION)
+    } LINUX_NET_PACKED;
+#else
+    };
+#endif
 
 struct igmpv3_report {
 	__u8 type;
@@ -57,7 +69,11 @@ struct igmpv3_report {
 	__be16 resv2;
 	__be16 ngrec;
 	struct igmpv3_grec grec[0];
+#if defined(CONFIG_MIPS_BCM963XX) && defined(CONFIG_BCM_KF_UNALIGNED_EXCEPTION)
+} LINUX_NET_PACKED;
+#else
 };
+#endif
 
 struct igmpv3_query {
 	__u8 type;
@@ -78,7 +94,11 @@ struct igmpv3_query {
 	__u8 qqic;
 	__be16 nsrcs;
 	__be32 srcs[0];
+#if defined(CONFIG_MIPS_BCM963XX) && defined(CONFIG_BCM_KF_UNALIGNED_EXCEPTION)
+} LINUX_NET_PACKED;
+#else
 };
+#endif
 
 #define IGMP_HOST_MEMBERSHIP_QUERY	0x11	/* From RFC1112 */
 #define IGMP_HOST_MEMBERSHIP_REPORT	0x12	/* Ditto */
@@ -189,6 +209,9 @@ struct ip_mc_list {
 	unsigned int		sfmode;
 	struct ip_sf_list	*sources;
 	struct ip_sf_list	*tomb;
+#if defined(CONFIG_BCM_KF_IGMP) && defined(CC_BRCM_KF_MULTI_IGMP_GR_SUPPRESSION)
+	unsigned int		osfmode;
+#endif
 	unsigned long		sfcount[2];
 	union {
 		struct ip_mc_list *next;

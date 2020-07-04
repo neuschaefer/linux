@@ -328,4 +328,8 @@ source "drivers/mtd/lpddr/Kconfig"
 
 source "drivers/mtd/ubi/Kconfig"
 
+#if defined(CONFIG_BCM_KF_MTD_BCMNAND)
+source "drivers/mtd/brcmnand/Kconfig"
+#endif
+
 endif # MTD

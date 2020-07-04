@@ -18,6 +18,33 @@
 #include <linux/netfilter_bridge.h>
 #include <linux/export.h>
 #include "br_private.h"
+#if defined(CONFIG_BCM_KF_IP)
+#include <linux/if_vlan.h>
+#include <linux/timer.h>
+#include <linux/igmp.h>
+#include <linux/ip.h>
+#include <linux/ktime.h>
+#endif
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+#include <linux/blog.h>
+#endif
+#if defined(CONFIG_BCM_KF_IGMP)
+#include "br_igmp.h"
+#endif
+#if defined(CONFIG_BCM_KF_MLD) && defined(CONFIG_BR_MLD_SNOOP)
+#include "br_mld.h"
+#endif
+#if defined(CONFIG_BCM_KF_WL)
+#if defined(PKTC)
+#include <linux_osl_dslcpe_pktc.h>
+#include "linux/bcm_skb_defines.h"
+
+uint32_t (*wl_pktc_req_hook)(int req_id, uint32_t param0, uint32_t param1, uint32_t param2) = NULL;
+EXPORT_SYMBOL(wl_pktc_req_hook);
+uint32_t (*dhd_pktc_req_hook)(int req_id, uint32_t param0, uint32_t param1, uint32_t param2) = NULL;
+EXPORT_SYMBOL(dhd_pktc_req_hook);
+#endif /* PKTC */
+#endif
 
 /* Bridge group multicast address 802.1d (pg 51). */
 const u8 br_group_address[ETH_ALEN] = { 0x01, 0x80, 0xc2, 0x00, 0x00, 0x00 };
@@ -31,6 +58,14 @@ static int br_pass_frame_up(struct sk_buff *skb)
 	struct net_device *indev, *brdev = BR_INPUT_SKB_CB(skb)->brdev;
 	struct net_bridge *br = netdev_priv(brdev);
 	struct br_cpu_netstats *brstats = this_cpu_ptr(br->stats);
+
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+	blog_link(IF_DEVICE, blog_ptr(skb), (void*)br->dev, DIR_RX, skb->len);
+
+	/* Gather general RX statistics */
+	brdev->stats.rx_packets++;
+	brdev->stats.rx_bytes += skb->len;
+#endif   
 
 	u64_stats_update_begin(&brstats->syncp);
 	brstats->rx_packets++;
@@ -53,19 +88,136 @@ int br_handle_frame_finish(struct sk_buff *skb)
 	struct net_bridge_fdb_entry *dst;
 	struct net_bridge_mdb_entry *mdst;
 	struct sk_buff *skb2;
+#if (defined(CONFIG_BCM_KF_IGMP) && defined(CONFIG_BR_IGMP_SNOOP)) || defined(CONFIG_BCM_KF_IGMP_RATE_LIMIT)
+	struct iphdr *pipmcast = NULL;
+	struct igmphdr *pigmp = NULL;
+#endif
+#if (defined(CONFIG_BCM_KF_MLD) && defined(CONFIG_BR_MLD_SNOOP))
+	struct ipv6hdr *pipv6mcast = NULL;
+	struct icmp6hdr *picmpv6 = NULL;
+#endif
 
+#if defined(CONFIG_BCM_KF_VLAN_AGGREGATION) && defined(CONFIG_BCM_VLAN_AGGREGATION)
+	__u16 vid = VLAN_N_VID;
+#endif
 	if (!p || p->state == BR_STATE_DISABLED)
 		goto drop;
 
+#if (defined(CONFIG_BCM_KF_IGMP) && defined(CONFIG_BR_IGMP_SNOOP)) || defined(CONFIG_BCM_KF_IGMP_RATE_LIMIT)
+	br_igmp_get_ip_igmp_hdrs(skb, &pipmcast, &pigmp, NULL);
+#endif
+
+#if defined(CONFIG_BCM_KF_IGMP_RATE_LIMIT)
+	if ( pigmp != NULL)
+	{
+#if defined(CONFIG_BCM_GPON_MODULE)
+		/* drop IGMP v1 report packets */
+		if (pigmp->type == IGMP_HOST_MEMBERSHIP_REPORT)
+		{
+			goto drop;
+		}
+
+		/* drop IGMP v1 query packets */
+		if ((pigmp->type == IGMP_HOST_MEMBERSHIP_QUERY) &&
+		    (pigmp->code == 0))
+		{
+			goto drop;
+		}
+
+		/* drop IGMP leave packets for group 0.0.0.0 */
+		if ((pigmp->type == IGMP_HOST_LEAVE_MESSAGE) &&
+		    (0 == pigmp->group) )
+		{
+			goto drop;
+		}
+#endif
+		/* rate limit IGMP */
+		br = p->br;
+		if ( br->igmp_rate_limit )
+		{
+			ktime_t      curTime;
+			u64          diffUs;
+			unsigned int usPerPacket;
+			unsigned int temp32;
+			unsigned int burstLimit;
+
+			/* add tokens to the bucket - compute in microseconds */
+			curTime     = ktime_get();
+			usPerPacket = (1000000 / br->igmp_rate_limit);
+			diffUs      = ktime_to_us(ktime_sub(curTime, br->igmp_rate_last_packet));
+			diffUs     += br->igmp_rate_rem_time;
+
+			/* allow 25% burst */
+			burstLimit = br->igmp_rate_limit >> 2;
+			if ( 0 == burstLimit)
+			{
+				burstLimit = 1;
+			}
+
+			if ( diffUs > 1000000 )
+			{
+				br->igmp_rate_bucket   = burstLimit;
+				br->igmp_rate_rem_time = 0;
+			}
+			else
+			{
+				temp32 = (unsigned int)diffUs / usPerPacket;
+				br->igmp_rate_bucket += temp32;
+				if (temp32)
+				{
+					br->igmp_rate_rem_time = diffUs - (temp32 * usPerPacket);
+				}
+			}
+			if (br->igmp_rate_bucket > burstLimit)
+			{
+				br->igmp_rate_bucket   = burstLimit;
+				br->igmp_rate_rem_time = 0;
+			}
+
+			/* if bucket is empty drop the packet */
+			if (0 == br->igmp_rate_bucket)
+			{
+				goto drop;
+			}
+			br->igmp_rate_bucket--;
+			br->igmp_rate_last_packet.tv64 = curTime.tv64;
+		}
+	}
+#endif
+
+#if defined(CONFIG_BCM_KF_VLAN_AGGREGATION) && defined(CONFIG_BCM_VLAN_AGGREGATION)
+#if defined(CONFIG_BCM_KF_VLAN) && (defined(CONFIG_BCM_VLAN) || defined(CONFIG_BCM_VLAN_MODULE))
+	if (skb->vlan_count)
+ 		vid = (skb->vlan_header[0] >> 16) & VLAN_VID_MASK;
+	else 
+#endif /* CONFIG_BCM_VLAN) */
+	/* 
+	*  dev.c/__netif_receive_skb(): if proto == ETH_P_8021Q
+	*  call vlan_untag() to remove tag and save vid in skb->vlan_tci
+	*/
+	if (vlan_tx_tag_present(skb))
+		vid = skb->vlan_tci & VLAN_VID_MASK;
+	else if ( vlan_eth_hdr(skb)->h_vlan_proto == htons(ETH_P_8021Q) )
+		vid = ntohs(vlan_eth_hdr(skb)->h_vlan_TCI) & VLAN_VID_MASK;
+#endif
+
 	/* insert into forwarding database after filtering to avoid spoofing */
 	br = p->br;
+#if defined(CONFIG_BCM_KF_VLAN_AGGREGATION) && defined(CONFIG_BCM_VLAN_AGGREGATION)
+	br_fdb_update(br, p, eth_hdr(skb)->h_source, vid);
+#else
 	br_fdb_update(br, p, eth_hdr(skb)->h_source);
+#endif
 
 	if (!is_broadcast_ether_addr(dest) && is_multicast_ether_addr(dest) &&
 	    br_multicast_rcv(br, p, skb))
 		goto drop;
 
+#if defined(CONFIG_BCM_KF_WL)
+	if ((p->state == BR_STATE_LEARNING) && (skb->protocol != htons(0x886c) /*ETHER_TYPE_BRCM*/))
+#else
 	if (p->state == BR_STATE_LEARNING)
+#endif
 		goto drop;
 
 	BR_INPUT_SKB_CB(skb)->brdev = br->dev;
@@ -78,8 +230,36 @@ int br_handle_frame_finish(struct sk_buff *skb)
 
 	dst = NULL;
 
+#if defined(CONFIG_BCM_KF_MLD) && defined(CONFIG_BR_MLD_SNOOP)
+	br_mld_get_ip_icmp_hdrs(skb, &pipv6mcast, &picmpv6, NULL);
+	if(pipv6mcast != NULL ) {
+		if (br_mld_mc_forward(br, skb, 1, 0))
+		{
+			/* packet processed by mld snooping - no further processing required */
+			goto out;
+		}
+	}
+	else
+#endif
+#if defined(CONFIG_BCM_KF_IGMP) && defined(CONFIG_BR_IGMP_SNOOP)
+	if (pipmcast != NULL) {
+		if (br_igmp_mc_forward(br, skb, 1, 0)) 
+		{
+			/* packet processed by igmp snooping - no further processing required */
+			goto out;
+		}
+	}
+#endif
+
 	if (is_broadcast_ether_addr(dest))
-		skb2 = skb;
+#if defined(CONFIG_BCM_KF_EXTSTATS)
+	{
+		br->dev->stats.rx_broadcast_packets++;
+#endif
+		skb2 = skb;   
+#if defined(CONFIG_BCM_KF_EXTSTATS)
+	}
+#endif
 	else if (is_multicast_ether_addr(dest)) {
 		mdst = br_mdb_get(br, skb);
 		if (mdst || BR_INPUT_SKB_CB_MROUTERS_ONLY(skb)) {
@@ -94,17 +274,129 @@ int br_handle_frame_finish(struct sk_buff *skb)
 			skb2 = skb;
 
 		br->dev->stats.multicast++;
+#if defined(CONFIG_BCM_KF_EXTSTATS)
+		br->dev->stats.rx_multicast_bytes += skb2->len;
+#endif
+#if !(defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG))
 	} else if ((dst = __br_fdb_get(br, dest)) && dst->is_local) {
 		skb2 = skb;
 		/* Do not forward the packet since it's local. */
 		skb = NULL;
 	}
+#else
+	} 
+	else {
+		dst = __br_fdb_get(br, dest);
+		blog_link(BRIDGEFDB, blog_ptr(skb),
+					(void*)__br_fdb_get(br, eth_hdr(skb)->h_source),
+					BLOG_PARAM1_SRCFDB, 0);
+		blog_link(BRIDGEFDB, blog_ptr(skb), (void*)dst, BLOG_PARAM1_DSTFDB, 0);
 
+#if defined(PKTC)
+		/* wlan pktc */
+		if ((dst != NULL) && (!dst->is_local))
+		{
+#if defined(CONFIG_BCM_KF_WL)
+			u8 from_wl_to_switch=0, from_switch_to_wl=0;
+			struct net_bridge_fdb_entry *src = __br_fdb_get(br, eth_hdr(skb)->h_source);
+			struct net_device *root_dst_dev_p = dst->dst->dev;
+			BlogPhy_t srcPhyType, dstPhyType;
+			uint32_t chainIdx;
+			uint32_t pktc_tx_enabled;
+
+			if (unlikely(src == NULL))
+				goto next; 
+
+			srcPhyType = BLOG_GET_PHYTYPE(src->dst->dev->path.hw_port_type);
+			dstPhyType = BLOG_GET_PHYTYPE(dst->dst->dev->path.hw_port_type);
+
+			pktc_tx_enabled = wl_pktc_req_hook ? 
+						wl_pktc_req_hook(GET_PKTC_TX_MODE, 0, 0, 0) : 0;
+			if ((srcPhyType == BLOG_WLANPHY) && (dstPhyType == BLOG_ENETPHY))
+			{
+				from_wl_to_switch = 1;
+				while(!netdev_path_is_root(root_dst_dev_p) && (root_dst_dev_p->priv_flags & IFF_BCM_VLAN))
+				{
+					root_dst_dev_p = netdev_path_next_dev(root_dst_dev_p);
+				}
+			}
+			else if ((srcPhyType == BLOG_ENETPHY || srcPhyType == BLOG_XTMPHY) &&
+				(dstPhyType == BLOG_WLANPHY) &&
+				   pktc_tx_enabled)
+				from_switch_to_wl = 1;
+
+#if defined(CONFIG_BCM_KF_WANDEV)
+			if ((from_wl_to_switch || from_switch_to_wl) && !(dst->dst->dev->priv_flags & IFF_WANDEV) && netdev_path_is_root(root_dst_dev_p)) { 
+			/* Also check for non-WAN cases.
+			   For the Rx direction, VLAN cases are allowed as long as the packets are untagged.
+			   Tagged packets are not forwarded through the chaining path by WLAN driver. Tagged packets go through the flowcache path.
+			   see wlc_sendup_chain() function for reference.
+			   For the Tx direction, there are no VLAN interfaces created on wl device when LAN_VLAN flag is enabled in the build.
+			   The netdev_path_is_root() check makes sure that we are always transmitting to a root device */
+#if defined(CONFIG_BCM963138) || defined(CONFIG_BCM963148) || defined(CONFIG_BCM96838)
+				if (from_wl_to_switch && (dhd_pktc_req_hook != NULL)) {
+					dhd_pktc_req_hook(UPDATE_BRC_HOT,
+								     (uint32_t)&(dst->addr.addr[0]),
+								     (uint32_t)root_dst_dev_p, 0);
+				}
+#endif
+				chainIdx = wl_pktc_req_hook ? 
+								wl_pktc_req_hook(UPDATE_BRC_HOT,
+								     (uint32_t)&(dst->addr.addr[0]),
+								     (uint32_t)root_dst_dev_p, 0) : INVALID_CHAIN_IDX;
+				if (chainIdx != INVALID_CHAIN_IDX)
+				{
+					//Update chainIdx in blog
+					// chainEntry->tx_dev will always be NOT NULL as we just added that above
+					if (skb->blog_p != NULL) 
+					{
+#if defined(CONFIG_BCM963138) || defined(CONFIG_BCM963148) || defined(CONFIG_BCM96838)
+                        if (from_switch_to_wl)
+                        {
+                            uint8_t wlan_queue = 0;
+
+                            skb->blog_p->wfd_queue = ((chainIdx & WFD_IDX_UINT16_BIT_MASK) >> WFD_IDX_UINT16_BIT_POS);
+							
+                            wlan_queue = GET_WLAN_PRIORITY(skb->blog_p->mark);
+                            chainIdx |= ((wlan_queue & 0x0f) << 8);
+                            skb->blog_p->wl_metadata = chainIdx | WLAN_SKB_DRV_CHECK_MASK;
+                        }
+#else
+						skb->blog_p->wl_metadata = chainIdx | WLAN_SKB_DRV_CHECK_MASK;
+#endif
+                        //printk("%s: Added ChainEntryIdx 0x%x Dev %s blogSrcAddr 0x%x blogDstAddr 0x%x DstMac %x:%x:%x:%x:%x:%x "
+                        //          "wfd_q %d wl_metadata %d wl 0x%x\n", __FUNCTION__,
+						//          chainIdx, dst->dst->dev->name, skb->blog_p->rx.tuple.saddr, skb->blog_p->rx.tuple.daddr, 
+                        //          dst->addr.addr[0], dst->addr.addr[1], dst->addr.addr[2], dst->addr.addr[3], dst->addr.addr[4], 
+                        //          dst->addr.addr[5], skb->blog_p->wfd_queue, skb->blog_p->wl_metadata, skb->blog_p->wl);
+					}
+				}
+			}
+#endif /* CONFIG_BCM_KF_WANDEV */
+#endif
+		}
+next:
+#endif /* PKTC */
+		if ((dst != NULL) && dst->is_local) 
+		{
+			skb2 = skb;
+			/* Do not forward the packet since it's local. */
+			skb = NULL;
+		}
+	}
+#endif
 	if (skb) {
 		if (dst) {
 			dst->used = jiffies;
 			br_forward(dst->dst, skb, skb2);
 		} else
+#if defined(CONFIG_BCM_KF_FBOND) && (defined(CONFIG_BCM_FBOND) || defined(CONFIG_BCM_FBOND_MODULE))
+			if ( BR_STATE_BLOCKING == p->state ) {
+				/* prevent flooding unknown unicast from blocked port */
+				goto drop;
+			}
+			else
+#endif
 			br_flood_forward(br, skb, skb2);
 	}
 
@@ -123,7 +415,11 @@ static int br_handle_local_finish(struct sk_buff *skb)
 {
 	struct net_bridge_port *p = br_port_get_rcu(skb->dev);
 
+#if defined(CONFIG_BCM_KF_VLAN_AGGREGATION) && defined(CONFIG_BCM_VLAN_AGGREGATION)
+	br_fdb_update(p->br, p, eth_hdr(skb)->h_source, VLAN_N_VID);
+#else
 	br_fdb_update(p->br, p, eth_hdr(skb)->h_source);
+#endif
 	return 0;	 /* process further */
 }
 
@@ -204,8 +500,50 @@ rx_handler_result_t br_handle_frame(struct sk_buff **pskb)
 	}
 
 forward:
+#if defined(CONFIG_BCM_KF_IEEE1905) && defined(CONFIG_BCM_IEEE1905)
+	/* allow broute to forward packets to the stack in any STP state */
+	rhook = rcu_dereference(br_should_route_hook);
+	if (rhook) {
+		if ((*rhook)(skb)) {
+			*pskb = skb;
+			if ( (skb->protocol == htons(0x893a)) || 
+			(skb->protocol == htons(0x8912)) || 
+			(skb->protocol == htons(0x88e1)) )
+			{
+				br_handle_local_finish(skb);
+			}
+			return RX_HANDLER_PASS;
+		}
+		else if (skb->protocol == htons(0x893a) && (skb->pkt_type == PACKET_MULTICAST))
+		{
+			/* do not bridge multicast 1905 packets when 1905 is compiled */
+			goto drop;
+		}
+		dest = eth_hdr(skb)->h_dest;
+	}
+#endif
+
+#if defined(CONFIG_BCM_KF_WL)
+	if ((skb->protocol == htons(0x886c) /*ETHER_TYPE_BRCM*/) && (p->state != BR_STATE_FORWARDING)) {
+		/* force to forward brcm_type event packet */
+		NF_HOOK(NFPROTO_BRIDGE, NF_BR_PRE_ROUTING, skb, skb->dev, NULL,
+			br_handle_frame_finish);
+		return RX_HANDLER_CONSUMED;
+	}
+#endif
+
 	switch (p->state) {
+#if defined(CONFIG_BCM_KF_FBOND) && (defined(CONFIG_BCM_FBOND) || defined(CONFIG_BCM_FBOND_MODULE))
+	case BR_STATE_BLOCKING:
+		/* if this is unicast let it through even if the port is blocked 
+		   it will be dropped later if a destination is not found to
+                   prevent flooding unicast from a blocked port */
+		if ( is_multicast_ether_addr(dest) ) {
+			goto drop;
+		}
+#endif
 	case BR_STATE_FORWARDING:
+#if !defined(CONFIG_BCM_KF_IEEE1905) || !defined(CONFIG_BCM_IEEE1905)
 		rhook = rcu_dereference(br_should_route_hook);
 		if (rhook) {
 			if ((*rhook)(skb)) {
@@ -214,6 +552,7 @@ forward:
 			}
 			dest = eth_hdr(skb)->h_dest;
 		}
+#endif
 		/* fall through */
 	case BR_STATE_LEARNING:
 		if (!compare_ether_addr(p->br->dev->dev_addr, dest))

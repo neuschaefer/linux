@@ -792,33 +792,33 @@ static void neigh_periodic_work(struct work_struct *work)
 
 		while ((n = rcu_dereference_protected(*np,
 				lockdep_is_held(&tbl->lock))) != NULL) {
-			unsigned int state;
+		unsigned int state;
 
-			write_lock(&n->lock);
+		write_lock(&n->lock);
 
-			state = n->nud_state;
-			if (state & (NUD_PERMANENT | NUD_IN_TIMER)) {
-				write_unlock(&n->lock);
-				goto next_elt;
-			}
-
-			if (time_before(n->used, n->confirmed))
-				n->used = n->confirmed;
-
-			if (atomic_read(&n->refcnt) == 1 &&
-			    (state == NUD_FAILED ||
-			     time_after(jiffies, n->used + n->parms->gc_staletime))) {
-				*np = n->next;
-				n->dead = 1;
-				write_unlock(&n->lock);
-				neigh_cleanup_and_release(n);
-				continue;
-			}
+		state = n->nud_state;
+		if (state & (NUD_PERMANENT | NUD_IN_TIMER)) {
 			write_unlock(&n->lock);
+			goto next_elt;
+		}
+
+		if (time_before(n->used, n->confirmed))
+			n->used = n->confirmed;
+
+		if (atomic_read(&n->refcnt) == 1 &&
+		    (state == NUD_FAILED ||
+			     time_after(jiffies, n->used + n->parms->gc_staletime))) {
+			*np = n->next;
+			n->dead = 1;
+			write_unlock(&n->lock);
+			neigh_cleanup_and_release(n);
+			continue;
+		}
+		write_unlock(&n->lock);
 
 next_elt:
-			np = &n->next;
-		}
+		np = &n->next;
+	}
 		/*
 		 * It's fine to release lock here, even if hash table
 		 * grows while we are preempted.
@@ -947,7 +947,7 @@ static void neigh_timer_handler(unsigned long arg)
 		neigh->nud_state = NUD_FAILED;
 		notify = 1;
 		neigh_invalidate(neigh);
-	}
+		}
 
 	if (neigh->nud_state & NUD_IN_TIMER) {
 		if (time_before(next, jiffies + HZ/2))
@@ -1171,6 +1171,9 @@ int neigh_update(struct neighbour *neigh, const u8 *lladdr, u8 new,
 	}
 
 	if (lladdr != neigh->ha) {
+#if defined(CONFIG_BCM_KF_BLOG)
+		call_netevent_notifiers(NETEVENT_ARP_BINDING_CHANGE, neigh);
+#endif
 		write_seqlock(&neigh->ha_lock);
 		memcpy(&neigh->ha, lladdr, dev->addr_len);
 		write_sequnlock(&neigh->ha_lock);
@@ -1253,7 +1256,7 @@ static void neigh_hh_init(struct neighbour *n, struct dst_entry *dst)
 		dev->header_ops->cache(n, hh, prot);
 
 	write_unlock_bh(&n->lock);
-}
+	}
 
 /* This function can be used in contexts, where only old dev_queue_xmit
  * worked, f.e. if you want to override normal output path (eql, shaper),
@@ -1330,8 +1333,8 @@ int neigh_connected_output(struct neighbour *neigh, struct sk_buff *skb)
 
 	do {
 		seq = read_seqbegin(&neigh->ha_lock);
-		err = dev_hard_header(skb, dev, ntohs(skb->protocol),
-				      neigh->ha, NULL, skb->len);
+	err = dev_hard_header(skb, dev, ntohs(skb->protocol),
+			      neigh->ha, NULL, skb->len);
 	} while (read_seqretry(&neigh->ha_lock, seq));
 
 	if (err >= 0)
@@ -2146,9 +2149,9 @@ static int neigh_fill_info(struct sk_buff *skb, struct neighbour *neigh,
 
 		neigh_ha_snapshot(haddr, neigh, neigh->dev);
 		if (nla_put(skb, NDA_LLADDR, neigh->dev->addr_len, haddr) < 0) {
-			read_unlock_bh(&neigh->lock);
-			goto nla_put_failure;
-		}
+		read_unlock_bh(&neigh->lock);
+		goto nla_put_failure;
+	}
 	}
 
 	ci.ndm_used	 = jiffies_to_clock_t(now - neigh->used);
@@ -2205,7 +2208,7 @@ static void neigh_update_notify(struct neighbour *neigh)
 static int neigh_dump_table(struct neigh_table *tbl, struct sk_buff *skb,
 			    struct netlink_callback *cb)
 {
-	struct net *net = sock_net(skb->sk);
+	struct net * net = sock_net(skb->sk);
 	struct neighbour *n;
 	int rc, h, s_h = cb->args[1];
 	int idx, s_idx = idx = cb->args[2];
@@ -2408,7 +2411,7 @@ static struct neighbour *neigh_get_first(struct seq_file *seq)
 				break;
 			if (n->nud_state & ~NUD_NOARP)
 				break;
-next:
+		next:
 			n = rcu_dereference_bh(n->next);
 		}
 
@@ -2450,7 +2453,7 @@ static struct neighbour *neigh_get_next(struct seq_file *seq,
 
 			if (n->nud_state & ~NUD_NOARP)
 				break;
-next:
+		next:
 			n = rcu_dereference_bh(n->next);
 		}
 
@@ -2513,7 +2516,7 @@ static struct pneigh_entry *pneigh_get_next(struct seq_file *seq,
 	struct neigh_table *tbl = state->tbl;
 
 	do {
-		pn = pn->next;
+	pn = pn->next;
 	} while (pn && !net_eq(pneigh_net(pn), net));
 
 	while (!pn) {

@@ -236,6 +236,9 @@ struct cpufreq_driver {
 	int	(*exit)		(struct cpufreq_policy *policy);
 	int	(*suspend)	(struct cpufreq_policy *policy);
 	int	(*resume)	(struct cpufreq_policy *policy);
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX)
+	int	(*init_sysfs)	(struct cpufreq_policy *policy);
+#endif
 	struct freq_attr	**attr;
 };
 
@@ -310,6 +313,9 @@ __ATTR(_name, 0644, show_##_name, store_##_name)
  *                        CPUFREQ 2.6. INTERFACE                     *
  *********************************************************************/
 int cpufreq_get_policy(struct cpufreq_policy *policy, unsigned int cpu);
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX)
+int cpufreq_set_policy(struct cpufreq_policy *data, struct cpufreq_policy *policy);
+#endif
 int cpufreq_update_policy(unsigned int cpu);
 
 #ifdef CONFIG_CPU_FREQ

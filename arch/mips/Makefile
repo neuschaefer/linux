@@ -48,6 +48,11 @@ ifneq ($(SUBARCH),$(ARCH))
   endif
 endif
 
+ifdef BCM_KF # defined(CONFIG_BCM_KF_MISC_MAKEFILE)
+# removing -ffunction-sections from clfags-y
+cflags-y :=
+endif # BCM_KF # CONFIG_BCM_KF_MISC_MAKEFILE
+
 ifdef CONFIG_FUNCTION_GRAPH_TRACER
   ifndef KBUILD_MCOUNT_RA_ADDRESS
     ifeq ($(call cc-option-yn,-mmcount-ra-address), y)
@@ -101,7 +106,7 @@ cflags-y += -ffreestanding
 # carefully avoid to add it redundantly because gcc 3.3/3.4 complains
 # when fed the toolchain default!
 #
-# Certain gcc versions up to gcc 4.1.1 (probably 4.2-subversion as of
+# Certain gcc versions upto gcc 4.1.1 (probably 4.2-subversion as of
 # 2006-10-10 don't properly change the predefined symbols if -EB / -EL
 # are used, so we kludge that here.  A bug has been filed at
 # http://gcc.gnu.org/bugzilla/show_bug.cgi?id=29413.
@@ -110,13 +115,20 @@ undef-all += -UMIPSEB -U_MIPSEB -U__MIPSEB -U__MIPSEB__
 undef-all += -UMIPSEL -U_MIPSEL -U__MIPSEL -U__MIPSEL__
 predef-be += -DMIPSEB -D_MIPSEB -D__MIPSEB -D__MIPSEB__
 predef-le += -DMIPSEL -D_MIPSEL -D__MIPSEL -D__MIPSEL__
-cflags-$(CONFIG_CPU_BIG_ENDIAN)		+= $(shell $(CC) -dumpmachine |grep -q 'mips.*el-.*' && echo -EB $(undef-all) $(predef-be))
-cflags-$(CONFIG_CPU_LITTLE_ENDIAN)	+= $(shell $(CC) -dumpmachine |grep -q 'mips.*el-.*' || echo -EL $(undef-all) $(predef-le))
+cflags-$(CONFIG_CPU_BIG_ENDIAN)		+= $(shell $(CC) -dumpmachine |grep -q 'mips.*el-.*' || echo -EB $(undef-all) $(predef-be))
+cflags-$(CONFIG_CPU_LITTLE_ENDIAN)	+= $(shell $(CC) -dumpmachine |grep -q 'mips.*el-.*' && echo -EL $(undef-all) $(predef-le))
 
 cflags-$(CONFIG_CPU_HAS_SMARTMIPS)	+= $(call cc-option,-msmartmips)
 
 cflags-$(CONFIG_SB1XXX_CORELIS)	+= $(call cc-option,-mno-sched-prolog) \
 				   -fno-omit-frame-pointer
+
+ifdef BCM_KF # defined(CONFIG_BCM_KF_MISC_MAKEFILE)
+cflags-$(CONFIG_REMOTE_DEBUG)	+= -ggdb
+endif # BCM_KF # CONFIG_BCM_KF_MISC_MAKEFILE
+
+ifdef BCM_KF # defined(CONFIG_BCM_KF_BALOO)
+endif # BCM_KF # CONFIG_BCM_KF_BALOO
 
 #
 # CPU-dependent compiler/assembler options for optimization.

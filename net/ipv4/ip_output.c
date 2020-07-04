@@ -80,6 +80,10 @@
 #include <linux/netlink.h>
 #include <linux/tcp.h>
 
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+#include <linux/blog.h>
+#endif
+
 int sysctl_ip_default_ttl __read_mostly = IPDEFTTL;
 EXPORT_SYMBOL(sysctl_ip_default_ttl);
 
@@ -230,6 +234,14 @@ static inline int ip_skb_dst_mtu(struct sk_buff *skb)
 
 static int ip_finish_output(struct sk_buff *skb)
 {
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+    uint32_t mtu = dst_mtu(skb_dst(skb));
+    Blog_t * blog_p = blog_ptr(skb);
+
+    if (blog_p && blog_p->minMtu > mtu)
+        blog_p->minMtu = mtu;
+#endif
+
 #if defined(CONFIG_NETFILTER) && defined(CONFIG_XFRM)
 	/* Policy lookup after SNAT yielded a new policy */
 	if (skb_dst(skb)->xfrm != NULL) {
@@ -278,10 +290,18 @@ int ip_mc_output(struct sk_buff *skb)
 #endif
 		   ) {
 			struct sk_buff *newskb = skb_clone(skb, GFP_ATOMIC);
+
 			if (newskb)
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+            {
+                blog_clone(skb, blog_ptr(newskb));
+#endif
 				NF_HOOK(NFPROTO_IPV4, NF_INET_POST_ROUTING,
 					newskb, NULL, newskb->dev,
 					ip_dev_loopback_xmit);
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+            }
+#endif
 		}
 
 		/* Multicasts with ttl 0 must not go beyond the host */
@@ -484,6 +504,17 @@ int ip_fragment(struct sk_buff *skb, int (*output)(struct sk_buff *))
 		return -EMSGSIZE;
 	}
 
+#if defined(CONFIG_BCM_KF_IP)
+   /* 
+    * Do not fragment the packets going to 4in6 tunnel:
+    * RFC2473 sec 7.2: fragmentation should happen in tunnel
+    */
+    if (strstr(dev->name, "ip6tnl"))
+    {
+        return output(skb);
+    }
+#endif    
+
 	/*
 	 *	Setup starting values.
 	 */
@@ -672,6 +703,9 @@ slow_path:
 			BUG();
 		left -= len;
 
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+        blog_xfer(skb2, skb);
+#endif
 		/*
 		 *	Fill in the new header fields.
 		 */

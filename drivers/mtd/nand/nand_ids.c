@@ -88,6 +88,9 @@ struct nand_flash_dev nand_flash_ids[] = {
 	{"NAND 128MiB 1,8V 8-bit",	0xA1, 0, 128, 0, LP_OPTIONS},
 	{"NAND 128MiB 3,3V 8-bit",	0xF1, 0, 128, 0, LP_OPTIONS},
 	{"NAND 128MiB 3,3V 8-bit",	0xD1, 0, 128, 0, LP_OPTIONS},
+#if defined(CONFIG_BCM_KF_NAND)
+	{"NAND 128MiB 3,3V 8-bit",	0x12, 0, 128, 0, LP_OPTIONS}, // Micron SPI NAND
+#endif
 	{"NAND 128MiB 1,8V 16-bit",	0xB1, 0, 128, 0, LP_OPTIONS16},
 	{"NAND 128MiB 3,3V 16-bit",	0xC1, 0, 128, 0, LP_OPTIONS16},
 	{"NAND 128MiB 1,8V 16-bit",     0xAD, 0, 128, 0, LP_OPTIONS16},
@@ -95,12 +98,20 @@ struct nand_flash_dev nand_flash_ids[] = {
 	/* 2 Gigabit */
 	{"NAND 256MiB 1,8V 8-bit",	0xAA, 0, 256, 0, LP_OPTIONS},
 	{"NAND 256MiB 3,3V 8-bit",	0xDA, 0, 256, 0, LP_OPTIONS},
+#if defined(CONFIG_BCM_KF_NAND)
+	{"NAND 256MiB 3,3V 8-bit",	0xD2, 0, 256, 0, LP_OPTIONS}, // Gigadevice SPI NAND
+	{"NAND 256MiB 3,3V 8-bit",	0x22, 0, 256, 0, LP_OPTIONS}, // Micron SPI NAND
+#endif
 	{"NAND 256MiB 1,8V 16-bit",	0xBA, 0, 256, 0, LP_OPTIONS16},
 	{"NAND 256MiB 3,3V 16-bit",	0xCA, 0, 256, 0, LP_OPTIONS16},
 
 	/* 4 Gigabit */
 	{"NAND 512MiB 1,8V 8-bit",	0xAC, 0, 512, 0, LP_OPTIONS},
 	{"NAND 512MiB 3,3V 8-bit",	0xDC, 0, 512, 0, LP_OPTIONS},
+#if defined(CONFIG_BCM_KF_NAND)
+	{"NAND 512MiB 3,3V 8-bit",	0xD4, 0, 512, 0, LP_OPTIONS}, // Gigadevice SPI NAND
+	{"NAND 512MiB 3,3V 8-bit",	0x32, 0, 512, 0, LP_OPTIONS}, // Micron SPI NAND
+#endif
 	{"NAND 512MiB 1,8V 16-bit",	0xBC, 0, 512, 0, LP_OPTIONS16},
 	{"NAND 512MiB 3,3V 16-bit",	0xCC, 0, 512, 0, LP_OPTIONS16},
 
@@ -178,6 +189,9 @@ struct nand_manufacturers nand_manuf_ids[] = {
 	{NAND_MFR_MICRON, "Micron"},
 	{NAND_MFR_AMD, "AMD"},
 	{NAND_MFR_MACRONIX, "Macronix"},
+#if defined(CONFIG_BCM_KF_NAND)
+	{NAND_MFR_GIGADEVICE, "Gigadevice"},
+#endif
 	{0x0, "Unknown"}
 };
 

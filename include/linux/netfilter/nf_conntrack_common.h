@@ -83,6 +83,12 @@ enum ip_conntrack_status {
 	/* Conntrack is a fake untracked entry */
 	IPS_UNTRACKED_BIT = 12,
 	IPS_UNTRACKED = (1 << IPS_UNTRACKED_BIT),
+
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+    /* Conntrack eligible for Blogging */
+    IPS_BLOG_BIT = 13,
+    IPS_BLOG = (1 << IPS_BLOG_BIT),
+#endif
 };
 
 /* Connection tracking event types */

@@ -57,7 +57,11 @@ ENTRY(cpu_v7_reset)
  THUMB(	bic	r1, r1, #1 << 30 )		@ SCTLR.TE (Thumb exceptions)
 	mcr	p15, 0, r1, c1, c0, 0		@ disable MMU
 	isb
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX)
+	bx	r0
+#else
 	mov	pc, r0
+#endif
 ENDPROC(cpu_v7_reset)
 	.popsection
 
@@ -75,6 +79,17 @@ ENTRY(cpu_v7_do_idle)
 ENDPROC(cpu_v7_do_idle)
 
 ENTRY(cpu_v7_dcache_clean_area)
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX)
+	ALT_SMP(W(nop))			@ MP extensions imply L1 PTW
+	ALT_UP_B(1f)
+	mov	pc, lr
+1:	dcache_line_size r2, r3
+2:	mcr	p15, 0, r0, c7, c10, 1		@ clean D entry
+	add	r0, r0, r2
+	subs	r1, r1, r2
+	bhi	2b
+	dsb	ishst
+#else
 #ifndef TLB_CAN_READ_FROM_L1_CACHE
 	dcache_line_size r2, r3
 1:	mcr	p15, 0, r0, c7, c10, 1		@ clean D entry
@@ -82,6 +97,7 @@ ENTRY(cpu_v7_dcache_clean_area)
 	subs	r1, r1, r2
 	bhi	1b
 	dsb
+#endif
 #endif
 	mov	pc, lr
 ENDPROC(cpu_v7_dcache_clean_area)
@@ -98,9 +114,17 @@ ENTRY(cpu_v7_do_suspend)
 	mrc	p15, 0, r4, c13, c0, 0	@ FCSE/PID
 	mrc	p15, 0, r5, c13, c0, 3	@ User r/o thread ID
 	stmia	r0!, {r4 - r5}
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX)
+#ifdef CONFIG_MMU
 	mrc	p15, 0, r6, c3, c0, 0	@ Domain ID
 	mrc	p15, 0, r7, c2, c0, 1	@ TTB 1
 	mrc	p15, 0, r11, c2, c0, 2	@ TTB control register
+#endif
+#else
+	mrc	p15, 0, r6, c3, c0, 0	@ Domain ID
+	mrc	p15, 0, r7, c2, c0, 1	@ TTB 1
+	mrc	p15, 0, r11, c2, c0, 2	@ TTB control register
+#endif
 	mrc	p15, 0, r8, c1, c0, 0	@ Control register
 	mrc	p15, 0, r9, c1, c0, 1	@ Auxiliary control register
 	mrc	p15, 0, r10, c1, c0, 2	@ Co-processor access control
@@ -110,13 +134,36 @@ ENDPROC(cpu_v7_do_suspend)
 
 ENTRY(cpu_v7_do_resume)
 	mov	ip, #0
+#if !defined(CONFIG_BCM_KF_ARM_BCM963XX)
 	mcr	p15, 0, ip, c8, c7, 0	@ invalidate TLBs
+#endif
 	mcr	p15, 0, ip, c7, c5, 0	@ invalidate I cache
 	mcr	p15, 0, ip, c13, c0, 1	@ set reserved context ID
 	ldmia	r0!, {r4 - r5}
 	mcr	p15, 0, r4, c13, c0, 0	@ FCSE/PID
 	mcr	p15, 0, r5, c13, c0, 3	@ User r/o thread ID
 	ldmia	r0, {r6 - r11}
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX)
+#ifdef CONFIG_MMU
+	mcr	p15, 0, ip, c8, c7, 0	@ invalidate TLBs
+	mcr	p15, 0, r6, c3, c0, 0	@ Domain ID
+#ifndef CONFIG_ARM_LPAE
+	ALT_SMP(orr	r1, r1, #TTB_FLAGS_SMP)
+	ALT_UP(orr	r1, r1, #TTB_FLAGS_UP)
+#endif
+	mcr	p15, 0, r1, c2, c0, 0	@ TTB 0
+	mcr	p15, 0, r7, c2, c0, 1	@ TTB 1
+	mcr	p15, 0, r11, c2, c0, 2	@ TTB control register
+	ldr	r4, =PRRR		@ PRRR
+	ldr	r5, =NMRR		@ NMRR
+	mcr	p15, 0, r4, c10, c2, 0	@ write PRRR
+	mcr	p15, 0, r5, c10, c2, 1	@ write NMRR
+#endif	/* CONFIG_MMU */
+	mrc	p15, 0, r4, c1, c0, 1	@ Read Auxiliary control register
+	teq	r4, r9			@ Is it already set?
+	mcrne	p15, 0, r9, c1, c0, 1	@ No, so write it
+	mcr	p15, 0, r10, c1, c0, 2	@ Co-processor access control
+#else
 	mcr	p15, 0, r6, c3, c0, 0	@ Domain ID
 #ifndef CONFIG_ARM_LPAE
 	ALT_SMP(orr	r1, r1, #TTB_FLAGS_SMP)
@@ -133,6 +180,7 @@ ENTRY(cpu_v7_do_resume)
 	ldr	r5, =NMRR		@ NMRR
 	mcr	p15, 0, r4, c10, c2, 0	@ write PRRR
 	mcr	p15, 0, r5, c10, c2, 1	@ write NMRR
+#endif
 	isb
 	dsb
 	mov	r0, r8			@ control register
@@ -172,7 +220,11 @@ __v7_ca15mp_setup:
 __v7_setup:
 	adr	r12, __v7_setup_stack		@ the local stack
 	stmia	r12, {r0-r5, r7, r9, r11, lr}
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX)
+	bl      v7_flush_dcache_louis
+#else
 	bl	v7_flush_dcache_all
+#endif
 	ldmia	r12, {r0-r5, r7, r9, r11, lr}
 
 	mrc	p15, 0, r0, c0, c0, 0		@ read main ID register
@@ -246,7 +298,9 @@ __v7_setup:
 
 3:	mov	r10, #0
 	mcr	p15, 0, r10, c7, c5, 0		@ I+BTB cache invalidate
+#if !defined(CONFIG_BCM_KF_ARM_BCM963XX)
 	dsb
+#endif
 #ifdef CONFIG_MMU
 	mcr	p15, 0, r10, c8, c7, 0		@ invalidate I + D TLBs
 	v7_ttb_setup r10, r4, r8, r5		@ TTBCR, TTBRx setup
@@ -254,6 +308,9 @@ __v7_setup:
 	ldr	r6, =NMRR			@ NMRR
 	mcr	p15, 0, r5, c10, c2, 0		@ write PRRR
 	mcr	p15, 0, r6, c10, c2, 1		@ write NMRR
+#endif
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX)
+	dsb
 #endif
 #ifndef CONFIG_ARM_THUMBEE
 	mrc	p15, 0, r0, c0, c1, 0		@ read ID_PFR0 for ThumbEE
@@ -363,6 +420,18 @@ __v7_ca15mp_proc_info:
 	.long	0xff0ffff0
 	__v7_proc __v7_ca15mp_setup, hwcaps = HWCAP_IDIV
 	.size	__v7_ca15mp_proc_info, . - __v7_ca15mp_proc_info
+
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX)
+	/*
+	 * Broadcom Corporation Brahma-B15 processor.
+	 */
+	.type	__v7_b15mp_proc_info, #object
+__v7_b15mp_proc_info:
+	.long	0x420f00f0
+	.long	0xff0ffff0
+	__v7_proc __v7_ca15mp_setup, hwcaps = HWCAP_IDIV
+	.size	__v7_b15mp_proc_info, . - __v7_b15mp_proc_info
+#endif
 
 	/*
 	 * Match any ARMv7 processor core.

@@ -20,6 +20,24 @@
 #include <net/net_namespace.h>
 #include <asm/uaccess.h>
 #include "br_private.h"
+#if defined(CONFIG_BCM_KF_IGMP) && defined(CONFIG_BR_IGMP_SNOOP)
+#include "br_igmp.h"
+#endif
+#if defined(CONFIG_BCM_KF_MLD) && defined(CONFIG_BR_MLD_SNOOP)
+#include "br_mld.h"
+#endif
+#if defined(CONFIG_BCM_KF_NETFILTER)
+#include <linux/module.h> 
+#include "br_flows.h"
+#endif
+
+#if defined(CONFIG_BCM_KF_NETFILTER)
+#include <linux/bcm_log.h>
+#if defined(CONFIG_BCM96828) && !defined(CONFIG_EPON_HGU)
+extern int uni_uni_enabled;
+#endif
+#endif
+
 
 /* called with RTNL */
 static int get_bridge_ifindices(struct net *net, int *indices, int num)
@@ -82,6 +100,317 @@ static int get_fdb_entries(struct net_bridge *br, void __user *userbuf,
 	return num;
 }
 
+#if defined(CONFIG_BCM_KF_BRIDGE_STATIC_FDB) || defined(CONFIG_BCM_KF_BRIDGE_DYNAMIC_FDB)
+/* called with RTNL */
+static int add_fdb_entries(struct net_bridge *br, void __user *userbuf,
+			   unsigned long maxnum, int ifindex, int isStatic)
+{
+	struct net_device *dev;
+	unsigned char     *pMacAddr = NULL;
+	unsigned char     *pMac = NULL;
+	int                size;
+	int                i;
+	int                ret = 0;
+	struct net_bridge_port *port;
+
+	if (!capable(CAP_NET_ADMIN))
+	{
+		return -EPERM;
+	}
+
+	dev = dev_get_by_index(dev_net(br->dev), ifindex);
+	if (!dev)
+	{
+		return -EINVAL;
+	}
+
+	port = br_port_get_rtnl(dev);
+	if (!port)
+	{
+		dev_put(dev);
+		return -EINVAL;
+	}
+
+	size     = maxnum * ETH_ALEN;
+	pMacAddr = kmalloc(size, GFP_KERNEL);
+	if (!pMacAddr)
+	{
+		dev_put(dev);
+		return -ENOMEM;
+	}
+
+	copy_from_user(pMacAddr, userbuf, size);
+
+	pMac = pMacAddr;
+	for ( i = 0; i < maxnum; i++ )
+	{
+#if defined(CONFIG_BCM_KF_BRIDGE_STATIC_FDB)
+		if(isStatic)
+		{   
+			ret = br_fdb_adddel_static(br, port, (const unsigned char *)pMac, 1);
+		}
+		else
+#endif
+		{        
+#if defined(CONFIG_BCM_KF_VLAN_AGGREGATION) && defined(CONFIG_BCM_VLAN_AGGREGATION)
+			br_fdb_update(br, port, (const unsigned char *)pMac, VLAN_N_VID);
+#else
+			br_fdb_update(br, port, (const unsigned char *)pMac);
+#endif
+			ret = 0;
+		}
+		pMac += ETH_ALEN;
+	}
+
+	kfree(pMacAddr);
+
+	dev_put(dev);
+   
+	return ret;
+}
+#endif
+
+#if defined(CONFIG_BCM_KF_BRIDGE_DYNAMIC_FDB)
+/* called with RTNL */
+static int del_dyn_fdb_entries(struct net_bridge *br, int ifindex)
+{
+	struct net_device *dev;
+	struct net_bridge_port *port;
+
+	if (!capable(CAP_NET_ADMIN))
+	{
+		return -EPERM;
+	}
+
+	dev = dev_get_by_index(dev_net(br->dev), ifindex);
+	if (!dev)
+	{
+		return -EINVAL;
+	}
+
+	port = br_port_get_rtnl(dev);
+	if (!port)
+	{
+		dev_put(dev);
+		return -EINVAL;
+	}
+
+	br_fdb_delete_by_port(br, port, 0);
+	dev_put(dev);
+	return 0;
+}
+#endif
+
+#if defined(CONFIG_BCM_KF_BRIDGE_STATIC_FDB)
+/* called with RTNL */
+static int delete_fdb_entries(struct net_bridge *br, void __user *userbuf,
+			unsigned long maxnum, int ifindex)
+{
+	struct net_device *dev;
+	unsigned char     *pMacAddr = NULL;
+	unsigned char     *pMac = NULL;
+	int                size;
+	int                i;
+	int                ret = 0;
+	struct net_bridge_port *port;
+
+	if (!capable(CAP_NET_ADMIN))
+	{
+		return -EPERM;
+	}
+
+	dev = dev_get_by_index(dev_net(br->dev), ifindex);
+	if (!dev)
+	{
+		return -EINVAL;
+	}
+
+	port = br_port_get_rtnl(dev);
+	if (!port)
+	{
+		dev_put(dev);
+		return -EINVAL;
+	}
+
+	size     = maxnum * ETH_ALEN;
+	pMacAddr = kmalloc(size, GFP_KERNEL);
+	if (!pMacAddr)
+	{
+		dev_put(dev);
+		return -ENOMEM;
+	}
+
+	copy_from_user(pMacAddr, userbuf, size);
+
+	pMac = pMacAddr;
+	for ( i = 0; i < maxnum; i++ )
+	{
+		ret = br_fdb_adddel_static(br, port, (const unsigned char *)pMac, 0);
+		pMac += ETH_ALEN;
+	}
+
+	kfree(pMacAddr);
+
+	dev_put(dev);
+
+	return ret;
+}
+
+#endif
+
+#if defined(CONFIG_BCM_KF_BRIDGE_DYNAMIC_FDB)
+/* called with RTNL */
+static int add_fdb_dynamic_entries(struct net_bridge *br, void __user *userbuf,
+			   unsigned long maxnum, int ifindex)
+{
+	return add_fdb_entries(br, userbuf, maxnum, ifindex, 0);
+}
+#endif
+
+#if defined(CONFIG_BCM_KF_BRIDGE_STATIC_FDB)
+/* called with RTNL */
+static int add_fdb_static_entries(struct net_bridge *br, void __user *userbuf,
+			   unsigned long maxnum, int ifindex)
+{
+	return add_fdb_entries(br, userbuf, maxnum, ifindex, 1);
+}
+
+/* called with RTNL */
+static int del_static_fdb_entries(struct net_bridge *br, int ifindex)
+{
+	struct net_device *dev;
+	struct net_bridge_port *port;
+
+	if (!capable(CAP_NET_ADMIN))
+	{
+		return -EPERM;
+	}
+
+	dev = dev_get_by_index(dev_net(br->dev), ifindex);
+	if (!dev)
+	{
+		return -EINVAL;
+	}
+
+	port = br_port_get_rtnl(dev);
+	if (!port)
+	{
+		dev_put(dev);
+		return -EINVAL;
+	}
+
+	br_fdb_delete_by_port(br, port, 2);
+	dev_put(dev);
+	return 0;
+}
+
+#endif
+
+#if defined(CONFIG_BCM_KF_BRIDGE_MAC_FDB_LIMIT) && defined(CONFIG_BCM_BRIDGE_MAC_FDB_LIMIT)
+static int get_dev_and_port(struct net_bridge *br, int ifindex,
+								struct net_device **dev, struct net_bridge_port **port)
+{
+	if (!capable(CAP_NET_ADMIN))
+	{
+		return -EPERM;
+	}
+
+	*dev = dev_get_by_index(dev_net(br->dev), ifindex);
+	if (!*dev)
+	{
+		return -EINVAL;
+	}
+
+	if (port != NULL)
+	{    		
+		*port = br_port_get_rtnl(*dev);
+		if (!*port)
+		{
+			dev_put(*dev);
+			return -EINVAL;
+		}
+	}
+	return 0;
+}
+
+/* called with RTNL */
+/* Get FDB limit
+ *    lmtType 0: Bridge limit
+ *                1: Port limit
+ */
+static int get_fdb_mac_limit(struct net_bridge *br, int lmt_type,
+								 int ifindex, int is_min)
+{
+	struct net_device *dev = NULL;
+	struct net_bridge_port *port = NULL;
+	int fdb_limit = 0;
+	
+	if (lmt_type == 1)
+	{    
+		if (get_dev_and_port(br, ifindex, &dev, &port) != 0)
+		{
+			return -EINVAL;
+		}
+		fdb_limit = br_get_fdb_limit(NULL, port, is_min);           
+	}
+	else
+	{
+		fdb_limit = br_get_fdb_limit(br, NULL, is_min);   
+	}
+
+
+	if(dev)
+		dev_put(dev);
+	return fdb_limit;
+}
+
+static int set_fdb_mac_limit(struct net_bridge *br, int fdb_limit,
+								int lmt_type, int ifindex, int is_min)
+{
+	struct net_device *dev = NULL;
+	struct net_bridge_port *port = NULL;
+	int ret = 0;
+	
+	if (lmt_type == 1)
+	{    
+		if (get_dev_and_port(br, ifindex, &dev, &port) != 0)
+		{
+			return -EINVAL;
+		}		
+	}
+	ret = br_set_fdb_limit(br, port, lmt_type, is_min, fdb_limit);
+	if(dev)
+		dev_put(dev);
+	return ret;
+}
+#endif
+
+#if defined(CONFIG_BCM_KF_NETFILTER)
+static int set_flows(struct net_bridge *br, int rxifindex, int txifindex)
+{
+	struct net_device *rxdev, *txdev;
+	int                ret = 0;
+
+	if (!capable(CAP_NET_ADMIN))
+		return -EPERM;
+
+	rxdev = dev_get_by_index(dev_net(br->dev), rxifindex);
+	if (rxdev == NULL)
+		return -EINVAL;
+
+	txdev = dev_get_by_index(dev_net(br->dev), txifindex);
+	if (txdev == NULL)
+		return -EINVAL;
+
+   br_flow_blog_rules(br, rxdev, txdev);
+
+   dev_put(rxdev);
+   dev_put(txdev);
+
+	return ret;
+}
+#endif
+
 /* called with RTNL */
 static int add_del_if(struct net_bridge *br, int ifindex, int isadd)
 {
@@ -100,6 +429,9 @@ static int add_del_if(struct net_bridge *br, int ifindex, int isadd)
 	else
 		ret = br_del_if(br, dev);
 
+#if defined(CONFIG_BCM_KF_BRIDGE_PORT_ISOLATION)
+	br_dev_notify_if_change(&br->dev->name[0]);
+#endif
 	return ret;
 }
 
@@ -111,7 +443,11 @@ static int add_del_if(struct net_bridge *br, int ifindex, int isadd)
 static int old_dev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	struct net_bridge *br = netdev_priv(dev);
+#if defined(CONFIG_BCM_KF_BRIDGE_MAC_FDB_LIMIT) && defined(CONFIG_BCM_BRIDGE_MAC_FDB_LIMIT)    
+	unsigned long args[5];
+#else
 	unsigned long args[4];
+#endif
 
 	if (copy_from_user(args, rq->ifr_data, sizeof(args)))
 		return -EFAULT;
@@ -288,11 +624,79 @@ static int old_dev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 
 	case BRCTL_GET_FDB_ENTRIES:
 		return get_fdb_entries(br, (void __user *)args[1],
-				       args[2], args[3]);
+					   args[2], args[3]);
+
+#if defined(CONFIG_BCM_KF_BRIDGE_STATIC_FDB)
+	case BRCTL_ADD_FDB_ENTRIES:
+		return add_fdb_static_entries(br, (void __user *)args[1],
+					   args[2], args[3]);
+
+	case BRCTL_DEL_FDB_ENTRIES:
+		return delete_fdb_entries(br, (void __user *)args[1],
+					   args[2], args[3]);
+
+	case BRCTL_DEL_STATIC_FDB_ENTRIES:
+		return del_static_fdb_entries(br, args[1]);
+#endif
+
+#if defined(CONFIG_BCM_KF_BRIDGE_DYNAMIC_FDB)
+	case BRCTL_DEL_DYN_FDB_ENTRIES:
+		return del_dyn_fdb_entries(br, args[1]);
+
+	case BRCTL_ADD_FDB_DYNAMIC_ENTRIES:
+		return add_fdb_dynamic_entries(br, (void __user *)args[1],
+					   args[2], args[3]); 
+#endif
+
+#if defined(CONFIG_BCM_KF_NETFILTER)
+	case BRCTL_SET_FLOWS:
+		return set_flows(br, args[1], args[2]);
+#endif
+
+#if defined(CONFIG_BCM_KF_BRIDGE_MAC_FDB_LIMIT) && defined(CONFIG_BCM_BRIDGE_MAC_FDB_LIMIT)
+	case BRCTL_GET_BR_FDB_LIMIT:
+	{
+		int fdb_limit;
+		
+		fdb_limit = get_fdb_mac_limit(br, args[2], args[3], args[4]);
+		if(fdb_limit < 0)
+			fdb_limit = 0;
+		if (copy_to_user((void __user *)args[1], &fdb_limit, sizeof(fdb_limit)))
+			return -EFAULT;
+		return 0;
+	}
+
+	case BRCTL_SET_BR_FDB_LIMIT:
+		return set_fdb_mac_limit(br, args[1], args[2], args[3], args[4]);        
+#endif
 	}
 
 	return -EOPNOTSUPP;
 }
+
+#if (defined(CONFIG_BCM_KF_IGMP) && defined(CONFIG_BR_IGMP_SNOOP)) || (defined(CONFIG_BCM_KF_MLD) && defined(CONFIG_BR_MLD_SNOOP)) || defined(CONFIG_BCM_KF_IGMP_RATE_LIMIT)
+static int getDevice(struct net_device **dev, unsigned long arg1)
+{
+	char buf[IFNAMSIZ];
+
+	if (!capable(CAP_NET_ADMIN))
+	{
+		return -EPERM;
+	}
+	if (copy_from_user(buf, (void __user *) arg1, IFNAMSIZ))
+	{
+		return -EFAULT;
+	}
+	buf[IFNAMSIZ-1] = 0;
+	*dev = dev_get_by_name(&init_net, buf);
+	if (*dev == NULL)
+	{
+		return  -ENXIO; 	/* Could not find device */
+	}
+
+	return 0;
+}
+#endif
 
 static int old_deviceless(struct net *net, void __user *uarg)
 {
@@ -343,6 +747,268 @@ static int old_deviceless(struct net *net, void __user *uarg)
 
 		return br_del_bridge(net, buf);
 	}
+#if defined(CONFIG_BCM_KF_IGMP) && defined(CONFIG_BR_IGMP_SNOOP)
+	case BRCTL_ENABLE_SNOOPING:
+	{
+		struct net_device *dev = NULL;
+		struct net_bridge *br;
+		int error = getDevice(&dev, args[1]);
+		if (error)
+		{
+			return error;
+		}
+		
+		br = netdev_priv(dev);
+		br->igmp_snooping = args[2];
+		dev_put(dev);
+
+		return 0;
+	}
+
+	case BRCTL_ENABLE_PROXY_MODE:
+	{
+		struct net_device *dev = NULL;
+		struct net_bridge *br;
+		int error = getDevice(&dev, args[1]);
+		if (error)
+		{
+			return error;
+		}
+
+		br = netdev_priv(dev);
+		br->igmp_proxy = args[2];
+
+		dev_put(dev);
+
+		return 0;
+	}
+	case BRCTL_ENABLE_IGMP_LAN2LAN_MC:
+	{
+		struct net_device *dev = NULL;
+		struct net_bridge *br;
+		int error = getDevice(&dev, args[1]);
+		if (error)
+		{
+			return error;
+		}
+		
+		br = netdev_priv(dev);
+		br->igmp_lan2lan_mc_enable= args[2];
+
+		dev_put(dev);
+
+		return 0;
+	}
+
+	case BRCTL_GET_IGMP_LAN_TO_LAN_MCAST_ENABLED:
+	{
+		struct net_device *dev = NULL;
+		struct net_bridge *br;
+		int enable;
+	  
+		int error = getDevice(&dev, args[1]);
+		if (error)
+		{
+			return error;
+		}
+
+		br = netdev_priv(dev);
+		enable = br_mcast_get_lan2lan_snooping (BR_MCAST_PROTO_IGMP, br);
+		if (copy_to_user((void __user *)args[2], &enable, sizeof(int)))
+		{
+			dev_put(dev);
+			return -EFAULT;
+		}
+		dev_put(dev);
+		return 0;
+	}
+#endif
+#if defined(CONFIG_BCM_KF_MLD) && defined(CONFIG_BR_MLD_SNOOP)
+	case BRCTL_MLD_ENABLE_SNOOPING:
+	{
+		struct net_device *dev = NULL;
+		struct net_bridge *br;
+		int error = getDevice(&dev, args[1]);
+		if (error)
+		{
+			return error;
+		}
+		
+		br = netdev_priv(dev);
+		br->mld_snooping = args[2];
+		if(br->mld_snooping==SNOOPING_DISABLED_MODE) 
+			br_mcast_wl_flush(br) ;
+		
+		dev_put(dev);
+
+		return 0;
+	}
+
+	case BRCTL_MLD_ENABLE_PROXY_MODE:
+	{
+		struct net_device *dev = NULL;
+		struct net_bridge *br;
+		int error = getDevice(&dev, args[1]);
+		if (error)
+		{
+			return error;
+		}
+
+		br = netdev_priv(dev);
+		br->mld_proxy = args[2];
+
+		dev_put(dev);
+
+		return 0;
+	}
+
+	case BRCTL_ENABLE_MLD_LAN2LAN_MC:
+	{
+		struct net_device *dev = NULL;
+		struct net_bridge *br;
+		int error = getDevice(&dev, args[1]);
+		if (error)
+		{
+			return error;
+		}
+		
+		br = netdev_priv(dev);
+		br->mld_lan2lan_mc_enable= args[2];
+		
+		dev_put(dev);
+
+		return 0;
+
+	}
+
+	case BRCTL_GET_MLD_LAN_TO_LAN_MCAST_ENABLED:
+	{
+		struct net_device *dev = NULL;
+		struct net_bridge *br;
+		int enable;
+		int error = getDevice(&dev, args[1]);
+		if (error)
+		{
+			return error;
+		}
+
+		br = netdev_priv(dev);
+		enable = br_mcast_get_lan2lan_snooping (BR_MCAST_PROTO_MLD, br);
+		if (copy_to_user((void __user *)args[2], &enable, sizeof(int)))
+		{
+			dev_put(dev);
+			return -EFAULT;
+		}
+		dev_put(dev);
+		return 0;
+	}   
+#endif
+
+#if defined(CONFIG_BCM_KF_IGMP_RATE_LIMIT)
+	case BRCTL_ENABLE_IGMP_RATE_LIMIT:
+	{
+		struct net_device *dev = NULL;
+		struct net_bridge *br;
+		int error = getDevice(&dev, args[1]);
+		if (error)
+		{
+			return error;
+		}
+
+		br = netdev_priv(dev);
+
+		if (args[2] > 500)
+		{
+			dev_put(dev);
+			return  -EINVAL; 	/* Could not find device */
+		}
+
+		br = netdev_priv(dev);
+		br->igmp_rate_limit       = args[2];
+		br->igmp_rate_last_packet = ktime_set(0,0);
+		br->igmp_rate_bucket      = 0;
+		br->igmp_rate_rem_time    = 0;
+
+		dev_put(dev);
+
+		return 0;
+	}
+#endif
+
+#if defined(CONFIG_BCM_KF_UNI_UNI) && (defined(CONFIG_BCM96828) && !defined(CONFIG_EPON_HGU))
+	case BRCTL_SET_UNI_UNI_CTRL:
+	{
+		bcmFun_t *regFunc;
+		BCM_EnetHandle_t param;
+		BCM_EponHandle_t epon_param;
+		char rxif[16], txif[16];
+		int i, j, uniport_cnt = 0;
+		char buf[IFNAMSIZ];
+		struct net_device *dev, *rxdev, *txdev;
+		struct net_bridge *br;
+
+		uni_uni_enabled       = args[2];
+		if ((regFunc = bcmFun_get(BCM_FUN_ID_ENET_HANDLE))) {
+			param.type = BCM_ENET_FUN_TYPE_UNI_UNI_CTRL;
+			param.enable = uni_uni_enabled;
+			regFunc((void *)&param);
+		}
+		if ((regFunc = bcmFun_get(BCM_FUN_ID_EPON_HANDLE))) {
+			epon_param.type = BCM_EPON_FUN_TYPE_UNI_UNI_CTRL;
+			epon_param.enable = uni_uni_enabled;
+			regFunc((void *)&epon_param);
+		}
+
+		if ((regFunc = bcmFun_get(BCM_FUN_ID_ENET_HANDLE))) {
+			param.type = BCM_ENET_FUN_TYPE_GET_VPORT_CNT;
+			regFunc((void *)&param);
+			uniport_cnt = param.uniport_cnt;
+
+			if (!capable(CAP_NET_ADMIN))
+				return -EPERM;
+			if (copy_from_user(buf, (void __user *)args[1], IFNAMSIZ))
+				return -EFAULT;
+			buf[IFNAMSIZ-1] = 0;
+			dev = dev_get_by_name(&init_net, buf);
+			if (dev == NULL) 
+				return  -ENXIO;
+			br = netdev_priv(dev);
+
+			param.type = BCM_ENET_FUN_TYPE_GET_IF_NAME_OF_VPORT;
+			for(i = 1; i <= uniport_cnt; i++) {
+				param.port = i;
+				regFunc((void *)&param);
+				strcpy(rxif, param.name);
+				strcat(rxif,".v0");
+				rxdev = dev_get_by_name(&init_net, rxif);
+				if (rxdev == NULL) 
+					return  -ENXIO;
+				for(j = 1; j <= uniport_cnt; j++) {
+					if (i != j) {
+						param.port = j;
+						regFunc((void *)&param);
+						strcpy(txif, param.name);
+						strcat(txif,".v0");
+						txdev = dev_get_by_name(&init_net, txif);
+						if (txdev == NULL) 
+							return  -ENXIO;
+						if (uni_uni_enabled) {
+							br_flow_blog_rules(br, rxdev, txdev);
+						} else {
+							br_flow_path_delete(br, rxdev, txdev);
+						}
+						dev_put(txdev);
+					}
+				}
+				dev_put(rxdev);
+			}
+
+			dev_put(dev);
+		}
+
+		return 0;
+	}
+#endif
 	}
 
 	return -EOPNOTSUPP;

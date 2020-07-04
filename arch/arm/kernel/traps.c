@@ -388,6 +388,19 @@ asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
 #endif
 			instr = *(u32 *) pc;
 	} else if (thumb_mode(regs)) {
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX)
+		if (get_user(instr, (u16 __user *)pc))
+			goto die_sig;
+		if (is_wide_instruction(instr)) {
+			unsigned int instr2;
+			if (get_user(instr2, (u16 __user *)pc+1))
+				goto die_sig;
+			instr <<= 16;
+			instr |= instr2;
+		}
+	} else if (get_user(instr, (u32 __user *)pc)) {
+		goto die_sig;
+#else
 		get_user(instr, (u16 __user *)pc);
 		if (is_wide_instruction(instr)) {
 			unsigned int instr2;
@@ -397,11 +410,15 @@ asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
 		}
 	} else {
 		get_user(instr, (u32 __user *)pc);
+#endif /* CONFIG_BCM_KF_ARM_BCM963XX */
 	}
 
 	if (call_undef_hook(regs, instr) == 0)
 		return;
 
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX)
+die_sig:
+#endif
 #ifdef CONFIG_DEBUG_USER
 	if (user_debug & UDBG_UNDEFINED) {
 		printk(KERN_INFO "%s (%d): undefined instruction: pc=%p\n",

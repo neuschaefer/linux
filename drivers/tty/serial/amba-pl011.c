@@ -1655,8 +1655,13 @@ pl011_set_termios(struct uart_port *port, struct ktermios *termios,
 	}
 
 	/* Set baud rate */
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX) && defined(CONFIG_BCM63138_SIM)
+	writew(0, port->membase + UART011_FBRD);
+	writew(1, port->membase + UART011_IBRD);
+#else
 	writew(quot & 0x3f, port->membase + UART011_FBRD);
 	writew(quot >> 6, port->membase + UART011_IBRD);
+#endif
 
 	/*
 	 * ----------v----------v----------v----------v-----

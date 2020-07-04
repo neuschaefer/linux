@@ -43,6 +43,7 @@ config BRIDGE_EBT_T_NAT
 	  See the man page for ebtables(8).
 
 	  To compile it as a module, choose M here.  If unsure, say N.
+
 #
 # matches
 #
@@ -132,6 +133,17 @@ config BRIDGE_EBT_VLAN
 	  802.1Q vlan fields.
 
 	  To compile it as a module, choose M here.  If unsure, say N.
+
+config BRIDGE_EBT_TIME
+	tristate "ebt: time filter support"
+	depends on BRIDGE_NF_EBTABLES
+	depends on BCM_KF_NETFILTER
+	help
+	  This option adds the system time match, which allows the filtering
+	  of system time when a frame arrives.
+
+	  To compile it as a module, choose M here.  If unsure, say N.
+
 #
 # targets
 #
@@ -177,6 +189,37 @@ config BRIDGE_EBT_SNAT
 	  source address of frames.
 
 	  To compile it as a module, choose M here.  If unsure, say N.
+
+config BRIDGE_EBT_FTOS_T
+	tristate "ebt: ftos target support"
+	depends on BRIDGE_NF_EBTABLES
+	depends on BCM_KF_NETFILTER
+	help
+	  This option adds the ftos target, which allows altering the full TOS byte
+	  in IP frames.
+
+	  To compile it as a module, choose M here.  If unsure, say N.
+
+config BRIDGE_EBT_SKIPLOG_T
+	tristate "ebt: skip target support"
+	depends on BRIDGE_NF_EBTABLES
+	depends on BCM_KF_NETFILTER
+	help
+	  This option adds the skiplog target, which can prevent packet from
+	  acceleration.
+
+	  To compile it as a module, choose M here.  If unsure, say N.
+
+config BRIDGE_EBT_WMM_MARK
+	tristate "ebt: Wireless Wi-Fi WMM marking support"
+	depends on BRIDGE_NF_EBTABLES
+	depends on BCM_KF_NETFILTER
+	help
+	  This option adds the wmm-mark target, which allows to 
+	  mark Wi-Fi WMM priorities.
+
+	  To compile it as a module, choose M here.  If unsure, say N.
+
 #
 # watchers
 #

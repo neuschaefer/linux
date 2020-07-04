@@ -45,8 +45,6 @@
 #include <net/addrconf.h>
 #include <net/xfrm.h>
 
-
-
 inline int ip6_rcv_finish( struct sk_buff *skb)
 {
 	if (skb_dst(skb) == NULL)
@@ -195,7 +193,10 @@ resubmit:
 
 		if (ipprot->flags & INET6_PROTO_FINAL) {
 			const struct ipv6hdr *hdr;
-
+#if defined(CONFIG_MIPS_BCM963XX) && defined(CONFIG_BCM_KF_UNALIGNED_EXCEPTION)
+			struct in6_addr srcAddr;
+			struct in6_addr dstAddr;
+#endif
 			/* Free reference early: we don't need it any more,
 			   and it may hold ip_conntrack module loaded
 			   indefinitely. */
@@ -204,11 +205,21 @@ resubmit:
 			skb_postpull_rcsum(skb, skb_network_header(skb),
 					   skb_network_header_len(skb));
 			hdr = ipv6_hdr(skb);
+#if defined(CONFIG_MIPS_BCM963XX) && defined(CONFIG_BCM_KF_UNALIGNED_EXCEPTION)
+			memcpy(&srcAddr, &hdr->saddr, sizeof(struct in6_addr));
+			memcpy(&dstAddr, &hdr->daddr, sizeof(struct in6_addr));
+			if (ipv6_addr_is_multicast(&dstAddr) &&
+			    !ipv6_chk_mcast_addr(skb->dev, &dstAddr,
+			    &srcAddr) &&
+			    !ipv6_is_mld(skb, nexthdr))
+				goto discard;
+#else
 			if (ipv6_addr_is_multicast(&hdr->daddr) &&
 			    !ipv6_chk_mcast_addr(skb->dev, &hdr->daddr,
 			    &hdr->saddr) &&
 			    !ipv6_is_mld(skb, nexthdr))
 				goto discard;
+#endif
 		}
 		if (!(ipprot->flags & INET6_PROTO_NOPOLICY) &&
 		    !xfrm6_policy_check(NULL, XFRM_POLICY_IN, skb))
@@ -252,20 +263,32 @@ int ip6_mc_input(struct sk_buff *skb)
 {
 	const struct ipv6hdr *hdr;
 	int deliver;
+#if defined(CONFIG_MIPS_BCM963XX) && defined(CONFIG_BCM_KF_UNALIGNED_EXCEPTION)
+	struct in6_addr dAddr;
+#endif
 
 	IP6_UPD_PO_STATS_BH(dev_net(skb_dst(skb)->dev),
 			 ip6_dst_idev(skb_dst(skb)), IPSTATS_MIB_INMCAST,
 			 skb->len);
 
 	hdr = ipv6_hdr(skb);
+#if defined(CONFIG_MIPS_BCM963XX) && defined(CONFIG_BCM_KF_UNALIGNED_EXCEPTION)
+	memcpy(&dAddr, &hdr->daddr, sizeof(struct in6_addr));
+	deliver = ipv6_chk_mcast_addr(skb->dev, &dAddr, NULL);
+#else
 	deliver = ipv6_chk_mcast_addr(skb->dev, &hdr->daddr, NULL);
+#endif
 
 #ifdef CONFIG_IPV6_MROUTE
 	/*
 	 *      IPv6 multicast router mode is now supported ;)
 	 */
 	if (dev_net(skb->dev)->ipv6.devconf_all->mc_forwarding &&
+#if defined(CONFIG_MIPS_BCM963XX) && defined(CONFIG_BCM_KF_UNALIGNED_EXCEPTION)
+	    !(ipv6_addr_type(&dAddr) & IPV6_ADDR_LINKLOCAL) &&
+#else
 	    !(ipv6_addr_type(&hdr->daddr) & IPV6_ADDR_LINKLOCAL) &&
+#endif
 	    likely(!(IP6CB(skb)->flags & IP6SKB_FORWARDED))) {
 		/*
 		 * Okay, we try to forward - split and duplicate

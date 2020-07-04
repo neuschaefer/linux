@@ -368,6 +368,10 @@
 									\
 	/* Built-in module versions. */					\
 	__modver : AT(ADDR(__modver) - LOAD_OFFSET) {			\
+/* #if defined(CONFIG_BCM_KF_LINKER_WORKAROUND)  */				\
+    /* IGNORE_BCM_KF_EXCEPTION */						\
+		*(__modver_tmp)						\
+/* #endif */                                                                 \
 		VMLINUX_SYMBOL(__start___modver) = .;			\
 		*(__modver)						\
 		VMLINUX_SYMBOL(__stop___modver) = .;			\

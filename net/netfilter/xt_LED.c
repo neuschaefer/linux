@@ -56,6 +56,12 @@ led_tg(struct sk_buff *skb, const struct xt_action_param *par)
 	const struct xt_led_info *ledinfo = par->targinfo;
 	struct xt_led_info_internal *ledinternal = ledinfo->internal_data;
 
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG_FEATURE)
+	skb->ipt_check |= IPT_TARGET_LED;
+	if ( skb->ipt_check & IPT_TARGET_CHECK )
+		return XT_CONTINUE;
+#endif
+
 	/*
 	 * If "always blink" is enabled, and there's still some time until the
 	 * LED will switch off, briefly switch it off now.

@@ -66,6 +66,33 @@
 #define ARCH_SHF_SMALL 0
 #endif
 
+#if defined(CONFIG_BCM_KF_DSP) && defined(CONFIG_BCM_BCMDSP_MODULE)
+/*
+** These are pointers to memory chunks allocated for the DSP module. The memory is allocated in
+** start_kernel() during initialization. 
+*/
+extern void *dsp_core;
+extern void *dsp_init;
+
+/* Size of the DSP core and init buffers. */
+static unsigned long dsp_core_size;
+static unsigned long dsp_init_size;
+
+/*
+ * is_dsp_module - is this the DSP module?
+ * @addr: the module to check.
+ */
+#define is_dsp_module(mod) (strcmp(mod->name, "dspdd") == 0)
+
+/*
+ * is_dsp_module_address - is this address inside the DSP module?
+ * @addr: the address to check.
+ */
+#define is_dsp_module_address(addr) \
+	(dsp_core && ((unsigned long*)addr >= (unsigned long*)dsp_core) && ((unsigned long*)addr < ((unsigned long*)dsp_core) + dsp_core_size)) || \
+	(dsp_init && ((unsigned long*)addr >= (unsigned long*)dsp_init) && ((unsigned long*)addr < ((unsigned long*)dsp_init) + dsp_init_size))
+
+#endif /* defined(CONFIG_BCM_KF_DSP) */
 /*
  * Modules' sections will be aligned on page boundaries
  * to ensure complete separation of code and data, but
@@ -788,6 +815,12 @@ SYSCALL_DEFINE2(delete_module, const char __user *, name_user,
 		goto out;
 	}
 
+#if defined(CONFIG_BCM_KF_DSP) && defined(CONFIG_BCM_BCMDSP_MODULE)
+    /* This check is not needed for the DSP module */
+	if ( !is_dsp_module(mod) )
+	{
+#endif
+
 	if (!list_empty(&mod->source_list)) {
 		/* Other modules depend on us: get rid of them first. */
 		ret = -EWOULDBLOCK;
@@ -824,6 +857,14 @@ SYSCALL_DEFINE2(delete_module, const char __user *, name_user,
 	/* Never wait if forced. */
 	if (!forced && module_refcount(mod) != 0)
 		wait_for_zero_refcount(mod);
+
+#if defined(CONFIG_BCM_KF_DSP) && defined(CONFIG_BCM_BCMDSP_MODULE)
+	}
+	else
+	{
+		ret = 0;
+	}
+#endif
 
 	mutex_unlock(&module_mutex);
 	/* Final destruction now no one is using it. */
@@ -911,7 +952,7 @@ void __module_get(struct module *module)
 		__this_cpu_inc(module->refptr->incs);
 		trace_module_get(module, _RET_IP_);
 		preempt_enable();
-	}
+}
 }
 EXPORT_SYMBOL(__module_get);
 
@@ -1820,6 +1861,10 @@ static void free_module(struct module *mod)
 
 	/* This may be NULL, but that's OK */
 	unset_module_init_ro_nx(mod);
+
+#if defined(CONFIG_BCM_KF_DSP) && defined(CONFIG_BCM_BCMDSP_MODULE)
+	if ( !is_dsp_module(mod) )
+#endif
 	module_free(mod, mod->module_init);
 	kfree(mod->args);
 	percpu_modfree(mod);
@@ -1829,6 +1874,9 @@ static void free_module(struct module *mod)
 
 	/* Finally, free the core (containing the module structure) */
 	unset_module_core_ro_nx(mod);
+#if defined(CONFIG_BCM_KF_DSP) && defined(CONFIG_BCM_BCMDSP_MODULE)
+	if ( !is_dsp_module(mod) )
+#endif
 	module_free(mod, mod->module_core);
 
 #ifdef CONFIG_MPU
@@ -2661,6 +2709,14 @@ static int move_module(struct module *mod, struct load_info *info)
 	void *ptr;
 
 	/* Do the allocs. */
+#if defined(CONFIG_BCM_KF_DSP) && defined(CONFIG_BCM_BCMDSP_MODULE)
+	if ( is_dsp_module(mod) )
+	{
+		ptr = dsp_core;
+		dsp_core_size = dsp_core ? mod->core_size : 0;
+	}
+	else
+#endif
 	ptr = module_alloc_update_bounds(mod->core_size);
 	/*
 	 * The pointer to this block is stored in the module structure
@@ -2674,6 +2730,14 @@ static int move_module(struct module *mod, struct load_info *info)
 	memset(ptr, 0, mod->core_size);
 	mod->module_core = ptr;
 
+#if defined(CONFIG_BCM_KF_DSP) && defined(CONFIG_BCM_BCMDSP_MODULE)
+	if ( is_dsp_module(mod) )
+	{
+		ptr = dsp_init;
+		dsp_init_size = dsp_init ? mod->init_size : 0;
+	}
+	else
+#endif
 	ptr = module_alloc_update_bounds(mod->init_size);
 	/*
 	 * The pointer to this block is stored in the module structure
@@ -3048,9 +3112,17 @@ SYSCALL_DEFINE3(init_module, void __user *, umod,
 		module_put(mod);
 		blocking_notifier_call_chain(&module_notify_list,
 					     MODULE_STATE_GOING, mod);
-		free_module(mod);
-		wake_up(&module_wq);
-		return ret;
+#if defined(CONFIG_BCM_KF_DSP) && defined(CONFIG_BCM_BCMDSP_MODULE)
+        /* Only if not the dsp module */
+		if ( !is_dsp_module(mod) )
+		{
+#endif /* defined(CONFIG_BCM_KF_DSP) */
+			free_module(mod);
+			wake_up(&module_wq);
+			return ret;
+#if defined(CONFIG_BCM_KF_DSP) && defined(CONFIG_BCM_BCMDSP_MODULE)
+		}
+#endif /* defined(CONFIG_BCM_KF_DSP) */
 	}
 	if (ret > 0) {
 		printk(KERN_WARNING
@@ -3080,11 +3152,14 @@ SYSCALL_DEFINE3(init_module, void __user *, umod,
 	mod->strtab = mod->core_strtab;
 #endif
 	unset_module_init_ro_nx(mod);
+#if    ! ( defined(CONFIG_BCM_KF_BOUNCE) && defined(CONFIG_BRCM_BOUNCE) )
 	module_free(mod, mod->module_init);
 	mod->module_init = NULL;
 	mod->init_size = 0;
 	mod->init_ro_size = 0;
 	mod->init_text_size = 0;
+#endif
+
 	mutex_unlock(&module_mutex);
 
 	return 0;
@@ -3364,6 +3439,10 @@ static int m_show(struct seq_file *m, void *p)
 	/* Used by oprofile and other similar tools. */
 	seq_printf(m, " 0x%pK", mod->module_core);
 
+#if ( defined(CONFIG_BCM_KF_BOUNCE) && defined(CONFIG_BRCM_BOUNCE) )
+	seq_printf(m, " 0x%p", mod->module_init);
+#endif
+
 	/* Taints info */
 	if (mod->taints)
 		seq_printf(m, " %s", module_flags(mod, buf));
@@ -3456,8 +3535,11 @@ bool is_module_address(unsigned long addr)
 struct module *__module_address(unsigned long addr)
 {
 	struct module *mod;
-
+#if defined(CONFIG_BCM_KF_DSP) && defined(CONFIG_BCM_BCMDSP_MODULE)
+	if ((!is_dsp_module_address(addr)) && (addr < module_addr_min || addr > module_addr_max))
+#else
 	if (addr < module_addr_min || addr > module_addr_max)
+#endif
 		return NULL;
 
 	list_for_each_entry_rcu(mod, &modules, list)
@@ -3517,7 +3599,18 @@ void print_modules(void)
 	/* Most callers should already have preempt disabled, but make sure */
 	preempt_disable();
 	list_for_each_entry_rcu(mod, &modules, list)
+#if defined(CONFIG_BCM_KF_EXTRA_DEBUG) 
+	{
 		printk(" %s%s", mod->name, module_flags(mod, buf));
+		printk(" init_addr(%p - %p), core_addr(%p - %p)\n",
+			mod->module_init,
+			mod->module_init+mod->init_text_size,
+			mod->module_core, 
+			mod->module_core+mod->core_text_size);
+	}
+#else
+		printk(" %s%s", mod->name, module_flags(mod, buf));
+#endif
 	preempt_enable();
 	if (last_unloaded_module[0])
 		printk(" [last unloaded: %s]", last_unloaded_module);

@@ -968,6 +968,13 @@ static int cpufreq_add_dev(struct device *dev, struct subsys_interface *sif)
 	if (ret)
 		goto err_out_unregister;
 
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX)
+	if (cpufreq_driver->init_sysfs) {
+		ret = cpufreq_driver->init_sysfs(policy);
+		if (ret)
+			goto err_out_unregister;
+	}
+#endif
 	unlock_policy_rwsem_write(cpu);
 
 	kobject_uevent(&policy->kobj, KOBJ_ADD);
@@ -1725,6 +1732,14 @@ error_out:
 	return ret;
 }
 
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX)
+int cpufreq_set_policy(struct cpufreq_policy *data, struct cpufreq_policy *policy)
+{
+	return __cpufreq_set_policy(data, policy);
+}
+EXPORT_SYMBOL(cpufreq_set_policy);
+
+#endif
 /**
  *	cpufreq_update_policy - re-evaluate an existing cpufreq policy
  *	@cpu: CPU which shall be re-evaluated

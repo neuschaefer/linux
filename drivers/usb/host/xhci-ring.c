@@ -1279,7 +1279,11 @@ static void handle_device_notification(struct xhci_hcd *xhci,
 	u32 slot_id;
 	struct usb_device *udev;
 
+#if defined(CONFIG_BCM_KF_MIPS_BCM963XX) || defined(CONFIG_BCM_KF_ARM_BCM963XX) 
+	slot_id = TRB_TO_SLOT_ID(le32_to_cpu(event->generic.field[3]));
+#else
 	slot_id = TRB_TO_SLOT_ID(event->generic.field[3]);
+#endif
 	if (!xhci->devs[slot_id]) {
 		xhci_warn(xhci, "Device Notification event for "
 				"unused slot %u\n", slot_id);
@@ -2787,12 +2791,18 @@ static u32 xhci_td_remainder(unsigned int remainder)
 		return (remainder >> 10) << 17;
 }
 
+/* IGNORE_BCM_KF_EXCEPTION */
+/* The changes made to this file are backported from 3.7 kernel,
+ * I'm adding exception instead on wrapping changes with BCM_XXX
+ * as these are not broadcom specific changes
+ */
+
 /*
- * For xHCI 1.0 host controllers, TD size is the number of packets remaining in
- * the TD (*not* including this TRB).
+ * For xHCI 1.0 host controllers, TD size is the number of max packet sized
+ * packets remaining in the TD (*not* including this TRB).
  *
  * Total TD packet count = total_packet_count =
- *     roundup(TD size in bytes / wMaxPacketSize)
+ *     DIV_ROUND_UP(TD size in bytes / wMaxPacketSize)
  *
  * Packets transferred up to and including this TRB = packets_transferred =
  *     rounddown(total bytes transferred including this TRB / wMaxPacketSize)
@@ -2800,15 +2810,16 @@ static u32 xhci_td_remainder(unsigned int remainder)
  * TD size = total_packet_count - packets_transferred
  *
  * It must fit in bits 21:17, so it can't be bigger than 31.
+ * The last TRB in a TD must have the TD size set to zero.
  */
-
 static u32 xhci_v1_0_td_remainder(int running_total, int trb_buff_len,
-		unsigned int total_packet_count, struct urb *urb)
+		unsigned int total_packet_count, struct urb *urb,
+		unsigned int num_trbs_left)
 {
 	int packets_transferred;
 
 	/* One TRB with a zero-length data packet. */
-	if (running_total == 0 && trb_buff_len == 0)
+	if (num_trbs_left == 0 || (running_total == 0 && trb_buff_len == 0))
 		return 0;
 
 	/* All the TRB queueing functions don't count the current TRB in
@@ -2817,7 +2828,9 @@ static u32 xhci_v1_0_td_remainder(int running_total, int trb_buff_len,
 	packets_transferred = (running_total + trb_buff_len) /
 		usb_endpoint_maxp(&urb->ep->desc);
 
-	return xhci_td_remainder(total_packet_count - packets_transferred);
+	if ((total_packet_count - packets_transferred) > 31)
+		return 31 << 17;
+	return (total_packet_count - packets_transferred) << 17;
 }
 
 static int queue_bulk_sg_tx(struct xhci_hcd *xhci, gfp_t mem_flags,
@@ -2844,7 +2857,7 @@ static int queue_bulk_sg_tx(struct xhci_hcd *xhci, gfp_t mem_flags,
 
 	num_trbs = count_sg_trbs_needed(xhci, urb);
 	num_sgs = urb->num_mapped_sgs;
-	total_packet_count = roundup(urb->transfer_buffer_length,
+	total_packet_count = DIV_ROUND_UP(urb->transfer_buffer_length,
 			usb_endpoint_maxp(&urb->ep->desc));
 
 	trb_buff_len = prepare_transfer(xhci, xhci->devs[slot_id],
@@ -2927,7 +2940,8 @@ static int queue_bulk_sg_tx(struct xhci_hcd *xhci, gfp_t mem_flags,
 					running_total);
 		} else {
 			remainder = xhci_v1_0_td_remainder(running_total,
-					trb_buff_len, total_packet_count, urb);
+					trb_buff_len, total_packet_count, urb,
+					num_trbs - 1);
 		}
 		length_field = TRB_LEN(trb_buff_len) |
 			remainder |
@@ -3035,7 +3049,7 @@ int xhci_queue_bulk_tx(struct xhci_hcd *xhci, gfp_t mem_flags,
 	start_cycle = ep_ring->cycle_state;
 
 	running_total = 0;
-	total_packet_count = roundup(urb->transfer_buffer_length,
+	total_packet_count = DIV_ROUND_UP(urb->transfer_buffer_length,
 			usb_endpoint_maxp(&urb->ep->desc));
 	/* How much data is in the first TRB? */
 	addr = (u64) urb->transfer_dma;
@@ -3081,7 +3095,8 @@ int xhci_queue_bulk_tx(struct xhci_hcd *xhci, gfp_t mem_flags,
 					running_total);
 		} else {
 			remainder = xhci_v1_0_td_remainder(running_total,
-					trb_buff_len, total_packet_count, urb);
+					trb_buff_len, total_packet_count, urb,
+					num_trbs - 1);
 		}
 		length_field = TRB_LEN(trb_buff_len) |
 			remainder |
@@ -3344,7 +3359,7 @@ static int xhci_queue_isoc_tx(struct xhci_hcd *xhci, gfp_t mem_flags,
 		addr = start_addr + urb->iso_frame_desc[i].offset;
 		td_len = urb->iso_frame_desc[i].length;
 		td_remain_len = td_len;
-		total_packet_count = roundup(td_len,
+		total_packet_count = DIV_ROUND_UP(td_len,
 				usb_endpoint_maxp(&urb->ep->desc));
 		/* A zero-length transfer still involves at least one packet. */
 		if (total_packet_count == 0)
@@ -3421,7 +3436,8 @@ static int xhci_queue_isoc_tx(struct xhci_hcd *xhci, gfp_t mem_flags,
 			} else {
 				remainder = xhci_v1_0_td_remainder(
 						running_total, trb_buff_len,
-						total_packet_count, urb);
+						total_packet_count, urb,
+						(trbs_per_td - j - 1));
 			}
 			length_field = TRB_LEN(trb_buff_len) |
 				remainder |

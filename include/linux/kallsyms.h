@@ -115,7 +115,14 @@ static inline void print_symbol(const char *fmt, unsigned long addr)
 
 static inline void print_ip_sym(unsigned long ip)
 {
+#if defined(CONFIG_BCM_KF_EXTRA_DEBUG)
+    if (((ip & 0xF0000000) == 0x80000000) || ((ip & 0xF0000000) == 0xc0000000))
 	printk("[<%p>] %pS\n", (void *) ip, (void *) ip);
+    else
+    	printk("[<%p>] (suspected corrupt symbol)\n", (void *) ip);
+#else
+	printk("[<%p>] %pS\n", (void *) ip, (void *) ip);
+#endif
 }
 
 #endif /*_LINUX_KALLSYMS_H*/

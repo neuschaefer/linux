@@ -47,6 +47,11 @@
 #include <linux/kernel.h>
 #include <linux/pm_runtime.h>
 
+#if (defined(CONFIG_BCM_KF_USBNET) && defined(CONFIG_BCM_USBNET_ACCELERATION) && defined(CONFIG_BLOG))
+#include <linux/nbuff.h> 
+#include <linux/blog.h>
+#endif
+
 #define DRIVER_VERSION		"22-Aug-2005"
 
 
@@ -232,6 +237,30 @@ void usbnet_skb_return (struct usbnet *dev, struct sk_buff *skb)
 		return;
 	}
 
+#if (defined(CONFIG_BCM_KF_USBNET) && defined(CONFIG_BCM_USBNET_ACCELERATION) && defined(CONFIG_BLOG))
+	if(skb->clone_fc_head == NULL)
+	{
+		/* Make sure fcache does not expand the skb->data if clone_fc_head
+		 * is not set by the dongle driver's(ex:rndis_host.c, asix.c etc..)
+		 * we expect dongle/class drivers using fcache to set minumun headroom
+		 * available for all packets in an aggregated skb by calling 
+		 * skb_clone_headers_set() before calling usbnet_skb_return.
+		 *
+		 * Ex:rndis based drivers have 8 bytes spacig between 2 packets in an
+		 * aggreated skb. we can call skb_clone_ headers_set(skb, 8) in
+		 * rndis_rx_fixup();
+		 * By setting this we are telling fcache or enet driver can expand
+		 * skb->data for upto 8 bytes. This is helpful to avoid packet
+		 * copy incase of LAN VLAN's, External Switch tag's  etc..
+		 *   
+		 */
+		skb_clone_headers_set(skb, 0);
+	}
+	if (PKT_DONE == blog_sinit(skb, skb->dev, TYPE_ETH, 0, BLOG_USBPHY)) {
+		return;
+	}
+#endif
+
 	skb->protocol = eth_type_trans (skb, dev->net);
 	dev->net->stats.rx_packets++;
 	dev->net->stats.rx_bytes += skb->len;
@@ -243,7 +272,11 @@ void usbnet_skb_return (struct usbnet *dev, struct sk_buff *skb)
 	if (skb_defer_rx_timestamp(skb))
 		return;
 
+#if (defined(CONFIG_BCM_KF_USBNET) && defined(CONFIG_BCM_USBNET_ACCELERATION) && defined(CONFIG_BLOG))
+	status = netif_receive_skb(skb);
+#else
 	status = netif_rx (skb);
+#endif
 	if (status != NET_RX_SUCCESS)
 		netif_dbg(dev, rx_err, dev->net,
 			  "netif_rx status %d\n", status);
@@ -1091,6 +1124,21 @@ netdev_tx_t usbnet_start_xmit (struct sk_buff *skb,
 	struct driver_info	*info = dev->driver_info;
 	unsigned long		flags;
 	int retval;
+
+#if (defined(CONFIG_BCM_KF_USBNET) && defined(CONFIG_BCM_USBNET_ACCELERATION) && defined(CONFIG_BLOG))
+	if(skb)
+	{
+		struct sk_buff *orig_skb = skb;
+		skb = nbuff_xlate((pNBuff_t )skb);
+		if (skb == NULL)
+		{
+			dev->net->stats.tx_dropped++;
+			nbuff_free((pNBuff_t) orig_skb);
+			return NETDEV_TX_OK;
+		}
+		blog_emit( skb, net, TYPE_ETH, 0, BLOG_USBPHY );
+	}
+#endif
 
 	if (skb)
 		skb_tx_timestamp(skb);

@@ -125,6 +125,12 @@ tproxy_tg4(struct sk_buff *skb, __be32 laddr, __be16 lport,
 	struct udphdr _hdr, *hp;
 	struct sock *sk;
 
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG_FEATURE)
+	skb->ipt_check |= IPT_TARGET_TPROXY;
+	if ( skb->ipt_check & IPT_TARGET_CHECK )
+		return XT_CONTINUE;
+#endif
+
 	hp = skb_header_pointer(skb, ip_hdrlen(skb), sizeof(_hdr), &_hdr);
 	if (hp == NULL)
 		return NF_DROP;

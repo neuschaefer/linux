@@ -1286,7 +1286,11 @@ int dev_ethtool(struct net *net, struct ifreq *ifr)
 	void __user *useraddr = ifr->ifr_data;
 	u32 ethcmd;
 	int rc;
+#if defined(CONFIG_BCM_KF_ETHTOOL)   
+	netdev_features_t old_features;
+#else
 	u32 old_features;
+#endif
 
 	if (!dev || !netif_device_present(dev))
 		return -ENODEV;

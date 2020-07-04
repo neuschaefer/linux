@@ -11,6 +11,20 @@
 #include <linux/smp.h>
 #include <linux/percpu.h>
 
+#if defined(CONFIG_BCM_KF_IKOS) && defined(CONFIG_BRCM_IKOS)
+void __cpuinit calibrate_delay(void)
+{
+	printk("IKOS bypassing delay loop calibration, using ");
+#if defined(CONFIG_BCM63138_SIM) || defined(CONFIG_BCM63148_SIM)
+	loops_per_jiffy = 800000;
+#else
+	loops_per_jiffy = 500000;
+#endif
+	printk("%lu.%02lu BogoMIPS\n",
+		loops_per_jiffy/(500000/HZ),
+		(loops_per_jiffy/(5000/HZ)) % 100);
+}
+#else
 unsigned long lpj_fine;
 unsigned long preset_lpj;
 static int __init lpj_setup(char *str)
@@ -299,3 +313,4 @@ void __cpuinit calibrate_delay(void)
 	loops_per_jiffy = lpj;
 	printed = true;
 }
+#endif

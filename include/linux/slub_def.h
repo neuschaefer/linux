@@ -142,6 +142,9 @@ struct kmem_cache {
 /* Disable DMA functionality */
 #define SLUB_DMA (__force gfp_t)0
 #endif
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX) && defined(CONFIG_BCM_ZONE_ACP)
+#define SLUB_ACP __GFP_ACP
+#endif
 
 /*
  * We keep the general caches in an array of slab caches that are used for

@@ -52,4 +52,8 @@ obj-$(CONFIG_MTD_NAND_RICOH)		+= r852.o
 obj-$(CONFIG_MTD_NAND_JZ4740)		+= jz4740_nand.o
 obj-$(CONFIG_MTD_NAND_GPMI_NAND)	+= gpmi-nand/
 
+ifdef BCM_KF # CONFIG_BCM_KF_MTD_BCM963XX
+obj-$(CONFIG_MTD_BCM_SPI_NAND)		+= bcm63xx_spinand.o
+endif # BCM_KF
+
 nand-objs := nand_base.o nand_bbt.o

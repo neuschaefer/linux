@@ -129,11 +129,82 @@ static void irq_wake_thread(struct irq_desc *desc, struct irqaction *action)
 	wake_up_process(action->thread);
 }
 
+#if defined(CONFIG_BCM_KF_HARDIRQ_CYCLES)
+/* see the description in arch/mips/bcm963xx/Kconfig */
+struct kernel_stat_shadow {
+	struct cpu_usage_stat last_cpustat;  /* cpustat when we started accumulating */
+	unsigned int start_cnt;            /**< c0 count when starting hardirq */
+	unsigned int accumulated_cnt;      /**< cycles accumulated so far */
+	unsigned int intrs;     /**< debug only, how many intrs accumulate whole tick */
+	/* we could even expand this structure to keep track of cycle counts on a
+	 * per interrupt basis and find out which interrupt is using too many
+	 * cycles.  Surprisingly, the timer interrupt seems to take about 10-15us.
+	 */
+};
+
+DEFINE_PER_CPU(struct kernel_stat_shadow, kstat_shadow);
+static unsigned int cycles_per_tick;
+extern unsigned int mips_hpt_frequency;
+
+static void start_hardirq_count(void)
+{
+	struct kernel_stat_shadow *ks_shadow = &per_cpu(kstat_shadow, smp_processor_id());
+	ks_shadow->start_cnt = read_c0_count();
+}
+
+static void stop_hardirq_count(void)
+{
+	unsigned int end_cnt = read_c0_count();
+	struct kernel_stat_shadow *ks_shadow;
+	ks_shadow = &per_cpu(kstat_shadow, smp_processor_id());
+	ks_shadow->intrs++;
+	if (end_cnt > ks_shadow->start_cnt)
+		ks_shadow->accumulated_cnt += end_cnt - ks_shadow->start_cnt;
+	else
+		//counter rolled over
+		ks_shadow->accumulated_cnt += (UINT_MAX - ks_shadow->start_cnt) + end_cnt;
+
+	if (cycles_per_tick == 0) {
+		cycles_per_tick = mips_hpt_frequency/HZ;
+	}
+
+	// See if we have accumulated a whole tick
+	if (ks_shadow->accumulated_cnt >= cycles_per_tick) {
+		struct cpu_usage_stat *cpustat = &kstat_this_cpu.cpustat;
+		cputime64_t user_delta = cpustat->user - ks_shadow->last_cpustat.user;
+		cputime64_t system_delta = cpustat->system - ks_shadow->last_cpustat.system;
+		cputime64_t softirq_delta = cpustat->softirq - ks_shadow->last_cpustat.softirq;
+		cputime64_t idle_delta = cpustat->idle - ks_shadow->last_cpustat.idle;
+
+//		printk("TICK on %d in %d intrs!\n", smp_processor_id(), ks_shadow->intrs);
+		cpustat->irq++;
+		// subtract 1 tick from the field that has incremented the most
+		if (user_delta > system_delta && user_delta > softirq_delta && user_delta > idle_delta)
+			cpustat->user--;
+		else if (system_delta > user_delta && system_delta > softirq_delta && system_delta > idle_delta)
+			cpustat->system--;
+		else if (softirq_delta > user_delta && softirq_delta > system_delta && softirq_delta > idle_delta)
+			cpustat->softirq--;
+		else
+			cpustat->idle--;
+
+		ks_shadow->accumulated_cnt -= cycles_per_tick;
+		ks_shadow->intrs = 0;
+		ks_shadow->last_cpustat = *cpustat;
+	}
+}
+#endif
+
+
 irqreturn_t
 handle_irq_event_percpu(struct irq_desc *desc, struct irqaction *action)
 {
 	irqreturn_t retval = IRQ_NONE;
 	unsigned int flags = 0, irq = desc->irq_data.irq;
+
+#if defined(CONFIG_BCM_KF_HARDIRQ_CYCLES)
+	start_hardirq_count();
+#endif
 
 	do {
 		irqreturn_t res;
@@ -172,10 +243,18 @@ handle_irq_event_percpu(struct irq_desc *desc, struct irqaction *action)
 		action = action->next;
 	} while (action);
 
+#ifndef CONFIG_PREEMPT_RT_FULL
+	/* FIXME: Can we unbreak that ? */
 	add_interrupt_randomness(irq, flags);
+#endif
 
 	if (!noirqdebug)
 		note_interrupt(irq, desc, retval);
+
+#if defined(CONFIG_BCM_KF_HARDIRQ_CYCLES)
+	stop_hardirq_count();
+#endif
+		
 	return retval;
 }
 

@@ -250,7 +250,7 @@ struct rt_hash_bucket {
 };
 
 #if defined(CONFIG_SMP) || defined(CONFIG_DEBUG_SPINLOCK) || \
-	defined(CONFIG_PROVE_LOCKING)
+	defined(CONFIG_PROVE_LOCKING) || defined(CONFIG_PREEMPT_RT_FULL)
 /*
  * Instead of using one spinlock for each rt_hash_bucket, we use a table of spinlocks
  * The size of this table is a power of two and depends on the number of CPUS.
@@ -3029,9 +3029,15 @@ static int rt_fill_info(struct net *net,
 
 		if (ipv4_is_multicast(dst) && !ipv4_is_local_multicast(dst) &&
 		    IPV4_DEVCONF_ALL(net, MC_FORWARDING)) {
+#if defined(CONFIG_BCM_KF_IGMP)
+			int err = ipmr_get_route(net, skb,
+						 rt->rt_src, rt->rt_dst,
+						 r, nowait, rt->rt_iif);
+#else
 			int err = ipmr_get_route(net, skb,
 						 rt->rt_src, rt->rt_dst,
 						 r, nowait);
+#endif
 			if (err <= 0) {
 				if (!nowait) {
 					if (err == 0)

@@ -708,6 +708,13 @@ static int ehci_init(struct usb_hcd *hcd)
 		temp &= ~(3 << 2);
 		temp |= (EHCI_TUNE_FLS << 2);
 	}
+#if (defined(CONFIG_BCM_KF_MIPS_BCM963XX) && defined(CONFIG_MIPS_BCM963XX))
+    /* Some DSL chips(63268,6828 )have a LPM support for HOST, but when a device 
+       with out an LPM support is connected, the device is not detected properly.
+       so disable LPM support in SW for all DSL chips by default
+     */
+
+#else
 	if (HCC_LPM(hcc_params)) {
 		/* support link power management EHCI 1.1 addendum */
 		ehci_dbg(ehci, "support lpm\n");
@@ -719,6 +726,7 @@ static int ehci_init(struct usb_hcd *hcd)
 		}
 		temp |= hird << 24;
 	}
+#endif
 	ehci->command = temp;
 
 	/* Accept arbitrarily long scatter-gather lists */
@@ -843,7 +851,6 @@ static int __maybe_unused ehci_setup (struct usb_hcd *hcd)
 }
 
 /*-------------------------------------------------------------------------*/
-
 static irqreturn_t ehci_irq (struct usb_hcd *hcd)
 {
 	struct ehci_hcd		*ehci = hcd_to_ehci (hcd);

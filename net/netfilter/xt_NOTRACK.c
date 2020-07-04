@@ -15,6 +15,13 @@ MODULE_ALIAS("ip6t_NOTRACK");
 static unsigned int
 notrack_tg(struct sk_buff *skb, const struct xt_action_param *par)
 {
+
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG_FEATURE)
+	skb->ipt_check |= IPT_TARGET_NOTRACK;
+	if ( skb->ipt_check & IPT_TARGET_CHECK )
+		return XT_CONTINUE;
+#endif
+
 	/* Previously seen (loopback)? Ignore. */
 	if (skb->nfct != NULL)
 		return XT_CONTINUE;

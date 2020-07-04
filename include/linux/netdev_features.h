@@ -57,6 +57,10 @@ enum {
 	NETIF_F_RXFCS_BIT,		/* Append FCS to skb pkt data */
 	NETIF_F_RXALL_BIT,		/* Receive errored frames too */
 
+#if defined(CONFIG_BCM_KF_BLOG)
+	NETIF_F_EXTSTATS_BIT,		/* Support extended statistics */
+#endif
+
 	/*
 	 * Add your fresh new feature above and remember to update
 	 * netdev_features_strings[] in net/core/ethtool.c and maybe
@@ -102,6 +106,10 @@ enum {
 #define NETIF_F_VLAN_CHALLENGED	__NETIF_F(VLAN_CHALLENGED)
 #define NETIF_F_RXFCS		__NETIF_F(RXFCS)
 #define NETIF_F_RXALL		__NETIF_F(RXALL)
+
+#if defined(CONFIG_BCM_KF_EXTSTATS)
+#define NETIF_F_EXTSTATS	__NETIF_F(EXTSTATS)
+#endif
 
 /* Features valid for ethtool to change */
 /* = all defined minus driver/device-class-related */
