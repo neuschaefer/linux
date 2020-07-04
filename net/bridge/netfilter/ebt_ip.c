@@ -32,7 +32,7 @@ struct tcpudphdr {
 
 #ifdef CONFIG_IP_PREC_TOS_REMARK
 /* IP precedence and TOS remark  */
-#define QOS_DSCP_MARK       0x1 /* 区分ebtables ftos 是dscp还是tos或者ipp */
+#define QOS_DSCP_MARK       0x1 /* 鍖哄垎ebtables ftos 鏄痙scp杩樻槸tos鎴栬�卛pp */
 #define QOS_IPP_MARK_ZERO   0x100 
 #define QOS_TOS_MARK_ZERO   0x200 
 
@@ -95,7 +95,7 @@ ebt_ip_mt(const struct sk_buff *skb, struct xt_action_param *par)
             }
             else
             {
-                // 其他情况
+                // 鍏朵粬鎯呭喌
 		        return false;
             }
         }

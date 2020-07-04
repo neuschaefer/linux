@@ -95,9 +95,9 @@ vlan_dev_get_egress_qos_mask(struct net_device *dev, struct sk_buff *skb)
 		mp = mp->next;
 	}
 
-/* start ´úÂë¼ìÊÓ:È¥µôºê¿ØÖÆ£¬³ÉÎªÍ¨ÓÃ´¦Àí */
-/*start of : vdslÉÏÐÐÊ±WAN²à±¨ÎÄÃ»ÓÐ´òÉÏ802.1pµÄ±ê¼Ç */
-/*end of : vdslÉÏÐÐÊ±WAN²à±¨ÎÄÃ»ÓÐ´òÉÏ802.1pµÄ±ê¼Ç */
+/* start ä»£ç æ£€è§†:åŽ»æŽ‰å®æŽ§åˆ¶ï¼Œæˆä¸ºé€šç”¨å¤„ç† */
+/*start of : vdslä¸Šè¡Œæ—¶WANä¾§æŠ¥æ–‡æ²¡æœ‰æ‰“ä¸Š802.1pçš„æ ‡è®° */
+/*end of : vdslä¸Šè¡Œæ—¶WANä¾§æŠ¥æ–‡æ²¡æœ‰æ‰“ä¸Š802.1pçš„æ ‡è®° */
     int ntp = 0; //xy vlan_dev_priv(dev)->nfmark_to_priority;    
     unsigned short vlan_qos;        
     if ((ntp >= 0) && (ntp <= 7))     
@@ -105,7 +105,7 @@ vlan_dev_get_egress_qos_mask(struct net_device *dev, struct sk_buff *skb)
         vlan_qos = (ntp <<13) & 0xe000;        
         return vlan_qos;    
     }
-/* start ´úÂë¼ìÊÓ:È¥µôºê¿ØÖÆ£¬³ÉÎªÍ¨ÓÃ´¦Àí */
+/* start ä»£ç æ£€è§†:åŽ»æŽ‰å®æŽ§åˆ¶ï¼Œæˆä¸ºé€šç”¨å¤„ç† */
 
 	return 0;
 }
@@ -183,15 +183,15 @@ static netdev_tx_t vlan_dev_hard_start_xmit(struct sk_buff *skb,
         /*Start of modified for qos function 2012-1-6*/
 #if defined(CONFIG_IMQ)
         /* mark -----|-----|-------|------|-------|-----|------|------  */
-        /* START OF Add:  2011-05-21 FOR ÒÆÖ²BCM EthÉÏÐÐµÄQoS */
-        /* START Modify  20110708 °ÑÔ­À´µÄÎªhhb3Ð´µÄelse·ÖÖ§È¥µô£¬Ê¹µÃÓëÍ¨ÓÃ´úÂëÒ»ÖÂ */
+        /* START OF Add:  2011-05-21 FOR ç§»æ¤BCM Ethä¸Šè¡Œçš„QoS */
+        /* START Modify  20110708 æŠŠåŽŸæ¥çš„ä¸ºhhb3å†™çš„elseåˆ†æ”¯åŽ»æŽ‰ï¼Œä½¿å¾—ä¸Žé€šç”¨ä»£ç ä¸€è‡´ */
         /* BCM Eth qos     lan |dscp |default|  wmm |      |802.1p|policer|queue */
         /* IMQ QOS |802.1p|queue|policer */
         if (skb->mark & 0x10)        
         {            
             vlan_tci = ((vlan_tci & 0x1fff) | ((skb->mark & 0xe0) << 8));        
         }
-        /* END Modify  20110708 °ÑÔ­À´µÄÎªhhb3Ð´µÄelse·ÖÖ§È¥µô£¬Ê¹µÃÓëÍ¨ÓÃ´úÂëÒ»ÖÂ */
+        /* END Modify  20110708 æŠŠåŽŸæ¥çš„ä¸ºhhb3å†™çš„elseåˆ†æ”¯åŽ»æŽ‰ï¼Œä½¿å¾—ä¸Žé€šç”¨ä»£ç ä¸€è‡´ */
         /* END OF Add: 2011-05-21 */
 
     	if (__constant_htons(ETH_P_PPP_SES) == skb->protocol) 

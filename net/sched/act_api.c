@@ -397,8 +397,8 @@ int tcf_action_exec(struct sk_buff *skb, const struct tc_action *act,
 #ifdef CONFIG_ATP_HYBRID    
 	while ((a = act) != NULL) {
 repeat:
-        /* Ö´ÐÐ¶à¸öactÊ±£¬ºóÃæµÄactÎÞ·¨Ö´ÐÐ£¬Ã¿´Î¶¼ÊÇÖ´ÐÐµÚÒ»¸öact£¬Ìí¼ÓÅÐ¶ÏÖ®Ç°Ö´ÐÐ»ò¸ÃactÖ®ºó£¬           
-           ²»ÔÙÖ´ÐÐ£¬ Í¬Ê±Ìø¹ýgact´¦Àí£¬Ö±½Ó½øÈëÏÂÒ»¸öact */
+        /* æ‰§è¡Œå¤šä¸ªactæ—¶ï¼ŒåŽé¢çš„actæ— æ³•æ‰§è¡Œï¼Œæ¯æ¬¡éƒ½æ˜¯æ‰§è¡Œç¬¬ä¸€ä¸ªactï¼Œæ·»åŠ åˆ¤æ–­ä¹‹å‰æ‰§è¡Œæˆ–è¯¥actä¹‹åŽï¼Œ           
+           ä¸å†æ‰§è¡Œï¼Œ åŒæ—¶è·³è¿‡gactå¤„ç†ï¼Œç›´æŽ¥è¿›å…¥ä¸‹ä¸€ä¸ªact */
 		if ((a->ops && a->ops->act) 
             && (ACT_SKB_CB(skb)->act != a->ops->act)
             && (a->ops->type != TCA_ACT_GACT))

@@ -182,36 +182,36 @@ static struct inet6_dev * ipv6_find_idev(struct net_device *dev);
 static ATOMIC_NOTIFIER_HEAD(inet6addr_chain);
 
 static struct ipv6_devconf ipv6_devconf __read_mostly = {
-/* start of  2009-09-18 Ä¬ÈÏ¿ªÆôIPv6µÄÂ·ÓÉ¹¦ÄÜ */
+/* start of  2009-09-18 é»˜è®¤å¼€å¯IPv6çš„è·¯ç”±åŠŸèƒ½ */
 #ifdef CONFIG_SUPPORT_ATP
     .forwarding     = 1,
 #else
 	.forwarding		= 0,
 #endif	
-/* end of  2009-09-18 Ä¬ÈÏ¿ªÆôIPv6µÄÂ·ÓÉ¹¦ÄÜ */
+/* end of  2009-09-18 é»˜è®¤å¼€å¯IPv6çš„è·¯ç”±åŠŸèƒ½ */
 	.hop_limit		= IPV6_DEFAULT_HOPLIMIT,
 	.mtu6			= IPV6_MIN_MTU,
-/* start of  2009-10-20 Ä¬ÈÏ¹Ø±Õ½ÓÊÕRAµÄ¹¦ÄÜ£¬ÒòÎª¿¼ÂÇµ½PPP½Ó¿ÚÐèÒª»ùÓÚnas½Ó¿Ú£¬Èç¹û
- * ¿ªÆôµÄ»°¿ÉÄÜÕâÐ©nas½Ó¿Ú»á´¦ÀíRA,×¢ÒâÈç¹ûÒªÏ¸»¯¿ÉÒÔ½ÓÊÕRA(´Ó¶ø¿ÉÒÔ´¦ÀíÂ·ÓÉµÈÐÅÏ¢)
- * ÄÇÃ´Òª¿ØÖÆµÄ±äÁ¿ÊÇ autoconf 
+/* start of  2009-10-20 é»˜è®¤å…³é—­æŽ¥æ”¶RAçš„åŠŸèƒ½ï¼Œå› ä¸ºè€ƒè™‘åˆ°PPPæŽ¥å£éœ€è¦åŸºäºŽnasæŽ¥å£ï¼Œå¦‚æžœ
+ * å¼€å¯çš„è¯å¯èƒ½è¿™äº›nasæŽ¥å£ä¼šå¤„ç†RA,æ³¨æ„å¦‚æžœè¦ç»†åŒ–å¯ä»¥æŽ¥æ”¶RA(ä»Žè€Œå¯ä»¥å¤„ç†è·¯ç”±ç­‰ä¿¡æ¯)
+ * é‚£ä¹ˆè¦æŽ§åˆ¶çš„å˜é‡æ˜¯ autoconf 
  */
 #ifdef CONFIG_SUPPORT_ATP
         .accept_ra      = 0,
 #else
         .accept_ra      = 1,
 #endif
-/* end of  2009-10-20 Ä¬ÈÏ¹Ø±Õ½ÓÊÕRAµÄ¹¦ÄÜ£¬ÒòÎª¿¼ÂÇµ½PPP½Ó¿ÚÐèÒª»ùÓÚnas½Ó¿Ú£¬Èç¹û
- * ¿ªÆôµÄ»°¿ÉÄÜÕâÐ©nas½Ó¿Ú»á´¦ÀíRA,×¢ÒâÈç¹ûÒªÏ¸»¯¿ÉÒÔ½ÓÊÕRA(´Ó¶ø¿ÉÒÔ´¦ÀíÂ·ÓÉµÈÐÅÏ¢)
- * ÄÇÃ´Òª¿ØÖÆµÄ±äÁ¿ÊÇ autoconf 
+/* end of  2009-10-20 é»˜è®¤å…³é—­æŽ¥æ”¶RAçš„åŠŸèƒ½ï¼Œå› ä¸ºè€ƒè™‘åˆ°PPPæŽ¥å£éœ€è¦åŸºäºŽnasæŽ¥å£ï¼Œå¦‚æžœ
+ * å¼€å¯çš„è¯å¯èƒ½è¿™äº›nasæŽ¥å£ä¼šå¤„ç†RA,æ³¨æ„å¦‚æžœè¦ç»†åŒ–å¯ä»¥æŽ¥æ”¶RA(ä»Žè€Œå¯ä»¥å¤„ç†è·¯ç”±ç­‰ä¿¡æ¯)
+ * é‚£ä¹ˆè¦æŽ§åˆ¶çš„å˜é‡æ˜¯ autoconf 
  */
 	.accept_redirects	= 1,
-/*  start of  2009-10-21 Ä¬ÈÏÇé¿öÏÂ£¬ËùÓÐ½Ó¿Ú¼È²»´¦ÀíRAÒ²²»×Ô¶¯ÅäÖÃµØÖ· */
+/*  start of  2009-10-21 é»˜è®¤æƒ…å†µä¸‹ï¼Œæ‰€æœ‰æŽ¥å£æ—¢ä¸å¤„ç†RAä¹Ÿä¸è‡ªåŠ¨é…ç½®åœ°å€ */
 #ifdef CONFIG_SUPPORT_ATP
 	.autoconf		    = 0,
 #else
     .autoconf           = 1,
 #endif
-/*  end of  2009-10-21 Ä¬ÈÏÇé¿öÏÂ£¬ËùÓÐ½Ó¿Ú¼È²»´¦ÀíRAÒ²²»×Ô¶¯ÅäÖÃµØÖ· */
+/*  end of  2009-10-21 é»˜è®¤æƒ…å†µä¸‹ï¼Œæ‰€æœ‰æŽ¥å£æ—¢ä¸å¤„ç†RAä¹Ÿä¸è‡ªåŠ¨é…ç½®åœ°å€ */
 	.force_mld_version	= 0,
 	.dad_transmits		= 1,
 	.rtr_solicits		= MAX_RTR_SOLICITATIONS,
@@ -247,44 +247,44 @@ static struct ipv6_devconf ipv6_devconf __read_mostly = {
 #else
 	.accept_dad		= 1,
 #endif
-/* start of  2009-12-05 Ö§³Ö¶à²¥Â·ÓÉ */
+/* start of  2009-12-05 æ”¯æŒå¤šæ’­è·¯ç”± */
 #ifdef CONFIG_IPV6_MROUTE
 	.mc_forwarding		= 0,
 #endif
-/* end of  2009-12-05 Ö§³Ö¶à²¥Â·ÓÉ */
+/* end of  2009-12-05 æ”¯æŒå¤šæ’­è·¯ç”± */
 };
 
 static struct ipv6_devconf ipv6_devconf_dflt __read_mostly = {
-/* start of  2009-09-18 Ä¬ÈÏ¿ªÆôIPv6µÄÂ·ÓÉ¹¦ÄÜ */
+/* start of  2009-09-18 é»˜è®¤å¼€å¯IPv6çš„è·¯ç”±åŠŸèƒ½ */
 #ifdef CONFIG_SUPPORT_ATP
         .forwarding     = 1,
 #else
         .forwarding     = 0,
 #endif   
-/* end of  2009-09-18 Ä¬ÈÏ¿ªÆôIPv6µÄÂ·ÓÉ¹¦ÄÜ */
+/* end of  2009-09-18 é»˜è®¤å¼€å¯IPv6çš„è·¯ç”±åŠŸèƒ½ */
 	.hop_limit		= IPV6_DEFAULT_HOPLIMIT,
 	.mtu6			= IPV6_MIN_MTU,
-/* start of  2009-10-20 Ä¬ÈÏ¹Ø±Õ½ÓÊÕRAµÄ¹¦ÄÜ£¬ÒòÎª¿¼ÂÇµ½PPP½Ó¿ÚÐèÒª»ùÓÚnas½Ó¿Ú£¬Èç¹û
- * ¿ªÆôµÄ»°¿ÉÄÜÕâÐ©nas½Ó¿Ú»á´¦ÀíRA,×¢ÒâÈç¹ûÒªÏ¸»¯¿ÉÒÔ½ÓÊÕRA(´Ó¶ø¿ÉÒÔ´¦ÀíÂ·ÓÉµÈÐÅÏ¢)
- * ÄÇÃ´Òª¿ØÖÆµÄ±äÁ¿ÊÇ autoconf 
+/* start of  2009-10-20 é»˜è®¤å…³é—­æŽ¥æ”¶RAçš„åŠŸèƒ½ï¼Œå› ä¸ºè€ƒè™‘åˆ°PPPæŽ¥å£éœ€è¦åŸºäºŽnasæŽ¥å£ï¼Œå¦‚æžœ
+ * å¼€å¯çš„è¯å¯èƒ½è¿™äº›nasæŽ¥å£ä¼šå¤„ç†RA,æ³¨æ„å¦‚æžœè¦ç»†åŒ–å¯ä»¥æŽ¥æ”¶RA(ä»Žè€Œå¯ä»¥å¤„ç†è·¯ç”±ç­‰ä¿¡æ¯)
+ * é‚£ä¹ˆè¦æŽ§åˆ¶çš„å˜é‡æ˜¯ autoconf 
  */
 #ifdef CONFIG_SUPPORT_ATP
 	.accept_ra		= 0,
 #else
     .accept_ra      = 1,
 #endif
-/* end of  2009-10-20 Ä¬ÈÏ¹Ø±Õ½ÓÊÕRAµÄ¹¦ÄÜ£¬ÒòÎª¿¼ÂÇµ½PPP½Ó¿ÚÐèÒª»ùÓÚnas½Ó¿Ú£¬Èç¹û
- * ¿ªÆôµÄ»°¿ÉÄÜÕâÐ©nas½Ó¿Ú»á´¦ÀíRA,×¢ÒâÈç¹ûÒªÏ¸»¯¿ÉÒÔ½ÓÊÕRA(´Ó¶ø¿ÉÒÔ´¦ÀíÂ·ÓÉµÈÐÅÏ¢)
- * ÄÇÃ´Òª¿ØÖÆµÄ±äÁ¿ÊÇ autoconf 
+/* end of  2009-10-20 é»˜è®¤å…³é—­æŽ¥æ”¶RAçš„åŠŸèƒ½ï¼Œå› ä¸ºè€ƒè™‘åˆ°PPPæŽ¥å£éœ€è¦åŸºäºŽnasæŽ¥å£ï¼Œå¦‚æžœ
+ * å¼€å¯çš„è¯å¯èƒ½è¿™äº›nasæŽ¥å£ä¼šå¤„ç†RA,æ³¨æ„å¦‚æžœè¦ç»†åŒ–å¯ä»¥æŽ¥æ”¶RA(ä»Žè€Œå¯ä»¥å¤„ç†è·¯ç”±ç­‰ä¿¡æ¯)
+ * é‚£ä¹ˆè¦æŽ§åˆ¶çš„å˜é‡æ˜¯ autoconf 
  */
 	.accept_redirects	= 1,
-    /*  start of  2009-10-21 Ä¬ÈÏÇé¿öÏÂ£¬ËùÓÐ½Ó¿Ú¼È²»´¦ÀíRAÒ²²»×Ô¶¯ÅäÖÃµØÖ· */
+    /*  start of  2009-10-21 é»˜è®¤æƒ…å†µä¸‹ï¼Œæ‰€æœ‰æŽ¥å£æ—¢ä¸å¤„ç†RAä¹Ÿä¸è‡ªåŠ¨é…ç½®åœ°å€ */
 #ifdef CONFIG_SUPPORT_ATP
         .autoconf           = 0,
 #else
         .autoconf           = 1,
 #endif
-    /*  end of  2009-10-21 Ä¬ÈÏÇé¿öÏÂ£¬ËùÓÐ½Ó¿Ú¼È²»´¦ÀíRAÒ²²»×Ô¶¯ÅäÖÃµØÖ· */
+    /*  end of  2009-10-21 é»˜è®¤æƒ…å†µä¸‹ï¼Œæ‰€æœ‰æŽ¥å£æ—¢ä¸å¤„ç†RAä¹Ÿä¸è‡ªåŠ¨é…ç½®åœ°å€ */
 	.dad_transmits		= 1,
 	.rtr_solicits		= MAX_RTR_SOLICITATIONS,
 	.rtr_solicit_interval	= RTR_SOLICITATION_INTERVAL,
@@ -319,11 +319,11 @@ static struct ipv6_devconf ipv6_devconf_dflt __read_mostly = {
 #else
 	.accept_dad		= 1,
 #endif
-/* start of  2009-12-05 Ö§³Ö¶à²¥Â·ÓÉ */
+/* start of  2009-12-05 æ”¯æŒå¤šæ’­è·¯ç”± */
 #ifdef CONFIG_IPV6_MROUTE
 	.mc_forwarding		= 0,
 #endif
-/* end of  2009-12-05 Ö§³Ö¶à²¥Â·ÓÉ */
+/* end of  2009-12-05 æ”¯æŒå¤šæ’­è·¯ç”± */
 };
 
 /* IPv6 Wildcard Address and Loopback Address defined by RFC2553 */
@@ -452,7 +452,7 @@ static struct inet6_dev * ipv6_add_dev(struct net_device *dev)
 	INIT_LIST_HEAD(&ndev->addr_list);
 
 	memcpy(&ndev->cnf, dev_net(dev)->ipv6.devconf_dflt, sizeof(ndev->cnf));
-	/*½«WAN¿ÚµÄenableÖÃÎª0, ²»ÈÃËü·¢°ü,cmsµÄWAN³õÊ¼»¯Ê±»áÔÙ½«Æä°´ÐèÖÃÎ»*/
+	/*å°†WANå£çš„enableç½®ä¸º0, ä¸è®©å®ƒå‘åŒ…,cmsçš„WANåˆå§‹åŒ–æ—¶ä¼šå†å°†å…¶æŒ‰éœ€ç½®ä½*/
 #ifdef CONFIG_SUPPORT_ATP_IPV6_ENABLE
 	if (IS_WAN_DEVICE(dev->name))
 	{
@@ -1513,9 +1513,9 @@ struct inet6_ifaddr *ipv6_get_ifaddr(struct net *net, const struct in6_addr *add
 
 /* Gets referenced address, destroys ifaddr */
 
-/* ÈçÏÂ¹æÔò:
- * 1 Èç¹ûµØÖ·ÊÇÊÖ¶¯ÅäÖÃµÄÍ¬Ê±¸ÃµØÖ·²»ÊÇÁ´Â·µØÖ··¶Î§£¬ÄÇÃ´¸ÃµØÖ·²»»áÖØÐÂÉú³É
- * 2 Èç¹ûµØÖ·²»ÊÇÊÖ¶¯ÅäÖÃµÄ£¬¶øÇÒÇ°×ºÐ¡ÓÚµÈÓÚ64£¬ÄÇÃ´ÖØÐÂÉú³É
+/* å¦‚ä¸‹è§„åˆ™:
+ * 1 å¦‚æžœåœ°å€æ˜¯æ‰‹åŠ¨é…ç½®çš„åŒæ—¶è¯¥åœ°å€ä¸æ˜¯é“¾è·¯åœ°å€èŒƒå›´ï¼Œé‚£ä¹ˆè¯¥åœ°å€ä¸ä¼šé‡æ–°ç”Ÿæˆ
+ * 2 å¦‚æžœåœ°å€ä¸æ˜¯æ‰‹åŠ¨é…ç½®çš„ï¼Œè€Œä¸”å‰ç¼€å°äºŽç­‰äºŽ64ï¼Œé‚£ä¹ˆé‡æ–°ç”Ÿæˆ
  */
 static void addrconf_dad_stop(struct inet6_ifaddr *ifp, int dad_failed)
 {
@@ -1526,11 +1526,11 @@ static void addrconf_dad_stop(struct inet6_ifaddr *ifp, int dad_failed)
     }
 #endif
 
-/* start of 2009-12-03 ½â¾öIPµØÖ·³åÍ» */
+/* start of 2009-12-03 è§£å†³IPåœ°å€å†²çª */
 	if ((ifp->flags&IFA_F_PERMANENT)
         && !(ifp->scope & IFA_LINK)) 
     {        
-/* end of 2009-12-03 ½â¾öIPµØÖ·³åÍ» */
+/* end of 2009-12-03 è§£å†³IPåœ°å€å†²çª */
 		spin_lock_bh(&ifp->lock);
 		addrconf_del_timer(ifp);
 		ifp->flags |= IFA_F_TENTATIVE;

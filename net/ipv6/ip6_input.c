@@ -140,7 +140,7 @@ int ipv6_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt
 		hdr = ipv6_hdr(skb);
 	}
 #ifdef CONFIG_SUPPORT_ATP
-    /*start  WAN接口收到报文大于自身MTU的报文时回复too big报文*/
+    /*start  WAN鎺ュ彛鏀跺埌鎶ユ枃澶т簬鑷韩MTU鐨勬姤鏂囨椂鍥炲too big鎶ユ枃*/
     if (skb->len > skb->dev->mtu) {
         icmpv6_send(skb, ICMPV6_PKT_TOOBIG, 0, skb->dev->mtu);
         IP6_INC_STATS_BH(net,
@@ -149,7 +149,7 @@ int ipv6_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt
 				 idev, IPSTATS_MIB_FRAGFAILS);
         goto drop;
     }
-    /*end  WAN接口收到报文大于自身MTU的报文时回复too big报文*/
+    /*end  WAN鎺ュ彛鏀跺埌鎶ユ枃澶т簬鑷韩MTU鐨勬姤鏂囨椂鍥炲too big鎶ユ枃*/
 #endif
 	if (hdr->nexthdr == NEXTHDR_HOP) {
 		if (ipv6_parse_hopopts(skb) < 0) {

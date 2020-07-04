@@ -1791,7 +1791,7 @@ struct dst_entry *xfrm_lookup(struct net *net, struct dst_entry *dst_orig,
 	u8 dir = policy_to_flow_dir(XFRM_POLICY_OUT);
 	int i, err, num_pols, num_xfrms = 0, drop_pols = 0;
 
-	/* Start of  2010-07-31 ºìÇøÊ¹ÓÃDHCP RelayµÄÊ±ºò»áµ¼ÖÂ¹ã²¥±¨ÎÄÎŞ·¨·¢ËÍµ½LAN²à */
+	/* Start of  2010-07-31 çº¢åŒºä½¿ç”¨DHCP Relayçš„æ—¶å€™ä¼šå¯¼è‡´å¹¿æ’­æŠ¥æ–‡æ— æ³•å‘é€åˆ°LANä¾§ */
 #ifdef CONFIG_SUPPORT_ATP
     if (sk 
         && (AF_INET == sk->sk_family)
@@ -1800,7 +1800,7 @@ struct dst_entry *xfrm_lookup(struct net *net, struct dst_entry *dst_orig,
         return 0;
     }
 #endif
-/* End of  2010-07-31 ºìÇøÊ¹ÓÃDHCP RelayµÄÊ±ºò»áµ¼ÖÂ¹ã²¥±¨ÎÄÎŞ·¨·¢ËÍµ½LAN²à */
+/* End of  2010-07-31 çº¢åŒºä½¿ç”¨DHCP Relayçš„æ—¶å€™ä¼šå¯¼è‡´å¹¿æ’­æŠ¥æ–‡æ— æ³•å‘é€åˆ°LANä¾§ */
 
 restart:
 	dst = NULL;
@@ -2957,7 +2957,7 @@ static void xfrm_reset_timer(struct net *net, struct xfrm_state **states, int n)
 	{
         if (XFRM_STATE_ACQ == states[i]->km.state)
         {
-            /* ×¢Òâ£¬ÕâÀï·Ç³£ÒÀÀµÓÚxfrm_state_find ÖĞÉèÖÃ¶¨Ê±Æ÷µÄµØ·½£¬Ò²ÒÀÀµÓÚxfrm_timer_handlerµÄÊµÏÖ */
+            /* æ³¨æ„ï¼Œè¿™é‡Œéå¸¸ä¾èµ–äºxfrm_state_find ä¸­è®¾ç½®å®šæ—¶å™¨çš„åœ°æ–¹ï¼Œä¹Ÿä¾èµ–äºxfrm_timer_handlerçš„å®ç° */
 			states[i]->lft.hard_add_expires_seconds = net->xfrm.sysctl_acq_expires;
             tasklet_hrtimer_start(&states[i]->mtimer, 
                 ktime_set(net->xfrm.sysctl_acq_expires, 0), HRTIMER_MODE_REL);
@@ -3048,8 +3048,8 @@ int xfrm_migrate(const struct xfrm_selector *sel, u8 dir, u8 type,
 				x_new[nx_new] = xc;
 				nx_new++;
 #ifdef CONFIG_SUPPORT_ATP
-                /* ÒòÎªÎÒÃÇÄ¿Ç°¶ÔÓÚACQµÄSAÊ¹ÓÃµÄ¾ÍÊÇÍ¬Ò»¸ö½á¹¹Ìå£¬Òò´ËÕâÖÖÇé¿öÏÂÎÒÃÇ¾ÍĞèÒªÄÜ¹»ÔÚÓöµ½´íÎóµÄÊ±ºò»¹Ô­
-                       * ×¢Òâ£¬ĞèÒªÄæµôxfrm_state_migrate()º¯ÊıÖĞµÄÄÚÈİ
+                /* å› ä¸ºæˆ‘ä»¬ç›®å‰å¯¹äºACQçš„SAä½¿ç”¨çš„å°±æ˜¯åŒä¸€ä¸ªç»“æ„ä½“ï¼Œå› æ­¤è¿™ç§æƒ…å†µä¸‹æˆ‘ä»¬å°±éœ€è¦èƒ½å¤Ÿåœ¨é‡åˆ°é”™è¯¯çš„æ—¶å€™è¿˜åŸ
+                       * æ³¨æ„ï¼Œéœ€è¦é€†æ‰xfrm_state_migrate()å‡½æ•°ä¸­çš„å†…å®¹
                        */
                 if (XFRM_STATE_ACQ == x->km.state)
                 {

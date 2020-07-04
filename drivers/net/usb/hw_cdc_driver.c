@@ -1811,7 +1811,7 @@ static void hw_tx_timeout (struct net_device *net)
 /*-------------------------------------------------------------------------*/
 /*****************************************************************************
   Function:      RNIC_ProcDemDial
-  Description:   wan ²àÁ÷Á¿¼à²â
+  Description:   wan ä¾§æµé‡ç›‘æµ‹
   Calls:            
   Called By:     
   Input:         skb_buff  
@@ -1825,13 +1825,13 @@ void RNIC_ProcDemDial(struct sk_buff*     pstSkb)
     {
         return;
     }
-    /*²»ÉÏ±¨ÊÂ¼şÖ±½Ó·µ»Ø*/
+    /*ä¸ä¸ŠæŠ¥äº‹ä»¶ç›´æ¥è¿”å›*/
     if(ALLOW_EVENT_REPORT != g_DialMode.enEventReportFlag)
     {
         return;
     }
 
-    /*Èç¹ûÊÇ¹ã²¥°ü£¬Ö±½Ó¹ıÂËµô*/
+    /*å¦‚æœæ˜¯å¹¿æ’­åŒ…ï¼Œç›´æ¥è¿‡æ»¤æ‰*/
     if (NULL != pstSkb->mac_header)
     {
         unsigned char* addr = (unsigned char*)pstSkb->mac_header;
@@ -1840,7 +1840,7 @@ void RNIC_ProcDemDial(struct sk_buff*     pstSkb)
             return;
         }
     }
-    /*ÊÇ·ñÎªlanÊı¾İ*/
+    /*æ˜¯å¦ä¸ºlanæ•°æ®*/
     if ( pstSkb->mark & 0x200000)
     {
         set_rnic_last_net_time(jiffies);
@@ -2047,8 +2047,8 @@ void hw_disconnect (struct usb_interface *intf)
             dev->driver_desc);
     }
 
-    /*Í¬²½È¡Ïû¿ÉÄÜ×¢²áµÄÑÓ³Ù¹¤×÷½ø³Ì£¬Èç¹û¸Ã¹¤×÷½ø³ÌÒÑ¾­ÔÚÖ´ĞĞÁË£¬
-    ÔòÔÚÕâÀï£¬ĞèÒªµÈ´ı¸Ã¹¤×÷½ø³ÌÖ´ĞĞÍê³ÉÖ®ºó£¬discconect²Å»á¼ÌĞøÍùÏÂÖ´ĞĞ¡£*/
+    /*åŒæ­¥å–æ¶ˆå¯èƒ½æ³¨å†Œçš„å»¶è¿Ÿå·¥ä½œè¿›ç¨‹ï¼Œå¦‚æœè¯¥å·¥ä½œè¿›ç¨‹å·²ç»åœ¨æ‰§è¡Œäº†ï¼Œ
+    åˆ™åœ¨è¿™é‡Œï¼Œéœ€è¦ç­‰å¾…è¯¥å·¥ä½œè¿›ç¨‹æ‰§è¡Œå®Œæˆä¹‹åï¼Œdiscconectæ‰ä¼šç»§ç»­å¾€ä¸‹æ‰§è¡Œã€‚*/
     cancel_delayed_work_sync(&dev->status_work);//Added by fangxz 2010-3-26
 
     net = dev->net;
@@ -2086,7 +2086,7 @@ static const struct net_device_ops hw_netdev_ops = {
     .ndo_change_mtu = hw_change_mtu,
     .ndo_set_mac_address = hw_eth_mac_addr,
     .ndo_validate_addr = eth_validate_addr,
-    .ndo_get_stats = hw_get_stats, //ÓÃÓÚÁ÷Á¿Í³¼Æ
+    .ndo_get_stats = hw_get_stats, //ç”¨äºæµé‡ç»Ÿè®¡
 };
 #endif
 
@@ -3643,7 +3643,7 @@ op_error:
     .bInterfaceProtocol    = 0x76
 
 static const struct usb_device_id    hw_products [] = {
-    /*É¾³ı¶ÔPRODUCT IDµÄ±È½Ï£¬Ä¬ÈÏÄÜ¹»Ö§³ÖËùÓĞHUAWEI_ETHER_INTERFACE ½Ó¿ÚÀàĞÍµÄNDISÉè±¸*/
+    /*åˆ é™¤å¯¹PRODUCT IDçš„æ¯”è¾ƒï¼Œé»˜è®¤èƒ½å¤Ÿæ”¯æŒæ‰€æœ‰HUAWEI_ETHER_INTERFACE æ¥å£ç±»å‹çš„NDISè®¾å¤‡*/
     /* delete by  2011/12/26,prevent hilink load hw_cdc_driver.ko*/
     /*
     {

@@ -120,7 +120,7 @@ struct in_addr {
 #define IP_MULTICAST_ALL		49
 #define IP_UNICAST_IF			50
 
-/* START of add  for HG526v3 Ç¿ÖÆÃÅ»§ at 2013.1.4*/
+/* START of add  for HG526v3 å¼ºåˆ¶é—¨æˆ· at 2013.1.4*/
 #ifdef CONFIG_ATP_PRSITE
 #define PRSITE_ADD                      51
 #define PRSITE_DEL                      52
@@ -128,9 +128,9 @@ struct in_addr {
 #define PRSITE_MODIFY                   54
 #define PRSITE_DUMP                     55
 #endif
-/* END of add  for HG526v3 Ç¿ÖÆÃÅ»§ at 2013.1.4*/
+/* END of add  for HG526v3 å¼ºåˆ¶é—¨æˆ· at 2013.1.4*/
 
-/*Start of ATP 2013-1-31 for HOMEGW-15189/RFC4604: SSMÄ£Ê½ÏÂÖ»ÄÜ·¢type 1/5/6±¨ÎÄ, option 64-67²»ÄÜÊ¹ÓÃ£¬Ìø¹ıµ½½Ï´óµÄ¿Õ¼äÇøÓò£¬±ÜÃâºÍ±ğµÄ¹¦ÄÜ³åÍ»*/
+/*Start of ATP 2013-1-31 for HOMEGW-15189/RFC4604: SSMæ¨¡å¼ä¸‹åªèƒ½å‘type 1/5/6æŠ¥æ–‡, option 64-67ä¸èƒ½ä½¿ç”¨ï¼Œè·³è¿‡åˆ°è¾ƒå¤§çš„ç©ºé—´åŒºåŸŸï¼Œé¿å…å’Œåˆ«çš„åŠŸèƒ½å†²çª*/
 #define MCAST_SSM_ADD                 110
 #define MCAST_SSM_DEL                 111
 #define MCAST_ASM_ADD                 112
@@ -281,7 +281,7 @@ struct sockaddr_in {
 
 #ifdef __KERNEL__
 
-/* ATP igmpµÈÄ£¿éÊ¹ÓÃ */
+/* ATP igmpç­‰æ¨¡å—ä½¿ç”¨ */
 /* Some random defines to make it easier in the kernel.. */
 #define LOOPBACK(x)	(((x) & htonl(0xff000000)) == htonl(0x7f000000))
 #define MULTICAST(x)	(((x) & htonl(0xf0000000)) == htonl(0xe0000000))

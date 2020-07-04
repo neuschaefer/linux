@@ -852,7 +852,7 @@ static struct sk_buff *__pfkey_xfrm_state2msg(const struct xfrm_state *x,
 		lifetime->sadb_lifetime_allocations =  _X2KEY(x->lft.hard_packet_limit);
 		lifetime->sadb_lifetime_bytes = _X2KEY(x->lft.hard_byte_limit);
 
-        /*  Ö»Ö§³ÖÅäÖÃ¾«È·µ½ KB */
+        /*  åªæ”¯æŒé…ç½®ç²¾ç¡®åˆ° KB */
 #ifdef CONFIG_SUPPORT_ATP
         lifetime->sadb_lifetime_bytes == 0? 0 : x->lft.hard_byte_limit/1024;
 #endif
@@ -868,7 +868,7 @@ static struct sk_buff *__pfkey_xfrm_state2msg(const struct xfrm_state *x,
 		lifetime->sadb_lifetime_exttype = SADB_EXT_LIFETIME_SOFT;
 		lifetime->sadb_lifetime_allocations =  _X2KEY(x->lft.soft_packet_limit);
 		lifetime->sadb_lifetime_bytes = _X2KEY(x->lft.soft_byte_limit);
-		/*  Ö»Ö§³ÖÅäÖÃ¾«È·µ½ KB */
+		/*  åªæ”¯æŒé…ç½®ç²¾ç¡®åˆ° KB */
 #ifdef CONFIG_SUPPORT_ATP
 		lifetime->sadb_lifetime_bytes == 0? 0 : (x->lft.soft_byte_limit)/1024;
 #endif
@@ -1130,7 +1130,7 @@ static struct xfrm_state * pfkey_msg2xfrm_state(struct net *net,
 	if (lifetime != NULL) {
 		x->lft.hard_packet_limit = _KEY2X(lifetime->sadb_lifetime_allocations);
 		x->lft.hard_byte_limit = _KEY2X(lifetime->sadb_lifetime_bytes);
-        /*  Ö»Ö§³ÖÅäÖÃ¾«È·µ½ KB */
+        /*  åªæ”¯æŒé…ç½®ç²¾ç¡®åˆ° KB */
 #ifdef CONFIG_SUPPORT_ATP
         x->lft.hard_byte_limit 
             == XFRM_INF? XFRM_INF:(lifetime->sadb_lifetime_bytes * 1024);
@@ -1143,7 +1143,7 @@ static struct xfrm_state * pfkey_msg2xfrm_state(struct net *net,
 	if (lifetime != NULL) {
 		x->lft.soft_packet_limit = _KEY2X(lifetime->sadb_lifetime_allocations);
 		x->lft.soft_byte_limit = _KEY2X(lifetime->sadb_lifetime_bytes);
-        /*  Ö»Ö§³ÖÅäÖÃ¾«È·µ½ KB */
+        /*  åªæ”¯æŒé…ç½®ç²¾ç¡®åˆ° KB */
 #ifdef CONFIG_SUPPORT_ATP
         x->lft.soft_byte_limit 
             == XFRM_INF? XFRM_INF:(lifetime->sadb_lifetime_bytes * 1024);
@@ -1422,7 +1422,7 @@ static int pfkey_acquire(struct sock *sk, struct sk_buff *skb, const struct sadb
 
 	spin_lock_bh(&x->lock);
 	if (x->km.state == XFRM_STATE_ACQ) {
-	 /* start of Blackdns ½«IPµØÖ·¼ÓÈëºÚÃûµ¥ºóÖÜÆÚ²»×¼È·  */     
+	 /* start of Blackdns å°†IPåœ°å€åŠ å…¥é»‘åå•åå‘¨æœŸä¸å‡†ç¡®  */     
 #ifdef CONFIG_SUPPORT_ATP
         if (!net->xfrm.sysctl_larval_drop)
         {
@@ -1436,7 +1436,7 @@ static int pfkey_acquire(struct sock *sk, struct sk_buff *skb, const struct sadb
             __xfrm_state_delete(x);
         }
 #endif
-/* End of Blackdns ½«IPµØÖ·¼ÓÈëºÚÃûµ¥ºóÖÜÆÚ²»×¼È·  */       
+/* End of Blackdns å°†IPåœ°å€åŠ å…¥é»‘åå•åå‘¨æœŸä¸å‡†ç¡®  */       
 	}
 	spin_unlock_bh(&x->lock);
 	xfrm_state_put(x);
@@ -2095,7 +2095,7 @@ static int pfkey_xfrm_policy2msg(struct sk_buff *skb, const struct xfrm_policy *
 	lifetime->sadb_lifetime_exttype = SADB_EXT_LIFETIME_HARD;
 	lifetime->sadb_lifetime_allocations =  _X2KEY(xp->lft.hard_packet_limit);
 	lifetime->sadb_lifetime_bytes = _X2KEY(xp->lft.hard_byte_limit);
-    /*  Ö»Ö§³ÖÅäÖÃ¾«È·µ½ KB */
+    /*  åªæ”¯æŒé…ç½®ç²¾ç¡®åˆ° KB */
 #ifdef CONFIG_SUPPORT_ATP
     lifetime->sadb_lifetime_bytes == 0? 0 : (xp->lft.hard_byte_limit)/1024;
 #endif
@@ -2110,7 +2110,7 @@ static int pfkey_xfrm_policy2msg(struct sk_buff *skb, const struct xfrm_policy *
 	lifetime->sadb_lifetime_allocations =  _X2KEY(xp->lft.soft_packet_limit);
 	lifetime->sadb_lifetime_bytes = _X2KEY(xp->lft.soft_byte_limit);
 
-        /*  Ö»Ö§³ÖÅäÖÃ¾«È·µ½ KB */
+        /*  åªæ”¯æŒé…ç½®ç²¾ç¡®åˆ° KB */
 #ifdef CONFIG_SUPPORT_ATP
     lifetime->sadb_lifetime_bytes == 0? 0 : (xp->lft.soft_byte_limit)/1024;
 #endif
@@ -2308,7 +2308,7 @@ static int pfkey_spdadd(struct sock *sk, struct sk_buff *skb, const struct sadb_
 	if ((lifetime = ext_hdrs[SADB_EXT_LIFETIME_HARD-1]) != NULL) {
 		xp->lft.hard_packet_limit = _KEY2X(lifetime->sadb_lifetime_allocations);
 		xp->lft.hard_byte_limit = _KEY2X(lifetime->sadb_lifetime_bytes);
-            /*  Ö»Ö§³ÖÅäÖÃ¾«È·µ½ KB */
+            /*  åªæ”¯æŒé…ç½®ç²¾ç¡®åˆ° KB */
 #ifdef CONFIG_SUPPORT_ATP
         xp->lft.hard_byte_limit 
             == XFRM_INF? XFRM_INF : (lifetime->sadb_lifetime_bytes) * 1024;
@@ -2319,7 +2319,7 @@ static int pfkey_spdadd(struct sock *sk, struct sk_buff *skb, const struct sadb_
 	if ((lifetime = ext_hdrs[SADB_EXT_LIFETIME_SOFT-1]) != NULL) {
 		xp->lft.soft_packet_limit = _KEY2X(lifetime->sadb_lifetime_allocations);
 		xp->lft.soft_byte_limit = _KEY2X(lifetime->sadb_lifetime_bytes);
-    /*  Ö»Ö§³ÖÅäÖÃ¾«È·µ½ KB */
+    /*  åªæ”¯æŒé…ç½®ç²¾ç¡®åˆ° KB */
 #ifdef CONFIG_SUPPORT_ATP
         xp->lft.soft_byte_limit 
             == XFRM_INF? XFRM_INF : (lifetime->sadb_lifetime_bytes) * 1024;

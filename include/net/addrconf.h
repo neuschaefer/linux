@@ -270,7 +270,7 @@ static inline void addrconf_addr_solict_mult(const struct in6_addr *addr,
 
 static inline int ipv6_addr_is_multicast(const struct in6_addr *addr)
 {
-    /*START ADD:  FOR ´¦ÀíIPV6 ·Ç¶ÔÆë·ÃÎÊ 2014-01-24*/
+    /*START ADD:  FOR å¤„ç†IPV6 éå¯¹é½è®¿é—® 2014-01-24*/
 #ifdef CONFIG_ATP_BRCM
     struct in6_addr ip6addr;
     
@@ -281,7 +281,7 @@ static inline int ipv6_addr_is_multicast(const struct in6_addr *addr)
 #else
     return (addr->s6_addr32[0] & htonl(0xFF000000)) == htonl(0xFF000000);
 #endif
-    /*END ADD:  FOR ´¦ÀíIPV6 ·Ç¶ÔÆë·ÃÎÊ 2014-01-24*/
+    /*END ADD:  FOR å¤„ç†IPV6 éå¯¹é½è®¿é—® 2014-01-24*/
 }
 
 static inline int ipv6_addr_is_ll_all_nodes(const struct in6_addr *addr)

@@ -43,7 +43,7 @@ static bool match (const struct sk_buff *skb, const struct xt_action_param *par)
     unsigned int ulBuffLen = 0;
     unsigned char acBuff[URL_STRING_LEN] = {0};
 
-/*ע����ʹ֮Ҳ��ƥ��ipv6��dns��ѯ��,cms�ӹ���ʱ��ȷ����dns�����ߵ�����*/
+/*注掉，使之也能匹配ipv6的dns查询包,cms加规则时已确保是dns包才走到这里*/
 #if 0
     if ((NULL == iph) || (iph->protocol != IPPROTO_UDP))
     {
@@ -66,7 +66,7 @@ static bool match (const struct sk_buff *skb, const struct xt_action_param *par)
     ptr = (unsigned char *)(pstUdpHdr + 1);
     pstDnsHdr = (struct stDnsMsgHdr *)ptr;
     ptr += sizeof(struct stDnsMsgHdr);
-    /* ֻ������ѯ���� */
+    /* 只处理查询报文 */
     if ((ntohs(pstDnsHdr->u16Coms) >> 15) != URL_FLT_DNS_QUERY_CODE)
     {
         DEBUGPC("no query packet......");
@@ -81,8 +81,8 @@ static bool match (const struct sk_buff *skb, const struct xt_action_param *par)
         memset(acBuff, 0, URL_STRING_LEN);
         do
         {
-            ucStrLen = *ptr;        /* ָ�򳤶� */
-            ptr++;                  /* ָ������ */
+            ucStrLen = *ptr;        /* 指向长度 */
+            ptr++;                  /* 指向域名 */
             
             if (0 == ucStrLen)
             {
@@ -97,7 +97,7 @@ static bool match (const struct sk_buff *skb, const struct xt_action_param *par)
                     DEBUGPC("found the url: %s\r\n\r\n", pstinfo->acURL);
                     return (1 ^ pstinfo->u16Inv);
                 }
-                ptr += (2 * sizeof(uint16_t));    /* ָ����һ����¼ */
+                ptr += (2 * sizeof(uint16_t));    /* 指向下一个记录 */
                 break;
             }
             
@@ -111,7 +111,7 @@ static bool match (const struct sk_buff *skb, const struct xt_action_param *par)
                 return (0 | pstinfo->u16Inv);
             }
 
-            /* ��ֹ��Ϊ���⹹��DNS��ѯ�����ܳ��ȳ����˻��������ܵ������� */
+            /* 防止认为恶意构造DNS查询名字总长度超过了缓冲区可能导致问题 */
             if ((URL_STRING_LEN - 1) < (strlen(acBuff) + ucStrLen))
             {
                 DEBUGPC("Get dns name: %s, begin to fund: %s", acBuff, pstinfo->acURL);

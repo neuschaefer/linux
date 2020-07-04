@@ -3,14 +3,14 @@
 * (C) Huawei Technologies Co., Ltd. < >
 */
 /******************************************************************************
-  ÎÄ¼şÃû³Æ: hi_nand_drv.c
-  ¹¦ÄÜÃèÊö: nandºËĞÄÇı¶¯-- ¿ØÖÆÆ÷(nandc)Çı¶¯
-  °æ±¾ÃèÊö: V1.0
+  æ–‡ä»¶åç§°: hi_nand_drv.c
+  åŠŸèƒ½æè¿°: nandæ ¸å¿ƒé©±åŠ¨-- æ§åˆ¶å™¨(nandc)é©±åŠ¨
+  ç‰ˆæœ¬æè¿°: V1.0
 
-  ´´½¨ÈÕÆÚ: D2013_04_20
+  åˆ›å»ºæ—¥æœŸ: D2013_04_20
 
-  ĞŞ¸Ä¼ÇÂ¼: 
-            Éú³É³õ¸å.
+  ä¿®æ”¹è®°å½•: 
+            ç”Ÿæˆåˆç¨¿.
 ******************************************************************************/
 #include <linux/delay.h>
 #include <linux/sched.h>
@@ -72,12 +72,12 @@ static struct hi_nand_oob_size g_ast_nand_oob_size[] =
 };
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  get oob page size
-  ÊäÈë²ÎÊı:  
+  å‡½æ•°åŠŸèƒ½:  get oob page size
+  è¾“å…¥å‚æ•°:  
                               pst_host : nand driver host structure
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:  ³É¹¦:oobsize      Ê§°Ü:0   
-  º¯Êı±¸×¢:  
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:  æˆåŠŸ:oobsize      å¤±è´¥:0   
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 hi_uint32 hi_nand_drv_get_oob_size(struct hi_nand_host *pst_host)
 {
@@ -115,12 +115,12 @@ static struct hi_nand_oob_offset g_ast_nand_oob_offset[] =
 };
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  get oob page inner offset for bus read oob only mode
-  ÊäÈë²ÎÊı:  
+  å‡½æ•°åŠŸèƒ½:  get oob page inner offset for bus read oob only mode
+  è¾“å…¥å‚æ•°:  
                               pst_host : nand driver host structure
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:  offset       
-  º¯Êı±¸×¢:  
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:  offset       
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 static hi_uint32 hi_nand_drv_get_oob_offset(struct hi_nand_host *pst_host)
 {
@@ -151,11 +151,11 @@ static hi_uint32 hi_nand_drv_get_oob_offset(struct hi_nand_host *pst_host)
 #endif
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  wait for nand status ready or time out
-  ÊäÈë²ÎÊı:  ÎŞ
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:  ui_nf_status       
-  º¯Êı±¸×¢:  
+  å‡½æ•°åŠŸèƒ½:  wait for nand status ready or time out
+  è¾“å…¥å‚æ•°:  æ— 
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:  ui_nf_status       
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 static inline hi_int32 hi_nand_drv_wait_ready(hi_void)
 {
@@ -173,14 +173,14 @@ static inline hi_int32 hi_nand_drv_wait_ready(hi_void)
 }
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  nand controller set nfc_cmd register
-  ÊäÈë²ÎÊı:  
+  å‡½æ•°åŠŸèƒ½:  nand controller set nfc_cmd register
+  è¾“å…¥å‚æ•°:  
                              ui_cmd1 : cmd1
                              ui_cmd2 : cmd2
                              ui_cmd_status : cmd status
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:  ÎŞ       
-  º¯Êı±¸×¢:  
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:  æ—        
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 static hi_void hi_nand_drv_reg_set_cmd(hi_uint32 ui_cmd1, hi_uint32 ui_cmd2, hi_uint32 ui_cmd_status)
 {
@@ -198,13 +198,13 @@ static hi_void hi_nand_drv_reg_set_cmd(hi_uint32 ui_cmd1, hi_uint32 ui_cmd2, hi_
 }
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  nand controller dma read/write
-  ÊäÈë²ÎÊı:  
+  å‡½æ•°åŠŸèƒ½:  nand controller dma read/write
+  è¾“å…¥å‚æ•°:  
                              ui_dst_addr : read/write address
                              en_op_type : operation type read/write/read oob
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:  0:OK;  -1:NOK,ecc err invalid     
-  º¯Êı±¸×¢:  
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:  0:OK;  -1:NOK,ecc err invalid     
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 static hi_int32 hi_nand_drv_dma_transfer(struct hi_nand_host *pst_host, hi_uint32 ui_addr, HI_NAND_OP_E en_op_type)
 {
@@ -257,12 +257,12 @@ static hi_int32 hi_nand_drv_dma_transfer(struct hi_nand_host *pst_host, hi_uint3
 #endif
 
 #if 0    //nfc v300
-    /* 5115µÄDMA´«ÊäÖ§³ÖËæ»ú¶Áµ¼ÖÂDMA»ùµØÖ·¼Ä´æÆ÷Ò×±ä£¬ĞèÒªÃ¿´Î¶ÁĞ´Ç°ÖØĞÂÅäÖÃÒ»ÏÂ*/
+    /* 5115çš„DMAä¼ è¾“æ”¯æŒéšæœºè¯»å¯¼è‡´DMAåŸºåœ°å€å¯„å­˜å™¨æ˜“å˜ï¼Œéœ€è¦æ¯æ¬¡è¯»å†™å‰é‡æ–°é…ç½®ä¸€ä¸‹*/
     HI_REG_WRITE(&g_pst_nfc_reg->ui_nfc_baddr_d,  (hi_uint32)pst_host->ui_dma       );
     HI_REG_WRITE(&g_pst_nfc_reg->ui_nfc_baddr_d1, (hi_uint32)pst_host->ui_dma_extern);
     HI_REG_WRITE(&g_pst_nfc_reg->ui_nfc_baddr_oob,(hi_uint32)pst_host->ui_dma_oob   );
 
-    /* set nfc_rd_logic_addr & nfc_rd_logoc_len regÕâÁ½¸ö¼Ä´æÆ÷Ò²ÊÇÒ×±äµÄ */
+    /* set nfc_rd_logic_addr & nfc_rd_logoc_len regè¿™ä¸¤ä¸ªå¯„å­˜å™¨ä¹Ÿæ˜¯æ˜“å˜çš„ */
     if(HI_NAND_READ_OOB_E == en_op_type)
     {
         HI_REG_WRITE(&g_pst_nfc_reg->ui_nfc_rd_logic_addr, pst_chip->st_spec.ui_page_size);
@@ -291,7 +291,7 @@ static hi_int32 hi_nand_drv_dma_transfer(struct hi_nand_host *pst_host, hi_uint3
     while(HI_TRUE == un_reg_nfc_dma_ctrl.st_bits.ui_dma_start)
     {
         HI_REG_READ(&g_pst_nfc_reg->ui_nfc_dma_ctrl, un_reg_nfc_dma_ctrl.ui_value);
-        _cond_resched();    /* ½ûÖ¹½ø³ÌÇÀ¶Ï */
+        _cond_resched();    /* ç¦æ­¢è¿›ç¨‹æŠ¢æ–­ */
     }
 
     /* read ints status to check dma result */
@@ -326,14 +326,14 @@ static hi_int32 hi_nand_drv_dma_transfer(struct hi_nand_host *pst_host, hi_uint3
 
 #if 1    //nfc v500
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  nand bus read/write/read oob only
-  ÊäÈë²ÎÊı:  
+  å‡½æ•°åŠŸèƒ½:  nand bus read/write/read oob only
+  è¾“å…¥å‚æ•°:  
                              pst_host : nand driver host structure
                              ui_dst_addr : read/write address
                              en_op_type : operation type read/write/read oob
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:  0:OK;  -1:NOK,ecc err invalid
-  º¯Êı±¸×¢:  
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:  0:OK;  -1:NOK,ecc err invalid
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 static hi_int32 hi_nand_drv_bus_rw(struct hi_nand_host *pst_host, hi_uint32 ui_addr, HI_NAND_OP_E en_op_type)
 {
@@ -348,7 +348,7 @@ static hi_int32 hi_nand_drv_bus_rw(struct hi_nand_host *pst_host, hi_uint32 ui_a
     
     struct hi_nand_chip *pst_chip = pst_host->pst_chip;
 
-    /* bus·½Ê½Ö»¶Áoob²»ÎÈ¶¨£¬Ö»Ó°Ïìpage0Ö»¶Áoob, È¡Ïû¸Ã¹¦ÄÜ£¬±ÜÃâÒì³£´òÓ¡ */
+    /* busæ–¹å¼åªè¯»oobä¸ç¨³å®šï¼Œåªå½±å“page0åªè¯»oob, å–æ¶ˆè¯¥åŠŸèƒ½ï¼Œé¿å…å¼‚å¸¸æ‰“å° */
     if(HI_NAND_READ_OOB_E == en_op_type)
     {
         return 0;
@@ -387,7 +387,7 @@ static hi_int32 hi_nand_drv_bus_rw(struct hi_nand_host *pst_host, hi_uint32 ui_a
     /* set read/write addr */
     if(HI_NAND_READ_OOB_E == en_op_type)
     {
-        if(0 == ui_addr)    /* ÅäÖÃÒ³¹Ì¶¨Îª1082 */
+        if(0 == ui_addr)    /* é…ç½®é¡µå›ºå®šä¸º1082 */
         {
             un_reg_nfc_addrl.st_rw_bits.ui_page_inner_addr = 1082;
         }
@@ -484,14 +484,14 @@ static hi_int32 hi_nand_drv_bus_rw(struct hi_nand_host *pst_host, hi_uint32 ui_a
 #endif
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  nand read/write entry(page 0 use bus rw mode, others use dma rw mode)
-  ÊäÈë²ÎÊı:  
+  å‡½æ•°åŠŸèƒ½:  nand read/write entry(page 0 use bus rw mode, others use dma rw mode)
+  è¾“å…¥å‚æ•°:  
                              pst_host : nand driver host structure
                              ui_addr : read/write address
                              en_op_type : operation type read/write/read oob
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:  hi_int32       
-  º¯Êı±¸×¢:  
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:  hi_int32       
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 static hi_int32 hi_nand_drv_rw(struct hi_nand_host *pst_host, hi_uint32 ui_addr, HI_NAND_OP_E en_op_type)
 {
@@ -503,7 +503,7 @@ static hi_int32 hi_nand_drv_rw(struct hi_nand_host *pst_host, hi_uint32 ui_addr,
 
         if(HI_NAND_WRITE_E == en_op_type)
         {
-            /* Ö§³Ö×î´óÓĞĞ§Êı¾İ³¤¶È£¬È·±£´óÓÚÓĞĞ§Êı¾İµÄÒ³ÄÚµØÖ·Ìî³ä0xff£¬·ñÔò»áECC³ö´í */
+            /* æ”¯æŒæœ€å¤§æœ‰æ•ˆæ•°æ®é•¿åº¦ï¼Œç¡®ä¿å¤§äºæœ‰æ•ˆæ•°æ®çš„é¡µå†…åœ°å€å¡«å……0xffï¼Œå¦åˆ™ä¼šECCå‡ºé”™ */
             hi_memset(pst_host->puc_buffer + HI_NFC_MAX_PAGE0_LEN, 0xFF, pst_chip->st_spec.ui_page_size-HI_NFC_MAX_PAGE0_LEN);
         }
         return hi_nand_drv_bus_rw(pst_host, ui_addr, en_op_type);
@@ -516,14 +516,14 @@ static hi_int32 hi_nand_drv_rw(struct hi_nand_host *pst_host, hi_uint32 ui_addr,
 }
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  nand controller read page
-  ÊäÈë²ÎÊı:  
+  å‡½æ•°åŠŸèƒ½:  nand controller read page
+  è¾“å…¥å‚æ•°:  
                              pst_host : nand driver host structure
                              puc_buf : read buffer
                              ui_dst_addr : page addr
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:  0:OK;  -1:NOK            
-  º¯Êı±¸×¢:  
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:  0:OK;  -1:NOK            
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 hi_int32 hi_nand_drv_read(struct hi_nand_host *pst_host, hi_uchar8 *puc_buf, hi_uint32 ui_src_addr)
 {
@@ -545,14 +545,14 @@ hi_int32 hi_nand_drv_read(struct hi_nand_host *pst_host, hi_uchar8 *puc_buf, hi_
 }
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  nand controller read oob only
-  ÊäÈë²ÎÊı:  
+  å‡½æ•°åŠŸèƒ½:  nand controller read oob only
+  è¾“å…¥å‚æ•°:  
                              pst_host : nand driver host structure
                              puc_buf : oob buffer
                              ui_src_addr : page addr
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:  0:OK;  -1:NOK       
-  º¯Êı±¸×¢:  
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:  0:OK;  -1:NOK       
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 hi_int32 hi_nand_drv_read_oob(struct hi_nand_host *pst_host, hi_uchar8 *puc_buf, hi_uint32 ui_src_addr)
 {
@@ -573,14 +573,14 @@ hi_int32 hi_nand_drv_read_oob(struct hi_nand_host *pst_host, hi_uchar8 *puc_buf,
 }
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  nand controller write page
-  ÊäÈë²ÎÊı:  
+  å‡½æ•°åŠŸèƒ½:  nand controller write page
+  è¾“å…¥å‚æ•°:  
                              pst_host : nand driver host structure
                              puc_buf : oob buffer
                              ui_dst_addr : page addr
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:  hi_int32       
-  º¯Êı±¸×¢:  
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:  hi_int32       
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 hi_int32 hi_nand_drv_write(struct hi_nand_host *pst_host, hi_uchar8 *puc_buf, hi_uint32 ui_dst_addr)
 {
@@ -611,14 +611,14 @@ hi_int32 hi_nand_drv_write(struct hi_nand_host *pst_host, hi_uchar8 *puc_buf, hi
 }
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  nand controller write oob
-  ÊäÈë²ÎÊı:  
+  å‡½æ•°åŠŸèƒ½:  nand controller write oob
+  è¾“å…¥å‚æ•°:  
                              pst_host : nand driver host structure
                              puc_buf : oob buffer
                              ui_dst_addr : page addr
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:  hi_nand_drv_rw
-  º¯Êı±¸×¢:  
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:  hi_nand_drv_rw
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 hi_int32 hi_nand_drv_write_oob(struct hi_nand_host *pst_host, hi_uchar8 *puc_buf, hi_uint32 ui_dst_addr)
 {
@@ -638,12 +638,12 @@ hi_int32 hi_nand_drv_write_oob(struct hi_nand_host *pst_host, hi_uchar8 *puc_buf
 }
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  nand controller erase one block
-  ÊäÈë²ÎÊı:  
+  å‡½æ•°åŠŸèƒ½:  nand controller erase one block
+  è¾“å…¥å‚æ•°:  
                              ui_dst_addr : block addr
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:  i_status       
-  º¯Êı±¸×¢:  
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:  i_status       
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 hi_int32 hi_nand_drv_erase(hi_uint32 ui_dst_addr)
 {
@@ -692,14 +692,14 @@ hi_int32 hi_nand_drv_erase(hi_uint32 ui_dst_addr)
 }
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  to read nandflash id 
-  ÊäÈë²ÎÊı:  
+  å‡½æ•°åŠŸèƒ½:  to read nandflash id 
+  è¾“å…¥å‚æ•°:  
                              host : nand driver host structure
                              puc_buf : output id buffer
                              uc_id_len : read id len
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:  ÎŞ       
-  º¯Êı±¸×¢:  
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:  æ—        
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 hi_void hi_nand_drv_read_id(struct hi_nand_host *pst_host, hi_uchar8 *puc_buf, hi_uchar8 uc_id_len)
 {
@@ -756,11 +756,11 @@ hi_void hi_nand_drv_read_id(struct hi_nand_host *pst_host, hi_uchar8 *puc_buf, h
 }
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  nand chip reset 
-  ÊäÈë²ÎÊı:  ÎŞ
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:  ÎŞ       
-  º¯Êı±¸×¢:  
+  å‡½æ•°åŠŸèƒ½:  nand chip reset 
+  è¾“å…¥å‚æ•°:  æ— 
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:  æ—        
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 hi_void hi_nand_drv_reset(hi_void)
 {
@@ -783,11 +783,11 @@ hi_void hi_nand_drv_reset(hi_void)
 }
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  nand chip reset test, only return ok when do reset and read nand status is 'ready'
-  ÊäÈë²ÎÊı:  ÎŞ
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:  0:OK   -1:NOK       
-  º¯Êı±¸×¢:  
+  å‡½æ•°åŠŸèƒ½:  nand chip reset test, only return ok when do reset and read nand status is 'ready'
+  è¾“å…¥å‚æ•°:  æ— 
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:  0:OK   -1:NOK       
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 static hi_int32 hi_nand_drv_reset_test(hi_void)
 {
@@ -824,11 +824,11 @@ static hi_int32 hi_nand_drv_reset_test(hi_void)
 }
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  check if the chip is write protected
-  ÊäÈë²ÎÊı:  ÎŞ
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:  0:not write protected;     1:write protected
-  º¯Êı±¸×¢:  
+  å‡½æ•°åŠŸèƒ½:  check if the chip is write protected
+  è¾“å…¥å‚æ•°:  æ— 
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:  0:not write protected;     1:write protected
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 hi_int32 hi_nand_drv_wp_check(hi_void)
 {
@@ -859,12 +859,12 @@ hi_int32 hi_nand_drv_wp_check(hi_void)
 }
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  malloc dma buffer & set nfc_baddr/nfc_baddr1 & nfc_oob reg
-  ÊäÈë²ÎÊı:  
+  å‡½æ•°åŠŸèƒ½:  malloc dma buffer & set nfc_baddr/nfc_baddr1 & nfc_oob reg
+  è¾“å…¥å‚æ•°:  
                              host : nand driver host structure
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:  0:OK;  -1:malloc dma buffer error       
-  º¯Êı±¸×¢:  
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:  0:OK;  -1:malloc dma buffer error       
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 hi_int32 hi_nand_drv_dma_init(struct hi_nand_host *pst_host)
 {  
@@ -894,12 +894,12 @@ hi_int32 hi_nand_drv_dma_init(struct hi_nand_host *pst_host)
 }
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  nand drv first init(to init nandc buffer & reg ioremap for nand reset & read id)
-  ÊäÈë²ÎÊı:  
+  å‡½æ•°åŠŸèƒ½:  nand drv first init(to init nandc buffer & reg ioremap for nand reset & read id)
+  è¾“å…¥å‚æ•°:  
                              host : nand driver host structure
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:  0:OK;  -1:ioremap error(kernel only)       
-  º¯Êı±¸×¢:  
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:  0:OK;  -1:ioremap error(kernel only)       
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 hi_int32 hi_nand_drv_pre_init(struct hi_nand_host *pst_host)
 {    
@@ -925,12 +925,12 @@ hi_int32 hi_nand_drv_pre_init(struct hi_nand_host *pst_host)
 }
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  nand drv init
-  ÊäÈë²ÎÊı:  
+  å‡½æ•°åŠŸèƒ½:  nand drv init
+  è¾“å…¥å‚æ•°:  
                              host : nand driver host structure
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:  hi_nand_drv_reset_test();  -1:malloc dma buffer error       
-  º¯Êı±¸×¢:  
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:  hi_nand_drv_reset_test();  -1:malloc dma buffer error       
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 hi_int32 hi_nand_drv_init(struct hi_nand_host *pst_host)
 {
@@ -973,12 +973,12 @@ hi_int32 hi_nand_drv_init(struct hi_nand_host *pst_host)
 }
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  nand drv exit
-  ÊäÈë²ÎÊı:  
+  å‡½æ•°åŠŸèƒ½:  nand drv exit
+  è¾“å…¥å‚æ•°:  
                              host : nand driver host structure
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:  0³É¹¦    
-  º¯Êı±¸×¢:  
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:  0æˆåŠŸ    
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 hi_int32 hi_nand_drv_exit(struct hi_nand_host *pst_host)
 {

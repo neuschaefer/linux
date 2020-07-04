@@ -173,7 +173,7 @@ nf_ct_find_expectation(struct net *net, u16 zone,
 
 
 #ifdef CONFIG_NF_CONNTRACK_PRI
-/*ÎªÈ·±£ALGÀàÐÍÁ¬½Ó¸ú×ÙÄÜ½¨Á¢£¬ÐèÐÂÔöÒ»¸ö²»Ó°ÏìÔ­ÓÐÔ¤ÆÚÁ¬½Ó×´Ì¬µÄ²éÕÒº¯Êý*/
+/*ä¸ºç¡®ä¿ALGç±»åž‹è¿žæŽ¥è·Ÿè¸ªèƒ½å»ºç«‹ï¼Œéœ€æ–°å¢žä¸€ä¸ªä¸å½±å“åŽŸæœ‰é¢„æœŸè¿žæŽ¥çŠ¶æ€çš„æŸ¥æ‰¾å‡½æ•°*/
 struct nf_conntrack_expect *
 nf_ct_find_expectation_safe(struct net *net, const struct nf_conntrack_tuple *tuple)
 {
@@ -657,8 +657,8 @@ int nf_conntrack_expect_init(struct net *net)
 	}
 
 #ifdef CONFIG_SUPPORT_ATP
-	//Ê¹ÓÃFULL CONEÊ±»á½¨Á¬½ÓÔ¤ÆÚ£¬ÉèÖÃºÍnf_conntrack_maxÒ»Ñù´ó
-	/*Fix me :ÈçÐè¸ù¾ÝÊÇ·ñÆôÓÃConeNat¾ö¶¨Ô¤ÆÚÁ¬½Ó¸öÊý£¬½¨ÒéÔÚÓÃ»§¿Õ¼äÉèÖÃ*/
+	//ä½¿ç”¨FULL CONEæ—¶ä¼šå»ºè¿žæŽ¥é¢„æœŸï¼Œè®¾ç½®å’Œnf_conntrack_maxä¸€æ ·å¤§
+	/*Fix me :å¦‚éœ€æ ¹æ®æ˜¯å¦å¯ç”¨ConeNatå†³å®šé¢„æœŸè¿žæŽ¥ä¸ªæ•°ï¼Œå»ºè®®åœ¨ç”¨æˆ·ç©ºé—´è®¾ç½®*/
 	nf_ct_expect_max = nf_conntrack_max;
 #endif
 

@@ -107,10 +107,10 @@ typedef char	ppp_name[IFNAMSIZ];
 #define PPPIOCSNPSTATE	_IOW('t', 94, struct npstateioctl)  /* set NP state */
 #endif
 
-/*°´Ğè²¦ºÅÔÚÆôÓÃÎ±Â·ÓÉÇ°Ğè¹ØÕ¢£¬ÔÚ²¦ºÅ³É¹¦ºónatÉèÖÃÍê³ÉºóÔÚ¿ªÕ¢ close gate  start*/ 
+/*æŒ‰éœ€æ‹¨å·åœ¨å¯ç”¨ä¼ªè·¯ç”±å‰éœ€å…³é—¸ï¼Œåœ¨æ‹¨å·æˆåŠŸånatè®¾ç½®å®Œæˆååœ¨å¼€é—¸ close gate  start*/ 
 #define PPPIOCSCLOSE	_IOW('t', 93, int)	/* drop all packet from lan */
 #define PPPIOCSOPEN	_IOW('t', 92, int)	/* no close gate */
-/*°´Ğè²¦ºÅÔÚÆôÓÃÎ±Â·ÓÉÇ°Ğè¹ØÕ¢£¬ÔÚ²¦ºÅ³É¹¦ºónatÉèÖÃÍê³ÉºóÔÚ¿ªÕ¢ close gate  end*/
+/*æŒ‰éœ€æ‹¨å·åœ¨å¯ç”¨ä¼ªè·¯ç”±å‰éœ€å…³é—¸ï¼Œåœ¨æ‹¨å·æˆåŠŸånatè®¾ç½®å®Œæˆååœ¨å¼€é—¸ close gate  end*/
  
 #define	PPPIOCGFLAGS	_IOR('t', 90, int)	/* get configuration flags */
 #define	PPPIOCSFLAGS	_IOW('t', 89, int)	/* set configuration flags */

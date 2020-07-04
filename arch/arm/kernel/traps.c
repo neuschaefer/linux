@@ -457,7 +457,7 @@ void die(const char *str, struct pt_regs *regs, int err)
 	add_taint(TAINT_DIE);
 	raw_spin_unlock_irq(&die_lock);
  #ifdef CONFIG_SUPPORT_PANIC
-       /*记录register信息，以备Panic写到内存*/
+       /*璁板綍register淇℃伅锛屼互澶嘝anic鍐欏埌鍐呭瓨*/
        set_panic_regs(regs);
  #endif
 	oops_exit();

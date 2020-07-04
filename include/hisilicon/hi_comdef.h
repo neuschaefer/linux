@@ -4,13 +4,13 @@
 */
 /******************************************************************************
 
-                  °æÈ¨ËùÓĞ (C), 2009-2019, º£Ë¼°ëµ¼ÌåÓĞÏŞ¹«Ë¾
+                  ç‰ˆæƒæ‰€æœ‰ (C), 2009-2019, æµ·æ€åŠå¯¼ä½“æœ‰é™å…¬å¸
 
  ******************************************************************************
-  ÎÄ ¼ş Ãû   : hi_comdef.h
-  °æ ±¾ ºÅ   : ³õ¸å
-  Éú³ÉÈÕÆÚ   : D2011_07_29
-  ×î½üĞŞ¸Ä   :
+  æ–‡ ä»¶ å   : hi_comdef.h
+  ç‰ˆ æœ¬ å·   : åˆç¨¿
+  ç”Ÿæˆæ—¥æœŸ   : D2011_07_29
+  æœ€è¿‘ä¿®æ”¹   :
 
 ******************************************************************************/
 #ifndef __HI_COMDEF_H__
@@ -47,21 +47,21 @@ typedef enum
     HI_TRUE_E     
 }hi_bool_e;
 
-/* ÓÃÓÚÄ³Ğ©Ó²¼şÌØĞÔµÄµçÆ½ÅäÖÃ */
+/* ç”¨äºæŸäº›ç¡¬ä»¶ç‰¹æ€§çš„ç”µå¹³é…ç½® */
 typedef enum
 {
     HI_LOW_LEVEL_E = 0 , 
     HI_HIGH_LEVEL_E       
 }hi_level_e;
 
-/* ÓÃÓÚÄ³Ğ©Ó²¼şÌØĞÔµÄĞÅºÅ´¥·¢ÑØÅäÖÃ */
+/* ç”¨äºæŸäº›ç¡¬ä»¶ç‰¹æ€§çš„ä¿¡å·è§¦å‘æ²¿é…ç½® */
 typedef enum
 {
-    HI_UP_EDGE_E = 0,       /* ÉÏÉıÑØ */
-    HI_DOWN_EDGE_E,         /* ÏÂ½µÑØ */        
+    HI_UP_EDGE_E = 0,       /* ä¸Šå‡æ²¿ */
+    HI_DOWN_EDGE_E,         /* ä¸‹é™æ²¿ */        
 } hi_edge_e;
 
-/*¶¨ÒåµÄ±äÁ¿£¬ÓÃÓÚÉèÖÃÒ»¸öbitÎª1»ò0*/
+/*å®šä¹‰çš„å˜é‡ï¼Œç”¨äºè®¾ç½®ä¸€ä¸ªbitä¸º1æˆ–0*/
 #define HI_BIT31_1 (0x00000001 << 31)
 #define HI_BIT30_1 (0x00000001 << 30)
 #define HI_BIT29_1 (0x00000001 << 29)
@@ -128,7 +128,7 @@ typedef enum
 #define HI_BIT01_0 (~HI_BIT01_1)
 #define HI_BIT00_0 (~HI_BIT00_1)
 
-/*¶¨ÒåµÄ±äÁ¿£¬ÓÃÓÚÉèÖÃbitÑÚÂë*/
+/*å®šä¹‰çš„å˜é‡ï¼Œç”¨äºè®¾ç½®bitæ©ç */
 #define HI_BITMASK_LOW01 0x00000001
 #define HI_BITMASK_LOW02 0x00000003
 #define HI_BITMASK_LOW03 0x00000007
@@ -150,7 +150,7 @@ typedef enum
 #define HI_BITMASK_LOW30 0x3fffffff
 #define HI_BITMASK_LOW32 0xffffffff
 
-/* Êı×Öºê¶¨Òå */
+/* æ•°å­—å®å®šä¹‰ */
 #define HI_NUM_0                0
 #define HI_NUM_1                1
 #define HI_NUM_2                2
@@ -184,21 +184,21 @@ typedef enum
 #define HI_BIT(ui_bit) (1 << ( ui_bit ))
 #define HI_GET_BIT(ui_data,ui_bit) ( ( (ui_data) >>(ui_bit) ) & 1 )
 
-/* »ñÈ¡³ÉÔ±ÔÚ½á¹¹ÌåÖĞµÄÆ«ÒÆ */
+/* è·å–æˆå‘˜åœ¨ç»“æ„ä½“ä¸­çš„åç§» */
 #define HI_MEMBER_OFFSET(type, mem) ((hi_uint32)&((type *)0)->mem)
 
-/* 4×Ö½Ú¶ÔÆë·µ»ØĞèÒª²¹ÆëµÄÓàÁ¿*/
+/* 4å­—èŠ‚å¯¹é½è¿”å›éœ€è¦è¡¥é½çš„ä½™é‡*/
 #define HI_BYTE_ALIGN_VALUE(value)  ((value&HI_NUM_3) ? (HI_NUM_4 - (value&HI_NUM_3) ) : (0) )
 #define HI_BYTE_ALIGN_OFFSET(ptr)   ((hi_uint32)(ptr) & 0x3)
 #define HI_BYTE_ALIGN(ptr)          ((hi_uint32)(ptr) & (~0x3))
 
-/*¼ì²éÈë¿ÚÖ¸Õë*/
+/*æ£€æŸ¥å…¥å£æŒ‡é’ˆ*/
 #define HI_INVALID_PTR(ptr)         if( HI_NULL == ptr ) return HI_RET_NULLPTR;
 
 #define HI_ARRAY_SIZE(a)            (sizeof(a)/sizeof(a[0]))
 
 #define HI_INVALID_VLAN_ID          0xFFF
-/* ¼ì²éº¯Êı·µ»ØÖµ */
+/* æ£€æŸ¥å‡½æ•°è¿”å›å€¼ */
 #define HI_CHECK_RET(ret)\
     do\
     {\
@@ -209,11 +209,11 @@ typedef enum
     }while(0)
 
 
-/* ×¢²áµÄº¯ÊıÖ¸ÕëÀàĞÍ¶¨Òå */
+/* æ³¨å†Œçš„å‡½æ•°æŒ‡é’ˆç±»å‹å®šä¹‰ */
 typedef hi_int32 (* HI_FUNCCALLBACK_EXT)( hi_void *pv_data,hi_uint32 ui_inlen,hi_uint32 *pui_outlen);
 typedef hi_int32 (* HI_FUNCCALLBACK)( hi_void *pv_data, hi_uint32 ui_inlen );
 
-// Ä§Êõ×Ö
+// é­”æœ¯å­—
 #define HI_MAGICAL                      0x68776877
 
 #ifdef __cplusplus

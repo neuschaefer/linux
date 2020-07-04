@@ -28,7 +28,7 @@ MODULE_LICENSE("GPL");
 MODULE_ALIAS("ip_conntrack_tftp");
 MODULE_ALIAS_NFCT_HELPER("tftp");
 
-/* ╣╠г╟╤╗рЕtftp©ьжфа╛╫с╣да╛╫с╦Звый╠╪Дн╙12 Hour, ╠ёж╓©ирт╦Ы╬щ©ьжфа╛╫сур╣╫йЩ╬ща╛╫с╦Звы*/
+/* Е╫⌠Е┴█Е╝ Д╧┴tftpФ▌╖Е┬╤Х©·Ф▌╔Г └Х©·Ф▌╔Х╥÷Х╦╙Ф≈╤И≈╢Д╦╨12 Hour, Д©²Х╞│Е▐╞Д╩╔Ф═╧Ф█╝Ф▌╖Е┬╤Х©·Ф▌╔Ф┴╬Е┬╟Ф∙╟Ф█╝Х©·Ф▌╔Х╥÷Х╦╙*/
 #define TFTP_MAST_NF_TIMEOUT_SECONDS (43200)
 
 #define MAX_PORTS 8
@@ -59,8 +59,8 @@ static int tftp_help(struct sk_buff *skb,
 	if (tfh == NULL)
 		return NF_ACCEPT;
 
-    /* DMZ portmappingпч╦дй╠р╙гСр╣нЯ©ирта╒╪╢жп╤оBUILD_NAT_CT_CLEAN©ьжф
-    н╙╠ёж╓tftp©ирта╒╪╢жп╤оясЁ╓tftp©ьжфа╛╫с╣да╛╫с╦ЗвыЁ╛й╠й╠╪Д*/    
+    /* DMZ portmappingД©╝Ф■╧Ф≈╤Х╕│Ф╠┌Д╦ Е┼║Е▐╞Д╩╔Г╚▀Е█ЁД╦╜Ф√╜BUILD_NAT_CT_CLEANФ▌╖Е┬╤
+    Д╦╨Д©²Х╞│tftpЕ▐╞Д╩╔Г╚▀Е█ЁД╦╜Ф√╜Е╩╤И∙©tftpФ▌╖Е┬╤Х©·Ф▌╔Г └Х©·Ф▌╔Х╥÷Х╦╙Х╤┘Ф≈╤Ф≈╤И≈╢*/    
 #ifdef CONFIG_IP_NF_TFTP_INCREASE_MAST_CONTRACK_TIMEOUT
     nf_ct_refresh(ct, skb, TFTP_MAST_NF_TIMEOUT_SECONDS * HZ);
 #endif 

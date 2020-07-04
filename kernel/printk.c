@@ -48,14 +48,14 @@
 
 #include <asm/uaccess.h>
 
-/*Add by Huawei 2010-9-21 Ìí¼ÓÈ¥µôconsole´òÓ¡µÄÌØĞÔ*/
+/*Add by Huawei 2010-9-21 æ·»åŠ å»æ‰consoleæ‰“å°çš„ç‰¹æ€§*/
 #include "atpconfig.h"
 /*add by  2010-11-10 for on/off console*/
 #if defined(SUPPORT_ATP_SECURITY_REDLINE_CONSOLE)
 extern int g_TagConsole;
 #endif
 /*end add by  2010-11-10 for on/off console*/
-/*Add by Huawei 2010-9-21 Ìí¼ÓÈ¥µôconsole´òÓ¡µÄÌØĞÔ*/
+/*Add by Huawei 2010-9-21 æ·»åŠ å»æ‰consoleæ‰“å°çš„ç‰¹æ€§*/
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/printk.h>
@@ -531,7 +531,7 @@ static void __call_console_drivers(unsigned start, unsigned end)
 {
 	struct console *con;
 
-/*Add by Huawei 2010-9-21 Ìí¼ÓÈ¥µôconsole´òÓ¡µÄÌØĞÔ*/
+/*Add by Huawei 2010-9-21 æ·»åŠ å»æ‰consoleæ‰“å°çš„ç‰¹æ€§*/
 /*add by  2010-11-10*/
 #ifndef HISI_CHIP
 #if defined(SUPPORT_ATP_SECURITY_REDLINE_CONSOLE)
@@ -542,7 +542,7 @@ static void __call_console_drivers(unsigned start, unsigned end)
 #endif
 #endif
 /*end add by  2010-11-10*/
-/*Add by Huawei 2010-9-21 Ìí¼ÓÈ¥µôconsole´òÓ¡µÄÌØĞÔ*/
+/*Add by Huawei 2010-9-21 æ·»åŠ å»æ‰consoleæ‰“å°çš„ç‰¹æ€§*/
 
 	migrate_disable();
 	for_each_console(con) {

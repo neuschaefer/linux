@@ -4,14 +4,14 @@
 */
 /******************************************************************************
 
-          °æÈ¨ËùÓĞ (C), 2008-2018, º£Ë¼°ëµ¼ÌåÓĞÏŞ¹«Ë¾
+          ç‰ˆæƒæ‰€æœ‰ (C), 2008-2018, æµ·æ€åŠå¯¼ä½“æœ‰é™å…¬å¸
 
 ******************************************************************************
-  ÎÄ¼şÃû³Æ: hi_nand_check.c
-  ¹¦ÄÜÃèÊö: nand ²ÁºÍĞ´Ğ£Ñé
-  °æ±¾ÃèÊö: V1.0
+  æ–‡ä»¶åç§°: hi_nand_check.c
+  åŠŸèƒ½æè¿°: nand æ“¦å’Œå†™æ ¡éªŒ
+  ç‰ˆæœ¬æè¿°: V1.0
 
-  ´´½¨ÈÕÆÚ: D2014_02_29
+  åˆ›å»ºæ—¥æœŸ: D2014_02_29
 ******************************************************************************/
 #include <asm/setup.h>
 #include <linux/slab.h>
@@ -46,7 +46,7 @@ hi_int32 hi_nand_drv_check_erase(hi_uint32 ui_dst_addr)
     while(ui_block_size)
     {
         hi_memset( g_uc_page_buf, 0, ui_page_size );
-        // ¶ÁÒ»¸öpageÄÚÈİ,Ô¤ÆÚ½á¹ûÎªÈ«0xff
+        // è¯»ä¸€ä¸ªpageå†…å®¹,é¢„æœŸç»“æœä¸ºå…¨0xff
         i_ret = hi_nand_drv_read( pst_nand_host, g_uc_page_buf, ui_page_addr);
         if( HI_RET_SUCC != i_ret )
         {
@@ -63,7 +63,7 @@ hi_int32 hi_nand_drv_check_erase(hi_uint32 ui_dst_addr)
             }
         }
         
-        // ÏòÇ°Æ«ÒÆÒ»¸öpage
+        // å‘å‰åç§»ä¸€ä¸ªpage
         ui_block_size   -= ui_page_size;
         ui_page_addr ++;
     }
@@ -79,7 +79,7 @@ hi_int32 hi_nand_drv_check_write(hi_uchar8 *puc_buf,hi_uint32 ui_page_addr)
 
     hi_memset( g_uc_page_buf, 0x0, ui_page_size );
     
-    // ¶ÁÒ»¸öpageÄÚÈİ£¬Ô¤ÆÚ½á¹ûÎª
+    // è¯»ä¸€ä¸ªpageå†…å®¹ï¼Œé¢„æœŸç»“æœä¸º
     i_ret = hi_nand_drv_read( pst_nand_host, g_uc_page_buf, ui_page_addr);
     if( HI_RET_SUCC != i_ret )
     {

@@ -278,10 +278,10 @@ static void br_igmpv3_parse(struct net_bridge *br, struct sk_buff *skb,
     
    // pstRepV3 = (struct igmpv3_report *)(skb->data + (pip->ihl << 2));
     pstGrec = &pstRepV3->grec[0];
-    // ±éÀúËùÓĞµÄ×é¼ÇÂ¼
-    /*Start of Protocol :igmpÎŞ·¨²¥·ÅÎÊÌâ */
+    // éå†æ‰€æœ‰çš„ç»„è®°å½•
+    /*Start of Protocol :igmpæ— æ³•æ’­æ”¾é—®é¢˜ */
     for (k = 0; k < ntohs(pstRepV3->ngrec); k++)
-    /*End of Protocol :igmpÎŞ·¨²¥·ÅÎÊÌâ */
+    /*End of Protocol :igmpæ— æ³•æ’­æ”¾é—®é¢˜ */
     {
 #ifdef CONFIG_IGMP_SSM
 		if(br_igmpv3_ssm_validate_grec(pstGrec))
@@ -290,12 +290,12 @@ static void br_igmpv3_parse(struct net_bridge *br, struct sk_buff *skb,
             continue;
         }
 #endif
-        // IS_EXCLUDE/CHANGE_TO_EXCLUDEÄ£Ê½¶¼ÊÇ±íÊ¾ĞÂÔö×éµÄ
-        // Èç¹ûµ±Ç°ÎªIS_INCLUDE²¢ÇÒ¶ÔÓ¦µÄINCLUDE²»ÎªNULLÄÇÃ´±íÊ¾Ö»ÊÇĞèÒªĞÂÔö£¬Èç¹ûÎªNULLÄÇÃ´¿ÉÄÜ¾Í±íÊ¾LEAVEÏûÏ¢ÁË
-        // Èç¹ûÊÇCHANGE_TO_INCLUDEÄÇÃ´Èç¹ûÔ´²»ÎªNULLÒ²±íÊ¾ÊÇĞÂÔö
-        // ×ÜÖ®Õâ¼¸ÖÖÄ£Ê½¶¼±íÊ¾ÊÇĞèÒªĞÂÔö£¬Ö»ÓĞµ±INCLUDE²¢ÇÒÔ´ÎªNULLÄÇÃ´²ÅÊÇleaveÏûÏ¢
-        // ËùÒÔÊµ¼ÊÉÏ£¬ÎÒÃÇÕâÀï²¢Ã»ÓĞ×ö·Ç³£¾«È·µÄÅĞ¶Ï£¬±ÈÈçµ½µ×includeÄÄ¸öµØÖ·£¬EXCLUDEÄÄ¸öµØÖ·µÈ¶øÊÇÒ»¹ÉÄÔµÄÈ«²¿ÔÊĞí
-        // Êµ¼ÊÉÏ£¬Ä³¸öPC¿ÉÄÜÖ»ÊÇĞèÒªINCLUDEÄ³Ò»¸öÔ´µØÖ·µÄ£¬ÆäËüµÄ·Ç¸ÃÔ´µØÖ·µÄ¸ÃPCÒ²Ğí²»ĞèÒª´¦Àí
+        // IS_EXCLUDE/CHANGE_TO_EXCLUDEæ¨¡å¼éƒ½æ˜¯è¡¨ç¤ºæ–°å¢ç»„çš„
+        // å¦‚æœå½“å‰ä¸ºIS_INCLUDEå¹¶ä¸”å¯¹åº”çš„INCLUDEä¸ä¸ºNULLé‚£ä¹ˆè¡¨ç¤ºåªæ˜¯éœ€è¦æ–°å¢ï¼Œå¦‚æœä¸ºNULLé‚£ä¹ˆå¯èƒ½å°±è¡¨ç¤ºLEAVEæ¶ˆæ¯äº†
+        // å¦‚æœæ˜¯CHANGE_TO_INCLUDEé‚£ä¹ˆå¦‚æœæºä¸ä¸ºNULLä¹Ÿè¡¨ç¤ºæ˜¯æ–°å¢
+        // æ€»ä¹‹è¿™å‡ ç§æ¨¡å¼éƒ½è¡¨ç¤ºæ˜¯éœ€è¦æ–°å¢ï¼Œåªæœ‰å½“INCLUDEå¹¶ä¸”æºä¸ºNULLé‚£ä¹ˆæ‰æ˜¯leaveæ¶ˆæ¯
+        // æ‰€ä»¥å®é™…ä¸Šï¼Œæˆ‘ä»¬è¿™é‡Œå¹¶æ²¡æœ‰åšéå¸¸ç²¾ç¡®çš„åˆ¤æ–­ï¼Œæ¯”å¦‚åˆ°åº•includeå“ªä¸ªåœ°å€ï¼ŒEXCLUDEå“ªä¸ªåœ°å€ç­‰è€Œæ˜¯ä¸€è‚¡è„‘çš„å…¨éƒ¨å…è®¸
+        // å®é™…ä¸Šï¼ŒæŸä¸ªPCå¯èƒ½åªæ˜¯éœ€è¦INCLUDEæŸä¸€ä¸ªæºåœ°å€çš„ï¼Œå…¶å®ƒçš„éè¯¥æºåœ°å€çš„è¯¥PCä¹Ÿè®¸ä¸éœ€è¦å¤„ç†
         if ((IGMPV3_MODE_IS_EXCLUDE == pstGrec->grec_type) || 
             (IGMPV3_CHANGE_TO_EXCLUDE == pstGrec->grec_type) || 
             (pstGrec->grec_nsrcs != 0 && IGMPV3_MODE_IS_INCLUDE == pstGrec->grec_type) || 
@@ -307,15 +307,15 @@ static void br_igmpv3_parse(struct net_bridge *br, struct sk_buff *skb,
         }
         else if ((IGMPV3_CHANGE_TO_INCLUDE == pstGrec->grec_type && pstGrec->grec_nsrcs == 0) || 
                  (pstGrec->grec_nsrcs == 0 && IGMPV3_MODE_IS_INCLUDE == pstGrec->grec_type) || 
-                 (IGMPV3_BLOCK_OLD_SOURCES == pstGrec->grec_type))  //Ç°ÃæÁ½ÖÖ±íÊ¾LEAVEÏûÏ¢£¬ºóÃæÒ»ÖÖÒ²¿ÉÄÜ±íÊ¾LEAVEÏûÏ¢
+                 (IGMPV3_BLOCK_OLD_SOURCES == pstGrec->grec_type))  //å‰é¢ä¸¤ç§è¡¨ç¤ºLEAVEæ¶ˆæ¯ï¼Œåé¢ä¸€ç§ä¹Ÿå¯èƒ½è¡¨ç¤ºLEAVEæ¶ˆæ¯
         {
             br_igmp_debug("delete IGMPv3 entry\r\n");
             br_igmpv3_rrd_process(br, skb, pip, pstGrec, MC_FDB_DEL_OP);
         }
         
-        /*Start of Protocol :igmpÎŞ·¨²¥·ÅÎÊÌâ */
+        /*Start of Protocol :igmpæ— æ³•æ’­æ”¾é—®é¢˜ */
         pstGrec = (struct igmpv3_grec *)((char *)pstGrec + sizeof(struct igmpv3_grec) + ntohs(pstGrec->grec_nsrcs) * sizeof(struct in_addr)); 
-        /*End of Protocol :igmpÎŞ·¨²¥·ÅÎÊÌâ */
+        /*End of Protocol :igmpæ— æ³•æ’­æ”¾é—®é¢˜ */
     }
     return ;
 }

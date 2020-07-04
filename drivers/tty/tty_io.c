@@ -1092,11 +1092,11 @@ EXPORT_SYMBOL(tty_log_write);
 void mlog_tty_write(const char* name, const unsigned char *data, size_t len, int mode)
 {
 #if defined(CONFIG_BUILD_ATP_MLOG)
-#define MLOG_STRING_SIZE    (16)    /* Ò»´ÎĞ´Èë16¸ö×Ö·û */
+#define MLOG_STRING_SIZE    (16)    /* ä¸€æ¬¡å†™å…¥16ä¸ªå­—ç¬¦ */
 #define HEX_2_ASCII_STRING  "0123456789ABCDEF"
     int i = 0;
     char *logbuf = NULL;
-    /* Ä¬ÈÏÅäÖÃÏÂ²»Ö´ĞĞ£¬´ò¿ªÌØ¶¨µÄ¹¦ÄÜ²ÅÖ´ĞĞ */
+    /* é»˜è®¤é…ç½®ä¸‹ä¸æ‰§è¡Œï¼Œæ‰“å¼€ç‰¹å®šçš„åŠŸèƒ½æ‰æ‰§è¡Œ */
     if (0
 #if defined (CONFIG_BUILD_COMPONENT_SILICON_ZIBEE_CHIP)
         || ((0<strlen(name)) && (0<strlen(mlog_tty_name)) && (0==strcmp(name, mlog_tty_name)))
@@ -1116,7 +1116,7 @@ void mlog_tty_write(const char* name, const unsigned char *data, size_t len, int
         memset(logbuf, 0, (MLOG_STRING_SIZE+1)*3);
         for (i=0; i<len; )
         {
-            /* Ã¿¸ö×Ö·ûĞ´ÈëÒ»´Îlog£¬Ò»´ÎĞ´ÈëmlogÓĞ×î´ó×Ö·ûÏŞÖÆ */
+            /* æ¯ä¸ªå­—ç¬¦å†™å…¥ä¸€æ¬¡logï¼Œä¸€æ¬¡å†™å…¥mlogæœ‰æœ€å¤§å­—ç¬¦é™åˆ¶ */
             logbuf[3*(i&0xf)] = HEX_2_ASCII_STRING[data[i]>>4];
             logbuf[3*(i&0xf)+1] = HEX_2_ASCII_STRING[data[i]&0xf];
             logbuf[3*(i&0xf)+2] = ' ';  
@@ -1135,7 +1135,7 @@ void mlog_tty_write(const char* name, const unsigned char *data, size_t len, int
             }
         }
 
-        /* Ã»ÓĞ·¢ÍêµÄÊı¾İ×îºó·¢ËÍ */        
+        /* æ²¡æœ‰å‘å®Œçš„æ•°æ®æœ€åå‘é€ */        
         if (i&0xf)
         {
             if (mode)

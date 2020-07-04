@@ -46,7 +46,7 @@ void br_mld_snooping_init(void)
 	INIT_LIST_HEAD(&mld_snooping_list.mld_list);
 	mld_snooping_list.mld_lock = SPIN_LOCK_UNLOCKED;
 	mld_snooping_list.mld_start_timer = 0;
-	/*Ä¬ÈÏ¿ªÆômld snooping*/
+	/*é»˜è®¤å¼€å¯mld snooping*/
 	mld_snooping_list.mld_snooping_enable = 1;
 }
 
@@ -59,7 +59,7 @@ static void br_mld_snooping_query_timeout(unsigned long ptr)
 
 	spin_lock_bh(&mld_list->mld_lock);
     /*START MODIFY:Huawei 2012-11-20 FOR mld snooping cpu 0*/
-    /*´æÔÚdelºÍfree²Ù×÷µÄ±éÀú£¬ÐèÒªÊ¹ÓÃsafeº¯Êý*/
+    /*å­˜åœ¨delå’Œfreeæ“ä½œçš„éåŽ†ï¼Œéœ€è¦ä½¿ç”¨safeå‡½æ•°*/
     list_for_each_entry_safe(dst_entry, tmp_entry, &mld_list->mld_list, list) 
     {
 	    if ((jiffies > dst_entry->time) 
@@ -124,22 +124,22 @@ static int br_mld_snooping_add(struct net_bridge_port *dev_port,
 {
 	struct net_bridge_mld_snooping_entry *mld_entry;
 
-    // TODO: ÌØÊâMACµØÖ·¹ýÂË
+    // TODO: ç‰¹æ®ŠMACåœ°å€è¿‡æ»¤
 		    
 	if (br_mld_snooping_update(dev_port, grp_mac, host_mac))
 	{
     	return 0;
 	}
 	
-    /*START MODIFY:Huawei 2012-11-20 FOR schedule while atomicÎÊÌâ*/
-    /*bhÉÏÏÂÎÄ±»µ÷ÓÃµÄÄÚ´æ·ÖÅäº¯ÊýÓ¦Ê¹ÓÃATOMIC²Ù×÷*/
+    /*START MODIFY:Huawei 2012-11-20 FOR schedule while atomicé—®é¢˜*/
+    /*bhä¸Šä¸‹æ–‡è¢«è°ƒç”¨çš„å†…å­˜åˆ†é…å‡½æ•°åº”ä½¿ç”¨ATOMICæ“ä½œ*/
     mld_entry = 
         kmalloc(sizeof(struct net_bridge_mld_snooping_entry), GFP_ATOMIC);
 	if (!mld_entry)
 	{
 	    return ENOMEM;
 	}	
-    /*END MODIFY:Huawei 2012-11-20 FOR schedule while atomicÎÊÌâ*/
+    /*END MODIFY:Huawei 2012-11-20 FOR schedule while atomicé—®é¢˜*/
 	memcpy(mld_entry->host_mac, host_mac, ETH_ALEN);	
 	memcpy(mld_entry->grp_mac, grp_mac, ETH_ALEN);
 	mld_entry->time = jiffies + MLD_QUERY_TIMEOUT*HZ;
@@ -163,7 +163,7 @@ static int br_mld_snooping_add(struct net_bridge_port *dev_port,
 }
 
 
-/* ´Ó¸ø¶¨µÄgrp_macÖÐÉ¾³ý¸ø¶¨µÄÖ÷»ú host_mac */
+/* ä»Žç»™å®šçš„grp_macä¸­åˆ é™¤ç»™å®šçš„ä¸»æœº host_mac */
 static int br_mld_snooping_del(struct net_bridge_port *dev_port, 
             unsigned char *grp_mac, unsigned char *host_mac)
 {
@@ -311,7 +311,7 @@ int br_mld_snooping_forward(struct sk_buff *skb,
     
     addr_type = ipv6_addr_type(&pstIP6Hdr->daddr);
 
-    /* Èç¹û²»ÊÇ¶à²¥µØÖ·ÄÇÃ´ÍË³ö */
+    /* å¦‚æžœä¸æ˜¯å¤šæ’­åœ°å€é‚£ä¹ˆé€€å‡º */
     if (!(addr_type & IPV6_ADDR_MULTICAST))
     {
         MLD_SNOOPING_P("Error: destination [ "NIP6_FMT" ] no multicast\r\n",NIP6(pstIP6Hdr->daddr));
@@ -319,7 +319,7 @@ int br_mld_snooping_forward(struct sk_buff *skb,
         return 0;
     }
     
-    // TODO:ÌØÊâMACµØÖ·¹ýÂË
+    // TODO:ç‰¹æ®ŠMACåœ°å€è¿‡æ»¤
     
     if ((IPPROTO_ICMPV6 == data[40])
         && ((ICMPV6_MGM_REPORT == data[48])
@@ -331,7 +331,7 @@ int br_mld_snooping_forward(struct sk_buff *skb,
             return 0;
         }
 
-        /* ±¨ÎÄ³¤¶ÈÐ£Ñé */
+        /* æŠ¥æ–‡é•¿åº¦æ ¡éªŒ */
         if (MLD_PAKCET_LEN > ntohs(pstIP6Hdr->payload_len))
         {
             MLD_SNOOPING_P("PACKET length error: %d\r\n", 
@@ -339,7 +339,7 @@ int br_mld_snooping_forward(struct sk_buff *skb,
             return 0;
         }
 
-        /* ÌøÊýÐ£Ñé */
+        /* è·³æ•°æ ¡éªŒ */
         if (MLD_HOP_LIMIT != pstIP6Hdr->hop_limit)
         {
             MLD_SNOOPING_P("Hoplimit error: %d must 1\r\n", pstIP6Hdr->hop_limit);
@@ -347,13 +347,13 @@ int br_mld_snooping_forward(struct sk_buff *skb,
         }
         
 
-        /* v1±¨¸æ±¨ÎÄ */
+        /* v1æŠ¥å‘ŠæŠ¥æ–‡ */
         if (ICMPV6_MGM_REPORT == data[48])
         {
             MLD_SNOOPING_P("mld v1 report: [ "NIP6_FMT" ]-->[ "NIP6_FMT" ]\r\n",
                 NIP6(pstIP6Hdr->saddr), NIP6(pstIP6Hdr->daddr));
 
-            /* ÒòÎª¶à²¥µØÖ·¾ßÓÐ²»Í¬µÄ·¶Î§£¬ËùÒÔÐèÒª¸ù¾Ý·¶Î§À´½øÐÐÈ·ÈÏ */
+            /* å› ä¸ºå¤šæ’­åœ°å€å…·æœ‰ä¸åŒçš„èŒƒå›´ï¼Œæ‰€ä»¥éœ€è¦æ ¹æ®èŒƒå›´æ¥è¿›è¡Œç¡®è®¤ */
             if (IN6_IS_ADDR_MC_NODELOCAL(&pstIP6Hdr->daddr)
                 || IN6_IS_ADDR_MC_LINKLOCAL(&pstIP6Hdr->daddr))
             {
@@ -363,7 +363,7 @@ int br_mld_snooping_forward(struct sk_buff *skb,
             
             br_mld_snooping_add(br_port_get_rcu(skb->dev), dest, eth_hdr(skb)->h_source);
         }
-        else if (ICMPV6_MLD2_REPORT == data[48])        /* mldv2 ±¨¸æ±¨ÎÄ */
+        else if (ICMPV6_MLD2_REPORT == data[48])        /* mldv2 æŠ¥å‘ŠæŠ¥æ–‡ */
         {
             pstMLDv2Ptr = (struct mld2_reportpkt *)&data[48];
             pszPtr = (char *)(pstMLDv2Ptr + 1);
@@ -429,7 +429,7 @@ int br_mld_snooping_forward(struct sk_buff *skb,
             MLD_SNOOPING_P("br_mld_snooping_del\n");
             br_mld_snooping_del(br_port_get_rcu(skb->dev), mc_mac, eth_hdr(skb)->h_source);
 
-            /* Èç¹û¸Ã×éÒÑ¾­¿ÕÁË */
+            /* å¦‚æžœè¯¥ç»„å·²ç»ç©ºäº† */
             if (br_mld_snooping_empty(mc_mac))
             {
                 skb2 = skb;
@@ -448,7 +448,7 @@ int br_mld_snooping_forward(struct sk_buff *skb,
         return status;
     }
 
-    /* ·ÇMLD±¨ÎÄÔò»áÖ±½Ó×ßÕâÀï */
+    /* éžMLDæŠ¥æ–‡åˆ™ä¼šç›´æŽ¥èµ°è¿™é‡Œ */
     list_for_each_entry_rcu(dst_entry, &mld_snooping_list.mld_list, list)
     {        
         if (!memcmp(&dst_entry->grp_mac, dest, ETH_ALEN)) 
@@ -464,7 +464,7 @@ int br_mld_snooping_forward(struct sk_buff *skb,
 
                 if(((NULL != pgroup)
                 && (ISIN_GROUP(pgroup->ports, dst_entry->dev_dst->port_no)))
-                || (!forward)) //Â·ÓÉWANµÄ×é²¥Á÷²»ÅÐ¶Ï°ó¶¨×é
+                || (!forward)) //è·¯ç”±WANçš„ç»„æ’­æµä¸åˆ¤æ–­ç»‘å®šç»„
                 {
                     skb2 = skb_clone(skb, GFP_ATOMIC);
                     
@@ -492,7 +492,7 @@ int br_mld_snooping_forward(struct sk_buff *skb,
             {
 #endif
 
-                if (forward) //ÇÅ½Ósnooping
+                if (forward) //æ¡¥æŽ¥snooping
                 {
 
                     if (0 == memcmp(dst_entry->dev_dst->br->dev->name,
@@ -503,7 +503,7 @@ int br_mld_snooping_forward(struct sk_buff *skb,
                         br_forward(dst_entry->dev_dst, skb, skb2);
                     }
                 }
-                else  //Â·ÓÉsnooping
+                else  //è·¯ç”±snooping
                 {
 
                     if (0 == memcmp(dst_entry->dev_dst->br->dev->name,skb->dev->name,strlen(skb->dev->name)))
@@ -538,7 +538,7 @@ int br_mld_snooping_forward(struct sk_buff *skb,
         || (0x07 == skb->data[42] && 0x6c == skb->data[43])
         || ((IPPROTO_ICMPV6 == data[40]) && (ICMPV6_MGM_QUERY == data[48])))
     {
-        //Ò»Ð©×é²¥±¨ÎÄ²»ÄÜ±»¹ýÂË£¬±ÈÈçRA ,DHCPV6 SOLICIT, multicast query,upnp
+        //ä¸€äº›ç»„æ’­æŠ¥æ–‡ä¸èƒ½è¢«è¿‡æ»¤ï¼Œæ¯”å¦‚RA ,DHCPV6 SOLICIT, multicast query,upnp
     }
     else
     {

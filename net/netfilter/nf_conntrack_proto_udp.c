@@ -41,7 +41,7 @@ enum udp_conntrack {
 
 static unsigned int udp_timeouts[UDP_CT_MAX] = {
 #ifdef CONFIG_SUPPORT_ATP
-	[UDP_CT_UNREPLIED]	= 150*HZ,	/*xBox upnp²âÊÔ,session policy test UDPÎ¬³ÖÊ±¼äĞŞ¸ÄÎª150*/
+	[UDP_CT_UNREPLIED]	= 150*HZ,	/*xBox upnpæµ‹è¯•,session policy test UDPç»´æŒæ—¶é—´ä¿®æ”¹ä¸º150*/
 #else
 	[UDP_CT_UNREPLIED]	= 30*HZ,
 #endif

@@ -4,12 +4,12 @@
 */
 /******************************************************************************
 
-                  ╟Фх╗кЫсп (C), 2008-2018, ╨ёк╪╟К╣╪лЕспоч╧╚к╬
+                  Г┴┬Ф²┐Ф┴─Ф°┴ (C), 2008-2018, Ф╣╥Ф─²Е█┼Е╞╪Д╫⌠Ф°┴И≥░Е┘╛Е▐╦
 
  ******************************************************************************
-  нд ╪Ч цШ   : hi_pcie.h
-  ╟Ф ╠╬ ╨е   : ЁУ╦Е
-  иЗЁихуфз   : D2014_03_09
+  Ф√┤ Д╩╤ Е░█   : hi_pcie.h
+  Г┴┬ Ф°╛ Е▐╥   : Е┬²Г╗©
+  Г■÷Ф┬░Ф≈╔Ф°÷   : D2014_03_09
 
 ******************************************************************************/
 #ifndef __HI_PCIE_H__
@@ -42,11 +42,11 @@ typedef enum
 #define HI_PCIE1_IRQ_INTC		    (65 + HI_PCIE_IRQ_BASE)
 #define HI_PCIE1_IRQ_INTD		    (66 + HI_PCIE_IRQ_BASE)
 
-#define HI_PCIE0_MEMIO_BASE	        (0x50000000)//еДжц©у╪Д
-#define HI_PCIE0_DBI_BASE_ADDR      (0x10A00000)//IO©у╪Д 64k
+#define HI_PCIE0_MEMIO_BASE	        (0x50000000)//И┘█Г╫╝Г╘╨И≈╢
+#define HI_PCIE0_DBI_BASE_ADDR      (0x10A00000)//IOГ╘╨И≈╢ 64k
 
-#define HI_PCIE1_MEMIO_BASE	        (0x68000000) //еДжц©у╪Д
-#define HI_PCIE1_DBI_BASE_ADDR		(0x10A02000) //IO©у╪Д 64k
+#define HI_PCIE1_MEMIO_BASE	        (0x68000000) //И┘█Г╫╝Г╘╨И≈╢
+#define HI_PCIE1_DBI_BASE_ADDR		(0x10A02000) //IOГ╘╨И≈╢ 64k
 
 #define HI_PCIE_BASE_ADDR_SIZE		(0x1000000)
 

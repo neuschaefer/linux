@@ -132,7 +132,7 @@ unsigned int g_lIgmpReportInterval = 1 * HZ;
 
 #define IGMP_Initial_Report_Delay		(1)
 
-/*Îª±ÜÃâ¼ÓºêÌ«¶à£¬Î´ÆôÓÃSSMÌØĞÔÊ±Ò²¶¨Òåip_mc_is_ssm*/
+/*ä¸ºé¿å…åŠ å®å¤ªå¤šï¼Œæœªå¯ç”¨SSMç‰¹æ€§æ—¶ä¹Ÿå®šä¹‰ip_mc_is_ssm*/
 #ifndef CONFIG_IGMP_SSM
 static inline int ip_mc_is_ssm(__be32 multiaddr)
 {
@@ -217,7 +217,7 @@ static void igmp_start_leave_timer(struct ip_mc_list *im, int max_delay)
 	if (!mod_timer(&im->timer1, jiffies+tv+2))
 		atomic_inc(&im->refcnt);
 #else
-    /* Ô­·¢ËÍ¼ä¸ôÉèÖÃÎª0ÖÁ×î´óÑÓÊ±Ö®¼äµÄËæ»úÊı,µ«ÊÇBTÒªÇó±£Ö¤·¢ËÍ¼ä¸ôÎªÉèÖÃÊ±¼ä */
+    /* åŸå‘é€é—´éš”è®¾ç½®ä¸º0è‡³æœ€å¤§å»¶æ—¶ä¹‹é—´çš„éšæœºæ•°,ä½†æ˜¯BTè¦æ±‚ä¿è¯å‘é€é—´éš”ä¸ºè®¾ç½®æ—¶é—´ */
     if (!mod_timer(&im->timer, jiffies+max_delay))
 		atomic_inc(&im->refcnt);
 #endif
@@ -261,7 +261,7 @@ static void igmp_ifc_start_timer(struct in_device *in_dev, int delay)
 static void igmp_mod_timer(struct ip_mc_list *im, int max_delay)
 {
 	spin_lock_bh(&im->lock);
-    /* BEGIN: ·¢ËÍ±¨ÎÄÊı¸ÄÎª 1 */
+    /* BEGIN: å‘é€æŠ¥æ–‡æ•°æ”¹ä¸º 1 */
 #ifdef CONFIG_SUPPORT_ATP
 	im->unsolicit_count = 1;
 #else
@@ -422,28 +422,28 @@ static int igmpv3_parse_leave(struct igmpv3_report *pstRepV3)
     
    // pstRepV3 = (struct igmpv3_report *)(skb->data + (pip->ihl << 2));
     pstGrec = &pstRepV3->grec[0];
-    // ±éÀúËùÓĞµÄ×é¼ÇÂ¼
-    /*Start of Protocol :igmpÎŞ·¨²¥·ÅÎÊÌâ */
+    // éå†æ‰€æœ‰çš„ç»„è®°å½•
+    /*Start of Protocol :igmpæ— æ³•æ’­æ”¾é—®é¢˜ */
     for (k = 0; k < ntohs(pstRepV3->ngrec); k++)
-    /*End of Protocol :igmpÎŞ·¨²¥·ÅÎÊÌâ */
+    /*End of Protocol :igmpæ— æ³•æ’­æ”¾é—®é¢˜ */
     {
-        // IS_EXCLUDE/CHANGE_TO_EXCLUDEÄ£Ê½¶¼ÊÇ±íÊ¾ĞÂÔö×éµÄ
-        // Èç¹ûµ±Ç°ÎªIS_INCLUDE²¢ÇÒ¶ÔÓ¦µÄINCLUDE²»ÎªNULLÄÇÃ´±íÊ¾Ö»ÊÇĞèÒªĞÂÔö£¬Èç¹ûÎªNULLÄÇÃ´¿ÉÄÜ¾Í±íÊ¾LEAVEÏûÏ¢ÁË
-        // Èç¹ûÊÇCHANGE_TO_INCLUDEÄÇÃ´Èç¹ûÔ´²»ÎªNULLÒ²±íÊ¾ÊÇĞÂÔö
-        // ×ÜÖ®Õâ¼¸ÖÖÄ£Ê½¶¼±íÊ¾ÊÇĞèÒªĞÂÔö£¬Ö»ÓĞµ±INCLUDE²¢ÇÒÔ´ÎªNULLÄÇÃ´²ÅÊÇleaveÏûÏ¢
-        // ËùÒÔÊµ¼ÊÉÏ£¬ÎÒÃÇÕâÀï²¢Ã»ÓĞ×ö·Ç³£¾«È·µÄÅĞ¶Ï£¬±ÈÈçµ½µ×includeÄÄ¸öµØÖ·£¬EXCLUDEÄÄ¸öµØÖ·µÈ¶øÊÇÒ»¹ÉÄÔµÄÈ«²¿ÔÊĞí
-        // Êµ¼ÊÉÏ£¬Ä³¸öPC¿ÉÄÜÖ»ÊÇĞèÒªINCLUDEÄ³Ò»¸öÔ´µØÖ·µÄ£¬ÆäËüµÄ·Ç¸ÃÔ´µØÖ·µÄ¸ÃPCÒ²Ğí²»ĞèÒª´¦Àí
+        // IS_EXCLUDE/CHANGE_TO_EXCLUDEæ¨¡å¼éƒ½æ˜¯è¡¨ç¤ºæ–°å¢ç»„çš„
+        // å¦‚æœå½“å‰ä¸ºIS_INCLUDEå¹¶ä¸”å¯¹åº”çš„INCLUDEä¸ä¸ºNULLé‚£ä¹ˆè¡¨ç¤ºåªæ˜¯éœ€è¦æ–°å¢ï¼Œå¦‚æœä¸ºNULLé‚£ä¹ˆå¯èƒ½å°±è¡¨ç¤ºLEAVEæ¶ˆæ¯äº†
+        // å¦‚æœæ˜¯CHANGE_TO_INCLUDEé‚£ä¹ˆå¦‚æœæºä¸ä¸ºNULLä¹Ÿè¡¨ç¤ºæ˜¯æ–°å¢
+        // æ€»ä¹‹è¿™å‡ ç§æ¨¡å¼éƒ½è¡¨ç¤ºæ˜¯éœ€è¦æ–°å¢ï¼Œåªæœ‰å½“INCLUDEå¹¶ä¸”æºä¸ºNULLé‚£ä¹ˆæ‰æ˜¯leaveæ¶ˆæ¯
+        // æ‰€ä»¥å®é™…ä¸Šï¼Œæˆ‘ä»¬è¿™é‡Œå¹¶æ²¡æœ‰åšéå¸¸ç²¾ç¡®çš„åˆ¤æ–­ï¼Œæ¯”å¦‚åˆ°åº•includeå“ªä¸ªåœ°å€ï¼ŒEXCLUDEå“ªä¸ªåœ°å€ç­‰è€Œæ˜¯ä¸€è‚¡è„‘çš„å…¨éƒ¨å…è®¸
+        // å®é™…ä¸Šï¼ŒæŸä¸ªPCå¯èƒ½åªæ˜¯éœ€è¦INCLUDEæŸä¸€ä¸ªæºåœ°å€çš„ï¼Œå…¶å®ƒçš„éè¯¥æºåœ°å€çš„è¯¥PCä¹Ÿè®¸ä¸éœ€è¦å¤„ç†
         if ((IGMPV3_CHANGE_TO_INCLUDE == pstGrec->grec_type && pstGrec->grec_nsrcs == 0) || 
                  (pstGrec->grec_nsrcs == 0 && IGMPV3_MODE_IS_INCLUDE == pstGrec->grec_type) || 
-                 (IGMPV3_BLOCK_OLD_SOURCES == pstGrec->grec_type))  //Ç°ÃæÁ½ÖÖ±íÊ¾LEAVEÏûÏ¢£¬ºóÃæÒ»ÖÖÒ²¿ÉÄÜ±íÊ¾LEAVEÏûÏ¢
+                 (IGMPV3_BLOCK_OLD_SOURCES == pstGrec->grec_type))  //å‰é¢ä¸¤ç§è¡¨ç¤ºLEAVEæ¶ˆæ¯ï¼Œåé¢ä¸€ç§ä¹Ÿå¯èƒ½è¡¨ç¤ºLEAVEæ¶ˆæ¯
         {
             //printk("delete IGMPv3 entry\r\n");
 			return 1;
         }
         
-        /*Start of Protocol :igmpÎŞ·¨²¥·ÅÎÊÌâ */
+        /*Start of Protocol :igmpæ— æ³•æ’­æ”¾é—®é¢˜ */
         pstGrec = (struct igmpv3_grec *)((char *)pstGrec + sizeof(struct igmpv3_grec) + ntohs(pstGrec->grec_nsrcs) * sizeof(struct in_addr)); 
-        /*End of Protocol :igmpÎŞ·¨²¥·ÅÎÊÌâ */
+        /*End of Protocol :igmpæ— æ³•æ’­æ”¾é—®é¢˜ */
     }
 	
     return 0;
@@ -1241,7 +1241,7 @@ static void igmpv3_add_delrec(struct in_device *in_dev, struct ip_mc_list *im)
 	pmc->multiaddr = im->multiaddr;
 #ifdef CONFIG_SUPPORT_ATP
 	isSsm = ip_mc_is_ssm(pmc->multiaddr);
-    /*Èç¹ûÊÇssmÄ£Ê½£¬²»·¢Ä£Ê½±ä»¯µÄ±¨ÎÄ£¬modify for HOMEGW-15189/RFC4604 : SSMÄ£Ê½ÏÂÖ»ÄÜ·¢type 1/5/6±¨ÎÄ*/
+    /*å¦‚æœæ˜¯ssmæ¨¡å¼ï¼Œä¸å‘æ¨¡å¼å˜åŒ–çš„æŠ¥æ–‡ï¼Œmodify for HOMEGW-15189/RFC4604 : SSMæ¨¡å¼ä¸‹åªèƒ½å‘type 1/5/6æŠ¥æ–‡*/
 	if (isSsm) {
 		pmc->crcount = 0;
 	} else {
@@ -1264,7 +1264,7 @@ static void igmpv3_add_delrec(struct in_device *in_dev, struct ip_mc_list *im)
 		pmc->tomb = im->tomb;
 		pmc->sources = im->sources;
 		im->tomb = im->sources = NULL;
-		/*Èç¹ûÊÇssmÄ£Ê½£¬Ö»·¢Ô´¼ÇÂ¼¸Ä±äµÄ±¨ÎÄ£¬modify for HOMEGW-15189/RFC4604 : SSMÄ£Ê½ÏÂÖ»ÄÜ·¢type 1/5/6±¨ÎÄ*/
+		/*å¦‚æœæ˜¯ssmæ¨¡å¼ï¼Œåªå‘æºè®°å½•æ”¹å˜çš„æŠ¥æ–‡ï¼Œmodify for HOMEGW-15189/RFC4604 : SSMæ¨¡å¼ä¸‹åªèƒ½å‘type 1/5/6æŠ¥æ–‡*/
 		for (psf=pmc->sources; psf; psf=psf->sf_next)
 #ifdef CONFIG_ATP_IGMP_CONTROL_REPORT_NUM
 			psf->sf_crcount = g_lIgmpReportCount;
@@ -1428,7 +1428,7 @@ static void igmp_group_added(struct ip_mc_list *im)
 	/* else, v3 */
 #ifdef CONFIG_SUPPORT_ATP
 	isSsm = ip_mc_is_ssm(im->multiaddr);
-	/*Èç¹ûÊÇssmÄ£Ê½£¬²»·¢Ä£Ê½±ä»¯µÄ±¨ÎÄ£¬modify for HOMEGW-15189/RFC4604 : SSMÄ£Ê½ÏÂÖ»ÄÜ·¢type 1/5/6±¨ÎÄ*/
+	/*å¦‚æœæ˜¯ssmæ¨¡å¼ï¼Œä¸å‘æ¨¡å¼å˜åŒ–çš„æŠ¥æ–‡ï¼Œmodify for HOMEGW-15189/RFC4604 : SSMæ¨¡å¼ä¸‹åªèƒ½å‘type 1/5/6æŠ¥æ–‡*/
 	if (isSsm) {
 		im->crcount = 0;
 	} else {
@@ -1826,7 +1826,7 @@ static int ip_mc_del_src(struct in_device *in_dev, __be32 *pmca, int sfmode,
 		pmc->sfmode = MCAST_INCLUDE;
 #ifdef CONFIG_IP_MULTICAST
 #ifdef CONFIG_SUPPORT_ATP
-		/*Èç¹ûÊÇssmÄ£Ê½£¬²»·¢Ä£Ê½±ä»¯µÄ±¨ÎÄ£¬modify for HOMEGW-15189/RFC4604 : SSMÄ£Ê½ÏÂÖ»ÄÜ·¢type 1/5/6±¨ÎÄ*/
+		/*å¦‚æœæ˜¯ssmæ¨¡å¼ï¼Œä¸å‘æ¨¡å¼å˜åŒ–çš„æŠ¥æ–‡ï¼Œmodify for HOMEGW-15189/RFC4604 : SSMæ¨¡å¼ä¸‹åªèƒ½å‘type 1/5/6æŠ¥æ–‡*/
 		if (isSsm) {
 			pmc->crcount = 0;
 		} else {
@@ -1842,7 +1842,7 @@ static int ip_mc_del_src(struct in_device *in_dev, __be32 *pmca, int sfmode,
 			IGMP_Unsolicited_Report_Count;
 #endif
 		in_dev->mr_ifc_count = pmc->crcount;
-		/*Èç¹ûÊÇssmÄ£Ê½£¬Ö»·¢Ô´¼ÇÂ¼¸Ä±äµÄ±¨ÎÄ£¬modify for HOMEGW-15189/RFC4604 : SSMÄ£Ê½ÏÂÖ»ÄÜ·¢type 1/5/6±¨ÎÄ*/
+		/*å¦‚æœæ˜¯ssmæ¨¡å¼ï¼Œåªå‘æºè®°å½•æ”¹å˜çš„æŠ¥æ–‡ï¼Œmodify for HOMEGW-15189/RFC4604 : SSMæ¨¡å¼ä¸‹åªèƒ½å‘type 1/5/6æŠ¥æ–‡*/
 		for (psf=pmc->sources; psf; psf = psf->sf_next) {
 #ifdef CONFIG_SUPPORT_ATP
 			if (isSsm) {
@@ -2048,7 +2048,7 @@ static int ip_mc_add_src(struct in_device *in_dev, __be32 *pmca, int sfmode,
 #endif
 
 		old_crcount = pmc->crcount;
-		/*Èç¹ûÊÇssmÄ£Ê½£¬²»·¢Ä£Ê½±ä»¯µÄ±¨ÎÄ£¬modify for HOMEGW-15189/RFC4604 : SSMÄ£Ê½ÏÂÖ»ÄÜ·¢type 1/5/6±¨ÎÄ*/
+		/*å¦‚æœæ˜¯ssmæ¨¡å¼ï¼Œä¸å‘æ¨¡å¼å˜åŒ–çš„æŠ¥æ–‡ï¼Œmodify for HOMEGW-15189/RFC4604 : SSMæ¨¡å¼ä¸‹åªèƒ½å‘type 1/5/6æŠ¥æ–‡*/
 		if (isSsm)
 		{
 		    pmc->crcount = 0;
@@ -2061,7 +2061,7 @@ static int ip_mc_add_src(struct in_device *in_dev, __be32 *pmca, int sfmode,
 		in_dev->mr_ifc_count = old_crcount;
 		sf_crcount = old_crcount;
 #endif
-		/*Èç¹ûÊÇssmÄ£Ê½£¬Ö»·¢Ô´¼ÇÂ¼¸Ä±äµÄ±¨ÎÄ£¬modify for HOMEGW-15189/RFC4604 : SSMÄ£Ê½ÏÂÖ»ÄÜ·¢type 1/5/6±¨ÎÄ*/
+		/*å¦‚æœæ˜¯ssmæ¨¡å¼ï¼Œåªå‘æºè®°å½•æ”¹å˜çš„æŠ¥æ–‡ï¼Œmodify for HOMEGW-15189/RFC4604 : SSMæ¨¡å¼ä¸‹åªèƒ½å‘type 1/5/6æŠ¥æ–‡*/
 		for (psf=pmc->sources; psf; psf = psf->sf_next) {
 			if (isSsm) {
 				psf->sf_crcount = sf_crcount;
@@ -2993,7 +2993,7 @@ static struct pernet_operations igmp_net_ops = {
 int __init igmp_mc_proc_init(void)
 {
 #ifdef CONFIG_IGMP_SSM
-    ip_group_list_init();//modify for HOMEGW-15189/RFC4604 : SSMÄ£Ê½ÏÂÖ»ÄÜ·¢type 1/5/6±¨ÎÄ*/
+    ip_group_list_init();//modify for HOMEGW-15189/RFC4604 : SSMæ¨¡å¼ä¸‹åªèƒ½å‘type 1/5/6æŠ¥æ–‡*/
 #endif
 	return register_pernet_subsys(&igmp_net_ops);
 }

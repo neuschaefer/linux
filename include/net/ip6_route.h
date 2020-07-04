@@ -8,9 +8,9 @@
 #define IP6_RT_PRIO_USER	1024
 #define IP6_RT_PRIO_ADDRCONF	256
 
-/*start 当添加BR0的优先级时，提高优先级为1，保证BR0下设备的优先*/
+/*start 褰撴坊鍔燘R0鐨勪紭鍏堢骇鏃讹紝鎻愰珮浼樺厛绾т负1锛屼繚璇丅R0涓嬭澶囩殑浼樺厛*/
 #define IP6_RT_PRIO_ATP_CONF	1
-/*end 当添加BR0的优先级时，提高优先级为1，保证BR0下设备的优先*/
+/*end 褰撴坊鍔燘R0鐨勪紭鍏堢骇鏃讹紝鎻愰珮浼樺厛绾т负1锛屼繚璇丅R0涓嬭澶囩殑浼樺厛*/
 struct route_info {
 	__u8			type;
 	__u8			length;

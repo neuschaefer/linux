@@ -114,7 +114,7 @@ struct usb_device_id {
 	__u8		bDeviceSubClass;
 	__u8		bDeviceProtocol;
 	/*Used for HUAWEI NDIS*/
-    /*<通过接入顺序来判断usb设备begin*/
+    /*<閫氳繃鎺ュ叆椤哄簭鏉ュ垽鏂璾sb璁惧begin*/
 	__u16       bInterfaceSequence;
     /* >*/
 	/* Used for interface class matches */
@@ -138,7 +138,7 @@ struct usb_device_id {
 #define USB_DEVICE_ID_MATCH_INT_SUBCLASS	0x0100
 #define USB_DEVICE_ID_MATCH_INT_PROTOCOL	0x0200
 
-/*< 通过接入顺序来判断usb设备begin*/
+/*< 閫氳繃鎺ュ叆椤哄簭鏉ュ垽鏂璾sb璁惧begin*/
 #define USB_DEVICE_ID_MATCH_INT_SEQUENCE      0x0400
 /* end>*/
 #define HID_ANY_ID				(~0)

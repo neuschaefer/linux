@@ -198,9 +198,9 @@ struct inet6_dev {
 	struct list_head	tempaddr_list;
 #endif
 
-/* start of by  2009-12-03 ½â¾öIPµØÖ·³åÍ» */
+/* start of by  2009-12-03 è§£å†³IPåœ°å€å†²çª */
     u8 aucIfID[8];
-/* end of by  2009-12-03 ½â¾öIPµØÖ·³åÍ» */
+/* end of by  2009-12-03 è§£å†³IPåœ°å€å†²çª */
 
 	struct neigh_parms	*nd_parms;
 	struct inet6_dev	*next;

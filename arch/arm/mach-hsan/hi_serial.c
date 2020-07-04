@@ -574,7 +574,7 @@ static void config_uart_gpio()
     pui_reg_gpiosel = (unsigned int *)ioremap(HI_REG_BASE_IOMUX + 0x1ac,4);
     pui_reg_iosel = (unsigned int *)ioremap(HI_REG_BASE_IOMUX + 0x198,4);
 
-    /*使能UART0 用于DECT控制通信*/
+    /*浣胯兘UART0 鐢ㄤ簬DECT鎺у埗閫氫俊*/
     HI_BIT_CLR(*(pui_reg_gpiosel), HI_BIT09_1);
     HI_BIT_CLR(*(pui_reg_gpiosel), HI_BIT10_1);
     HI_BIT_SET(*(pui_reg_iosel), HI_BIT00_1);
@@ -589,7 +589,7 @@ static hi_int32 hi_uart_init(hi_void)
 	
 	config_uart_gpio();
 
-    // 注册驱动
+    // 娉ㄥ唽椹卞姩
     i_ret = uart_register_driver(&g_st_uart_driver);
     if (0 != i_ret)
     {

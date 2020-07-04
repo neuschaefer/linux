@@ -13,7 +13,7 @@ struct ip_cone_nat_data
     struct nf_nat_ipv4_multi_range_compat data;
 };
 
-// CONE NAT 三种类型，full cone/addr restricted cone/port restricted cone
+// CONE NAT 涓夌绫诲瀷锛宖ull cone/addr restricted cone/port restricted cone
 enum cone_nat_type
 {
     FULL_CONE_TYPE = 0,

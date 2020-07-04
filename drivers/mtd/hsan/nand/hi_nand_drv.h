@@ -3,14 +3,14 @@
 * (C) Huawei Technologies Co., Ltd. < >
 */
 /******************************************************************************
-  ÎÄ¼şÃû³Æ: hi_nand.h
-  ¹¦ÄÜÃèÊö: nandºËĞÄÇı¶¯Í·ÎÄ¼ş
-  °æ±¾ÃèÊö: V1.0
+  æ–‡ä»¶åç§°: hi_nand.h
+  åŠŸèƒ½æè¿°: nandæ ¸å¿ƒé©±åŠ¨å¤´æ–‡ä»¶
+  ç‰ˆæœ¬æè¿°: V1.0
 
-  ´´½¨ÈÕÆÚ: D2013_04_20
+  åˆ›å»ºæ—¥æœŸ: D2013_04_20
 
-  ĞŞ¸Ä¼ÇÂ¼: 
-            Éú³É³õ¸å.
+  ä¿®æ”¹è®°å½•: 
+            ç”Ÿæˆåˆç¨¿.
 ******************************************************************************/
 #ifndef __HI_NAND_DRV_H__
 #define __HI_NAND_DRV_H__
@@ -31,28 +31,28 @@ extern "C"{
 #define HI_NFC_NANDC_BUF_LEN            (0x800+0x140)   //2048+320B
 #endif
 
-/* ·ÇECC0Ä£Ê½ÏÂÈ±Ê¡OOB³¤¶È */
+/* éECC0æ¨¡å¼ä¸‹ç¼ºçœOOBé•¿åº¦ */
 #define HI_NFC_ECC_DEFAULT_OOB_SIZE     32
 
 #if 1    //nfc v500
-/* page0 Ö§³Ö×î´óÓĞĞ§Êı¾İ³¤¶È */
+/* page0 æ”¯æŒæœ€å¤§æœ‰æ•ˆæ•°æ®é•¿åº¦ */
 #define HI_NFC_MAX_PAGE0_LEN            0x410   //1040B
 #endif
 
-/* ¶ÁĞ´Âö³å¿í¶È */
+/* è¯»å†™è„‰å†²å®½åº¦ */
 #define HI_NFC_PWIDTH_W_LCNT            0x5
 #define HI_NFC_PWIDTH_R_LCNT            0x5
 #define HI_NFC_PWIDTH_RW_HCNT           0x3
 
-/* ÖĞ¶ÏÊ¹ÄÜÑÚÂë */
+/* ä¸­æ–­ä½¿èƒ½æ©ç  */
 #define HI_NFC_INTERRUPT_MASK           0x7FF
 
-/* ·¢¸øNAND FlashµÄµØÖ·ÖÜÆÚÊı */
+/* å‘ç»™NAND Flashçš„åœ°å€å‘¨æœŸæ•° */
 #define HI_NFC_RW_ADDR_CYCLE            0x5
 #define HI_NFC_ERASE_ADDR_CYCLE         0x3
 #define HI_NFC_READID_ADDR_CYCLE        0x1
 
-/* nandcÖ§³Ö×î´óDMA buffer³¤¶È */
+/* nandcæ”¯æŒæœ€å¤§DMA bufferé•¿åº¦ */
 #define HI_NFC_MAX_DMA_BUF_LEN          0x1000
 
 
@@ -89,78 +89,78 @@ typedef enum
   *************************/
 typedef struct 
 {
-    hi_uint32 ui_nfc_con;                 /* (0x00) -NANDCÅäÖÃ¼Ä´æÆ÷                                                 */
-    hi_uint32 ui_nfc_pwidth;              /* (0x04) -¶ÁĞ´Âö³å¿í¶ÈÅäÖÃ¼Ä´æÆ÷                        */
-    hi_uint32 ui_nfc_opidle;              /* (0x08) -²Ù×÷¼ä¸ôÅäÖÃ¼Ä´æÆ÷                                    */
-    hi_uint32 ui_nfc_cmd;                 /* (0x0c) -ÃüÁî×ÖÅäÖÃ¼Ä´æÆ÷                                          */
-    hi_uint32 ui_nfc_addrl;               /* (0x10) -µÍÎ»µØÖ·ÅäÖÃ¼Ä´æÆ÷                                    */
-    hi_uint32 ui_nfc_addrh;               /* (0x14) -¸ßÎ»µØÖ·ÅäÖÃ¼Ä´æÆ÷                                    */
-    hi_uint32 ui_nfc_data_num;            /* (0x18) -¶ÁĞ´Êı¾İÊıÄ¿ÅäÖÃ¼Ä´æÆ÷                        */
-    hi_uint32 ui_nfc_op;                  /* (0x1c) -²Ù×÷¼Ä´æÆ÷                                                            */
-    hi_uint32 ui_nfc_status;              /* (0x20) -×´Ì¬¼Ä´æÆ÷                                                            */
-    hi_uint32 ui_nfc_inten;               /* (0x24) -ÖĞ¶ÏÊ¹ÄÜ¼Ä´æÆ÷                                                */
-    hi_uint32 ui_nfc_ints;                /* (0x28) -ÖĞ¶Ï×´Ì¬¼Ä´æÆ÷                                                */
-    hi_uint32 ui_nfc_intcrl;              /* (0x2c) -ÖĞ¶ÏÇå³ı¼Ä´æÆ÷                                                */
-    hi_uint32 ui_nfc_lock;                /* (0x30) -ËøµØÖ·ÅäÖÃ¼Ä´æÆ÷                                          */
-    hi_uint32 ui_nfc_lock_sa0;            /* (0x34) -ËøÆğÊ¼µØÖ·0ÅäÖÃ¼Ä´æÆ÷                            */
-    hi_uint32 ui_nfc_lock_sa1;            /* (0x38) -ËøÆğÊ¼µØÖ·1ÅäÖÃ¼Ä´æÆ÷                            */
-    hi_uint32 ui_nfc_lock_sa2;            /* (0x3c) -ËøÆğÊ¼µØÖ·2ÅäÖÃ¼Ä´æÆ÷                            */
-    hi_uint32 ui_nfc_lock_sa3;            /* (0x40) -ËøÆğÊ¼µØÖ·3ÅäÖÃ¼Ä´æÆ÷                            */
-    hi_uint32 ui_nfc_lock_ea0;            /* (0x44) -Ëø½áÊøµØÖ·0ÅäÖÃ¼Ä´æÆ÷                            */
-    hi_uint32 ui_nfc_lock_ea1;            /* (0x48) -Ëø½áÊøµØÖ·1ÅäÖÃ¼Ä´æÆ÷                            */
-    hi_uint32 ui_nfc_lock_ea2;            /* (0x4c) -Ëø½áÊøµØÖ·2ÅäÖÃ¼Ä´æÆ÷                            */
-    hi_uint32 ui_nfc_lock_ea3;            /* (0x50) -Ëø½áÊøµØÖ·3ÅäÖÃ¼Ä´æÆ÷                            */
+    hi_uint32 ui_nfc_con;                 /* (0x00) -NANDCé…ç½®å¯„å­˜å™¨                                                 */
+    hi_uint32 ui_nfc_pwidth;              /* (0x04) -è¯»å†™è„‰å†²å®½åº¦é…ç½®å¯„å­˜å™¨                        */
+    hi_uint32 ui_nfc_opidle;              /* (0x08) -æ“ä½œé—´éš”é…ç½®å¯„å­˜å™¨                                    */
+    hi_uint32 ui_nfc_cmd;                 /* (0x0c) -å‘½ä»¤å­—é…ç½®å¯„å­˜å™¨                                          */
+    hi_uint32 ui_nfc_addrl;               /* (0x10) -ä½ä½åœ°å€é…ç½®å¯„å­˜å™¨                                    */
+    hi_uint32 ui_nfc_addrh;               /* (0x14) -é«˜ä½åœ°å€é…ç½®å¯„å­˜å™¨                                    */
+    hi_uint32 ui_nfc_data_num;            /* (0x18) -è¯»å†™æ•°æ®æ•°ç›®é…ç½®å¯„å­˜å™¨                        */
+    hi_uint32 ui_nfc_op;                  /* (0x1c) -æ“ä½œå¯„å­˜å™¨                                                            */
+    hi_uint32 ui_nfc_status;              /* (0x20) -çŠ¶æ€å¯„å­˜å™¨                                                            */
+    hi_uint32 ui_nfc_inten;               /* (0x24) -ä¸­æ–­ä½¿èƒ½å¯„å­˜å™¨                                                */
+    hi_uint32 ui_nfc_ints;                /* (0x28) -ä¸­æ–­çŠ¶æ€å¯„å­˜å™¨                                                */
+    hi_uint32 ui_nfc_intcrl;              /* (0x2c) -ä¸­æ–­æ¸…é™¤å¯„å­˜å™¨                                                */
+    hi_uint32 ui_nfc_lock;                /* (0x30) -é”åœ°å€é…ç½®å¯„å­˜å™¨                                          */
+    hi_uint32 ui_nfc_lock_sa0;            /* (0x34) -é”èµ·å§‹åœ°å€0é…ç½®å¯„å­˜å™¨                            */
+    hi_uint32 ui_nfc_lock_sa1;            /* (0x38) -é”èµ·å§‹åœ°å€1é…ç½®å¯„å­˜å™¨                            */
+    hi_uint32 ui_nfc_lock_sa2;            /* (0x3c) -é”èµ·å§‹åœ°å€2é…ç½®å¯„å­˜å™¨                            */
+    hi_uint32 ui_nfc_lock_sa3;            /* (0x40) -é”èµ·å§‹åœ°å€3é…ç½®å¯„å­˜å™¨                            */
+    hi_uint32 ui_nfc_lock_ea0;            /* (0x44) -é”ç»“æŸåœ°å€0é…ç½®å¯„å­˜å™¨                            */
+    hi_uint32 ui_nfc_lock_ea1;            /* (0x48) -é”ç»“æŸåœ°å€1é…ç½®å¯„å­˜å™¨                            */
+    hi_uint32 ui_nfc_lock_ea2;            /* (0x4c) -é”ç»“æŸåœ°å€2é…ç½®å¯„å­˜å™¨                            */
+    hi_uint32 ui_nfc_lock_ea3;            /* (0x50) -é”ç»“æŸåœ°å€3é…ç½®å¯„å­˜å™¨                            */
 #if 1    //nfc v500 
-    hi_uint32 ui_nfc_expcmd;              /* (0x54) -À©Õ¹Ò³ÃüÁî¼Ä´æÆ÷                                          */
-    hi_uint32 ui_nfc_exbcmd;              /* (0x58) -À©Õ¹¿éÃüÁî¼Ä´æÆ÷                                          */
+    hi_uint32 ui_nfc_expcmd;              /* (0x54) -æ‰©å±•é¡µå‘½ä»¤å¯„å­˜å™¨                                          */
+    hi_uint32 ui_nfc_exbcmd;              /* (0x58) -æ‰©å±•å—å‘½ä»¤å¯„å­˜å™¨                                          */
 #else    //nfc v300 
-    hi_uint32 ui_nfc_reserved[2];         /* (0x54-0x58) -±£Áô                                                                    */
+    hi_uint32 ui_nfc_reserved[2];         /* (0x54-0x58) -ä¿ç•™                                                                    */
 #endif
-    hi_uint32 ui_nfc_ecc_test;            /* (0x5c) -ECC²âÊÔ¼Ä´æÆ÷                                                      */
-    hi_uint32 ui_nfc_dma_ctrl;            /* (0x60) -DMA¿ØÖÆ¼Ä´æÆ÷                                                     */
-    hi_uint32 ui_nfc_baddr_d;             /* (0x64) -´«ËÍÊı¾İÇøµÄ»ùµØÖ·¼Ä´æÆ÷                  */
-    hi_uint32 ui_nfc_baddr_oob;           /* (0x68) -´«ËÍOOBÇøµÄ»ùµØÖ·¼Ä´æÆ÷                       */
-    hi_uint32 ui_nfc_dma_len;             /* (0x6c) -´«ËÍ³¤¶È¼Ä´æÆ÷                                                */
-    hi_uint32 ui_nfc_op_para;             /* (0x70) -²Ù×÷²ÎÊı¼Ä´æÆ÷                                                */
-    hi_uint32 ui_nfc_version;             /* (0x74) -nandc°æ±¾¼Ä´æÆ÷                                                   */
+    hi_uint32 ui_nfc_ecc_test;            /* (0x5c) -ECCæµ‹è¯•å¯„å­˜å™¨                                                      */
+    hi_uint32 ui_nfc_dma_ctrl;            /* (0x60) -DMAæ§åˆ¶å¯„å­˜å™¨                                                     */
+    hi_uint32 ui_nfc_baddr_d;             /* (0x64) -ä¼ é€æ•°æ®åŒºçš„åŸºåœ°å€å¯„å­˜å™¨                  */
+    hi_uint32 ui_nfc_baddr_oob;           /* (0x68) -ä¼ é€OOBåŒºçš„åŸºåœ°å€å¯„å­˜å™¨                       */
+    hi_uint32 ui_nfc_dma_len;             /* (0x6c) -ä¼ é€é•¿åº¦å¯„å­˜å™¨                                                */
+    hi_uint32 ui_nfc_op_para;             /* (0x70) -æ“ä½œå‚æ•°å¯„å­˜å™¨                                                */
+    hi_uint32 ui_nfc_version;             /* (0x74) -nandcç‰ˆæœ¬å¯„å­˜å™¨                                                   */
 #if 1    //nfc v500 
-    hi_uint32 ui_nfc_reserved1[3];        /* (0x78-0x80) -±£Áô                                                                    */
+    hi_uint32 ui_nfc_reserved1[3];        /* (0x78-0x80) -ä¿ç•™                                                                    */
 #else    //nfc v300 
-    hi_uint32 ui_nfc_buf_baddr;           /* (0x78) -BUFFER»ùµØÖ·¼Ä´æÆ÷                                          */
-    hi_uint32 ui_nfc_rd_logic_addr;       /* (0x7c) -DMA¶ÁnandflashµÄÂß¼­µØÖ·¼Ä´æÆ÷               */
-    hi_uint32 ui_nfc_rd_logic_len;        /* (0x80) -DMA¶ÁnandflashµÄÂß¼­³¤¶È¼Ä´æÆ÷               */
+    hi_uint32 ui_nfc_buf_baddr;           /* (0x78) -BUFFERåŸºåœ°å€å¯„å­˜å™¨                                          */
+    hi_uint32 ui_nfc_rd_logic_addr;       /* (0x7c) -DMAè¯»nandflashçš„é€»è¾‘åœ°å€å¯„å­˜å™¨               */
+    hi_uint32 ui_nfc_rd_logic_len;        /* (0x80) -DMAè¯»nandflashçš„é€»è¾‘é•¿åº¦å¯„å­˜å™¨               */
 #endif
-    hi_uint32 ui_nfc_segment_id;          /* (0x84) -DMA¶ÁĞ´nandflashµÄÊı¾İ¶ÎID¼Ä´æÆ÷            */
-    hi_uint32 ui_nfc_reserved2[2];        /* (0x88-0x8c) -±£Áô                                                                    */
-    hi_uint32 ui_nfc_fifo_empty;          /* (0x90) -ÄÚ²¿fifo×´Ì¬¼Ä´æÆ÷                                           */
+    hi_uint32 ui_nfc_segment_id;          /* (0x84) -DMAè¯»å†™nandflashçš„æ•°æ®æ®µIDå¯„å­˜å™¨            */
+    hi_uint32 ui_nfc_reserved2[2];        /* (0x88-0x8c) -ä¿ç•™                                                                    */
+    hi_uint32 ui_nfc_fifo_empty;          /* (0x90) -å†…éƒ¨fifoçŠ¶æ€å¯„å­˜å™¨                                           */
 #if 1    //nfc v500 
-    hi_uint32 ui_nfc_boot_set;            /* (0x94) -boot²ÎÊıÉè¶¨¼Ä´æÆ÷                                         */
-    hi_uint32 ui_nfc_reserved3;           /* (0x98) -±£Áô                                                                              */
+    hi_uint32 ui_nfc_boot_set;            /* (0x94) -bootå‚æ•°è®¾å®šå¯„å­˜å™¨                                         */
+    hi_uint32 ui_nfc_reserved3;           /* (0x98) -ä¿ç•™                                                                              */
 #else    //nfc v300 
-    hi_uint32 ui_nfc_reserved3;           /* (0x94) -±£Áô                                                                             */
-    hi_uint32 ui_nf_status;               /* (0x98) -nandflashµÄsattus¼Ä´æÆ÷                                          */
+    hi_uint32 ui_nfc_reserved3;           /* (0x94) -ä¿ç•™                                                                             */
+    hi_uint32 ui_nf_status;               /* (0x98) -nandflashçš„sattuså¯„å­˜å™¨                                          */
 #endif
-    hi_uint32 ui_nfc_lp_ctrl;             /* (0x9c) -nandc µÄµÍ¹¦ºÄ¿ØÖÆ¼Ä´æÆ÷                          */
-    hi_uint32 ui_nfc_err_num0_buf0;       /* (0xa0) -nandflash µÚÒ»´Îbuffer¾À´íÍ³¼Æ¼Ä´æÆ÷0    */
-    hi_uint32 ui_nfc_err_num1_buf0;       /* (0xa4) -nandflash µÚÒ»´Îbuffer¾À´íÍ³¼Æ¼Ä´æÆ÷1    */
-    hi_uint32 ui_nfc_err_num0_buf1;       /* (0xa8) -nandflash µÚ¶ş´Îbuffer¾À´íÍ³¼Æ¼Ä´æÆ÷0    */
-    hi_uint32 ui_nfc_err_num1_buf1;       /* (0xac) -nandflash µÚ¶ş´Îbuffer¾À´íÍ³¼Æ¼Ä´æÆ÷1    */
-    hi_uint32 ui_nfc_rb_mode;             /* (0xb0) -nandflash µÄready_busyÄ£Ê½¼Ä´æÆ÷                     */
-    hi_uint32 ui_nfc_baddr_d1;            /* (0xb4) -´«ËÍÊı¾İÇøµÄ»ùµØÖ·¼Ä´æÆ÷1               */
-    hi_uint32 ui_nfc_baddr_d2;            /* (0xb8) -´«ËÍÊı¾İÇøµÄ»ùµØÖ·¼Ä´æÆ÷2               */
-    hi_uint32 ui_nfc_baddr_d3;            /* (0xbc) -´«ËÍÊı¾İÇøµÄ»ùµØÖ·¼Ä´æÆ÷3                */
+    hi_uint32 ui_nfc_lp_ctrl;             /* (0x9c) -nandc çš„ä½åŠŸè€—æ§åˆ¶å¯„å­˜å™¨                          */
+    hi_uint32 ui_nfc_err_num0_buf0;       /* (0xa0) -nandflash ç¬¬ä¸€æ¬¡bufferçº é”™ç»Ÿè®¡å¯„å­˜å™¨0    */
+    hi_uint32 ui_nfc_err_num1_buf0;       /* (0xa4) -nandflash ç¬¬ä¸€æ¬¡bufferçº é”™ç»Ÿè®¡å¯„å­˜å™¨1    */
+    hi_uint32 ui_nfc_err_num0_buf1;       /* (0xa8) -nandflash ç¬¬äºŒæ¬¡bufferçº é”™ç»Ÿè®¡å¯„å­˜å™¨0    */
+    hi_uint32 ui_nfc_err_num1_buf1;       /* (0xac) -nandflash ç¬¬äºŒæ¬¡bufferçº é”™ç»Ÿè®¡å¯„å­˜å™¨1    */
+    hi_uint32 ui_nfc_rb_mode;             /* (0xb0) -nandflash çš„ready_busyæ¨¡å¼å¯„å­˜å™¨                     */
+    hi_uint32 ui_nfc_baddr_d1;            /* (0xb4) -ä¼ é€æ•°æ®åŒºçš„åŸºåœ°å€å¯„å­˜å™¨1               */
+    hi_uint32 ui_nfc_baddr_d2;            /* (0xb8) -ä¼ é€æ•°æ®åŒºçš„åŸºåœ°å€å¯„å­˜å™¨2               */
+    hi_uint32 ui_nfc_baddr_d3;            /* (0xbc) -ä¼ é€æ•°æ®åŒºçš„åŸºåœ°å€å¯„å­˜å™¨3                */
 #if 1    //nfc v500 
-    hi_uint32 ui_nfc_reserved4;           /* (0xc0) -±£Áô                                                                             */
+    hi_uint32 ui_nfc_reserved4;           /* (0xc0) -ä¿ç•™                                                                             */
 #else    //nfc v300 
-    hi_uint32 ui_nfc_randomizer;          /* (0xc0) -nandflash µÄrandomizerÊ¹ÄÜ¼Ä´æÆ÷                      */
+    hi_uint32 ui_nfc_randomizer;          /* (0xc0) -nandflash çš„randomizerä½¿èƒ½å¯„å­˜å™¨                      */
 #endif
-    hi_uint32 ui_nfc_boot_cfg;            /* (0xc4) -nandflash µÄbootÅäÖÃ¼Ä´æÆ÷                               */
+    hi_uint32 ui_nfc_boot_cfg;            /* (0xc4) -nandflash çš„booté…ç½®å¯„å­˜å™¨                               */
 #if 1    //nfc v500 
-    hi_uint32 ui_nfc_oob_sel;             /* (0xc8) -16bit ECC£¬OOBÇø³¤¶ÈÑ¡Ôñ¼Ä´æÆ÷              */
-    hi_uint32 ui_nfc_mem_ctrl;            /* (0xcc) -Àı»¯mem¹ÜÀí                                                          */
-    hi_uint32 ui_nfc_sync_timing;         /* (0xd0) -Í¬²½NAND¶ÁĞ´Ê±Ğò²ÎÊı                                 */
-    hi_uint32 ui_nfc_dll_ctrl;            /* (0xd4) -DLLÄ£¿é¿ØÖÆĞÅÏ¢                                                */
-    hi_uint32 ui_nfc_dll_status;          /* (0xd8) -DLLÄ£¿é×´Ì¬ĞÅÏ¢                                                */
+    hi_uint32 ui_nfc_oob_sel;             /* (0xc8) -16bit ECCï¼ŒOOBåŒºé•¿åº¦é€‰æ‹©å¯„å­˜å™¨              */
+    hi_uint32 ui_nfc_mem_ctrl;            /* (0xcc) -ä¾‹åŒ–memç®¡ç†                                                          */
+    hi_uint32 ui_nfc_sync_timing;         /* (0xd0) -åŒæ­¥NANDè¯»å†™æ—¶åºå‚æ•°                                 */
+    hi_uint32 ui_nfc_dll_ctrl;            /* (0xd4) -DLLæ¨¡å—æ§åˆ¶ä¿¡æ¯                                                */
+    hi_uint32 ui_nfc_dll_status;          /* (0xd8) -DLLæ¨¡å—çŠ¶æ€ä¿¡æ¯                                                */
 #endif
 }hi_nfc_reg_s;
 
@@ -172,20 +172,20 @@ typedef union
     hi_uint32 ui_value;
     struct
     {
-        hi_uint32 ui_op_mode:1;           /* [0]-nandc²Ù×÷Ä£Ê½                            */
-        hi_uint32 ui_page_type:3;         /* [1:3]-nandflashÒ³´óĞ¡                         */
-        hi_uint32 ui_bus_width:1;         /* [4]-nandflashÊı¾İÏß¿í¶È                */
-        hi_uint32 ui_reserved:2;          /* [5:6]-±£Áô                                             */
-        hi_uint32 ui_cs_ctrl:1;           /* [7]-Æ¬Ñ¡¿ØÖÆ                                    */
-        hi_uint32 ui_rb_sel:1;            /* [8]-ready/busyĞÅºÅ¿ØÖÆ                   */
-        hi_uint32 ui_ecc_type:3;          /* [9:11]-eccÄ£Ê½                                      */
+        hi_uint32 ui_op_mode:1;           /* [0]-nandcæ“ä½œæ¨¡å¼                            */
+        hi_uint32 ui_page_type:3;         /* [1:3]-nandflashé¡µå¤§å°                         */
+        hi_uint32 ui_bus_width:1;         /* [4]-nandflashæ•°æ®çº¿å®½åº¦                */
+        hi_uint32 ui_reserved:2;          /* [5:6]-ä¿ç•™                                             */
+        hi_uint32 ui_cs_ctrl:1;           /* [7]-ç‰‡é€‰æ§åˆ¶                                    */
+        hi_uint32 ui_rb_sel:1;            /* [8]-ready/busyä¿¡å·æ§åˆ¶                   */
+        hi_uint32 ui_ecc_type:3;          /* [9:11]-eccæ¨¡å¼                                      */
 #if 1    //nfc v500 
-        hi_uint32 ui_reserved1:1;         /* [12]-±£Áô                                              */
-        hi_uint32 ui_randomizer_en:1;     /* [13]-randomizerÊ¹ÄÜ                             */
-        hi_uint32 ui_nf_mode:2;           /* [14:15]-nandflash½Ó¿ÚÀàĞÍÑ¡Ôñ   */
-        hi_uint32 ui_reserved2:16;        /* [16:31]-±£Áô                                         */
+        hi_uint32 ui_reserved1:1;         /* [12]-ä¿ç•™                                              */
+        hi_uint32 ui_randomizer_en:1;     /* [13]-randomizerä½¿èƒ½                             */
+        hi_uint32 ui_nf_mode:2;           /* [14:15]-nandflashæ¥å£ç±»å‹é€‰æ‹©   */
+        hi_uint32 ui_reserved2:16;        /* [16:31]-ä¿ç•™                                         */
 #else    //nfc v300 
-        hi_uint32 ui_reserved1:20;        /* [12:31]-±£Áô                                         */
+        hi_uint32 ui_reserved1:20;        /* [12:31]-ä¿ç•™                                         */
 #endif
     }st_bits;
 } hi_nfc_con_u;
@@ -198,10 +198,10 @@ typedef union
     hi_uint32 ui_value;
     struct
     {
-        hi_uint32 ui_w_lcnt:4;            /* [0:3] -nandflashĞ´ĞÅºÅµÍµçÆ½¿í¶È         */
-        hi_uint32 ui_r_lcnt:4;            /* [4:7] -nandflash¶ÁĞÅºÅµÍµçÆ½¿í¶È         */
-        hi_uint32 ui_rw_hcnt:4;           /* [8:11] -nandflash¶ÁĞ´ĞÅºÅ¸ßµçÆ½¿í¶È */
-        hi_uint32 ui_reserved:20;         /* [12:31] -±£Áô                                                       */
+        hi_uint32 ui_w_lcnt:4;            /* [0:3] -nandflashå†™ä¿¡å·ä½ç”µå¹³å®½åº¦         */
+        hi_uint32 ui_r_lcnt:4;            /* [4:7] -nandflashè¯»ä¿¡å·ä½ç”µå¹³å®½åº¦         */
+        hi_uint32 ui_rw_hcnt:4;           /* [8:11] -nandflashè¯»å†™ä¿¡å·é«˜ç”µå¹³å®½åº¦ */
+        hi_uint32 ui_reserved:20;         /* [12:31] -ä¿ç•™                                                       */
     }st_bits;
 } hi_nfc_pwidth_u;
 
@@ -213,10 +213,10 @@ typedef union
     hi_uint32 ui_value;
     struct
     {
-        hi_uint32 ui_cmd1:8;              /* [0:7]   -controller·¢¸ønandflashµÄµÚÒ»¸öÃüÁî*/
-        hi_uint32 ui_cmd2:8;              /* [8:15] -controller·¢¸ønandflashµÄµÚ¶ş¸öÃüÁî*/
-        hi_uint32 ui_read_status_cmd:8;   /* [16:23] -read statusÃüÁî×Ö                                       */
-        hi_uint32 ui_reserved:8;          /* [24:31] -±£Áô                                                              */
+        hi_uint32 ui_cmd1:8;              /* [0:7]   -controllerå‘ç»™nandflashçš„ç¬¬ä¸€ä¸ªå‘½ä»¤*/
+        hi_uint32 ui_cmd2:8;              /* [8:15] -controllerå‘ç»™nandflashçš„ç¬¬äºŒä¸ªå‘½ä»¤*/
+        hi_uint32 ui_read_status_cmd:8;   /* [16:23] -read statuså‘½ä»¤å­—                                       */
+        hi_uint32 ui_reserved:8;          /* [24:31] -ä¿ç•™                                                              */
     }st_bits;
 } hi_nfc_cmd_u;
 
@@ -228,13 +228,13 @@ typedef union
     hi_uint32 ui_value;
     struct
     {
-        hi_uint32 ui_page_inner_addr:16;  /* [0:15]-Ò³ÄÚµØÖ·£¬Ö»ÔÚbus·½Ê½Ö»¶ÁOOBÊ±Ê¹ÓÃ    */
-        hi_uint32 ui_page_addr:16;        /* [16:31]-Ò³µØÖ·                                                                                */
+        hi_uint32 ui_page_inner_addr:16;  /* [0:15]-é¡µå†…åœ°å€ï¼Œåªåœ¨busæ–¹å¼åªè¯»OOBæ—¶ä½¿ç”¨    */
+        hi_uint32 ui_page_addr:16;        /* [16:31]-é¡µåœ°å€                                                                                */
     }st_rw_bits;
     struct
     {
-        hi_uint32 ui_erase_addr:24;       /* [0:23]-²Á³ı²Ù×÷Ê±µÄ¿éµØÖ·    */
-        hi_uint32 ui_reserved:8;          /* [24:31]-±£Áô                                            */
+        hi_uint32 ui_erase_addr:24;       /* [0:23]-æ“¦é™¤æ“ä½œæ—¶çš„å—åœ°å€    */
+        hi_uint32 ui_reserved:8;          /* [24:31]-ä¿ç•™                                            */
     }st_erase_bits;
 } hi_nfc_addrl_u;
 
@@ -246,8 +246,8 @@ typedef union
     hi_uint32 ui_value;
     struct
     {
-        hi_uint32 ui_addr_h:8;             /* [0:7]-¸ß8bitµØÖ·¿Õ¼ä                       */
-        hi_uint32 ui_reserved:24;          /* [8:31]-±£Áô                                            */
+        hi_uint32 ui_addr_h:8;             /* [0:7]-é«˜8bitåœ°å€ç©ºé—´                       */
+        hi_uint32 ui_reserved:24;          /* [8:31]-ä¿ç•™                                            */
     }st_rw_bits;
 } hi_nfc_addrh_u;
 
@@ -259,21 +259,21 @@ typedef union
     hi_uint32 ui_value;
     struct
     {
-        hi_uint32 ui_read_status_en:1;    /* [0]-¶Á×´Ì¬Ê¹ÄÜ                                                                          */
-        hi_uint32 ui_read_data_en:1;      /* [1]-¶ÁÊı¾İÊ¹ÄÜ                                                                          */
-        hi_uint32 ui_wait_ready_en:1;     /* [2]-µÈ´ıready/busyĞÅºÅ±ä¸ßÊ¹ÄÜ                                       */
-        hi_uint32 ui_cmd2_en:1;           /* [3]-·¢cmd2ÃüÁîÊ¹ÄÜ                                                                  */
-        hi_uint32 ui_write_data_en:1;     /* [4]-ÏònandflashĞ´Êı¾İÊ¹ÄÜ                                                      */
-        hi_uint32 ui_addr_en:1;           /* [5]-ÏònandĞ´²Ù×÷µØÖ·Ê¹ÄÜ                                                 */
-        hi_uint32 ui_cmd1_en:1;           /* [6]-·¢cms1ÃüÁîÊ¹ÄÜ                                                                  */
-        hi_uint32 ui_nf_cs:2;             /* [7:8]-Ñ¡Ôñ²Ù×÷µÄnandflashÆ÷¼ş£¬¼´Æ¬Ñ¡                     */
-        hi_uint32 ui_address_cycle:3;     /* [9:11]-·¢¸ønandflashµÄµØÖ·ÖÜÆÚÊı                                     */
+        hi_uint32 ui_read_status_en:1;    /* [0]-è¯»çŠ¶æ€ä½¿èƒ½                                                                          */
+        hi_uint32 ui_read_data_en:1;      /* [1]-è¯»æ•°æ®ä½¿èƒ½                                                                          */
+        hi_uint32 ui_wait_ready_en:1;     /* [2]-ç­‰å¾…ready/busyä¿¡å·å˜é«˜ä½¿èƒ½                                       */
+        hi_uint32 ui_cmd2_en:1;           /* [3]-å‘cmd2å‘½ä»¤ä½¿èƒ½                                                                  */
+        hi_uint32 ui_write_data_en:1;     /* [4]-å‘nandflashå†™æ•°æ®ä½¿èƒ½                                                      */
+        hi_uint32 ui_addr_en:1;           /* [5]-å‘nandå†™æ“ä½œåœ°å€ä½¿èƒ½                                                 */
+        hi_uint32 ui_cmd1_en:1;           /* [6]-å‘cms1å‘½ä»¤ä½¿èƒ½                                                                  */
+        hi_uint32 ui_nf_cs:2;             /* [7:8]-é€‰æ‹©æ“ä½œçš„nandflashå™¨ä»¶ï¼Œå³ç‰‡é€‰                     */
+        hi_uint32 ui_address_cycle:3;     /* [9:11]-å‘ç»™nandflashçš„åœ°å€å‘¨æœŸæ•°                                     */
 #if 1    //nfc v500 
-        hi_uint32 ui_read_id_en:1;        /* [12]-¶ÔÓÚtoggle nand£¬0:·Ç¶ÁID²Ù×÷£¬1:¶ÁID²Ù×÷      */
-        hi_uint32 ui_rw_reg_en:1;         /* [13]-¶ÔÍ¬²½nand£¬0:¶ÁĞ´Êı¾İ£¬1:¶ÁĞ´¼Ä´æÆ÷     */
-        hi_uint32 ui_reserved:18;         /* [14:31]-±£Áô                                                                                      */
+        hi_uint32 ui_read_id_en:1;        /* [12]-å¯¹äºtoggle nandï¼Œ0:éè¯»IDæ“ä½œï¼Œ1:è¯»IDæ“ä½œ      */
+        hi_uint32 ui_rw_reg_en:1;         /* [13]-å¯¹åŒæ­¥nandï¼Œ0:è¯»å†™æ•°æ®ï¼Œ1:è¯»å†™å¯„å­˜å™¨     */
+        hi_uint32 ui_reserved:18;         /* [14:31]-ä¿ç•™                                                                                      */
 #else    //nfc v300 
-        hi_uint32 ui_reserved:20;         /* [12:31]-±£Áô                                                                                      */
+        hi_uint32 ui_reserved:20;         /* [12:31]-ä¿ç•™                                                                                      */
 #endif
     }st_bits;
 } hi_nfc_op_u;
@@ -286,21 +286,21 @@ typedef union
     hi_uint32 ui_value;
     struct
     {
-        hi_uint32 ui_nfc_ready:1;         /* [0]-nandcµ±Ç°²Ù×÷×´Ì¬                                            */
-        hi_uint32 ui_nf0_ready:1;         /* [1]-Æ¬Ñ¡0Æ÷¼şµÄready/busyĞÅºÅ×´Ì¬                */
-        hi_uint32 ui_nf1_ready:1;         /* [2]-Æ¬Ñ¡1Æ÷¼şµÄready/busyĞÅºÅ×´Ì¬                */
+        hi_uint32 ui_nfc_ready:1;         /* [0]-nandcå½“å‰æ“ä½œçŠ¶æ€                                            */
+        hi_uint32 ui_nf0_ready:1;         /* [1]-ç‰‡é€‰0å™¨ä»¶çš„ready/busyä¿¡å·çŠ¶æ€                */
+        hi_uint32 ui_nf1_ready:1;         /* [2]-ç‰‡é€‰1å™¨ä»¶çš„ready/busyä¿¡å·çŠ¶æ€                */
 #if 1    //nfc v500 
-        hi_uint32 ui_nf2_ready:1;         /* [3]-Æ¬Ñ¡2Æ÷¼şµÄready/busyĞÅºÅ×´Ì¬                */
-        hi_uint32 ui_nf3_ready:1;         /* [4]-Æ¬Ñ¡3Æ÷¼şµÄready/busyĞÅºÅ×´Ì¬                */
-        hi_uint32 ui_reserved:3;          /* [5:7]-±£Áô                                                                          */
-        hi_uint32 ui_nf_status:8;         /* [8:15]-´Ónandflash¶Á»ØµÄnandflash µÄstatusÊı¾İ    */
-        hi_uint32 ui_nf_ecc_type:3;       /* [16:18]-nandc eccÄ£Ê½£¬ÓëCONÏàÍ¬£¬Ö»¶Á       */
-        hi_uint32 ui_nf_randomizer_en:1;  /* [19]-randomizer×´Ì¬£¬ÓëCONÏàÍ¬¸ö£¬Ö»¶Á    */
-        hi_uint32 ui_reserved1:12;        /* [20:31] -±£Áô                                                                     */
+        hi_uint32 ui_nf2_ready:1;         /* [3]-ç‰‡é€‰2å™¨ä»¶çš„ready/busyä¿¡å·çŠ¶æ€                */
+        hi_uint32 ui_nf3_ready:1;         /* [4]-ç‰‡é€‰3å™¨ä»¶çš„ready/busyä¿¡å·çŠ¶æ€                */
+        hi_uint32 ui_reserved:3;          /* [5:7]-ä¿ç•™                                                                          */
+        hi_uint32 ui_nf_status:8;         /* [8:15]-ä»nandflashè¯»å›çš„nandflash çš„statusæ•°æ®    */
+        hi_uint32 ui_nf_ecc_type:3;       /* [16:18]-nandc eccæ¨¡å¼ï¼Œä¸CONç›¸åŒï¼Œåªè¯»       */
+        hi_uint32 ui_nf_randomizer_en:1;  /* [19]-randomizerçŠ¶æ€ï¼Œä¸CONç›¸åŒä¸ªï¼Œåªè¯»    */
+        hi_uint32 ui_reserved1:12;        /* [20:31] -ä¿ç•™                                                                     */
 #else    //nfc v300 
-        hi_uint32 ui_reserved:2;          /* [3:4]-±£Áô                                                                          */
-        hi_uint32 ui_nf_status:8;         /* [5:12]-´Ónandflash¶Á»ØµÄnandflash µÄstatusÊı¾İ    */
-        hi_uint32 ui_reserved1:19;        /* [13:31] -±£Áô                                                                     */
+        hi_uint32 ui_reserved:2;          /* [3:4]-ä¿ç•™                                                                          */
+        hi_uint32 ui_nf_status:8;         /* [5:12]-ä»nandflashè¯»å›çš„nandflash çš„statusæ•°æ®    */
+        hi_uint32 ui_reserved1:19;        /* [13:31] -ä¿ç•™                                                                     */
 #endif
     }st_bits;
 } hi_nfc_status_u;
@@ -313,18 +313,18 @@ typedef union
     hi_uint32 ui_value;
     struct
     {
-        hi_uint32 ui_op_done:1;           /* [0]-NANDC±¾´Î²Ù×÷½áÊøÖĞ¶Ï                                            */
-        hi_uint32 ui_cs0_done:1;          /* [1]-Æ¬Ñ¡0¶ÔÓ¦µÄready/busyĞÅºÅÓÉµÍ±ä¸ßÖĞ¶Ï     */
-        hi_uint32 ui_cs1_done:1;          /* [2]-Æ¬Ñ¡1¶ÔÓ¦µÄready/busyĞÅºÅÓÉµÍ±ä¸ßÖĞ¶Ï     */
-        hi_uint32 ui_cs2_done:1;          /* [3]-Æ¬Ñ¡2¶ÔÓ¦µÄready/busyĞÅºÅÓÉµÍ±ä¸ßÖĞ¶Ï     */
-        hi_uint32 ui_cs3_done:1;          /* [4]-Æ¬Ñ¡3¶ÔÓ¦µÄready/busyĞÅºÅÓÉµÍ±ä¸ßÖĞ¶Ï     */
-        hi_uint32 ui_err_valid:1;         /* [5]-²úÉú¿É¾ÀÕıµÄ´íÎóÖĞ¶Ï                                          */
-        hi_uint32 ui_err_invalid:1;       /* [6]-²úÉú²»¿É¾ÀÕıµÄ´íÎóÖĞ¶Ï                                    */
-        hi_uint32 ui_ahb_op:1;            /* [7]-NANDC¶ÁĞ´flashÆ÷¼şcpu¶ÁĞ´nandc buffer´íÎóÖĞ¶Ï */
-        hi_uint32 ui_wr_lock:1;           /* [8]-¶ÔlockµØÖ·½øĞĞĞ´²Ù×÷´íÎóÖĞ¶Ï                        */
-        hi_uint32 ui_dma_done:1;          /* [9]-DMA´«ÊäÍê³ÉÖĞ¶Ï                                                           */
-        hi_uint32 ui_dma_err:1;           /* [10]-DMA´«ÊäÖĞÏß³öÏÖ´íÎóÖĞ¶Ï                                 */
-        hi_uint32 ui_reserved:21;         /* [11:31] -±£Áô                                                                                 */
+        hi_uint32 ui_op_done:1;           /* [0]-NANDCæœ¬æ¬¡æ“ä½œç»“æŸä¸­æ–­                                            */
+        hi_uint32 ui_cs0_done:1;          /* [1]-ç‰‡é€‰0å¯¹åº”çš„ready/busyä¿¡å·ç”±ä½å˜é«˜ä¸­æ–­     */
+        hi_uint32 ui_cs1_done:1;          /* [2]-ç‰‡é€‰1å¯¹åº”çš„ready/busyä¿¡å·ç”±ä½å˜é«˜ä¸­æ–­     */
+        hi_uint32 ui_cs2_done:1;          /* [3]-ç‰‡é€‰2å¯¹åº”çš„ready/busyä¿¡å·ç”±ä½å˜é«˜ä¸­æ–­     */
+        hi_uint32 ui_cs3_done:1;          /* [4]-ç‰‡é€‰3å¯¹åº”çš„ready/busyä¿¡å·ç”±ä½å˜é«˜ä¸­æ–­     */
+        hi_uint32 ui_err_valid:1;         /* [5]-äº§ç”Ÿå¯çº æ­£çš„é”™è¯¯ä¸­æ–­                                          */
+        hi_uint32 ui_err_invalid:1;       /* [6]-äº§ç”Ÿä¸å¯çº æ­£çš„é”™è¯¯ä¸­æ–­                                    */
+        hi_uint32 ui_ahb_op:1;            /* [7]-NANDCè¯»å†™flashå™¨ä»¶cpuè¯»å†™nandc bufferé”™è¯¯ä¸­æ–­ */
+        hi_uint32 ui_wr_lock:1;           /* [8]-å¯¹lockåœ°å€è¿›è¡Œå†™æ“ä½œé”™è¯¯ä¸­æ–­                        */
+        hi_uint32 ui_dma_done:1;          /* [9]-DMAä¼ è¾“å®Œæˆä¸­æ–­                                                           */
+        hi_uint32 ui_dma_err:1;           /* [10]-DMAä¼ è¾“ä¸­çº¿å‡ºç°é”™è¯¯ä¸­æ–­                                 */
+        hi_uint32 ui_reserved:21;         /* [11:31] -ä¿ç•™                                                                                 */
     }st_bits;
 } hi_nfc_ints_u;
 
@@ -336,25 +336,25 @@ typedef union
     hi_uint32 ui_value;
     struct
     {
-        hi_uint32 ui_dma_start:1;         /* [0]-Æô¶¯dma²Ù×÷              */
-        hi_uint32 ui_dma_wr_en:1;         /* [1]-dma¶ÁĞ´Ê¹ÄÜ              */
-        hi_uint32 ui_reserved:2;          /* [2:3]-±£Áô                             */
-        hi_uint32 ui_burst4_en:1;         /* [4]-burst4Ê¹ÄÜ                       */
-        hi_uint32 ui_burst8_en:1;         /* [5]-burst8Ê¹ÄÜ                       */
-        hi_uint32 ui_burst16_en:1;        /* [6]-burst16Ê¹ÄÜ                     */
-        hi_uint32 ui_dma_addr_num:1;      /* [7]-µØÖ·Êı                           */
-        hi_uint32 ui_dma_nf_cs:2;         /* [8:9]-Ñ¡ÔñdmaÆ¬Ñ¡           */
+        hi_uint32 ui_dma_start:1;         /* [0]-å¯åŠ¨dmaæ“ä½œ              */
+        hi_uint32 ui_dma_wr_en:1;         /* [1]-dmaè¯»å†™ä½¿èƒ½              */
+        hi_uint32 ui_reserved:2;          /* [2:3]-ä¿ç•™                             */
+        hi_uint32 ui_burst4_en:1;         /* [4]-burst4ä½¿èƒ½                       */
+        hi_uint32 ui_burst8_en:1;         /* [5]-burst8ä½¿èƒ½                       */
+        hi_uint32 ui_burst16_en:1;        /* [6]-burst16ä½¿èƒ½                     */
+        hi_uint32 ui_dma_addr_num:1;      /* [7]-åœ°å€æ•°                           */
+        hi_uint32 ui_dma_nf_cs:2;         /* [8:9]-é€‰æ‹©dmaç‰‡é€‰           */
 #if 1    //nfc v500 
-        hi_uint32 ui_reserved1:1;         /* [10]-±£Áô                               */
+        hi_uint32 ui_reserved1:1;         /* [10]-ä¿ç•™                               */
 #else    //nfc v300 
-        hi_uint32 ui_rw_nf_disable:1;     /* [10]-ÅĞ¶ÏDMA¶ÁĞ´Ê±Êı¾İ°áÔËÍ¬²½ */
+        hi_uint32 ui_rw_nf_disable:1;     /* [10]-åˆ¤æ–­DMAè¯»å†™æ—¶æ•°æ®æ¬è¿åŒæ­¥ */
 #endif
-        hi_uint32 ui_wr_cmd_disable:1;    /* [11]-ÊÇ·ñ·¢³öĞ´ÃüÁî */
+        hi_uint32 ui_wr_cmd_disable:1;    /* [11]-æ˜¯å¦å‘å‡ºå†™å‘½ä»¤ */
 #if 1    //nfc v500 
-        hi_uint32 ui_dma_rd_oob:1;        /* [12]-ÊÇ·ñÖ»¶ÁOOB            */
-        hi_uint32 ui_reserved2:19;        /* [13:31]-±£Áô                          */
+        hi_uint32 ui_dma_rd_oob:1;        /* [12]-æ˜¯å¦åªè¯»OOB            */
+        hi_uint32 ui_reserved2:19;        /* [13:31]-ä¿ç•™                          */
 #else    //nfc v300 
-        hi_uint32 ui_reserved2:20;        /* [12:31]-±£Áô                          */
+        hi_uint32 ui_reserved2:20;        /* [12:31]-ä¿ç•™                          */
 #endif
     }st_bits;
 } hi_nfc_dma_ctrl_u;
@@ -367,16 +367,16 @@ typedef union
     hi_uint32 ui_value;
     struct
     {
-        hi_uint32 ui_data_rw_en:1;        /* [0] -nandflashÊı¾İÇø¶ÁĞ´             */
-        hi_uint32 ui_oob_rw_en:1;         /* [1] -nandflashÈßÓàÇø¶ÁĞ´Ê¹ÄÜ */
-        hi_uint32 ui_data_edc_en:1;       /* [2] -dataÇøĞ£ÑéÊ¹ÄÜ                    */
-        hi_uint32 ui_oob_edc_en:1;        /* [3] -oobÇøĞ£ÑéÊ¹ÄÜ                     */
+        hi_uint32 ui_data_rw_en:1;        /* [0] -nandflashæ•°æ®åŒºè¯»å†™             */
+        hi_uint32 ui_oob_rw_en:1;         /* [1] -nandflashå†—ä½™åŒºè¯»å†™ä½¿èƒ½ */
+        hi_uint32 ui_data_edc_en:1;       /* [2] -dataåŒºæ ¡éªŒä½¿èƒ½                    */
+        hi_uint32 ui_oob_edc_en:1;        /* [3] -oobåŒºæ ¡éªŒä½¿èƒ½                     */
 #if 1    //nfc v500 
-        hi_uint32 ui_reserved:28;         /* [4:31] -±£Áô                                       */
+        hi_uint32 ui_reserved:28;         /* [4:31] -ä¿ç•™                                       */
 #else    //nfc v300 
-        hi_uint32 ui_data_ecc_en:1;       /* [4] -dataÇøECC¾À´íÊ¹ÄÜ              */
-        hi_uint32 ui_oob_ecc_en:1;        /* [5] -oobÇøECC¾À´íÊ¹ÄÜ              */
-        hi_uint32 ui_reserved:26;         /* [6:31] -±£Áô                                       */
+        hi_uint32 ui_data_ecc_en:1;       /* [4] -dataåŒºECCçº é”™ä½¿èƒ½              */
+        hi_uint32 ui_oob_ecc_en:1;        /* [5] -oobåŒºECCçº é”™ä½¿èƒ½              */
+        hi_uint32 ui_reserved:26;         /* [6:31] -ä¿ç•™                                       */
 #endif
     }st_bits;
 } hi_nfc_op_para_u;
@@ -405,7 +405,7 @@ struct hi_nand_host
 };
 
 #if 0    //nfc v300 
-/* ·Çecc0ÏÂOOB³¤¶È¼ÆËã */
+/* éecc0ä¸‹OOBé•¿åº¦è®¡ç®— */
 struct hi_nand_oob_size
 {
     hi_uint32 ui_ecc_type;
@@ -415,7 +415,7 @@ struct hi_nand_oob_size
 #endif
 
 #if 1    //nfc v500 
-/* bus·½Ê½Ö»¶ÁOOBµÄÇé¿öÏÂ£¬°üº¬OOBĞÅÏ¢µÄsectorµÄÒ³ÄÚÆğÊ¼µØÖ· */
+/* busæ–¹å¼åªè¯»OOBçš„æƒ…å†µä¸‹ï¼ŒåŒ…å«OOBä¿¡æ¯çš„sectorçš„é¡µå†…èµ·å§‹åœ°å€ */
 struct hi_nand_oob_offset
 {
     hi_uint32 ui_ecc_type;

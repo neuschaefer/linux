@@ -3,14 +3,14 @@
 * (C) Huawei Technologies Co., Ltd. < >
 */
 /******************************************************************************
-  ÎÄ¼şÃû³Æ: watchdog.c
-  ¹¦ÄÜÃèÊö: Ó²¼ş¿´ÃÅ¹·Çı¶¯
-  °æ±¾ÃèÊö: V1.0
+  æ–‡ä»¶åç§°: watchdog.c
+  åŠŸèƒ½æè¿°: ç¡¬ä»¶çœ‹é—¨ç‹—é©±åŠ¨
+  ç‰ˆæœ¬æè¿°: V1.0
 
-  ´´½¨ÈÕÆÚ: D2011_09_30
+  åˆ›å»ºæ—¥æœŸ: D2011_09_30
 
-  ĞŞ¸Ä¼ÇÂ¼: 
-            Éú³É³õ¸å.
+  ä¿®æ”¹è®°å½•: 
+            ç”Ÿæˆåˆç¨¿.
 ******************************************************************************/
 #include <linux/module.h>
 #include <linux/init.h>
@@ -81,7 +81,7 @@ static ATP_E_BREATH_STATUS breath_complete_off = BREATH_OFF;
 static int gpio = 0;
 static int gpios = 0;
 
-/* °ó¶¨Ó²ÖĞ¶Ïµ½Ö¸¶¨CPU */
+/* ç»‘å®šç¡¬ä¸­æ–­åˆ°æŒ‡å®šCPU */
 static int hi_kernel_irq_bind_cpu(int ui_irq, int ui_cpu)
 {
    struct cpumask mask;
@@ -231,7 +231,7 @@ void hi_kernel_breath_timer_init(void)
 {
     writel(0,                                      CFG_TIMER2_VABASE + HI_REG_TIMER1_CONTROL);
     writel(BREATH_FREQUENCE,         CFG_TIMER2_VABASE + HI_REG_TIMER1_RELOAD );
-    writel(BREATH_FREQUENCE,         CFG_TIMER2_VABASE + HI_REG_TIMER1_BGLOAD  ); //ÕâÀïÑÓºó1Ãë£¬·ÀÖ¹³åÍ»
+    writel(BREATH_FREQUENCE,         CFG_TIMER2_VABASE + HI_REG_TIMER1_BGLOAD  ); //è¿™é‡Œå»¶å1ç§’ï¼Œé˜²æ­¢å†²çª
 	writel(0,                        CFG_TIMER2_VABASE + HI_REG_TIMER1_CONTROL); //disable hi_kernel_breath_timer	
 
     setup_irq(INTNR_TIMER_2_3, &hi_kernel_breath_timer_irq);

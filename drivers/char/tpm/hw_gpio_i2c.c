@@ -3,32 +3,32 @@
 * (C) Huawei Technologies Co., Ltd. < >
 */
 /******************************************************************************
-  °æÈ¨ËùÓÐ  : 2013-2020£¬»ªÎª¼¼ÊõÓÐÏÞ¹«Ë¾
-  ÎÄ ¼þ Ãû  : Hw_gpio_i2c.c
-  °æ           ±¾  : 1.0
-  ´´½¨ÈÕÆÚ  : 2013-09-05
-  Ãè          Êö  :   ¸ÃÎÄ¼þÖÐÊ¹ÓÃ2¸öGPIOÀ´Ä£ÄâI2C¿ØÖÆÆ÷.ÓÃÒ»¸öGPIOÀ´×öÊ±
-                           ÖÓÏß,ÁíÍâÒ»¸öGPIOÀ´×öÊý¾ÝÏß.
-  º¯ÊýÁÐ±í  :
-                        01. i2c_gpio_set_val        ÉèÖÃGPIOÖµ
-                        02. i2c_gpio_set_dir        ÉèÖÃGPIO·½Ïò,ÊäÈë»¹ÊÇÊä³ö
-                        03. gpio_i2c_start           ÏòI2C SLAVEÉè±¸·¢ËÍI2CÆô¶¯µÄÊ±Ðò
-                        04. gpio_i2c_stop            ÏòI2C SLAVEÉè±¸·¢ËÍI2C½áÊøµÄÊ±Ðò
-                        05. gpio_i2c_send_ack     ·¢ËÍACKÐÅºÅ,Èç¹ûÊÇ×îºóÒ»¸ö×Ö½ÚÔò·¢ËÍNACKÐÅºÅ
-                        06. gpio_get_value          »ñÈ¡SDA GPIOµÄÖµ
-                        07. gpio_i2c_receive_ack  ½ÓÊÕACKÐÅºÅ
-                        08. gpio_i2c_send_byte    ·¢ËÍÒ»¸ö×Ö½ÚµÄÊý¾Ý
-                        09. gpio_i2c_read_byte     ½ÓÊÕÒ»¸ö×Ö½ÚµÄÊý¾Ý
-                        10. gpio_i2c_write            ÏòI2C Ð´Êý¾Ý
-                        11. gpio_i2c_read             ÏòI2C¶ÁÊý¾Ý
-                        12. gpio_i2c_init               ³õÊ¼»¯GPIO SDA, GPIO SCLµÄÖµ, »ñÈ¡I2CµÄµØÖ·µÈ.
-  ÀúÊ·¼ÇÂ¼      :
-   1.ÈÕ    ÆÚ   : 2013-09-05
-     ÐÞ¸ÄÄÚÈÝ   : Íê³É³õ¸å
-   2.ÈÕ    ÆÚ   : 2013-10-20
-     ÐÞ¸ÄÄÚÈÝ   : Ôö¼ÓATMELÐ¾Æ¬µÄÖ§³ÖºÍÉý¼¶
-   3.ÈÕ    ÆÚ   : 2015-04-30
-     ÐÞ¸ÄÄÚÈÝ   : ÒÆÖ²µ½HISI5610Æ½Ì¨
+  ç‰ˆæƒæ‰€æœ‰  : 2013-2020ï¼ŒåŽä¸ºæŠ€æœ¯æœ‰é™å…¬å¸
+  æ–‡ ä»¶ å  : Hw_gpio_i2c.c
+  ç‰ˆ           æœ¬  : 1.0
+  åˆ›å»ºæ—¥æœŸ  : 2013-09-05
+  æ          è¿°  :   è¯¥æ–‡ä»¶ä¸­ä½¿ç”¨2ä¸ªGPIOæ¥æ¨¡æ‹ŸI2CæŽ§åˆ¶å™¨.ç”¨ä¸€ä¸ªGPIOæ¥åšæ—¶
+                           é’Ÿçº¿,å¦å¤–ä¸€ä¸ªGPIOæ¥åšæ•°æ®çº¿.
+  å‡½æ•°åˆ—è¡¨  :
+                        01. i2c_gpio_set_val        è®¾ç½®GPIOå€¼
+                        02. i2c_gpio_set_dir        è®¾ç½®GPIOæ–¹å‘,è¾“å…¥è¿˜æ˜¯è¾“å‡º
+                        03. gpio_i2c_start           å‘I2C SLAVEè®¾å¤‡å‘é€I2Cå¯åŠ¨çš„æ—¶åº
+                        04. gpio_i2c_stop            å‘I2C SLAVEè®¾å¤‡å‘é€I2Cç»“æŸçš„æ—¶åº
+                        05. gpio_i2c_send_ack     å‘é€ACKä¿¡å·,å¦‚æžœæ˜¯æœ€åŽä¸€ä¸ªå­—èŠ‚åˆ™å‘é€NACKä¿¡å·
+                        06. gpio_get_value          èŽ·å–SDA GPIOçš„å€¼
+                        07. gpio_i2c_receive_ack  æŽ¥æ”¶ACKä¿¡å·
+                        08. gpio_i2c_send_byte    å‘é€ä¸€ä¸ªå­—èŠ‚çš„æ•°æ®
+                        09. gpio_i2c_read_byte     æŽ¥æ”¶ä¸€ä¸ªå­—èŠ‚çš„æ•°æ®
+                        10. gpio_i2c_write            å‘I2C å†™æ•°æ®
+                        11. gpio_i2c_read             å‘I2Cè¯»æ•°æ®
+                        12. gpio_i2c_init               åˆå§‹åŒ–GPIO SDA, GPIO SCLçš„å€¼, èŽ·å–I2Cçš„åœ°å€ç­‰.
+  åŽ†å²è®°å½•      :
+   1.æ—¥    æœŸ   : 2013-09-05
+     ä¿®æ”¹å†…å®¹   : å®Œæˆåˆç¨¿
+   2.æ—¥    æœŸ   : 2013-10-20
+     ä¿®æ”¹å†…å®¹   : å¢žåŠ ATMELèŠ¯ç‰‡çš„æ”¯æŒå’Œå‡çº§
+   3.æ—¥    æœŸ   : 2015-04-30
+     ä¿®æ”¹å†…å®¹   : ç§»æ¤åˆ°HISI5610å¹³å°
 *****************************************************************************/
 
 /* Includes. */
@@ -273,7 +273,7 @@ unsigned int gpio_i2c_read( unsigned char* buffer, unsigned int len)
 
     for (i = 0; i < len; i++)
     {
-        // µ±ÊÇ×îºóÒ»¸ö×Ö½Úºó·¢ËÍNACKÐÅºÅ.
+        // å½“æ˜¯æœ€åŽä¸€ä¸ªå­—èŠ‚åŽå‘é€NACKä¿¡å·.
         gpio_i2c_read_byte(buffer++, !(len - i - 1));
     }
 

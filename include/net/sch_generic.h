@@ -429,7 +429,7 @@ static inline bool qdisc_tx_is_noop(const struct net_device *dev)
 	return true;
 }
 
-/* start ÉÏĞĞ·ÖÁ÷´ø¿íÅäÖÃ²»×¼È· 20130620  */
+/* start ä¸Šè¡Œåˆ†æµå¸¦å®½é…ç½®ä¸å‡†ç¡® 20130620  */
 #ifdef CONFIG_ATP_HYBRID
 #include <linux/if_arp.h>
 #include "atp_interface.h"
@@ -441,7 +441,7 @@ static inline bool qdisc_tx_is_noop(const struct net_device *dev)
 
 static inline unsigned int qdisc_pkt_len(const struct sk_buff *skb)
 {
-    /* HybridÉÏĞĞ·ÖÁ÷¼ÆËãÁ÷Á¿Ê±£¬Ã»ÓĞÌí¼ÓGRE, IP, PPP, ETHÍ· */
+    /* Hybridä¸Šè¡Œåˆ†æµè®¡ç®—æµé‡æ—¶ï¼Œæ²¡æœ‰æ·»åŠ GRE, IP, PPP, ETHå¤´ */
     if (IS_GRE_DEV(skb->dev->name))
     {
         if (ARPHRD_IPGRE == skb->dev->type)
@@ -466,7 +466,7 @@ static inline unsigned int qdisc_pkt_len(const struct sk_buff *skb)
 	return qdisc_skb_cb(skb)->pkt_len;
 }
 #endif
-/* end ÉÏĞĞ·ÖÁ÷´ø¿íÅäÖÃ²»×¼È· 20130620  */
+/* end ä¸Šè¡Œåˆ†æµå¸¦å®½é…ç½®ä¸å‡†ç¡® 20130620  */
 
 /* additional qdisc xmit flags (NET_XMIT_MASK in linux/netdevice.h) */
 enum net_xmit_qdisc_t {

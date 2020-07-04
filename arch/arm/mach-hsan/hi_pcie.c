@@ -4,12 +4,12 @@
 */
 /******************************************************************************
 
-                  °æÈ¨ËùÓĞ (C), 2008-2018, º£Ë¼°ëµ¼ÌåÓĞÏŞ¹«Ë¾
+                  ç‰ˆæƒæ‰€æœ‰ (C), 2008-2018, æµ·æ€åŠå¯¼ä½“æœ‰é™å…¬å¸
 
  ******************************************************************************
-  ÎÄ ¼ş Ãû   : hi_pcie.c
-  °æ ±¾ ºÅ   : ³õ¸å
-  Éú³ÉÈÕÆÚ   : D2014_03_13
+  æ–‡ ä»¶ å   : hi_pcie.c
+  ç‰ˆ æœ¬ å·   : åˆç¨¿
+  ç”Ÿæˆæ—¥æœŸ   : D2014_03_13
 
 ******************************************************************************/
 
@@ -28,15 +28,15 @@ enum pcie_init_mode
     pcie_mode_default	//for default mode
 };
 
-/* GPIO¹¤×÷Ä£Ê½ */
+/* GPIOå·¥ä½œæ¨¡å¼ */
 typedef enum
 {
-    SD5610X_GPIO_MODE_IN = 0, /* ÊäÈëÄ£Ê½ */
-    SD5610X_GPIO_MODE_OUT,    /* Êä³öÄ£Ê½ */
-    SD5610X_GPIO_MODE_HW,     /* ÌØÊâ¹¦ÄÜÄ£Ê½,Ó²¼şÄ£Ê½¹Ü½Å¸´ÓÃ */
+    SD5610X_GPIO_MODE_IN = 0, /* è¾“å…¥æ¨¡å¼ */
+    SD5610X_GPIO_MODE_OUT,    /* è¾“å‡ºæ¨¡å¼ */
+    SD5610X_GPIO_MODE_HW,     /* ç‰¹æ®ŠåŠŸèƒ½æ¨¡å¼,ç¡¬ä»¶æ¨¡å¼ç®¡è„šå¤ç”¨ */
 } sd5610x_gpio_mode_e;
 
-/* GPIOÊä³öµçÆ½ */
+/* GPIOè¾“å‡ºç”µå¹³ */
 typedef enum
 {
     SD5610X_GPIO_LEVEL_LOW = 0,
@@ -193,7 +193,7 @@ static hi_pcie_iatu_s g_st_iatu_table[HI_PCIE_NR][HI_PCIE_IATU_TBL_CNT] =
     // channel 0
     {
         {
-            /* ÅäÖÃ²Ù×÷µÄiATU¼Ä´æÆ÷³õÊ¼»¯ */
+            /* é…ç½®æ“ä½œçš„iATUå¯„å­˜å™¨åˆå§‹åŒ– */
     		.ui_viewport	    = 0x0,          //view index
     		.ui_region_ctrl_1	= 0x4,          //ctrl 1
     		.ui_region_ctrl_2	= 0x80000000,   //ctrl 2
@@ -204,7 +204,7 @@ static hi_pcie_iatu_s g_st_iatu_table[HI_PCIE_NR][HI_PCIE_IATU_TBL_CNT] =
     		.ui_utar		    = 0x0,          //target upper
     	},
         {
-            /* ÅäÖÃ²Ù×÷µÄiATU¼Ä´æÆ÷³õÊ¼»¯ */
+            /* é…ç½®æ“ä½œçš„iATUå¯„å­˜å™¨åˆå§‹åŒ– */
     		.ui_viewport	    = 0x1,          //view index
     		.ui_region_ctrl_1	= 0x2,          //ctrl 1 io 64k
     		.ui_region_ctrl_2	= 0x80000000,   //ctrl 2
@@ -215,7 +215,7 @@ static hi_pcie_iatu_s g_st_iatu_table[HI_PCIE_NR][HI_PCIE_IATU_TBL_CNT] =
     		.ui_utar		    = 0x0,          //target upper
     	},
         {
-            /* ÅäÖÃ²Ù×÷µÄiATU¼Ä´æÆ÷³õÊ¼»¯ */
+            /* é…ç½®æ“ä½œçš„iATUå¯„å­˜å™¨åˆå§‹åŒ– */
     		.ui_viewport	    = 0x2,          //view index
     		.ui_region_ctrl_1	= 0x0,          //ctrl 1 mem 0x400000
     		.ui_region_ctrl_2	= 0x80000000,   //ctrl 2
@@ -229,7 +229,7 @@ static hi_pcie_iatu_s g_st_iatu_table[HI_PCIE_NR][HI_PCIE_IATU_TBL_CNT] =
     // channel 1
     {
         {
-            /* ÅäÖÃ²Ù×÷µÄiATU¼Ä´æÆ÷³õÊ¼»¯ */
+            /* é…ç½®æ“ä½œçš„iATUå¯„å­˜å™¨åˆå§‹åŒ– */
     		.ui_viewport	    = 0x0,          //view index
     		.ui_region_ctrl_1	= 0x4,          //ctrl 1
     		.ui_region_ctrl_2	= 0x80000000,   //ctrl 2
@@ -240,7 +240,7 @@ static hi_pcie_iatu_s g_st_iatu_table[HI_PCIE_NR][HI_PCIE_IATU_TBL_CNT] =
     		.ui_utar		    = 0x0,          //target upper
     	},
         {
-            /* ÅäÖÃ²Ù×÷µÄiATU¼Ä´æÆ÷³õÊ¼»¯ ÍâÉèÅäÖÃ¿Õ¼ä */
+            /* é…ç½®æ“ä½œçš„iATUå¯„å­˜å™¨åˆå§‹åŒ– å¤–è®¾é…ç½®ç©ºé—´ */
     		.ui_viewport	    = 0x1,          //view index
     		.ui_region_ctrl_1	= 0x2,          //ctrl 1 io 64k
     		.ui_region_ctrl_2	= 0x80000000,   //ctrl 2
@@ -251,7 +251,7 @@ static hi_pcie_iatu_s g_st_iatu_table[HI_PCIE_NR][HI_PCIE_IATU_TBL_CNT] =
     		.ui_utar		    = 0x0,          //target upper
     	},
         {
-            /* ÅäÖÃ²Ù×÷µÄiATU¼Ä´æÆ÷³õÊ¼»¯ io²Ù×÷ ÍâÉèÄÚ²¿¼Ä´æÆ÷*/ 
+            /* é…ç½®æ“ä½œçš„iATUå¯„å­˜å™¨åˆå§‹åŒ– ioæ“ä½œ å¤–è®¾å†…éƒ¨å¯„å­˜å™¨*/ 
     		.ui_viewport	    = 0x2,          //view index
     		.ui_region_ctrl_1	= 0x0,          //ctrl 1 mem 0x400000
     		.ui_region_ctrl_2	= 0x80000000,   //ctrl 2
@@ -530,7 +530,7 @@ hi_int32 hi_pcie_check_link_2_0(hi_pcie_info_s *pst_info)
     hi_int32  i_idx         = 0;
     hi_uint32 ui_stable_cnt = 0; 
 
-	//ÅäÖÃpcie2.0ËÙÂÊ	   
+	//é…ç½®pcie2.0é€Ÿç‡	   
 	HI_REG_READ( pst_info->ui_dbi_base + 0x700 + 0x10C, ui_val);
 	ui_val = ui_val | 0x20000;
 	HI_REG_WRITE(pst_info->ui_dbi_base + 0x700 + 0x10C, ui_val);

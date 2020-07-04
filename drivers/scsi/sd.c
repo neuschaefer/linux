@@ -348,15 +348,15 @@ static int get_physicalmedium_usbdev_info(struct scsi_device *sdp, struct scsi_d
         {
             disk->isvalid = true;
 
-            //���кŴ��ڣ�ID�ĽṹΪvendor+serial����λ
+            //序列号存在，ID的结构为vendor+serial后四位
             if (us->pusb_dev->serial)
             {
-                //��¼�����кŵ�ָ��
+                //记录该序列号的指针
                 ser = us->pusb_dev->serial;
                 length = strlen(us->pusb_dev->serial);
                 
-                //ȡ���кŵĺ���λ
-                //��������������кų���С��4����0����4λ
+                //取序列号的后四位
+                //如果读出来的序列号长度小于4，则补0补够4位
                 if(length < 4)
                 {
 					snprintf(serialnum,sizeof(serialnum),"%s%s",us->pusb_dev->serial,"0000");
@@ -369,7 +369,7 @@ static int get_physicalmedium_usbdev_info(struct scsi_device *sdp, struct scsi_d
             }
             else
             {
-                //���кŲ����ڣ�ID�ĽṹΪvendor+product
+                //序列号不存在，ID的结构为vendor+product
 				snprintf(DeviceId,sizeof(DeviceId),"%04x%04x",giVendor,giProduct);
             }
             
@@ -378,7 +378,7 @@ static int get_physicalmedium_usbdev_info(struct scsi_device *sdp, struct scsi_d
                 DeviceId[i] = toupper(DeviceId[i]);
             }
             
-            //����д��proc�ļ���ID       
+            //最终写入proc文件的ID       
             snprintf(disk->model,sizeof(disk->model),"%s",DeviceId);
             
             /*diskname,sda,sdb,...*/
@@ -408,7 +408,7 @@ static int get_physicalmedium_usbdev_info(struct scsi_device *sdp, struct scsi_d
                 snprintf(disk->connectiontype,sizeof(disk->connectiontype),"%s","USB1.1");
             }
             
-            disk->capacity = (((unsigned long long)(sdkp->capacity)*(sdkp->device->sector_size)/1024))/1024;//��MΪ��λ
+            disk->capacity = (((unsigned long long)(sdkp->capacity)*(sdkp->device->sector_size)/1024))/1024;//以M为单位
             snprintf(disk->usbport,sizeof(disk->usbport),"%s",dev_name(&(us->pusb_dev->dev)));
         }
     }

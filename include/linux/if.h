@@ -62,7 +62,7 @@
 
 #define IFF_ECHO	0x40000		/* echo sent packets		*/
 
-#define IFF_ALLOWPASS 0x80000 /*ATPÐÞ¸Ä£¬allow packet from other brigde to pass*/
+#define IFF_ALLOWPASS 0x80000 /*ATPä¿®æ”¹ï¼Œallow packet from other brigde to pass*/
 
 #define IFF_VOLATILE	(IFF_LOOPBACK|IFF_POINTOPOINT|IFF_BROADCAST|IFF_ECHO|\
 		IFF_MASTER|IFF_SLAVE|IFF_RUNNING|IFF_LOWER_UP|IFF_DORMANT)
@@ -116,7 +116,7 @@
 #define IFF_PPP        0x800000            /* PPP Interface */
 #endif
 
-/*ATP smuxÐÂÔö*/
+/*ATP smuxæ–°å¢ž*/
 #define IFF_RSMUX      0x800             /* smux real interface          */
 #define IFF_OSMUX      0x1000             /* smux overlay interface       */
 

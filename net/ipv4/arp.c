@@ -899,7 +899,7 @@ static int arp_process(struct sk_buff *skb)
 			}
 		}
 	}
-	/*START ADD:Huawei 2013-1-3 FOR 应答子网地址和子网广播地址发出的arp请求*/
+	/*START ADD:Huawei 2013-1-3 FOR 搴旂瓟瀛愮綉鍦板潃鍜屽瓙缃戝箍鎾湴鍧�鍙戝嚭鐨刟rp璇锋眰*/
 #ifdef CONFIG_ARP_REPLY_TO_ANY_ADDR
 	else if (arp->ar_op == htons(ARPOP_REQUEST) &&
 		arp_is_need_reply(skb->dev, sip, tip))
@@ -907,7 +907,7 @@ static int arp_process(struct sk_buff *skb)
 		arp_send(ARPOP_REPLY, ETH_P_ARP, sip, dev, tip, sha, dev->dev_addr, sha);
 	}
 #endif
-	/*END ADD:Huawei 2013-1-3 FOR 应答子网地址和子网广播地址发出的arp请求*/
+	/*END ADD:Huawei 2013-1-3 FOR 搴旂瓟瀛愮綉鍦板潃鍜屽瓙缃戝箍鎾湴鍧�鍙戝嚭鐨刟rp璇锋眰*/
 
 	/* Update our ARP tables */
 

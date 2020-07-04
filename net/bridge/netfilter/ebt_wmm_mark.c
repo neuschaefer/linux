@@ -50,12 +50,12 @@ static unsigned int ebt_wmm_mark_tg(struct sk_buff *skb, const struct xt_action_
 	unsigned char prio = 0;
 	unsigned short TCI;
 
-	/*Add ½â¾ö´óÁ÷Á¿¹Ò»úµ¼ÖÂËÀ»úÎÊÌâ*/
+	/*Add è§£å†³å¤§æµé‡æŒ‚æœºå¯¼è‡´æ­»æœºé—®é¢˜*/
 	if (NULL == skb->network_header)
 	{
 	    return EBT_DROP;
 	}
-	/*End ½â¾ö´óÁ÷Á¿¹Ò»úµ¼ÖÂËÀ»úÎÊÌâ*/
+	/*End è§£å†³å¤§æµé‡æŒ‚æœºå¯¼è‡´æ­»æœºé—®é¢˜*/
 
 	if (info->markset != WMM_MARK_VALUE_NONE) {
 		/* use marset regardless of supported classification method */

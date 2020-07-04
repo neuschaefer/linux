@@ -394,7 +394,7 @@ static ctl_table ip_ct_sysctl_table[] = {
             .proc_handler   = &proc_dointvec,
         }, 
 #endif
-		/*使用应用态写文件的方式控制内核写log的速率*/
+		/*浣跨敤搴旂敤鎬佸啓鏂囦欢鐨勬柟寮忔帶鍒跺唴鏍稿啓log鐨勯�熺巼*/
 #ifdef CONFIG_FIREWALL_LOG
         {
             .procname   = "log_limit",

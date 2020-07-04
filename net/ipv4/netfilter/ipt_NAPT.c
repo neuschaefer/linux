@@ -152,7 +152,7 @@ static int masq_device_event(struct notifier_block *this,
 	struct net *net = dev_net(dev);
 
 #ifdef CONFIG_ATP_HYBRID
-	/*两个gre隧道都down后再删除ct*/
+	/*涓や釜gre闅ч亾閮絛own鍚庡啀鍒犻櫎ct*/
 	if (dev && IS_GRE_DEV(dev->name)) {
 		nf_conntrack_clean = 36;
 		return NOTIFY_DONE;

@@ -4,13 +4,13 @@
 */
 /******************************************************************************
 
-                  °æÈ¨ËùÓÐ (C), 2009-2019, º£Ë¼°ëµ¼ÌåÓÐÏÞ¹«Ë¾
+                  ç‰ˆæƒæ‰€æœ‰ (C), 2009-2019, æµ·æ€åŠå¯¼ä½“æœ‰é™å…¬å¸
 
  ******************************************************************************
-  ÎÄ ¼þ Ãû   : hi_netdef.h
-  °æ ±¾ ºÅ   : ³õ¸å
-  Éú³ÉÈÕÆÚ   : D2011_07_29
-  ×î½üÐÞ¸Ä   :
+  æ–‡ ä»¶ å   : hi_netdef.h
+  ç‰ˆ æœ¬ å·   : åˆç¨¿
+  ç”Ÿæˆæ—¥æœŸ   : D2011_07_29
+  æœ€è¿‘ä¿®æ”¹   :
 
 ******************************************************************************/
 #ifndef __HI_NETDEF_H__
@@ -23,7 +23,7 @@ extern "C"{
 #endif
 #endif /* __cplusplus */
 
-/*ÍøÂçÐò×ª»»,ÏµÍ³Ö»Ö§³Ölittle-endian*/
+/*ç½‘ç»œåºè½¬æ¢,ç³»ç»Ÿåªæ”¯æŒlittle-endian*/
 #ifndef HI_NTOLL
 #define HI_NTOLL(data)    ((hi_ulong64)( ((hi_ulong64)(data)  >> 56) \
                                         | ((hi_ulong64)(data) << 56)\
@@ -84,7 +84,7 @@ extern "C"{
 #define HI_MTU              1500
 #define HI_MAC_MTU          2000
 
-#define HI_MAC_LEN          6   /*MACµØÖ·³¤¶È*/
+#define HI_MAC_LEN          6   /*MACåœ°å€é•¿åº¦*/
 #define HI_ETH_HLEN         14      /* Total octets in header.   */
 #define HI_VLAN_HLEN        4
 #define HI_VLAN_MASK        0xEFFF
@@ -250,7 +250,7 @@ typedef struct {
 	};
 }hi_in6_addr_s;
 
-/* ÍøÂçÊý¾Ý½á¹¹ */
+/* ç½‘ç»œæ•°æ®ç»“æž„ */
 typedef struct {
 	hi_uchar8       uc_dest[HI_MAC_LEN];	/* destination eth addr	*/
 	hi_uchar8       uc_source[HI_MAC_LEN];	/* source ether addr	*/
@@ -313,10 +313,10 @@ typedef struct {
     hi_uchar8   uc_hln;		/* length of hardware address	*/
     hi_uchar8   uc_pln;		/* length of protocol address	*/
     hi_ushort16 us_op;		/* ARP opcode (command)		*/
-    hi_uchar8   uc_smac[HI_MAC_LEN];    /* ·¢ËÍÕßÓ²¼þµØÖ·         */
-    hi_uint32   ui_sip;                 /* ·¢ËÍÕßIPµØÖ·           */
-    hi_uchar8   uc_dmac[HI_MAC_LEN];    /* Ä¿±ê»úÓ²¼þµØÖ·         */
-    hi_uint32   ui_dip;                 /* Ä¿±ê»úIPµØÖ·           */
+    hi_uchar8   uc_smac[HI_MAC_LEN];    /* å‘é€è€…ç¡¬ä»¶åœ°å€         */
+    hi_uint32   ui_sip;                 /* å‘é€è€…IPåœ°å€           */
+    hi_uchar8   uc_dmac[HI_MAC_LEN];    /* ç›®æ ‡æœºç¡¬ä»¶åœ°å€         */
+    hi_uint32   ui_dip;                 /* ç›®æ ‡æœºIPåœ°å€           */
 }hi_arphdr_s;
 
 typedef struct {
@@ -393,15 +393,15 @@ typedef struct {
 }hi_in_addr_s;
 
 typedef struct {
-    hi_ushort16 us_sa_family; /* µØÖ·×å£¬ AF_xxx */
-    hi_uchar8   uc_sa_data[14]; /* 14 ×Ö½ÚµÄÐ­ÒéµØÖ· */ 
+    hi_ushort16 us_sa_family; /* åœ°å€æ—ï¼Œ AF_xxx */
+    hi_uchar8   uc_sa_data[14]; /* 14 å­—èŠ‚çš„åè®®åœ°å€ */ 
 }hi_sockaddr_s;
 
 typedef struct {
-    hi_ushort16     us_sin_family; /* µØÖ·×å */
-    hi_ushort16     us_sin_port; /* ¶Ë¿ÚºÅ */
-    hi_in_addr_s    st_sin_addr; /* IPµØÖ· */
-    hi_uchar8       uc_sin_zero[8]; /* Ìî³ä0 ÒÔ±£³ÖÓëstruct sockaddrÍ¬Ñù´óÐ¡ */
+    hi_ushort16     us_sin_family; /* åœ°å€æ— */
+    hi_ushort16     us_sin_port; /* ç«¯å£å· */
+    hi_in_addr_s    st_sin_addr; /* IPåœ°å€ */
+    hi_uchar8       uc_sin_zero[8]; /* å¡«å……0 ä»¥ä¿æŒä¸Žstruct sockaddråŒæ ·å¤§å° */
 }hi_sockaddr_in_s;
 
 

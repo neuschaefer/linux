@@ -5,15 +5,15 @@
 
 /******************************************************************************
 
-                  °æÈ¨ËùÓĞ (C), 2001-2011, »ªÎª¼¼ÊõÓĞÏŞ¹«Ë¾
+                  ç‰ˆæƒæ‰€æœ‰ (C), 2001-2011, åä¸ºæŠ€æœ¯æœ‰é™å…¬å¸
 
  ******************************************************************************
-  ÎÄ ¼ş Ãû   : br_igmp_statistic.c
-  °æ ±¾ ºÅ   : ³õ¸å
-  Éú³ÉÈÕÆÚ   : 2010Äê7ÔÂ20ÈÕ
-  ×î½üĞŞ¸Ä   :
-  ¹¦ÄÜÃèÊö   : IGMPÍ³¼Æ¹¦ÄÜ
-  º¯ÊıÁĞ±í   :
+  æ–‡ ä»¶ å   : br_igmp_statistic.c
+  ç‰ˆ æœ¬ å·   : åˆç¨¿
+  ç”Ÿæˆæ—¥æœŸ   : 2010å¹´7æœˆ20æ—¥
+  æœ€è¿‘ä¿®æ”¹   :
+  åŠŸèƒ½æè¿°   : IGMPç»Ÿè®¡åŠŸèƒ½
+  å‡½æ•°åˆ—è¡¨   :
               br_igmp_statistic_addnode
               br_igmp_statistic_clearallchain
               br_igmp_statistic_clearcurnode
@@ -24,9 +24,9 @@
               br_igmp_statistic_print
               br_igmp_statistic_setenable
               ppp_igmp_statistic_inc
-  ĞŞ¸ÄÀúÊ·   :
-  1.ÈÕ    ÆÚ   : 2010Äê7ÔÂ20ÈÕ
-    ĞŞ¸ÄÄÚÈİ   : ´´½¨ÎÄ¼ş
+  ä¿®æ”¹å†å²   :
+  1.æ—¥    æœŸ   : 2010å¹´7æœˆ20æ—¥
+    ä¿®æ”¹å†…å®¹   : åˆ›å»ºæ–‡ä»¶
 
 ******************************************************************************/
 
@@ -82,18 +82,18 @@ unsigned long  g_ulIgmpStatisticPauseSwitch  = 0;
 /************************* end ***************************/
 
 /*****************************************************************************
- º¯ Êı Ãû  : br_igmp_statistic_addmultisession
- ¹¦ÄÜÃèÊö  : Ìí¼Ó×é²¥»á»°¼ÇÂ¼
- ÊäÈë²ÎÊı  : struct tag_igmp_statistics_interface_st **pstInterface  
+ å‡½ æ•° å  : br_igmp_statistic_addmultisession
+ åŠŸèƒ½æè¿°  : æ·»åŠ ç»„æ’­ä¼šè¯è®°å½•
+ è¾“å…¥å‚æ•°  : struct tag_igmp_statistics_interface_st **pstInterface  
              unsigned char *pucMultiMacAddr                          
- Êä³ö²ÎÊı  : ÎŞ
- ·µ »Ø Öµ  : static int
- µ÷ÓÃº¯Êı  : 
- ±»µ÷º¯Êı  : 
+ è¾“å‡ºå‚æ•°  : æ— 
+ è¿” å› å€¼  : static int
+ è°ƒç”¨å‡½æ•°  : 
+ è¢«è°ƒå‡½æ•°  : 
  
- ĞŞ¸ÄÀúÊ·      :
-  1.ÈÕ    ÆÚ   : 2010Äê8ÔÂ12ÈÕ
-    ĞŞ¸ÄÄÚÈİ   : ĞÂÉú³Éº¯Êı
+ ä¿®æ”¹å†å²      :
+  1.æ—¥    æœŸ   : 2010å¹´8æœˆ12æ—¥
+    ä¿®æ”¹å†…å®¹   : æ–°ç”Ÿæˆå‡½æ•°
 
 *****************************************************************************/
 static int br_igmp_statistic_addmultisession(struct tag_igmp_statistics_interface_st **pstInterface,const unsigned char *pucMultiMacAddr)
@@ -158,7 +158,7 @@ static int br_igmp_statistic_addmultisession(struct tag_igmp_statistics_interfac
 
     if ( NULL == pstTemMultiSession && IGMP_MULTI_SESSION_STATISTIC_NODE_NUM_MAX > lNodeNum )
     {
-        /* Ñ­»·½áÊø,µ«Î´ÕÒµ½ */
+        /* å¾ªç¯ç»“æŸ,ä½†æœªæ‰¾åˆ° */
         pstTemMultiSession = (struct tag_igmp_multicast_union *)kmalloc(sizeof(struct tag_igmp_multicast_union),GFP_KERNEL);
         if ( NULL == pstTemMultiSession )
         {
@@ -186,18 +186,18 @@ static int br_igmp_statistic_addmultisession(struct tag_igmp_statistics_interfac
 }
 
 /*****************************************************************************
- º¯ Êı Ãû  : br_igmp_statistic_Findmultisession
- ¹¦ÄÜÃèÊö  : ²éÕÒ¶ÔÓ¦µÄ×é²¥»á»°MACµØÖ·
- ÊäÈë²ÎÊı  : struct tag_igmp_statistics_interface_st **pstInterface  
+ å‡½ æ•° å  : br_igmp_statistic_Findmultisession
+ åŠŸèƒ½æè¿°  : æŸ¥æ‰¾å¯¹åº”çš„ç»„æ’­ä¼šè¯MACåœ°å€
+ è¾“å…¥å‚æ•°  : struct tag_igmp_statistics_interface_st **pstInterface  
              unsigned char *pucMultiMacAddr                          
- Êä³ö²ÎÊı  : ÎŞ
- ·µ »Ø Öµ  : static int
- µ÷ÓÃº¯Êı  : 
- ±»µ÷º¯Êı  : 
+ è¾“å‡ºå‚æ•°  : æ— 
+ è¿” å› å€¼  : static int
+ è°ƒç”¨å‡½æ•°  : 
+ è¢«è°ƒå‡½æ•°  : 
  
- ĞŞ¸ÄÀúÊ·      :
-  1.ÈÕ    ÆÚ   : 2010Äê8ÔÂ12ÈÕ
-    ĞŞ¸ÄÄÚÈİ   : ĞÂÉú³Éº¯Êı
+ ä¿®æ”¹å†å²      :
+  1.æ—¥    æœŸ   : 2010å¹´8æœˆ12æ—¥
+    ä¿®æ”¹å†…å®¹   : æ–°ç”Ÿæˆå‡½æ•°
 
 *****************************************************************************/
 static int br_igmp_statistic_findmultisession(struct tag_igmp_statistics_interface_st **pstInterface,const unsigned char *pucMultiMacAddr)
@@ -266,17 +266,17 @@ static int br_igmp_statistic_findmultisession(struct tag_igmp_statistics_interfa
 }
 
 /*****************************************************************************
- º¯ Êı Ãû  : br_igmp_statistic_cleanmultisession
- ¹¦ÄÜÃèÊö  : Çå³ı×é²¥»á»°Í³¼Æ½á¹û
- ÊäÈë²ÎÊı  : struct tag_igmp_statistics_interface_st **pstInterface  
- Êä³ö²ÎÊı  : ÎŞ
- ·µ »Ø Öµ  : static void
- µ÷ÓÃº¯Êı  : 
- ±»µ÷º¯Êı  : 
+ å‡½ æ•° å  : br_igmp_statistic_cleanmultisession
+ åŠŸèƒ½æè¿°  : æ¸…é™¤ç»„æ’­ä¼šè¯ç»Ÿè®¡ç»“æœ
+ è¾“å…¥å‚æ•°  : struct tag_igmp_statistics_interface_st **pstInterface  
+ è¾“å‡ºå‚æ•°  : æ— 
+ è¿” å› å€¼  : static void
+ è°ƒç”¨å‡½æ•°  : 
+ è¢«è°ƒå‡½æ•°  : 
  
- ĞŞ¸ÄÀúÊ·      :
-  1.ÈÕ    ÆÚ   : 2010Äê8ÔÂ12ÈÕ
-    ĞŞ¸ÄÄÚÈİ   : ĞÂÉú³Éº¯Êı
+ ä¿®æ”¹å†å²      :
+  1.æ—¥    æœŸ   : 2010å¹´8æœˆ12æ—¥
+    ä¿®æ”¹å†…å®¹   : æ–°ç”Ÿæˆå‡½æ•°
 
 *****************************************************************************/
 static void br_igmp_statistic_cleanmultisession(struct tag_igmp_statistics_interface_st **pstInterface)
@@ -301,17 +301,17 @@ static void br_igmp_statistic_cleanmultisession(struct tag_igmp_statistics_inter
 }
 
 /*****************************************************************************
- º¯ Êı Ãû  : br_igmp_statistic_freemultisession
- ¹¦ÄÜÃèÊö  : ÊÍ·Å×é²¥»á»°Á´±í
- ÊäÈë²ÎÊı  : struct tag_igmp_statistics_interface_st **pstInterface  
- Êä³ö²ÎÊı  : ÎŞ
- ·µ »Ø Öµ  : static void
- µ÷ÓÃº¯Êı  : 
- ±»µ÷º¯Êı  : 
+ å‡½ æ•° å  : br_igmp_statistic_freemultisession
+ åŠŸèƒ½æè¿°  : é‡Šæ”¾ç»„æ’­ä¼šè¯é“¾è¡¨
+ è¾“å…¥å‚æ•°  : struct tag_igmp_statistics_interface_st **pstInterface  
+ è¾“å‡ºå‚æ•°  : æ— 
+ è¿” å› å€¼  : static void
+ è°ƒç”¨å‡½æ•°  : 
+ è¢«è°ƒå‡½æ•°  : 
  
- ĞŞ¸ÄÀúÊ·      :
-  1.ÈÕ    ÆÚ   : 2010Äê8ÔÂ16ÈÕ
-    ĞŞ¸ÄÄÚÈİ   : ĞÂÉú³Éº¯Êı
+ ä¿®æ”¹å†å²      :
+  1.æ—¥    æœŸ   : 2010å¹´8æœˆ16æ—¥
+    ä¿®æ”¹å†…å®¹   : æ–°ç”Ÿæˆå‡½æ•°
 
 *****************************************************************************/
 static void br_igmp_statistic_freemultisession(struct tag_igmp_statistics_interface_st **pstInterface)
@@ -336,19 +336,19 @@ static void br_igmp_statistic_freemultisession(struct tag_igmp_statistics_interf
 }
 
 /*****************************************************************************
- º¯ Êı Ãû  : br_igmp_statistic_addportnode
- ¹¦ÄÜÃèÊö  : Ìí¼ÓIGMP¶Ë¿ÚÍ³¼Æ½Úµã
- ÊäÈë²ÎÊı  : struct tag_igmp_port_statistic **pstheader  
+ å‡½ æ•° å  : br_igmp_statistic_addportnode
+ åŠŸèƒ½æè¿°  : æ·»åŠ IGMPç«¯å£ç»Ÿè®¡èŠ‚ç‚¹
+ è¾“å…¥å‚æ•°  : struct tag_igmp_port_statistic **pstheader  
              unsigned long ulindex                       
              unsigned long ulport                        
- Êä³ö²ÎÊı  : ÎŞ
- ·µ »Ø Öµ  : static struct tag_igmp_port_statistic *
- µ÷ÓÃº¯Êı  : 
- ±»µ÷º¯Êı  : 
+ è¾“å‡ºå‚æ•°  : æ— 
+ è¿” å› å€¼  : static struct tag_igmp_port_statistic *
+ è°ƒç”¨å‡½æ•°  : 
+ è¢«è°ƒå‡½æ•°  : 
  
- ĞŞ¸ÄÀúÊ·      :
-  1.ÈÕ    ÆÚ   : 2010Äê7ÔÂ21ÈÕ
-    ĞŞ¸ÄÄÚÈİ   : ĞÂÉú³Éº¯Êı
+ ä¿®æ”¹å†å²      :
+  1.æ—¥    æœŸ   : 2010å¹´7æœˆ21æ—¥
+    ä¿®æ”¹å†…å®¹   : æ–°ç”Ÿæˆå‡½æ•°
 
 *****************************************************************************/
 static struct tag_igmp_port_statistic *br_igmp_statistic_addportnode(struct tag_igmp_port_statistic **pstheader,unsigned long ulindex,unsigned long ulport)
@@ -372,19 +372,19 @@ static struct tag_igmp_port_statistic *br_igmp_statistic_addportnode(struct tag_
 }
 
 /*****************************************************************************
- º¯ Êı Ãû  : br_igmp_statistic_delportnode
- ¹¦ÄÜÃèÊö  : É¾³ıIGMP¶Ë¿ÚÍ³¼Æ½Úµã
- ÊäÈë²ÎÊı  : struct tag_igmp_port_statistic **pstheader  
+ å‡½ æ•° å  : br_igmp_statistic_delportnode
+ åŠŸèƒ½æè¿°  : åˆ é™¤IGMPç«¯å£ç»Ÿè®¡èŠ‚ç‚¹
+ è¾“å…¥å‚æ•°  : struct tag_igmp_port_statistic **pstheader  
              unsigned long ulindex                       
              unsigned long ulport                        
- Êä³ö²ÎÊı  : ÎŞ
- ·µ »Ø Öµ  : static int
- µ÷ÓÃº¯Êı  : 
- ±»µ÷º¯Êı  : 
+ è¾“å‡ºå‚æ•°  : æ— 
+ è¿” å› å€¼  : static int
+ è°ƒç”¨å‡½æ•°  : 
+ è¢«è°ƒå‡½æ•°  : 
  
- ĞŞ¸ÄÀúÊ·      :
-  1.ÈÕ    ÆÚ   : 2010Äê7ÔÂ21ÈÕ
-    ĞŞ¸ÄÄÚÈİ   : ĞÂÉú³Éº¯Êı
+ ä¿®æ”¹å†å²      :
+  1.æ—¥    æœŸ   : 2010å¹´7æœˆ21æ—¥
+    ä¿®æ”¹å†…å®¹   : æ–°ç”Ÿæˆå‡½æ•°
 
 *****************************************************************************/
 static int br_igmp_statistic_delportnode(struct tag_igmp_port_statistic **pstheader,unsigned long ulindex,unsigned long ulport)
@@ -423,17 +423,17 @@ static int br_igmp_statistic_delportnode(struct tag_igmp_port_statistic **psthea
 }
 
 /*****************************************************************************
- º¯ Êı Ãû  : br_igmp_statistic_freeportchain
- ¹¦ÄÜÃèÊö  : ÊÍ·ÅIGMP¶Ë¿ÚÍ³¼ÆÁ´±í
- ÊäÈë²ÎÊı  : struct tag_igmp_port_statistic **pstheader  
- Êä³ö²ÎÊı  : ÎŞ
- ·µ »Ø Öµ  : static void
- µ÷ÓÃº¯Êı  : 
- ±»µ÷º¯Êı  : 
+ å‡½ æ•° å  : br_igmp_statistic_freeportchain
+ åŠŸèƒ½æè¿°  : é‡Šæ”¾IGMPç«¯å£ç»Ÿè®¡é“¾è¡¨
+ è¾“å…¥å‚æ•°  : struct tag_igmp_port_statistic **pstheader  
+ è¾“å‡ºå‚æ•°  : æ— 
+ è¿” å› å€¼  : static void
+ è°ƒç”¨å‡½æ•°  : 
+ è¢«è°ƒå‡½æ•°  : 
  
- ĞŞ¸ÄÀúÊ·      :
-  1.ÈÕ    ÆÚ   : 2010Äê7ÔÂ21ÈÕ
-    ĞŞ¸ÄÄÚÈİ   : ĞÂÉú³Éº¯Êı
+ ä¿®æ”¹å†å²      :
+  1.æ—¥    æœŸ   : 2010å¹´7æœˆ21æ—¥
+    ä¿®æ”¹å†…å®¹   : æ–°ç”Ÿæˆå‡½æ•°
 
 *****************************************************************************/
 static void br_igmp_statistic_freeportchain(struct tag_igmp_port_statistic **pstheader)
@@ -459,17 +459,17 @@ static void br_igmp_statistic_freeportchain(struct tag_igmp_port_statistic **pst
 }
 
 /*****************************************************************************
- º¯ Êı Ãû  : br_igmp_statistic_cleanportchain
- ¹¦ÄÜÃèÊö  : Çå¿ÕIGMP¶Ë¿ÚÍ³¼ÆĞÅÏ¢
- ÊäÈë²ÎÊı  : struct tag_igmp_port_statistic **pstheader  
- Êä³ö²ÎÊı  : ÎŞ
- ·µ »Ø Öµ  : static void
- µ÷ÓÃº¯Êı  : 
- ±»µ÷º¯Êı  : 
+ å‡½ æ•° å  : br_igmp_statistic_cleanportchain
+ åŠŸèƒ½æè¿°  : æ¸…ç©ºIGMPç«¯å£ç»Ÿè®¡ä¿¡æ¯
+ è¾“å…¥å‚æ•°  : struct tag_igmp_port_statistic **pstheader  
+ è¾“å‡ºå‚æ•°  : æ— 
+ è¿” å› å€¼  : static void
+ è°ƒç”¨å‡½æ•°  : 
+ è¢«è°ƒå‡½æ•°  : 
  
- ĞŞ¸ÄÀúÊ·      :
-  1.ÈÕ    ÆÚ   : 2010Äê7ÔÂ21ÈÕ
-    ĞŞ¸ÄÄÚÈİ   : ĞÂÉú³Éº¯Êı
+ ä¿®æ”¹å†å²      :
+  1.æ—¥    æœŸ   : 2010å¹´7æœˆ21æ—¥
+    ä¿®æ”¹å†…å®¹   : æ–°ç”Ÿæˆå‡½æ•°
 
 *****************************************************************************/
 static void br_igmp_statistic_cleanportchain(struct tag_igmp_port_statistic **pstheader)
@@ -491,17 +491,17 @@ static void br_igmp_statistic_cleanportchain(struct tag_igmp_port_statistic **ps
     return;
 }
 /*****************************************************************************
- º¯ Êı Ãû  : br_igmp_statistic_clearcurnode
- ¹¦ÄÜÃèÊö  : Çå¿Õµ±Ç°½ÚµãÖĞµÄÍ³¼ÆĞÅÏ¢
- ÊäÈë²ÎÊı  : struct tag_igmp_statistics_interface_st *pstCurNode  
- Êä³ö²ÎÊı  : ÎŞ
- ·µ »Ø Öµ  : statistic void
- µ÷ÓÃº¯Êı  : 
- ±»µ÷º¯Êı  : 
+ å‡½ æ•° å  : br_igmp_statistic_clearcurnode
+ åŠŸèƒ½æè¿°  : æ¸…ç©ºå½“å‰èŠ‚ç‚¹ä¸­çš„ç»Ÿè®¡ä¿¡æ¯
+ è¾“å…¥å‚æ•°  : struct tag_igmp_statistics_interface_st *pstCurNode  
+ è¾“å‡ºå‚æ•°  : æ— 
+ è¿” å› å€¼  : statistic void
+ è°ƒç”¨å‡½æ•°  : 
+ è¢«è°ƒå‡½æ•°  : 
  
- ĞŞ¸ÄÀúÊ·      :
-  1.ÈÕ    ÆÚ   : 2010Äê7ÔÂ16ÈÕ
-    ĞŞ¸ÄÄÚÈİ   : ĞÂÉú³Éº¯Êı
+ ä¿®æ”¹å†å²      :
+  1.æ—¥    æœŸ   : 2010å¹´7æœˆ16æ—¥
+    ä¿®æ”¹å†…å®¹   : æ–°ç”Ÿæˆå‡½æ•°
 
 *****************************************************************************/
 static void br_igmp_statistic_clearcurnode(struct tag_igmp_statistics_interface_st *pstCurNode)
@@ -526,17 +526,17 @@ static void br_igmp_statistic_clearcurnode(struct tag_igmp_statistics_interface_
 }
 
 /*****************************************************************************
- º¯ Êı Ãû  : br_igmp_statistic_clearallchain
- ¹¦ÄÜÃèÊö  : ½«Í³¼ÆÁ´ÖĞµÄÊı¾İÇå¿Õ
- ÊäÈë²ÎÊı  : ÎŞ
- Êä³ö²ÎÊı  : ÎŞ
- ·µ »Ø Öµ  : void
- µ÷ÓÃº¯Êı  : 
- ±»µ÷º¯Êı  : 
+ å‡½ æ•° å  : br_igmp_statistic_clearallchain
+ åŠŸèƒ½æè¿°  : å°†ç»Ÿè®¡é“¾ä¸­çš„æ•°æ®æ¸…ç©º
+ è¾“å…¥å‚æ•°  : æ— 
+ è¾“å‡ºå‚æ•°  : æ— 
+ è¿” å› å€¼  : void
+ è°ƒç”¨å‡½æ•°  : 
+ è¢«è°ƒå‡½æ•°  : 
  
- ĞŞ¸ÄÀúÊ·      :
-  1.ÈÕ    ÆÚ   : 2010Äê7ÔÂ16ÈÕ
-    ĞŞ¸ÄÄÚÈİ   : ĞÂÉú³Éº¯Êı
+ ä¿®æ”¹å†å²      :
+  1.æ—¥    æœŸ   : 2010å¹´7æœˆ16æ—¥
+    ä¿®æ”¹å†…å®¹   : æ–°ç”Ÿæˆå‡½æ•°
 
 *****************************************************************************/
 void br_igmp_statistic_clearallchain(void)
@@ -548,7 +548,7 @@ void br_igmp_statistic_clearallchain(void)
     pstCurNode = g_pstIgmpStatistics;
     while ( pstCurNode )
     {
-        /* ½«µ±Ç°½ÚµãÇå¿Õ */
+        /* å°†å½“å‰èŠ‚ç‚¹æ¸…ç©º */
         br_igmp_statistic_clearcurnode(pstCurNode);
         pstCurNode = pstCurNode->next;
     }
@@ -557,17 +557,17 @@ void br_igmp_statistic_clearallchain(void)
 }
 
 /*****************************************************************************
- º¯ Êı Ãû  : br_igmp_statistic_findnode
- ¹¦ÄÜÃèÊö  : ÒÀÕÕÉè±¸Ãû³Æ²éÕÒÉè±¸.´æÔÚÆçÒå,µ±ÊäÈë²ÎÊı²»ºÏ·¨Ê±·µ»ØÎªNULL.
- ÊäÈë²ÎÊı  : const char *pcName  
- Êä³ö²ÎÊı  : ÎŞ
- ·µ »Ø Öµ  : static struct tag_igmp_statistics_interface_st *
- µ÷ÓÃº¯Êı  : 
- ±»µ÷º¯Êı  : 
+ å‡½ æ•° å  : br_igmp_statistic_findnode
+ åŠŸèƒ½æè¿°  : ä¾ç…§è®¾å¤‡åç§°æŸ¥æ‰¾è®¾å¤‡.å­˜åœ¨æ­§ä¹‰,å½“è¾“å…¥å‚æ•°ä¸åˆæ³•æ—¶è¿”å›ä¸ºNULL.
+ è¾“å…¥å‚æ•°  : const char *pcName  
+ è¾“å‡ºå‚æ•°  : æ— 
+ è¿” å› å€¼  : static struct tag_igmp_statistics_interface_st *
+ è°ƒç”¨å‡½æ•°  : 
+ è¢«è°ƒå‡½æ•°  : 
  
- ĞŞ¸ÄÀúÊ·      :
-  1.ÈÕ    ÆÚ   : 2010Äê7ÔÂ7ÈÕ
-    ĞŞ¸ÄÄÚÈİ   : ĞÂÉú³Éº¯Êı
+ ä¿®æ”¹å†å²      :
+  1.æ—¥    æœŸ   : 2010å¹´7æœˆ7æ—¥
+    ä¿®æ”¹å†…å®¹   : æ–°ç”Ÿæˆå‡½æ•°
 
 *****************************************************************************/
 struct tag_igmp_statistics_interface_st * br_igmp_statistic_findnode(const char *pcName)
@@ -595,17 +595,17 @@ struct tag_igmp_statistics_interface_st * br_igmp_statistic_findnode(const char 
     return NULL;
 }
 /*****************************************************************************
- º¯ Êı Ãû  : br_igmp_statistic_addnode
- ¹¦ÄÜÃèÊö  : Ôö¼Ó½Úµã
- ÊäÈë²ÎÊı  : struct tag_igmp_statistics_interface_st *pstAddNode  
- Êä³ö²ÎÊı  : ÎŞ
- ·µ »Ø Öµ  : static int
- µ÷ÓÃº¯Êı  : 
- ±»µ÷º¯Êı  : 
+ å‡½ æ•° å  : br_igmp_statistic_addnode
+ åŠŸèƒ½æè¿°  : å¢åŠ èŠ‚ç‚¹
+ è¾“å…¥å‚æ•°  : struct tag_igmp_statistics_interface_st *pstAddNode  
+ è¾“å‡ºå‚æ•°  : æ— 
+ è¿” å› å€¼  : static int
+ è°ƒç”¨å‡½æ•°  : 
+ è¢«è°ƒå‡½æ•°  : 
  
- ĞŞ¸ÄÀúÊ·      :
-  1.ÈÕ    ÆÚ   : 2010Äê7ÔÂ7ÈÕ
-    ĞŞ¸ÄÄÚÈİ   : ĞÂÉú³Éº¯Êı
+ ä¿®æ”¹å†å²      :
+  1.æ—¥    æœŸ   : 2010å¹´7æœˆ7æ—¥
+    ä¿®æ”¹å†…å®¹   : æ–°ç”Ÿæˆå‡½æ•°
 
 *****************************************************************************/
 struct tag_igmp_statistics_interface_st * br_igmp_statistic_addnode(struct tag_igmp_statistics_interface_st *pstAddNode)
@@ -644,17 +644,17 @@ struct tag_igmp_statistics_interface_st * br_igmp_statistic_addnode(struct tag_i
 }
 
 /*****************************************************************************
- º¯ Êı Ãû  : br_igmp_statistic_delnode
- ¹¦ÄÜÃèÊö  : ÒÀÕÕÉè±¸ÃûÉ¾³ı½Úµã
- ÊäÈë²ÎÊı  : const char *pcName  
- Êä³ö²ÎÊı  : ÎŞ
- ·µ »Ø Öµ  : static int
- µ÷ÓÃº¯Êı  : 
- ±»µ÷º¯Êı  : 
+ å‡½ æ•° å  : br_igmp_statistic_delnode
+ åŠŸèƒ½æè¿°  : ä¾ç…§è®¾å¤‡ååˆ é™¤èŠ‚ç‚¹
+ è¾“å…¥å‚æ•°  : const char *pcName  
+ è¾“å‡ºå‚æ•°  : æ— 
+ è¿” å› å€¼  : static int
+ è°ƒç”¨å‡½æ•°  : 
+ è¢«è°ƒå‡½æ•°  : 
  
- ĞŞ¸ÄÀúÊ·      :
-  1.ÈÕ    ÆÚ   : 2010Äê7ÔÂ7ÈÕ
-    ĞŞ¸ÄÄÚÈİ   : ĞÂÉú³Éº¯Êı
+ ä¿®æ”¹å†å²      :
+  1.æ—¥    æœŸ   : 2010å¹´7æœˆ7æ—¥
+    ä¿®æ”¹å†…å®¹   : æ–°ç”Ÿæˆå‡½æ•°
 
 *****************************************************************************/
 static int br_igmp_statistic_delnode(const char *pcName)
@@ -702,18 +702,18 @@ static int br_igmp_statistic_delnode(const char *pcName)
 }
 
 /*****************************************************************************
- º¯ Êı Ãû  : br_igmp_statistic_add_multigroup
- ¹¦ÄÜÃèÊö  : Ìí¼Ó×é²¥×é¼ÇÂ¼
- ÊäÈë²ÎÊı  : struct tag_igmp_statistics_interface_st *pstCurNode  
+ å‡½ æ•° å  : br_igmp_statistic_add_multigroup
+ åŠŸèƒ½æè¿°  : æ·»åŠ ç»„æ’­ç»„è®°å½•
+ è¾“å…¥å‚æ•°  : struct tag_igmp_statistics_interface_st *pstCurNode  
              unsigned int                             address     
- Êä³ö²ÎÊı  : ÎŞ
- ·µ »Ø Öµ  : static void
- µ÷ÓÃº¯Êı  : 
- ±»µ÷º¯Êı  : 
+ è¾“å‡ºå‚æ•°  : æ— 
+ è¿” å› å€¼  : static void
+ è°ƒç”¨å‡½æ•°  : 
+ è¢«è°ƒå‡½æ•°  : 
  
- ĞŞ¸ÄÀúÊ·      :
-  1.ÈÕ    ÆÚ   : 2010Äê12ÔÂ16ÈÕ
-    ĞŞ¸ÄÄÚÈİ   : ĞÂÉú³Éº¯Êı
+ ä¿®æ”¹å†å²      :
+  1.æ—¥    æœŸ   : 2010å¹´12æœˆ16æ—¥
+    ä¿®æ”¹å†…å®¹   : æ–°ç”Ÿæˆå‡½æ•°
 
 *****************************************************************************/
 static void br_igmp_statistic_add_multigroup
@@ -740,18 +740,18 @@ static void br_igmp_statistic_add_multigroup
 }
 
 /*****************************************************************************
- º¯ Êı Ãû  : br_igmp_statistic_find_multigroup
- ¹¦ÄÜÃèÊö  : ²éÑ¯×é²¥×é¼ÇÂ¼
- ÊäÈë²ÎÊı  : struct tag_igmp_statistics_interface_st *pstCurNode  
+ å‡½ æ•° å  : br_igmp_statistic_find_multigroup
+ åŠŸèƒ½æè¿°  : æŸ¥è¯¢ç»„æ’­ç»„è®°å½•
+ è¾“å…¥å‚æ•°  : struct tag_igmp_statistics_interface_st *pstCurNode  
              unsigned int                             address     
- Êä³ö²ÎÊı  : ÎŞ
- ·µ »Ø Öµ  : 
- µ÷ÓÃº¯Êı  : 
- ±»µ÷º¯Êı  : 
+ è¾“å‡ºå‚æ•°  : æ— 
+ è¿” å› å€¼  : 
+ è°ƒç”¨å‡½æ•°  : 
+ è¢«è°ƒå‡½æ•°  : 
  
- ĞŞ¸ÄÀúÊ·      :
-  1.ÈÕ    ÆÚ   : 2010Äê12ÔÂ16ÈÕ
-    ĞŞ¸ÄÄÚÈİ   : ĞÂÉú³Éº¯Êı
+ ä¿®æ”¹å†å²      :
+  1.æ—¥    æœŸ   : 2010å¹´12æœˆ16æ—¥
+    ä¿®æ”¹å†…å®¹   : æ–°ç”Ÿæˆå‡½æ•°
 
 *****************************************************************************/
 static struct tag_igmp_statistics_interface_group_record_st * 
@@ -765,7 +765,7 @@ br_igmp_statistic_find_multigroup
     
     for ( ulLoopi = 0 ; ulLoopi < IGMP_SESSION_MAX_NUM ; ulLoopi++ )
     {
-        /* Ê¹ÓÃ½ô´Õ½á¹¹,addressÎª0ÔòºóÃæÃ»ÓĞ¼ÇÂ¼ */
+        /* ä½¿ç”¨ç´§å‡‘ç»“æ„,addressä¸º0åˆ™åé¢æ²¡æœ‰è®°å½• */
         if ( 0 == pstCurNode->stIgmpGroup[ulLoopi].address )
         {
             return NULL;
@@ -784,20 +784,20 @@ br_igmp_statistic_find_multigroup
 }
 
 /*****************************************************************************
- º¯ Êı Ãû  : br_igmp_statistic_joinorleave_judgement
- ¹¦ÄÜÃèÊö  : ÅĞ¶Ï¼ÓÈëºÍÀë¿ª×éÊÇ·ñÂú×ãÍ³¼ÆĞèÇó¡£Ìõ¼ş£º¼ÓÈëÊ±Èç¹ûµ±Ç°×éÃ»ÓĞ¼Ó
-             ÈëÔòÍ³¼Æ£»Àë¿ªÊ±Èç¹ûµ±Ç°×ãÃ»ÓĞÀë¿ªÔòÍ³¼Æ¡£
- ÊäÈë²ÎÊı  : struct tag_igmp_statistics_interface_st *pstCurNode  
+ å‡½ æ•° å  : br_igmp_statistic_joinorleave_judgement
+ åŠŸèƒ½æè¿°  : åˆ¤æ–­åŠ å…¥å’Œç¦»å¼€ç»„æ˜¯å¦æ»¡è¶³ç»Ÿè®¡éœ€æ±‚ã€‚æ¡ä»¶ï¼šåŠ å…¥æ—¶å¦‚æœå½“å‰ç»„æ²¡æœ‰åŠ 
+             å…¥åˆ™ç»Ÿè®¡ï¼›ç¦»å¼€æ—¶å¦‚æœå½“å‰è¶³æ²¡æœ‰ç¦»å¼€åˆ™ç»Ÿè®¡ã€‚
+ è¾“å…¥å‚æ•°  : struct tag_igmp_statistics_interface_st *pstCurNode  
              int                                      stats       
              unsigned int                             address     
- Êä³ö²ÎÊı  : ÎŞ
- ·µ »Ø Öµ  : static int
- µ÷ÓÃº¯Êı  : 
- ±»µ÷º¯Êı  : 
+ è¾“å‡ºå‚æ•°  : æ— 
+ è¿” å› å€¼  : static int
+ è°ƒç”¨å‡½æ•°  : 
+ è¢«è°ƒå‡½æ•°  : 
  
- ĞŞ¸ÄÀúÊ·      :
-  1.ÈÕ    ÆÚ   : 2010Äê12ÔÂ16ÈÕ
-    ĞŞ¸ÄÄÚÈİ   : ĞÂÉú³Éº¯Êı
+ ä¿®æ”¹å†å²      :
+  1.æ—¥    æœŸ   : 2010å¹´12æœˆ16æ—¥
+    ä¿®æ”¹å†…å®¹   : æ–°ç”Ÿæˆå‡½æ•°
 
 *****************************************************************************/
 static int br_igmp_statistic_joinorleave_judgement
@@ -854,18 +854,18 @@ static int br_igmp_statistic_joinorleave_judgement
 }
 
 /*****************************************************************************
- º¯ Êı Ãû  : br_igmp_statistic_incparameter
- ¹¦ÄÜÃèÊö  : ÒÀ¾İÀàĞÍÔö¼ÓÍ³¼Æ£¬Ğ´ÈëÏàÓ¦ÎÄ¼ş
- ÊäÈë²ÎÊı  : struct sk_buff *skb
+ å‡½ æ•° å  : br_igmp_statistic_incparameter
+ åŠŸèƒ½æè¿°  : ä¾æ®ç±»å‹å¢åŠ ç»Ÿè®¡ï¼Œå†™å…¥ç›¸åº”æ–‡ä»¶
+ è¾“å…¥å‚æ•°  : struct sk_buff *skb
              int type                   
- Êä³ö²ÎÊı  : ÎŞ
- ·µ »Ø Öµ  : int
- µ÷ÓÃº¯Êı  : 
- ±»µ÷º¯Êı  : 
+ è¾“å‡ºå‚æ•°  : æ— 
+ è¿” å› å€¼  : int
+ è°ƒç”¨å‡½æ•°  : 
+ è¢«è°ƒå‡½æ•°  : 
  
- ĞŞ¸ÄÀúÊ·      :
-  1.ÈÕ    ÆÚ   : 2010Äê7ÔÂ7ÈÕ
-    ĞŞ¸ÄÄÚÈİ   : ĞÂÉú³Éº¯Êı
+ ä¿®æ”¹å†å²      :
+  1.æ—¥    æœŸ   : 2010å¹´7æœˆ7æ—¥
+    ä¿®æ”¹å†…å®¹   : æ–°ç”Ÿæˆå‡½æ•°
 
 *****************************************************************************/
 int br_igmp_statistic_incparameter
@@ -906,7 +906,7 @@ int br_igmp_statistic_incparameter
     pstCurNode = br_igmp_statistic_findnode(pcTempDevName);
     if ( NULL == pstCurNode )
     {
-        /* Ö»ÓĞÃüÁîĞĞÌí¼ÓµÄ½Ó¿Ú²Å½øĞĞÍ³¼Æ */
+        /* åªæœ‰å‘½ä»¤è¡Œæ·»åŠ çš„æ¥å£æ‰è¿›è¡Œç»Ÿè®¡ */
 #if 0
         /* add node */
         memset(&stTempNode,0,sizeof(struct tag_igmp_statistics_interface_st));
@@ -945,7 +945,7 @@ int br_igmp_statistic_incparameter
             break;
         case IGMP_UP_REQUEST_PACKET :
         {
-            /* Í³¼Æµ¥²¥ÉÏĞĞretransmit±¨ÎÄÊı */
+            /* ç»Ÿè®¡å•æ’­ä¸Šè¡ŒretransmitæŠ¥æ–‡æ•° */
             if ( !is_multicast_ether_addr(eth_hdr(skb)->h_dest) )
             {
                 if ( NULL != pstCurNode->stIgmpStatistics.pstUpstream )
@@ -954,13 +954,13 @@ int br_igmp_statistic_incparameter
                     usDstPort   = data[usIpHeadLen + 2];
                     usDstPort   = ((usDstPort<<8)&0xFF00) | data[usIpHeadLen + 3];
                     
-                    /* °´ÕÕÄ¿µÄ¶Ë¿ÚÍ³¼Æ */
+                    /* æŒ‰ç…§ç›®çš„ç«¯å£ç»Ÿè®¡ */
                     pstCurPortNode = pstCurNode->stIgmpStatistics.pstUpstream;
                     while ( pstCurPortNode )
                     {
                         if ( pstCurPortNode->ulPortNum == usDstPort )
                         {
-                            /* ¸Ã±¨ÎÄ²»ĞèÒª¼ÓËÙ */
+                            /* è¯¥æŠ¥æ–‡ä¸éœ€è¦åŠ é€Ÿ */
                             blog_skip(skb);
                             pstCurPortNode->ulStatistic++;
                             IGMP_STATISTIC_DEBUG("type[UP_REQUEST] dev[%s] port[%u]",
@@ -978,7 +978,7 @@ int br_igmp_statistic_incparameter
         }
         case IGMP_DOWN_RETRANSMIT_PACKET :
         {
-            /* Í³¼Æµ¥²¥ÏÂĞĞretransmit±¨ÎÄÊı */
+            /* ç»Ÿè®¡å•æ’­ä¸‹è¡ŒretransmitæŠ¥æ–‡æ•° */
             if ( !is_multicast_ether_addr(eth_hdr(skb)->h_dest) )
             {
                 if ( NULL != pstCurNode->stIgmpStatistics.pstDownstream )
@@ -987,13 +987,13 @@ int br_igmp_statistic_incparameter
                     usSrcPort   = data[usIpHeadLen];
                     usSrcPort   = ((usSrcPort<<8)&0xFF00) | data[usIpHeadLen + 1];
                     
-                    /* °´ÕÕÄ¿µÄ¶Ë¿ÚÍ³¼Æ */
+                    /* æŒ‰ç…§ç›®çš„ç«¯å£ç»Ÿè®¡ */
                     pstCurPortNode = pstCurNode->stIgmpStatistics.pstDownstream;
                     while ( pstCurPortNode )
                     {
                         if ( pstCurPortNode->ulPortNum == usSrcPort )
                         {
-                            /* ¸Ã±¨ÎÄ²»ĞèÒª¼ÓËÙ */
+                            /* è¯¥æŠ¥æ–‡ä¸éœ€è¦åŠ é€Ÿ */
                             blog_skip(skb);
                             pstCurPortNode->ulStatistic++;
                             IGMP_STATISTIC_DEBUG("type[DOWN_RETRANSMIT] dev[%s] port[%u]",
@@ -1020,10 +1020,10 @@ int br_igmp_statistic_incparameter
              && (IS_LAN_DEV(in_dev->dev->name) || IS_IP_WAN_DEVICE(in_dev->dev->name)) )
             {
 #if 0
-                /* Ê¹ÓÃigmp snoopingÊµÏÖ×é²¥»á»°Í³¼Æ */
+                /* ä½¿ç”¨igmp snoopingå®ç°ç»„æ’­ä¼šè¯ç»Ÿè®¡ */
                 pstCurNode->stIgmpStatistics.ulMultiGroupsNum = br_igmp_snooping_find_intrface_group_num(in_dev->dev->name);
 #else
-                /* Ê¹ÓÃÍ³¼ÆÊ±¼ä×îºó10ÃëµÄUDP±¨ÎÄ×÷Îª×é²¥»á»°ÒÀ¾İ */
+                /* ä½¿ç”¨ç»Ÿè®¡æ—¶é—´æœ€å10ç§’çš„UDPæŠ¥æ–‡ä½œä¸ºç»„æ’­ä¼šè¯ä¾æ® */
                 dest = eth_hdr(skb)->h_dest;
                 if ( NULL == dest )
                 {
@@ -1063,17 +1063,17 @@ int br_igmp_statistic_incparameter
 }
 
 /*****************************************************************************
- º¯ Êı Ãû  : br_igmp_statistic_inc
- ¹¦ÄÜÃèÊö  : ¸ù¾İ´«ÈëµÄÊı¾İ°ü¸Ä±ä¶ÔÓ¦Éè±¸µÄÍ³¼ÆÖµ
- ÊäÈë²ÎÊı  : struct sk_buff *skb  
- Êä³ö²ÎÊı  : ÎŞ
- ·µ »Ø Öµ  : int
- µ÷ÓÃº¯Êı  : 
- ±»µ÷º¯Êı  : 
+ å‡½ æ•° å  : br_igmp_statistic_inc
+ åŠŸèƒ½æè¿°  : æ ¹æ®ä¼ å…¥çš„æ•°æ®åŒ…æ”¹å˜å¯¹åº”è®¾å¤‡çš„ç»Ÿè®¡å€¼
+ è¾“å…¥å‚æ•°  : struct sk_buff *skb  
+ è¾“å‡ºå‚æ•°  : æ— 
+ è¿” å› å€¼  : int
+ è°ƒç”¨å‡½æ•°  : 
+ è¢«è°ƒå‡½æ•°  : 
  
- ĞŞ¸ÄÀúÊ·      :
-  1.ÈÕ    ÆÚ   : 2010Äê7ÔÂ7ÈÕ
-    ĞŞ¸ÄÄÚÈİ   : ĞÂÉú³Éº¯Êı
+ ä¿®æ”¹å†å²      :
+  1.æ—¥    æœŸ   : 2010å¹´7æœˆ7æ—¥
+    ä¿®æ”¹å†…å®¹   : æ–°ç”Ÿæˆå‡½æ•°
 
 *****************************************************************************/
 int br_igmp_statistic_inc(struct sk_buff *skb,int type)
@@ -1177,7 +1177,7 @@ int br_igmp_statistic_inc(struct sk_buff *skb,int type)
             }
             else
             {
-                /* ¸Ã·ÖÖ§±ÜÃâÖØ¸´Í³¼Æ¿ª»úºóµÄ½ÓÊÕµ½µÄ×é²¥°ü */
+                /* è¯¥åˆ†æ”¯é¿å…é‡å¤ç»Ÿè®¡å¼€æœºåçš„æ¥æ”¶åˆ°çš„ç»„æ’­åŒ… */
                 return 0;
             }
             break;
@@ -1193,7 +1193,7 @@ int br_igmp_statistic_inc(struct sk_buff *skb,int type)
 
             if ( NULL != skb->dev )
             {            
-                /* ×é²¥Êı¾İÁ÷Í³¼Æ */
+                /* ç»„æ’­æ•°æ®æµç»Ÿè®¡ */
                 switch ( type )
                 {
                     //case IGMP_BUFF :
@@ -1229,17 +1229,17 @@ int br_igmp_statistic_inc(struct sk_buff *skb,int type)
 
 
 /*****************************************************************************
- º¯ Êı Ãû  : ppp_igmp_statistic_inc
- ¹¦ÄÜÃèÊö  : Â·ÓÉWANÖĞµÄIGMPÍ³¼Æ¹¦ÄÜ
- ÊäÈë²ÎÊı  : struct sk_buff *skb  
- Êä³ö²ÎÊı  : ÎŞ
- ·µ »Ø Öµ  : int
- µ÷ÓÃº¯Êı  : 
- ±»µ÷º¯Êı  : 
+ å‡½ æ•° å  : ppp_igmp_statistic_inc
+ åŠŸèƒ½æè¿°  : è·¯ç”±WANä¸­çš„IGMPç»Ÿè®¡åŠŸèƒ½
+ è¾“å…¥å‚æ•°  : struct sk_buff *skb  
+ è¾“å‡ºå‚æ•°  : æ— 
+ è¿” å› å€¼  : int
+ è°ƒç”¨å‡½æ•°  : 
+ è¢«è°ƒå‡½æ•°  : 
  
- ĞŞ¸ÄÀúÊ·      :
-  1.ÈÕ    ÆÚ   : 2010Äê7ÔÂ21ÈÕ
-    ĞŞ¸ÄÄÚÈİ   : ĞÂÉú³Éº¯Êı
+ ä¿®æ”¹å†å²      :
+  1.æ—¥    æœŸ   : 2010å¹´7æœˆ21æ—¥
+    ä¿®æ”¹å†…å®¹   : æ–°ç”Ÿæˆå‡½æ•°
 
 *****************************************************************************/
 int ppp_igmp_statistic_inc(struct sk_buff *skb)
@@ -1316,18 +1316,18 @@ int ppp_igmp_statistic_inc(struct sk_buff *skb)
 }
 
 /*****************************************************************************
- º¯ Êı Ãû  : ppp_ip_statistic_inc
- ¹¦ÄÜÃèÊö  : IP²ãUDP±¨ÎÄÍ³¼Æ
- ÊäÈë²ÎÊı  : struct sk_buff *skb  
+ å‡½ æ•° å  : ppp_ip_statistic_inc
+ åŠŸèƒ½æè¿°  : IPå±‚UDPæŠ¥æ–‡ç»Ÿè®¡
+ è¾“å…¥å‚æ•°  : struct sk_buff *skb  
              int type             
- Êä³ö²ÎÊı  : ÎŞ
- ·µ »Ø Öµ  : int
- µ÷ÓÃº¯Êı  : 
- ±»µ÷º¯Êı  : 
+ è¾“å‡ºå‚æ•°  : æ— 
+ è¿” å› å€¼  : int
+ è°ƒç”¨å‡½æ•°  : 
+ è¢«è°ƒå‡½æ•°  : 
  
- ĞŞ¸ÄÀúÊ·      :
-  1.ÈÕ    ÆÚ   : 2010Äê11ÔÂ26ÈÕ
-    ĞŞ¸ÄÄÚÈİ   : ĞÂÉú³Éº¯Êı
+ ä¿®æ”¹å†å²      :
+  1.æ—¥    æœŸ   : 2010å¹´11æœˆ26æ—¥
+    ä¿®æ”¹å†…å®¹   : æ–°ç”Ÿæˆå‡½æ•°
 
 *****************************************************************************/
 int ppp_ip_statistic_inc(struct sk_buff *skb,int type)
@@ -1400,13 +1400,13 @@ int ppp_ip_statistic_inc(struct sk_buff *skb,int type)
         case IGMP_UP_REQUEST_PACKET :
             if ( NULL != pstCurNode->stIgmpStatistics.pstUpstream )
             {
-                /* °´ÕÕÄ¿µÄ¶Ë¿ÚÍ³¼Æ */
+                /* æŒ‰ç…§ç›®çš„ç«¯å£ç»Ÿè®¡ */
                 pstCurPortNode = pstCurNode->stIgmpStatistics.pstUpstream;
                 while ( pstCurPortNode )
                 {
                     if ( pstCurPortNode->ulPortNum == usDport )
                     {
-                        /* ¸Ã±¨ÎÄ²»ĞèÒª¼ÓËÙ */
+                        /* è¯¥æŠ¥æ–‡ä¸éœ€è¦åŠ é€Ÿ */
                         blog_skip(skb);
                         pstCurPortNode->ulStatistic++;
                         IGMP_STATISTIC_DEBUG("type[UP_REQUEST] dev[%s] port[%u] num[%u].",
@@ -1421,13 +1421,13 @@ int ppp_ip_statistic_inc(struct sk_buff *skb,int type)
         case IGMP_DOWN_RETRANSMIT_PACKET :
             if ( NULL != pstCurNode->stIgmpStatistics.pstDownstream )
             {
-                /* °´ÕÕÄ¿µÄ¶Ë¿ÚÍ³¼Æ */
+                /* æŒ‰ç…§ç›®çš„ç«¯å£ç»Ÿè®¡ */
                 pstCurPortNode = pstCurNode->stIgmpStatistics.pstDownstream;
                 while ( pstCurPortNode )
                 {
                     if ( pstCurPortNode->ulPortNum == usSport )
                     {
-                        /* ¸Ã±¨ÎÄ²»ĞèÒª¼ÓËÙ */
+                        /* è¯¥æŠ¥æ–‡ä¸éœ€è¦åŠ é€Ÿ */
                         blog_skip(skb);
                         pstCurPortNode->ulStatistic++;
                         IGMP_STATISTIC_DEBUG("type[DOWN_RETRANSMIT] dev[%s] port[%u] num[%u]",
@@ -1446,17 +1446,17 @@ int ppp_ip_statistic_inc(struct sk_buff *skb,int type)
 }
     
 /*****************************************************************************
- º¯ Êı Ãû  : br_igmp_statistic_print
- ¹¦ÄÜÃèÊö  : ´òÓ¡IGMPÍ³¼ÆĞÅÏ¢
- ÊäÈë²ÎÊı  : ÎŞ
- Êä³ö²ÎÊı  : ÎŞ
- ·µ »Ø Öµ  : void
- µ÷ÓÃº¯Êı  : 
- ±»µ÷º¯Êı  : 
+ å‡½ æ•° å  : br_igmp_statistic_print
+ åŠŸèƒ½æè¿°  : æ‰“å°IGMPç»Ÿè®¡ä¿¡æ¯
+ è¾“å…¥å‚æ•°  : æ— 
+ è¾“å‡ºå‚æ•°  : æ— 
+ è¿” å› å€¼  : void
+ è°ƒç”¨å‡½æ•°  : 
+ è¢«è°ƒå‡½æ•°  : 
  
- ĞŞ¸ÄÀúÊ·      :
-  1.ÈÕ    ÆÚ   : 2010Äê7ÔÂ21ÈÕ
-    ĞŞ¸ÄÄÚÈİ   : ĞÂÉú³Éº¯Êı
+ ä¿®æ”¹å†å²      :
+  1.æ—¥    æœŸ   : 2010å¹´7æœˆ21æ—¥
+    ä¿®æ”¹å†…å®¹   : æ–°ç”Ÿæˆå‡½æ•°
 
 *****************************************************************************/
 void br_igmp_statistic_print()
@@ -1549,17 +1549,17 @@ void br_igmp_statistic_print()
 }
 
 /*****************************************************************************
- º¯ Êı Ãû  : br_igmp_statistic_setenable
- ¹¦ÄÜÃèÊö  : Ê¹ÄÜºÍÈ¥Ê¹ÄÜIGMPÍ³¼Æ¹¦ÄÜ
- ÊäÈë²ÎÊı  : int enable  
- Êä³ö²ÎÊı  : ÎŞ
- ·µ »Ø Öµ  : void
- µ÷ÓÃº¯Êı  : 
- ±»µ÷º¯Êı  : 
+ å‡½ æ•° å  : br_igmp_statistic_setenable
+ åŠŸèƒ½æè¿°  : ä½¿èƒ½å’Œå»ä½¿èƒ½IGMPç»Ÿè®¡åŠŸèƒ½
+ è¾“å…¥å‚æ•°  : int enable  
+ è¾“å‡ºå‚æ•°  : æ— 
+ è¿” å› å€¼  : void
+ è°ƒç”¨å‡½æ•°  : 
+ è¢«è°ƒå‡½æ•°  : 
  
- ĞŞ¸ÄÀúÊ·      :
-  1.ÈÕ    ÆÚ   : 2010Äê7ÔÂ21ÈÕ
-    ĞŞ¸ÄÄÚÈİ   : ĞÂÉú³Éº¯Êı
+ ä¿®æ”¹å†å²      :
+  1.æ—¥    æœŸ   : 2010å¹´7æœˆ21æ—¥
+    ä¿®æ”¹å†…å®¹   : æ–°ç”Ÿæˆå‡½æ•°
 
 *****************************************************************************/
 void br_igmp_statistic_setenable(int enable)
@@ -1574,17 +1574,17 @@ void br_igmp_statistic_setenable(int enable)
 }
 
 /*****************************************************************************
- º¯ Êı Ãû  : br_igmp_statistic_getchainheader
- ¹¦ÄÜÃèÊö  : »ñÈ¡IGMPÍ³¼ÆÍ·½áµã
- ÊäÈë²ÎÊı  : void  
- Êä³ö²ÎÊı  : ÎŞ
- ·µ »Ø Öµ  : struct tag_igmp_statistics_interface_st *
- µ÷ÓÃº¯Êı  : 
- ±»µ÷º¯Êı  : 
+ å‡½ æ•° å  : br_igmp_statistic_getchainheader
+ åŠŸèƒ½æè¿°  : è·å–IGMPç»Ÿè®¡å¤´ç»“ç‚¹
+ è¾“å…¥å‚æ•°  : void  
+ è¾“å‡ºå‚æ•°  : æ— 
+ è¿” å› å€¼  : struct tag_igmp_statistics_interface_st *
+ è°ƒç”¨å‡½æ•°  : 
+ è¢«è°ƒå‡½æ•°  : 
  
- ĞŞ¸ÄÀúÊ·      :
-  1.ÈÕ    ÆÚ   : 2010Äê7ÔÂ21ÈÕ
-    ĞŞ¸ÄÄÚÈİ   : ĞÂÉú³Éº¯Êı
+ ä¿®æ”¹å†å²      :
+  1.æ—¥    æœŸ   : 2010å¹´7æœˆ21æ—¥
+    ä¿®æ”¹å†…å®¹   : æ–°ç”Ÿæˆå‡½æ•°
 
 *****************************************************************************/
 struct tag_igmp_statistics_interface_st * br_igmp_statistic_getchainheader(void)
@@ -1593,21 +1593,21 @@ struct tag_igmp_statistics_interface_st * br_igmp_statistic_getchainheader(void)
 }
 
 /*****************************************************************************
- º¯ Êı Ãû  : br_igmp_statistic_setinterfaceport
- ¹¦ÄÜÃèÊö  : ÉèÖÃÖ¸¶¨½Ó¿Ú°´ÕÕÒ»¶¨¶Ë¿Ú¹æÔòÍ³¼ÆĞÅÏ¢
- ÊäÈë²ÎÊı  : char *pcinterface    : ½Ó¿ÚÃû³Æ 
-             int lacction         : Ìí¼Ó»òÉ¾³ı 1 : add, 2 : del
-             int lindex           : ÊµÀıºÅ 
-             char *pcportattr     : Ô´¶Ë¿Ú»òÄ¿µÄ¶Ë¿Ú 
-             unsigned long ulport : ¶Ë¿ÚºÅ 
- Êä³ö²ÎÊı  : ÎŞ
- ·µ »Ø Öµ  : void
- µ÷ÓÃº¯Êı  : 
- ±»µ÷º¯Êı  : 
+ å‡½ æ•° å  : br_igmp_statistic_setinterfaceport
+ åŠŸèƒ½æè¿°  : è®¾ç½®æŒ‡å®šæ¥å£æŒ‰ç…§ä¸€å®šç«¯å£è§„åˆ™ç»Ÿè®¡ä¿¡æ¯
+ è¾“å…¥å‚æ•°  : char *pcinterface    : æ¥å£åç§° 
+             int lacction         : æ·»åŠ æˆ–åˆ é™¤ 1 : add, 2 : del
+             int lindex           : å®ä¾‹å· 
+             char *pcportattr     : æºç«¯å£æˆ–ç›®çš„ç«¯å£ 
+             unsigned long ulport : ç«¯å£å· 
+ è¾“å‡ºå‚æ•°  : æ— 
+ è¿” å› å€¼  : void
+ è°ƒç”¨å‡½æ•°  : 
+ è¢«è°ƒå‡½æ•°  : 
  
- ĞŞ¸ÄÀúÊ·      :
-  1.ÈÕ    ÆÚ   : 2010Äê7ÔÂ20ÈÕ
-    ĞŞ¸ÄÄÚÈİ   : ĞÂÉú³Éº¯Êı
+ ä¿®æ”¹å†å²      :
+  1.æ—¥    æœŸ   : 2010å¹´7æœˆ20æ—¥
+    ä¿®æ”¹å†…å®¹   : æ–°ç”Ÿæˆå‡½æ•°
 
 *****************************************************************************/
 void br_igmp_statistic_setinterfaceport(char *pcinterface, unsigned long ulacction, unsigned long ulindex, unsigned long ulportattr, unsigned long ulport)

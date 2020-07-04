@@ -130,7 +130,7 @@ struct ipv6hdr {
 
 	struct	in6_addr	saddr;
 	struct	in6_addr	daddr;
-} LINUX_NET_PACKED; /*Hybrid IPv6对齐提高性能*/
+} LINUX_NET_PACKED; /*Hybrid IPv6瀵归綈鎻愰珮鎬ц兘*/
 
 #ifdef __KERNEL__
 /*

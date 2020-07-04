@@ -310,7 +310,7 @@ netdev_tx_t br_dev_xmit(struct sk_buff *skb, struct net_device *dev)
 			br_flood_deliver(br, skb);
 			goto out;
 		}
-// TODO: 新内核已经支持了IGMP/MLD snooping功能，该功能和平台的IGMP功能需要二选一
+// TODO: 鏂板唴鏍稿凡缁忔敮鎸佷簡IGMP/MLD snooping鍔熻兘锛岃鍔熻兘鍜屽钩鍙扮殑IGMP鍔熻兘闇�瑕佷簩閫変竴
 #ifndef CONFIG_ATP_COMMON
 		if (br_multicast_rcv(br, NULL, skb)) {
 			kfree_skb(skb);

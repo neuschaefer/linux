@@ -420,9 +420,9 @@ static enum hrtimer_restart xfrm_timer_handler(struct hrtimer * me)
 	int err = 0;
 
 	spin_lock(&x->lock);
-	/* start of  µ±SA idleÖ®ºó¾¡ÔçÉ¾³ıÄÚºËµÄSA£¬ÕâÑù×ö¿ÉÄÜ´æÔÚ·çÏÕ£¬¿¼ÂÇ
-	 * µÄÇé¿ö¾ÍÊÇÈç¹û±¨ÎÄÒ»Ö±¶¼ÊÇ¶Ô·½ÔÚ·¢ËÍ¸ø±¾·½£¬µ«ÊÇ±¾·½²¢²»×ö³öÈÎºÎÓ¦´ğµÄÇé¿ö£¬²»¹ı
-	 * ÕâÖÖÇé¿öÏÂµÄ»°£¬Ó¦¸ÃÊÇ²»»á×ßµ½ÕâÀïÀ´µÄ¡£
+	/* start of  å½“SA idleä¹‹åå°½æ—©åˆ é™¤å†…æ ¸çš„SAï¼Œè¿™æ ·åšå¯èƒ½å­˜åœ¨é£é™©ï¼Œè€ƒè™‘
+	 * çš„æƒ…å†µå°±æ˜¯å¦‚æœæŠ¥æ–‡ä¸€ç›´éƒ½æ˜¯å¯¹æ–¹åœ¨å‘é€ç»™æœ¬æ–¹ï¼Œä½†æ˜¯æœ¬æ–¹å¹¶ä¸åšå‡ºä»»ä½•åº”ç­”çš„æƒ…å†µï¼Œä¸è¿‡
+	 * è¿™ç§æƒ…å†µä¸‹çš„è¯ï¼Œåº”è¯¥æ˜¯ä¸ä¼šèµ°åˆ°è¿™é‡Œæ¥çš„ã€‚
 	 */
 #if defined(CONFIG_SUPPORT_ATP) && defined(CONFIG_XFRM_IDLE_TIME)
     if (x->ucFlag & IDLE_TIMEOUT_FLAG)
@@ -430,7 +430,7 @@ static enum hrtimer_restart xfrm_timer_handler(struct hrtimer * me)
         goto expired;
     }
 #endif
-/* End of  µ±SA idleÖ®ºó¾¡ÔçÉ¾³ıÄÚºËµÄSA */
+/* End of  å½“SA idleä¹‹åå°½æ—©åˆ é™¤å†…æ ¸çš„SA */
 	if (x->km.state == XFRM_STATE_DEAD)
 		goto out;
 	if (x->km.state == XFRM_STATE_EXPIRED)
@@ -1178,7 +1178,7 @@ EXPORT_SYMBOL(xfrm_state_add);
 #ifdef CONFIG_XFRM_MIGRATE
 
 #ifdef CONFIG_SUPPORT_ATP
-/* Ê¹ÓÃ±¾º¯ÊıĞèÒªµ÷ÓÃµÄº¯ÊıÀ´±£Ö¤ XFRM_STATE_ACQ == x->km.state */
+/* ä½¿ç”¨æœ¬å‡½æ•°éœ€è¦è°ƒç”¨çš„å‡½æ•°æ¥ä¿è¯ XFRM_STATE_ACQ == x->km.state */
 void xfrm_migrate_del_acq_state_link(struct net *net, struct xfrm_state *x)
 {
     if (!net || !x)
@@ -1197,7 +1197,7 @@ void xfrm_migrate_del_acq_state_link(struct net *net, struct xfrm_state *x)
 }
 EXPORT_SYMBOL(xfrm_migrate_del_acq_state_link);
 
-/* Ê¹ÓÃ±¾º¯ÊıĞèÒªµ÷ÓÃµÄº¯ÊıÀ´±£Ö¤ XFRM_STATE_ACQ == x->km.state */
+/* ä½¿ç”¨æœ¬å‡½æ•°éœ€è¦è°ƒç”¨çš„å‡½æ•°æ¥ä¿è¯ XFRM_STATE_ACQ == x->km.state */
 void xfrm_migrate_add_acq_link(struct net *net, struct xfrm_state *x)
 {
 	unsigned int h;
@@ -1486,14 +1486,14 @@ EXPORT_SYMBOL(xfrm_state_update);
 
 int xfrm_state_check_expire(struct xfrm_state *x)
 {
-/* start of    Homehub B018ÎÊÌâ£¬BlackdnsÅäÖÃÎªIP·½Ê½£¬ÅäÖÃidletimeÊ±³¤Îª60s£¬Êµ¼Ê²âÊÔ³¬Ê±Ê±³¤ÔÚ45-48Ãë£¬²»×¼È·  */
+/* start of    Homehub B018é—®é¢˜ï¼ŒBlackdnsé…ç½®ä¸ºIPæ–¹å¼ï¼Œé…ç½®idletimeæ—¶é•¿ä¸º60sï¼Œå®é™…æµ‹è¯•è¶…æ—¶æ—¶é•¿åœ¨45-48ç§’ï¼Œä¸å‡†ç¡®  */
 #if 0
 	if (!x->curlft.use_time)
 		x->curlft.use_time = get_seconds();
 #else
 	x->curlft.use_time = get_seconds();
 #endif
-/* end of    Homehub B018ÎÊÌâ£¬BlackdnsÅäÖÃÎªIP·½Ê½£¬ÅäÖÃidletimeÊ±³¤Îª60s£¬Êµ¼Ê²âÊÔ³¬Ê±Ê±³¤ÔÚ45-48Ãë£¬²»×¼È·  */
+/* end of    Homehub B018é—®é¢˜ï¼ŒBlackdnsé…ç½®ä¸ºIPæ–¹å¼ï¼Œé…ç½®idletimeæ—¶é•¿ä¸º60sï¼Œå®é™…æµ‹è¯•è¶…æ—¶æ—¶é•¿åœ¨45-48ç§’ï¼Œä¸å‡†ç¡®  */
 
 	if (x->km.state != XFRM_STATE_VALID)
 		return -EINVAL;
@@ -1792,13 +1792,13 @@ static void xfrm_idle_timer_handler(unsigned long data)
 
     //xfrm_state_idle_clear(x);
 
-	/* start of  2010-08-25 Èç¹û¸ÃSAÒÑ¾­idle timeoutÁË£¬ÄÇÃ´ÏÂ´Îidle timeoutÊ±É¾³ı */
+	/* start of  2010-08-25 å¦‚æœè¯¥SAå·²ç»idle timeoutäº†ï¼Œé‚£ä¹ˆä¸‹æ¬¡idle timeoutæ—¶åˆ é™¤ */
     if (x->ucFlag & IDLE_TIMEOUT_FLAG)
     {
         xfrm_state_delete(x);
         return ;
     }
-	/* end of  2010-08-25 Èç¹û¸ÃSAÒÑ¾­ idle timeoutÁË£¬ÄÇÃ´ÏÂ´Îtimeout¾ÍÉ¾³ı */
+	/* end of  2010-08-25 å¦‚æœè¯¥SAå·²ç» idle timeoutäº†ï¼Œé‚£ä¹ˆä¸‹æ¬¡timeoutå°±åˆ é™¤ */
     
 	xfrm_state_hold(x);
 
@@ -1810,9 +1810,9 @@ static void xfrm_idle_timer_handler(unsigned long data)
 
     idle = (unsigned long)x->lft.idle_time_seconds;
 
-/* start of  µ±SA idleÖ®ºó¾¡ÔçÉ¾³ıÄÚºËµÄSA */
+/* start of  å½“SA idleä¹‹åå°½æ—©åˆ é™¤å†…æ ¸çš„SA */
     ulResetTime = idle >> 1;
-/* End of  µ±SA idleÖ®ºó¾¡ÔçÉ¾³ıÄÚºËµÄSA */
+/* End of  å½“SA idleä¹‹åå°½æ—©åˆ é™¤å†…æ ¸çš„SA */
 
     pstOther = xfrm_state_lookup_byaddr(xs_net(x), &x->props.saddr,
 						  &x->id.daddr,
@@ -1823,7 +1823,7 @@ static void xfrm_idle_timer_handler(unsigned long data)
         goto mod;
     }
 
-/* start of   Homehub B018ÎÊÌâ£¬BlackdnsÅäÖÃÎªIP·½Ê½£¬ÅäÖÃidletimeÊ±³¤Îª60s£¬Êµ¼Ê²âÊÔ³¬Ê±Ê±³¤ÔÚ45-48Ãë£¬²»×¼È·  */
+/* start of   Homehub B018é—®é¢˜ï¼ŒBlackdnsé…ç½®ä¸ºIPæ–¹å¼ï¼Œé…ç½®idletimeæ—¶é•¿ä¸º60sï¼Œå®é™…æµ‹è¯•è¶…æ—¶æ—¶é•¿åœ¨45-48ç§’ï¼Œä¸å‡†ç¡®  */
 #if 0
 	if (!x->curlft.use_time)
 		x->curlft.use_time = get_seconds();
@@ -1833,12 +1833,12 @@ static void xfrm_idle_timer_handler(unsigned long data)
 #endif
     //COLOR_DEBUG("now: %lu, x[%llu], other:[%llu]\r\n", 
         //now, x->curlft.use_time, pstOther->curlft.use_time);
-/* end of   Homehub B018ÎÊÌâ£¬BlackdnsÅäÖÃÎªIP·½Ê½£¬ÅäÖÃidletimeÊ±³¤Îª60s£¬Êµ¼Ê²âÊÔ³¬Ê±Ê±³¤ÔÚ45-48Ãë£¬²»×¼È·  */
+/* end of   Homehub B018é—®é¢˜ï¼ŒBlackdnsé…ç½®ä¸ºIPæ–¹å¼ï¼Œé…ç½®idletimeæ—¶é•¿ä¸º60sï¼Œå®é™…æµ‹è¯•è¶…æ—¶æ—¶é•¿åœ¨45-48ç§’ï¼Œä¸å‡†ç¡®  */
 
     left = now - x->curlft.use_time;
     left2 = now - pstOther->curlft.use_time; 
 
-    /* Á½¸ö SA ¶¼idle timeout ÁË²Å·¢ËÍÏûÏ¢¸øÓÃ»§Ì¬ */
+    /* ä¸¤ä¸ª SA éƒ½idle timeout äº†æ‰å‘é€æ¶ˆæ¯ç»™ç”¨æˆ·æ€ */
     if ((left < idle) || (left2 < idle))
     {
         max = left2 > left? (idle - left) : (idle - left2);
@@ -1855,41 +1855,41 @@ static void xfrm_idle_timer_handler(unsigned long data)
     c.pid = 0;    
 	km_state_notify(x, &c);
 
-	/* start of  Èç¹û¸ÃSA idle timeoutÁË£¬ÄÇÃ´ÏÂ´Îidle timeout¾ÍÉ¾³ı */
+	/* start of  å¦‚æœè¯¥SA idle timeoutäº†ï¼Œé‚£ä¹ˆä¸‹æ¬¡idle timeoutå°±åˆ é™¤ */
     x->ucFlag |= IDLE_TIMEOUT_FLAG;
     pstOther->ucFlag |= IDLE_TIMEOUT_FLAG;
-	/* end of  Èç¹û¸ÃSA idle timeoutÁË£¬ÄÇÃ´ÏÂ´Îidle timeout¾ÍÉ¾³ıÖ® */
+	/* end of  å¦‚æœè¯¥SA idle timeoutäº†ï¼Œé‚£ä¹ˆä¸‹æ¬¡idle timeoutå°±åˆ é™¤ä¹‹ */
 
     spin_lock(&pstOther->lock);
     mod_timer(&pstOther->idletimer, jiffies + HZ * idle);
-	/* start of  µ±SA idleÖ®ºó¾¡ÔçÉ¾³ıÄÚºËµÄSA */
+	/* start of  å½“SA idleä¹‹åå°½æ—©åˆ é™¤å†…æ ¸çš„SA */
     if (pstOther->ucFlag & IDLE_TIMEOUT_FLAG)
     {
         tasklet_hrtimer_start(&pstOther->mtimer, 
             ktime_set(ulResetTime, 0), HRTIMER_MODE_REL);
     }
-	/* End of  µ±SA idleÖ®ºó¾¡ÔçÉ¾³ıÄÚºËµÄSA */
+	/* End of  å½“SA idleä¹‹åå°½æ—©åˆ é™¤å†…æ ¸çš„SA */
     spin_unlock(&pstOther->lock);
 
 mod:
     spin_lock(&x->lock);
     mod_timer(&x->idletimer, jiffies + HZ * idle);
-	/* start of  µ±SA idleÖ®ºó¾¡ÔçÉ¾³ıÄÚºËµÄSA */
+	/* start of  å½“SA idleä¹‹åå°½æ—©åˆ é™¤å†…æ ¸çš„SA */
     if (x->ucFlag & IDLE_TIMEOUT_FLAG)
     {
         tasklet_hrtimer_start(&x->mtimer, 
             ktime_set(ulResetTime, 0), HRTIMER_MODE_REL);
     }
-	/* End of  µ±SA idleÖ®ºó¾¡ÔçÉ¾³ıÄÚºËµÄSA */
+	/* End of  å½“SA idleä¹‹åå°½æ—©åˆ é™¤å†…æ ¸çš„SA */
     spin_unlock(&x->lock);
 
 out:
-/* start of  µ±SA idleÖ®ºó¾¡ÔçÉ¾³ıÄÚºËµÄSA */
+/* start of  å½“SA idleä¹‹åå°½æ—©åˆ é™¤å†…æ ¸çš„SA */
     if (pstOther)
     {
         xfrm_state_put(pstOther);
     }
-/* End of  µ±SA idleÖ®ºó¾¡ÔçÉ¾³ıÄÚºËµÄSA */
+/* End of  å½“SA idleä¹‹åå°½æ—©åˆ é™¤å†…æ ¸çš„SA */
 	xfrm_state_put(x);
     return ;
 }

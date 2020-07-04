@@ -18,7 +18,7 @@
 int br_igmp_snooping_init_done=0;
 
 
-// ËùÓÐWAN¿ÚµÄ½Ó¿ÚÁÐ±í£¬°üÀ¨Â·ÓÉµÄ£¬ÇÅ½ÓµÄ¶¼°üÀ¨
+// æ‰€æœ‰WANå£çš„æŽ¥å£åˆ—è¡¨ï¼ŒåŒ…æ‹¬è·¯ç”±çš„ï¼Œæ¡¥æŽ¥çš„éƒ½åŒ…æ‹¬
 struct multicast_snooping_device_list multicast_snooping_dev_list;
 
 static void br_snooping_dump_dev_list(void);
@@ -44,7 +44,7 @@ static int br_multicast_event(struct notifier_block *unused, unsigned long event
         return NOTIFY_DONE;
     }
 
-    // ²»¿¼ÂÇLAN²à½Ó¿Ú
+    // ä¸è€ƒè™‘LANä¾§æŽ¥å£
     if ((IS_LAN_DEV(dev->name)) 
         || (IS_BRIDGE_DEV(dev->name))
         || (('i' == dev->name[0]) && (('m' == dev->name[1]) || ('f' == dev->name[1])))

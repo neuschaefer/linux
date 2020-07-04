@@ -175,7 +175,7 @@ static int ipv6_raw_deliver(struct sk_buff *skb, int nexthdr)
     u8     *h;
     __be16 gre_proto;
 
-    /*收到IPG_GRE的数据包只接收GRE控制报文gre_proto=0x0101;*/
+    /*鏀跺埌IPG_GRE鐨勬暟鎹寘鍙帴鏀禛RE鎺у埗鎶ユ枃gre_proto=0x0101;*/
     do{
         if (IPPROTO_GRE == nexthdr)    
         {

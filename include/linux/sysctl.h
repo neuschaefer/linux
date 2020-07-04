@@ -575,11 +575,11 @@ enum
     NET_IPV4_NF_QOS_SWITCH = 55,
 #endif
 /* end of add by  2009-04-15 to support alg switch */
-/*start added by  for HG658B_STC LAN-WAN×Ô¶¯ÇÅ°ó¶¨,2011-12-19*/
+/*start added by  for HG658B_STC LAN-WANè‡ªåŠ¨æ¡¥ç»‘å®š,2011-12-19*/
 #if defined(CONFIG_NF_CONNTRACK_BR_AUTOBIND)    
     NET_IPV4_NF_BR_AUTOBIND=60,
 #endif
-/*end added by  for HG658B_STC LAN-WAN×Ô¶¯ÇÅ°ó¶¨,2011-12-19*/
+/*end added by  for HG658B_STC LAN-WANè‡ªåŠ¨æ¡¥ç»‘å®š,2011-12-19*/
 
 #if defined(CONFIG_IMQ) || defined(CONFIG_IMQ_MODULE)
     NET_IPV4_NF_DOWNQOS_SWITCH = 61,
@@ -589,7 +589,7 @@ enum
     NET_IPV4_NF_SMARTQOS_SWITCH = 62, 
 #endif
 
-	/*¿ØÖÆÄÚºËlogËÙÂÊµÄ±äÁ¿*/
+	/*æ§åˆ¶å†…æ ¸logé€Ÿç‡çš„å˜é‡*/
 #ifdef CONFIG_FIREWALL_LOG
 	NET_IPV4_NF_FIREWALL_LOG_SWITCH = 56,
 #endif

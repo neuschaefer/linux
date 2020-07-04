@@ -1081,11 +1081,11 @@ int l2tp_xmit_skb(struct l2tp_session *session, struct sk_buff *skb, int hdr_len
 	inet = inet_sk(sk);
     
 #ifdef CONFIG_ATP_COMMON
-    /* BEGIN: add for FON: l2tpËíµÀÄÚµÄppp°üÎŞ·¨·¢ËÍ */ 
-    /* ËíµÀÅäÖÃµÄ¶Ô¶ËipµØÖ·Ã»ÓĞ¸³Öµ¸øsock£¬ÏÖÔÚÌí¼Ó½øÈ¥ */    
+    /* BEGIN: add for FON: l2tpéš§é“å†…çš„pppåŒ…æ— æ³•å‘é€ */ 
+    /* éš§é“é…ç½®çš„å¯¹ç«¯ipåœ°å€æ²¡æœ‰èµ‹å€¼ç»™sockï¼Œç°åœ¨æ·»åŠ è¿›å» */    
     inet->inet_daddr = session->tunnel_addr.addr.sin_addr.s_addr;
     inet->inet_dport  = session->tunnel_addr.addr.sin_port;       
-    /* END: add for FON: l2tpËíµÀÄÚµÄppp°üÎŞ·¨·¢ËÍ */ 
+    /* END: add for FON: l2tpéš§é“å†…çš„pppåŒ…æ— æ³•å‘é€ */ 
 #endif
 
 	fl = &inet->cork.fl;
@@ -1264,7 +1264,7 @@ static void l2tp_tunnel_free(struct l2tp_tunnel *tunnel)
 	       "%s: free...\n", tunnel->name);
 
 	/* Remove from tunnel list */
-    /* BEGIN: add for FON: ËíµÀ¶Ï¿ªÊ±£¬ÄÚºËcpu0 */ 
+    /* BEGIN: add for FON: éš§é“æ–­å¼€æ—¶ï¼Œå†…æ ¸cpu0 */ 
 	spin_lock_bh(&pn->l2tp_tunnel_list_lock);
 	list_del_rcu(&tunnel->list);
 #ifdef CONFIG_ATP_COMMON     
@@ -1274,7 +1274,7 @@ static void l2tp_tunnel_free(struct l2tp_tunnel *tunnel)
 #ifndef CONFIG_ATP_COMMON
 	synchronize_rcu();
 #endif
-    /* END: add for FON: ËíµÀ¶Ï¿ªÊ±£¬ÄÚºËcpu0 */ 
+    /* END: add for FON: éš§é“æ–­å¼€æ—¶ï¼Œå†…æ ¸cpu0 */ 
 	atomic_dec(&l2tp_tunnel_count);
 #ifndef CONFIG_ATP_COMMON
 	kfree(tunnel);

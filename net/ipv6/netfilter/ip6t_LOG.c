@@ -678,12 +678,12 @@ ip6t_log_packet(u_int8_t pf,
 		const char *prefix)
 {
     
-	/*Start   限制内核打印 */
+	/*Start   闄愬埗鍐呮牳鎵撳嵃 */
     if(!net_ratelimit())
     {
         return;
     }
-	/*End   限制内核打印 */
+	/*End   闄愬埗鍐呮牳鎵撳嵃 */
 
 	if (!loginfo)
 		loginfo = &default_loginfo;

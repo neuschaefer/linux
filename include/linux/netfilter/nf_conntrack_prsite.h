@@ -36,9 +36,9 @@
 #include <net/netfilter/nf_conntrack.h>
 
 #define HTTP_PORT                        80
-/* start of ·ÀÖ¹ÓÃ»§Ì¬ÅäÖÃÏÂÀ´µÄ×Ö·û´®³¤¶È¼ÓÉÏ http:// Ö®ºóÒç³ö  */
+/* start of é˜²æ­¢ç”¨æˆ·æ€é…ç½®ä¸‹æ¥çš„å­—ç¬¦ä¸²é•¿åº¦åŠ ä¸Š http:// ä¹‹åæº¢å‡º  */
 #define HTTP_URL_MAX                    (256 + 32)
-/* end of ·ÀÖ¹ÓÃ»§Ì¬ÅäÖÃÏÂÀ´µÄ×Ö·û´®³¤¶È¼ÓÉÏ http:// Ö®ºóÒç³ö  */
+/* end of é˜²æ­¢ç”¨æˆ·æ€é…ç½®ä¸‹æ¥çš„å­—ç¬¦ä¸²é•¿åº¦åŠ ä¸Š http:// ä¹‹åæº¢å‡º  */
 #define HTTP_TRACE_CHECK_TIMEOUT      5 //minutes
 #define HTTP_TRACE_TIMEOUT             30 //minutes
 #define HTTP_PROTO_HEAD_BUF_MAX        16
@@ -49,12 +49,12 @@
 
 #define HTTP_PROTO_NAME                 "HTTP"
 
-/* START of add  for HG526v3 Ç¿ÖÆÃÅ»§  at 2013.1.4*/
+/* START of add  for HG526v3 å¼ºåˆ¶é—¨æˆ·  at 2013.1.4*/
 #define LAN_PORT_1                           "eth0.5"
 #define LAN_PORT_2                           "eth0.4"
 #define LAN_PORT_3                           "eth0.3"
 #define LAN_PORT_4                           "eth0.2"
-/* END of add  for HG526v3 Ç¿ÖÆÃÅ»§  at 2013.1.4*/
+/* END of add  for HG526v3 å¼ºåˆ¶é—¨æˆ·  at 2013.1.4*/
 
 #define AFFINED_ADDR_HASH_KEY(addr) (((addr)^((addr)>>8)^((addr)>>16)^((addr)>>24)) & 0xF)
 
@@ -81,7 +81,7 @@ enum
     HTTP_RSPNS_BUTT
 };
 
-/* START of add  for HG526v3 Ç¿ÖÆÃÅ»§  at 2013.1.4*/
+/* START of add  for HG526v3 å¼ºåˆ¶é—¨æˆ·  at 2013.1.4*/
 struct prsite_url_info
 {
     int lEnable;
@@ -91,7 +91,7 @@ struct prsite_url_info
     char ac_stb_url[HTTP_URL_MAX];
     char ac_wifi_url[HTTP_URL_MAX];
 };
-/* END of add  for HG526v3 Ç¿ÖÆÃÅ»§  at 2013.1.4*/
+/* END of add  for HG526v3 å¼ºåˆ¶é—¨æˆ·  at 2013.1.4*/
 
 //for ioctl
 struct affined_bind
@@ -135,7 +135,7 @@ struct http_response
     int  code;
     char *desc;
 };
-/*start modified  for Ç¿ÖÆÃÅ»§ÒÆÖ²¸ù¾İlinux2.6.30ÄÚºËĞŞ¸Ä 2011-11-30*/
+/*start modified  for å¼ºåˆ¶é—¨æˆ·ç§»æ¤æ ¹æ®linux2.6.30å†…æ ¸ä¿®æ”¹ 2011-11-30*/
 extern void (*http_nat_help_hook)(struct nf_conn *ct,int dir,unsigned int hooknum,struct sk_buff *pskb);
-/*start modified  for Ç¿ÖÆÃÅ»§ÒÆÖ²¸ù¾İlinux2.6.30ÄÚºËĞŞ¸Ä 2011-11-30*/
+/*start modified  for å¼ºåˆ¶é—¨æˆ·ç§»æ¤æ ¹æ®linux2.6.30å†…æ ¸ä¿®æ”¹ 2011-11-30*/
 #endif

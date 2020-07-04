@@ -3,14 +3,14 @@
 * (C) Huawei Technologies Co., Ltd. < >
 */
 /******************************************************************************
-  ÎÄ¼şÃû³Æ: watchdog.c
-  ¹¦ÄÜÃèÊö: Ó²¼ş¿´ÃÅ¹·Çı¶¯
-  °æ±¾ÃèÊö: V1.0
+  æ–‡ä»¶åç§°: watchdog.c
+  åŠŸèƒ½æè¿°: ç¡¬ä»¶çœ‹é—¨ç‹—é©±åŠ¨
+  ç‰ˆæœ¬æè¿°: V1.0
 
-  ´´½¨ÈÕÆÚ: D2011_09_30
+  åˆ›å»ºæ—¥æœŸ: D2011_09_30
 
-  ĞŞ¸Ä¼ÇÂ¼: 
-            Éú³É³õ¸å.
+  ä¿®æ”¹è®°å½•: 
+            ç”Ÿæˆåˆç¨¿.
 ******************************************************************************/
 
 #include <mach/hi_hsan.h>
@@ -46,7 +46,7 @@ static hi_void hi_wdg_set_reset_time(hi_uint32 ui_time)
 {
     hi_crg_sc_perctrl4_u un_reg_crg_sc_perctrl4;
 
-    /*¼ì²éui_time·¶Î§*/
+    /*æ£€æŸ¥ui_timeèŒƒå›´*/
     if ((ui_time < HI_WDG_MIN_INTERVAL) || (ui_time > HI_WDG_MAX_INTERVAL))
     {
         ui_time = HI_WDG_DFT_RST_TIME;
@@ -148,7 +148,7 @@ hi_int32 hi_wdg_init(hi_void)
     hi_uint32           ui_cpu   = 0;
     struct task_struct *pst_task = HI_NULL;
 
-    /*ÎïÀíµØÖ·Ó³Éäµ½ĞéÄâÄÚ´æ*/
+    /*ç‰©ç†åœ°å€æ˜ å°„åˆ°è™šæ‹Ÿå†…å­˜*/
     g_pst_crg_reg = (hi_crg_reg_s*)hi_io_address(HI_REG_BASE_CRG);
 
     if ( HI_ENABLE != g_ui_wdg_en )

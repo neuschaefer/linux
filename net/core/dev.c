@@ -2842,7 +2842,7 @@ int dev_queue_xmit(struct sk_buff *skb)
 
 	ATP_HOOK(ATP_DEV_PRE_XMIT, skb, dev, NULL, 0);
 
-    /*qos½âñîºóÒÆµ½ATP_HOOKÖĞ*/
+    /*qosè§£è€¦åç§»åˆ°ATP_HOOKä¸­*/
 #ifdef CONFIG_ATP_COMMON
 	ret = skb_to_downlinkqos(skb,dev);
 	if(1 == ret)
@@ -3607,7 +3607,7 @@ static int ing_filter(struct sk_buff *skb, struct netdev_queue *rxq)
 	skb->tc_verd = SET_TC_AT(skb->tc_verd, AT_INGRESS);
 
 	q = rxq->qdisc;
-	if (q != &noop_qdisc && q != NULL) {/* ĞŞ¸Ä×é²¥¹ı³ÌÖĞ²å°ÎADSLÏßµ¼ÖÂÄÚºËÒì³£ÎÊÌâ. */
+	if (q != &noop_qdisc && q != NULL) {/* ä¿®æ”¹ç»„æ’­è¿‡ç¨‹ä¸­æ’æ‹”ADSLçº¿å¯¼è‡´å†…æ ¸å¼‚å¸¸é—®é¢˜. */
 		spin_lock(qdisc_lock(q));
 		if (likely(!test_bit(__QDISC_STATE_DEACTIVATED, &q->state)))
 			result = qdisc_enqueue_root(skb, q);
@@ -3783,7 +3783,7 @@ static inline int gre_kernel_accel_ipv4(struct sk_buff *skb, int data_offset)
     struct iphdr *pst_ipv4hdr = NULL;
     pst_ipv4hdr = (struct iphdr*)(skb->data + data_offset);
 
-    /* ·ÖÆ¬±¨ÎÄ²»¼ÓËÙ */
+    /* åˆ†ç‰‡æŠ¥æ–‡ä¸åŠ é€Ÿ */
     if (pst_ipv4hdr->frag_off & htons(IP_MF|IP_OFFSET))
     {
         return HYBRID_NOT_ACCELED;
@@ -3876,7 +3876,7 @@ static inline int gre_kernel_accel_recv(struct sk_buff *skb)
     
     if (IPPROTO_GRE == IPGRE_SKB_CB(skb)->ipgre_proto)
     {
-        /* ¸üĞÂskb_iif£¬·ñÔò¼ÓËÙ½Ó¿ÚÑ¡Ôñ´íÎó */
+        /* æ›´æ–°skb_iifï¼Œå¦åˆ™åŠ é€Ÿæ¥å£é€‰æ‹©é”™è¯¯ */
         skb->skb_iif = skb->dev->ifindex;  
         /*  gre header removed, accel pkt to lan, using hisi accel */
         return gre_kernel_accel(skb);
@@ -6312,9 +6312,9 @@ int dev_ioctl(struct net *net, unsigned int cmd, void __user *arg)
 	 */
 	default:
 #ifdef CONFIG_ATP_COMMON
-		/*ATPÀ©Õ¹µÄdev ioctl´¦Àí*/
+		/*ATPæ‰©å±•çš„dev ioctlå¤„ç†*/
 		if (0 == atp_dev_ioctl(cmd, &ifr)) {
-			/*cmdÒÑ±»ATP×¢²áµÄioctl´¦ÀíÁË*/
+			/*cmdå·²è¢«ATPæ³¨å†Œçš„ioctlå¤„ç†äº†*/
 			return 0;
 		}
 #endif

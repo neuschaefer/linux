@@ -203,25 +203,25 @@ trigger_out(struct sk_buff **pskb,
     #endif
     
     /* Check if the trigger range has already existed in 'trigger_list'. */
-    /* Ê×ÏÈ£¬ÔÚÈ«¾ÖÁ´±íÖÐ²éÕÒÊÇ·ñ´æÔÚ¸ÃskbÂú×ãµÄ¹æÔò */
+    /* é¦–å…ˆï¼Œåœ¨å…¨å±€é“¾è¡¨ä¸­æŸ¥æ‰¾æ˜¯å¦å­˜åœ¨è¯¥skbæ»¡è¶³çš„è§„åˆ™ */
 
     found = LIST_FIND(&trigger_list, trigger_out_matched,
         struct ipt_trigger *, iph->protocol, ntohs(tcph->dest), info);
 	/*End -- modified  20091111*/
 
-    /* Èç¹û·¢ÏÖ´æÔÚ¸ÃskbÂú×ãµÄ¹æÔò */
+    /* å¦‚æžœå‘çŽ°å­˜åœ¨è¯¥skbæ»¡è¶³çš„è§„åˆ™ */
     if (found) {
 
         #if 0
         printk("find the list ................\r\n");
         #endif
         
-        /* Yeah, it exists. We need to update(delay) the destroying timer. ¸üÐÂ¼ÆÊýÆ÷ */
+        /* Yeah, it exists. We need to update(delay) the destroying timer. æ›´æ–°è®¡æ•°å™¨ */
         trigger_refresh(found, TRIGGER_TIMEOUT * HZ);
         /* In order to allow multiple hosts use the same port range, we update
            the 'saddr' after previous trigger has a reply connection. */
-        /* Èç¹û·¢ÏÖreplyÒÑ¾­±»ÖÃ1ÁË£¬ÄÇÃ´±íÊ¾ÒÑ¾­ÓÐÆäËüÖ÷»ú¸øÊ¹ÓÃ¸Ã¹æÔòÁË£¬ÓÚÊÇÎÒÃÇ¾Í½«
-          * Ô´IP¸Ä³É±¾skbÖÐµÄÔ´IP£¬·ñÔòÍâÃæµÄ°ü½«»¹ÊÇ»áËÍµ½foundÖÐ´æ·ÅµÄÒÔÇ°µÄIP
+        /* å¦‚æžœå‘çŽ°replyå·²ç»è¢«ç½®1äº†ï¼Œé‚£ä¹ˆè¡¨ç¤ºå·²ç»æœ‰å…¶å®ƒä¸»æœºç»™ä½¿ç”¨è¯¥è§„åˆ™äº†ï¼ŒäºŽæ˜¯æˆ‘ä»¬å°±å°†
+          * æºIPæ”¹æˆæœ¬skbä¸­çš„æºIPï¼Œå¦åˆ™å¤–é¢çš„åŒ…å°†è¿˜æ˜¯ä¼šé€åˆ°foundä¸­å­˜æ”¾çš„ä»¥å‰çš„IP
           */
         if (found->reply)
             found->srcip = iph->saddr;
@@ -269,10 +269,10 @@ trigger_out(struct sk_buff **pskb,
         memset(&trig, 0, sizeof(trig));
         trig.srcip = iph->saddr;
 
-        /* ÒÔÇ°µÄ·½·¨ÊÇ±íÊ¾½øÀ´µÄÐ­ÒéÓ¦¸ÃÊÇÅäÖÃµÄÐ­ÒéÀàÐÍ£¬³öÈ¥µÄ²»¹Ü£¬Ò²¾ÍÊÇÈç¹ûÅäÖÃÁË¹æÔò£¬
-          * ±ÈÈç trigger-proto tcp ÄÇÃ´ÆäÊµ±íÊ¾µÄÊÇÄã½øÀ´µÄÓ¦¸ÃÊÇTCPÐ­Òé£¬¶ø²»ÊÇËµ³öÈ¥µÄÊÇTCP
-          * Ð­Òé£¬ËùÒÔ£¬²»¹ÜÊÇ³öÈ¥µÄÊÇUDP»¹ÊÇTCPÐ­Òé£¬Ö»ÒªÊÇ´Ó¹æÔòÖÐ¶ÔÓ¦¶Ë¿Ú³öÈ¥µÄ£¬ÄÇÃ´¾Í¿ÉÒÔ
-          * µ¼ÖÂ¸ÃÐ­ÒéµÄ´¥·¢£¬´Ó¶ø´ò¿ª¶ÔÓ¦¶Ë¿Ú¡£
+        /* ä»¥å‰çš„æ–¹æ³•æ˜¯è¡¨ç¤ºè¿›æ¥çš„åè®®åº”è¯¥æ˜¯é…ç½®çš„åè®®ç±»åž‹ï¼Œå‡ºåŽ»çš„ä¸ç®¡ï¼Œä¹Ÿå°±æ˜¯å¦‚æžœé…ç½®äº†è§„åˆ™ï¼Œ
+          * æ¯”å¦‚ trigger-proto tcp é‚£ä¹ˆå…¶å®žè¡¨ç¤ºçš„æ˜¯ä½ è¿›æ¥çš„åº”è¯¥æ˜¯TCPåè®®ï¼Œè€Œä¸æ˜¯è¯´å‡ºåŽ»çš„æ˜¯TCP
+          * åè®®ï¼Œæ‰€ä»¥ï¼Œä¸ç®¡æ˜¯å‡ºåŽ»çš„æ˜¯UDPè¿˜æ˜¯TCPåè®®ï¼Œåªè¦æ˜¯ä»Žè§„åˆ™ä¸­å¯¹åº”ç«¯å£å‡ºåŽ»çš„ï¼Œé‚£ä¹ˆå°±å¯ä»¥
+          * å¯¼è‡´è¯¥åè®®çš„è§¦å‘ï¼Œä»Žè€Œæ‰“å¼€å¯¹åº”ç«¯å£ã€‚
           */
         #if 0
         trig.mproto = iph->protocol;
@@ -341,8 +341,8 @@ static inline int trigger_in_matched(const struct ipt_trigger *i,
     printk("\r\n===============================================\r\n");
     #endif
     
-/******************Ò»´¥·¢¶à:ÄÚºËÀ©Õ¹³ÉÓÃÒ»Ìõ¹æÔòÖ§³Ö2000-2038,2050-2051,2069,2085,3010-3030¸ñÊ½µÄÄ£Ê½£¬
-    ²»ÐèÒª½«Íâ²¿¶Ë¿ÚºÅ½âÎö²¢·Ö¶Î£¬µ«±ØÐëÐ£Ñé±£Ö¤¸ñÊ½ÕýÈ·*****************************/
+/******************ä¸€è§¦å‘å¤š:å†…æ ¸æ‰©å±•æˆç”¨ä¸€æ¡è§„åˆ™æ”¯æŒ2000-2038,2050-2051,2069,2085,3010-3030æ ¼å¼çš„æ¨¡å¼ï¼Œ
+    ä¸éœ€è¦å°†å¤–éƒ¨ç«¯å£å·è§£æžå¹¶åˆ†æ®µï¼Œä½†å¿…é¡»æ ¡éªŒä¿è¯æ ¼å¼æ­£ç¡®*****************************/
 #if 0
     return (((i->rproto == proto) || (!i->rproto)) && (i->ports.rport[0] <= dport) 
         && (i->ports.rport[1] >= dport));
@@ -376,7 +376,7 @@ trigger_in(struct sk_buff **pskb,
     struct tcphdr *tcph = (void *)iph + iph->ihl*4;	/* Might be TCP, UDP */
 
     /* Check if the trigger-ed range has already existed in 'trigger_list'. 
-      * Ê×ÏÈÈ¥ÕÒÒ»°Ñ£¬¿´½øÀ´µÄ±¨ÎÄÊÇ·ñÂú×ãÒªÇó
+      * é¦–å…ˆåŽ»æ‰¾ä¸€æŠŠï¼Œçœ‹è¿›æ¥çš„æŠ¥æ–‡æ˜¯å¦æ»¡è¶³è¦æ±‚
       */
     found = LIST_FIND(&trigger_list, trigger_in_matched,
         struct ipt_trigger *, iph->protocol, ntohs(tcph->dest));
@@ -391,7 +391,7 @@ trigger_in(struct sk_buff **pskb,
     return XT_CONTINUE;	/* Our job is the interception. */
 }
 
-/* Ö÷ÒªÊÇÒòÎª½øÀ´µÄ°üÊÇÊ×ÏÈ·¢ÆðÁ¬½Ó£¬ËùÒÔÐèÒª¶ÔÆä½øÐÐDNAT£¬·ñÔò¾Í²»ÖªµÀ½øÀ´µÄ°ü¾ßÌå·¢¸øÄÄÒ»¸öÁË */
+/* ä¸»è¦æ˜¯å› ä¸ºè¿›æ¥çš„åŒ…æ˜¯é¦–å…ˆå‘èµ·è¿žæŽ¥ï¼Œæ‰€ä»¥éœ€è¦å¯¹å…¶è¿›è¡ŒDNATï¼Œå¦åˆ™å°±ä¸çŸ¥é“è¿›æ¥çš„åŒ…å…·ä½“å‘ç»™å“ªä¸€ä¸ªäº† */
     static unsigned int
 trigger_dnat(struct sk_buff **pskb,
     const struct net_device *in,
@@ -416,7 +416,7 @@ trigger_dnat(struct sk_buff **pskb,
     found = LIST_FIND(&trigger_list, trigger_in_matched,
         struct ipt_trigger *, iph->protocol, ntohs(tcph->dest));
 
-    /* Èç¹ûÃ»ÓÐÕÒµ½¶ÔÓ¦µÄ¹æÔò£¬ÄÇÃ´¾Í¼ÌÐø¸øÏÂÒ»¸öiptables¹æÔò´¦Àí¸Ãskb */
+    /* å¦‚æžœæ²¡æœ‰æ‰¾åˆ°å¯¹åº”çš„è§„åˆ™ï¼Œé‚£ä¹ˆå°±ç»§ç»­ç»™ä¸‹ä¸€ä¸ªiptablesè§„åˆ™å¤„ç†è¯¥skb */
     if (!found || !found->srcip)
         return XT_CONTINUE;	/* We don't block any packet. */
 
@@ -425,7 +425,7 @@ trigger_dnat(struct sk_buff **pskb,
     
     ct = nf_ct_get(*pskb, &ctinfo);
 
-    /* ÏÔÈ»Ó¦¸ÃÊÇÍâÃæÊ×ÏÈÁ¬½Ó½øÀ´ */
+    /* æ˜¾ç„¶åº”è¯¥æ˜¯å¤–é¢é¦–å…ˆè¿žæŽ¥è¿›æ¥ */
     NF_CT_ASSERT(ct && (ctinfo == IP_CT_NEW));
 
     DEBUGP("%s: got ", __FUNCTION__);
@@ -492,7 +492,7 @@ trigger_check(const struct xt_tgchk_param * tgchk_param)
         }
     }
 
-    /* Ôö¼ÓÁËÕë¶ÔrelatedÐ­Òé·ÖÀàµÄÅÐ¶Ï */
+    /* å¢žåŠ äº†é’ˆå¯¹relatedåè®®åˆ†ç±»çš„åˆ¤æ–­ */
     #ifdef ATP_SUPPORT_PRTT_RPROTOCOL
     if (info->rproto) {
         if (info->rproto != IPPROTO_TCP && info->rproto != IPPROTO_UDP) {
@@ -502,8 +502,8 @@ trigger_check(const struct xt_tgchk_param * tgchk_param)
     }
     #endif
 
-/******************Ò»´¥·¢¶à:ÄÚºËÀ©Õ¹³ÉÓÃÒ»Ìõ¹æÔòÖ§³Ö2000-2038,2050-2051,2069,2085,3010-3030¸ñÊ½µÄÄ£Ê½£¬
-    ²»ÐèÒª½«Íâ²¿¶Ë¿ÚºÅ½âÎö²¢·Ö¶Î£¬µ«±ØÐëÐ£Ñé±£Ö¤¸ñÊ½ÕýÈ·*****************************/
+/******************ä¸€è§¦å‘å¤š:å†…æ ¸æ‰©å±•æˆç”¨ä¸€æ¡è§„åˆ™æ”¯æŒ2000-2038,2050-2051,2069,2085,3010-3030æ ¼å¼çš„æ¨¡å¼ï¼Œ
+    ä¸éœ€è¦å°†å¤–éƒ¨ç«¯å£å·è§£æžå¹¶åˆ†æ®µï¼Œä½†å¿…é¡»æ ¡éªŒä¿è¯æ ¼å¼æ­£ç¡®*****************************/
 
     #if 0
     if (info->type == IPT_TRIGGER_OUT) {

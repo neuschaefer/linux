@@ -519,7 +519,7 @@ int ip6_forward(struct sk_buff *skb)
 			(dst->dev->priv_flags & IFF_WANDEV) )
 		{   
 #ifdef CONFIG_ATP_COMMON			
-            /*Start of ATP: ����lan��ʹ��ULAԴ��ַ��Ŀ���ַΪwan��ipv6��ַ����icmpv6 ping��������δת����wan��󣬻�Ӧ����PC�ظ�ICMPv6 Ŀ�Ĳ��ɴﱨ��*/
+            /*Start of ATP: 网关lan侧使用ULA源地址，目标地址为wan侧ipv6地址发送icmpv6 ping请求，网关未转发到wan侧后，还应该向PC回复ICMPv6 目的不可达报文*/
 			icmpv6_send(skb, ICMPV6_DEST_UNREACH, ICMPV6_ADDR_UNREACH, 0);
             /*End of ATP */
 #endif			

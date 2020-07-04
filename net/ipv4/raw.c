@@ -171,8 +171,8 @@ static int raw_v4_input(struct sk_buff *skb, const struct iphdr *iph, int hash)
     __be16 gre_proto;
     
     /* 
-       ÊÕµ½IPG_GREµÄÊı¾İ°üÖ»½ÓÊÕGRE¿ØÖÆ±¨ÎÄgre_proto=0x0101; Èç¹ûgre_proto=0x1234£¬       
-       ËµÃ÷ÊÇDHCP±¨ÎÄ£¬ÕâÀïĞŞ¸Ä³ÉIPĞ­Òé 
+       æ”¶åˆ°IPG_GREçš„æ•°æ®åŒ…åªæ¥æ”¶GREæ§åˆ¶æŠ¥æ–‡gre_proto=0x0101; å¦‚æœgre_proto=0x1234ï¼Œ       
+       è¯´æ˜æ˜¯DHCPæŠ¥æ–‡ï¼Œè¿™é‡Œä¿®æ”¹æˆIPåè®® 
     */
     do {
         if (iph && (IPPROTO_GRE == iph->protocol))    
@@ -425,7 +425,7 @@ static int raw_send_hdrinc(struct sock *sk, struct flowi4 *fl4,
 			skb_transport_header(skb))->type);
 
 #if defined(CONFIG_ATP_HYBRID)
-    /* °Ñgre¿ØÖÆ±¨ÎÄ·Åµ½×î¸ßÓÅÏÈ¼¶¶ÓÁĞÖĞ */
+    /* æŠŠgreæ§åˆ¶æŠ¥æ–‡æ”¾åˆ°æœ€é«˜ä¼˜å…ˆçº§é˜Ÿåˆ—ä¸­ */
     if (IPPROTO_GRE == iph->protocol)
     {
         skb->mark |= 0x7;

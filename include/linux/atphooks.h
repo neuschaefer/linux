@@ -3,16 +3,16 @@
 * (C) Huawei Technologies Co., Ltd. < >
 */
 /******************************************************************************
-  °æÈ¨ËùÓÐ  : 2007-2020£¬»ªÎª¼¼ÊõÓÐÏÞ¹«Ë¾
-  ÎÄ ¼þ Ãû  : atphooks.h
-  °æ    ±¾  : 1.0
-  ´´½¨ÈÕÆÚ  : 2014-7-31
-  Ãè    Êö  : atp hooksÍ·ÎÄ¼þ
-  º¯ÊýÁÐ±í  :
+  ç‰ˆæƒæ‰€æœ‰  : 2007-2020ï¼ŒåŽä¸ºæŠ€æœ¯æœ‰é™å…¬å¸
+  æ–‡ ä»¶ å  : atphooks.h
+  ç‰ˆ    æœ¬  : 1.0
+  åˆ›å»ºæ—¥æœŸ  : 2014-7-31
+  æ    è¿°  : atp hookså¤´æ–‡ä»¶
+  å‡½æ•°åˆ—è¡¨  :
 
-  ÀúÊ·¼ÇÂ¼      :
-   1.ÈÕ    ÆÚ   : 2014-7-31
-     ÐÞ¸ÄÄÚÈÝ   : Íê³É³õ¸å
+  åŽ†å²è®°å½•      :
+   1.æ—¥    æœŸ   : 2014-7-31
+     ä¿®æ”¹å†…å®¹   : å®Œæˆåˆç¨¿
 
 *********************************************************************************/
 
@@ -28,23 +28,23 @@
 
 enum atp_hooks_num
 {
-    /*Êý¾ÝÁ÷³ÌÀàhook*/
-    ATP_DEV_RCV,					/*Ð­ÒéÕ»ÊÕ°üÈë¿Ú*/
-    ATP_DEV_XMIT,					/*Ð­ÒéÕ»·¢°ü³ö¿Ú*/
-    ATP_BR_LOCALIN_BF_CHG_DEV,      /*¼´½«½øÈëbridge local in£¬µ«»¹Î´ÐÞ¸Ädev*/
-    ATP_CT_BEFOREINIT,              /*Á´½Ó¸ú×ÙCT³õÊ¼»¯Ç°µÄhookµã*/
-    ATP_IP_BF_RCV,                  /*IP ReceiveÊÕ°üÈë¿Ú*/
-    ATP_DEV_PRE_XMIT,			    /*dev_queue_xmitÈë¿Ú*/
-    ATP_AF_PKT_RCV,                 /*packet_rcv´¦Àí*/
+    /*æ•°æ®æµç¨‹ç±»hook*/
+    ATP_DEV_RCV,					/*åè®®æ ˆæ”¶åŒ…å…¥å£*/
+    ATP_DEV_XMIT,					/*åè®®æ ˆå‘åŒ…å‡ºå£*/
+    ATP_BR_LOCALIN_BF_CHG_DEV,      /*å³å°†è¿›å…¥bridge local inï¼Œä½†è¿˜æœªä¿®æ”¹dev*/
+    ATP_CT_BEFOREINIT,              /*é“¾æŽ¥è·Ÿè¸ªCTåˆå§‹åŒ–å‰çš„hookç‚¹*/
+    ATP_IP_BF_RCV,                  /*IP Receiveæ”¶åŒ…å…¥å£*/
+    ATP_DEV_PRE_XMIT,			    /*dev_queue_xmitå…¥å£*/
+    ATP_AF_PKT_RCV,                 /*packet_rcvå¤„ç†*/
 
-    /*Âß¼­¿ØÖÆÀàhook*/
-    ATP_DEV_MIRROR,					/*mirror ioctl ×¨ÓÃ*/
-    ATP_BR_INIT,                    /*bridgeÄ£¿é³õÊ¼»¯*/
-    ATP_BR_DEL_IF,                  /*bridge port É¾³ýÊ±*/
+    /*é€»è¾‘æŽ§åˆ¶ç±»hook*/
+    ATP_DEV_MIRROR,					/*mirror ioctl ä¸“ç”¨*/
+    ATP_BR_INIT,                    /*bridgeæ¨¡å—åˆå§‹åŒ–*/
+    ATP_BR_DEL_IF,                  /*bridge port åˆ é™¤æ—¶*/
     ATP_BR_IOCTL_PORT_RELAY,        /*br ioctl for dhcp port relay*/
-    ATP_BR_IOCTL_HOOK,              /*ATP À©Õ¹µÄbridge ioctlÃüÁî*/
-    ATP_CT_KILL_ALL,                /*Á¬½Ó¸ú×Ùkill_allÖÐµÄhook£¬ÓÃÓÚ±£Áôct²»±»É¾³ý*/
-    ATP_IPV6_NDISC_DEL_POLICYROUTE, /*ndiscÓÃÓÚdelpolicyroute*/
+    ATP_BR_IOCTL_HOOK,              /*ATP æ‰©å±•çš„bridge ioctlå‘½ä»¤*/
+    ATP_CT_KILL_ALL,                /*è¿žæŽ¥è·Ÿè¸ªkill_allä¸­çš„hookï¼Œç”¨äºŽä¿ç•™ctä¸è¢«åˆ é™¤*/
+    ATP_IPV6_NDISC_DEL_POLICYROUTE, /*ndiscç”¨äºŽdelpolicyroute*/
     ATP_MAX_HOOKS
 };
 

@@ -247,7 +247,7 @@ masquerade_tg(struct sk_buff *skb, const struct xt_action_param *par)
 
 #if defined(CONFIG_BCM_KF_NETFILTER)
 #ifdef CONFIG_ATP_BRCM
-	/*ÕâÀïÄ¬ÈÏfullcone µÄ±ê¼Çmin_ipÎª1£¬²»È¥ÅÐ¶Ï*/
+	/*è¿™é‡Œé»˜è®¤fullcone çš„æ ‡è®°min_ipä¸º1ï¼Œä¸åŽ»åˆ¤æ–­*/
 	if ((nfct_help(ct) == NULL || nfct_help(ct)->helper == NULL)
 		&& nf_ct_protonum(ct) == IPPROTO_UDP) {
 #else
@@ -281,7 +281,7 @@ masquerade_tg(struct sk_buff *skb, const struct xt_action_param *par)
 			for (newport = ntohs(minport),tmpport = ntohs(maxport); 
 			     newport <= tmpport; newport++) {
 					if (!find_exp(newsrc, htons(newport), ct)
-						/*¶Ë¿ÚÈç¹û±»ÆäËûctÕ¼ÓÃ£¬Ò²²»¿ÉÊ¹ÓÃ*/
+						/*ç«¯å£å¦‚æžœè¢«å…¶ä»–ctå ç”¨ï¼Œä¹Ÿä¸å¯ä½¿ç”¨*/
 #ifdef CONFIG_ATP_BRCM
 						&& !find_ct(newsrc, htons(newport), ct)
 #endif

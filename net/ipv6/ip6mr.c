@@ -2133,13 +2133,13 @@ int ip6_mr_input(struct sk_buff *skb)
 	/* mroute6 should not apply to MLD traffic
 	   in addition it does not make sense for TCP protocol to be used
 	   for multicast so just check for UDP */
-	/* start  网关无法处理分片的IPv6组播报文 */
+	/* start  缃戝叧鏃犳硶澶勭悊鍒嗙墖鐨処Pv6缁勬挱鎶ユ枃 */
 #ifdef CONFIG_ATP_COMMON	   
 	if( ipv6_hdr(skb)->nexthdr != IPPROTO_TCP )
 #else
 	if( ipv6_hdr(skb)->nexthdr == IPPROTO_UDP )
 #endif
-	/* end  网关无法处理分片的IPv6组播报文 */	
+	/* end  缃戝叧鏃犳硶澶勭悊鍒嗙墖鐨処Pv6缁勬挱鎶ユ枃 */	
 	{
 		mifi_t mifi = ip6mr_find_vif(mrt, skb->dev);
 		cache = ip6mr_cache_find(mrt, &ipv6_hdr(skb)->saddr, 

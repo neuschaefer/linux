@@ -1986,7 +1986,7 @@ static netdev_tx_t sky2_xmit_frame(struct sk_buff *skb,
 	sky2->tx_prod = slot;
 
 #if (defined CONFIG_HSAN)	
-    // ���ιرշ����ж�;��ֹ������״ֹ̬ͣ����
+    // 屏蔽关闭发包中断;防止大流量状态停止发包
 #else
 	if (tx_avail(sky2) <= MAX_SKB_TX_LE)
 		netif_stop_queue(dev);

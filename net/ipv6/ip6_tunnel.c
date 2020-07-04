@@ -954,12 +954,12 @@ static int ip6_tnl_xmit2(struct sk_buff *skb,
 		mtu = IPV6_MIN_MTU;
 	if (skb_dst(skb))
 		skb_dst(skb)->ops->update_pmtu(skb_dst(skb), mtu);
-    /*start  rfc 2473:Dslite报文不进行V4分片而进行V6分片*/
+    /*start  rfc 2473:Dslite鎶ユ枃涓嶈繘琛孷4鍒嗙墖鑰岃繘琛孷6鍒嗙墖*/
     if ((t->parms.proto == IPPROTO_IPIP && ip_hdr(skb)->frag_off&htons(IP_DF))
         || t->parms.proto == IPPROTO_IPV6){
         check = 1;
     }
-    /*end  rfc 2473:Dslite报文不进行V4分片而进行V6分片*/
+    /*end  rfc 2473:Dslite鎶ユ枃涓嶈繘琛孷4鍒嗙墖鑰岃繘琛孷6鍒嗙墖*/
 
 	if (skb->len > mtu && check) {
 		*pmtu = mtu;

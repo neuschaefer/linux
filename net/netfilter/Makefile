@@ -140,5 +140,5 @@ obj-$(CONFIG_IP_VS) += ipvs/
 #add to replace webstr
 obj-$(CONFIG_NETFILTER_XT_MATCH_DNS_FLT) += xt_dns_flt.o
 
-#add for а╛╫с╦Звысеох╪╤ 
+#add for Х©·Ф▌╔Х╥÷Х╦╙Д╪≤Е┘┬Г╨╖ 
 obj-$(CONFIG_NF_CONNTRACK_PRI) += nf_conntrack_pri.o

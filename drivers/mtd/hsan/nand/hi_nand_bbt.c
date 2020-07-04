@@ -3,14 +3,14 @@
 * (C) Huawei Technologies Co., Ltd. < >
 */
 /******************************************************************************
-  ÎÄ¼şÃû³Æ: hi_nand_bbt.c
-  ¹¦ÄÜÃèÊö: nandÇı¶¯»µ¿é¹ÜÀíÏà¹Ø½Ó¿Ú
-  °æ±¾ÃèÊö: V1.0
+  æ–‡ä»¶åç§°: hi_nand_bbt.c
+  åŠŸèƒ½æè¿°: nandé©±åŠ¨åå—ç®¡ç†ç›¸å…³æ¥å£
+  ç‰ˆæœ¬æè¿°: V1.0
 
-  ´´½¨ÈÕÆÚ: D2013_04_20
+  åˆ›å»ºæ—¥æœŸ: D2013_04_20
 
-  ĞŞ¸Ä¼ÇÂ¼: 
-            Éú³É³õ¸å.
+  ä¿®æ”¹è®°å½•: 
+            ç”Ÿæˆåˆç¨¿.
 ******************************************************************************/
 #include <linux/mtd/mtd.h>
 
@@ -27,13 +27,13 @@ extern "C"{
 
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  Check if block at offset is bad
-  ÊäÈë²ÎÊı:  
+  å‡½æ•°åŠŸèƒ½:  Check if block at offset is bad
+  è¾“å…¥å‚æ•°:  
                              pst_host : nand driver host structure
                              ui_block_addr : block address
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:  hi_int32       
-  º¯Êı±¸×¢:  
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:  hi_int32       
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 hi_int32 hi_nand_bbt_block_isbad(struct hi_nand_host *pst_host, hi_uint32 ui_block_addr)
 {
@@ -49,13 +49,13 @@ hi_int32 hi_nand_bbt_block_isbad(struct hi_nand_host *pst_host, hi_uint32 ui_blo
 }
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  Mark block at the given offset as bad
-  ÊäÈë²ÎÊı:  
+  å‡½æ•°åŠŸèƒ½:  Mark block at the given offset as bad
+  è¾“å…¥å‚æ•°:  
                              pst_host : nand driver host structure
                              ui_block_addr : block address
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:  hi_int32       
-  º¯Êı±¸×¢:  
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:  hi_int32       
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 hi_int32 hi_nand_bbt_block_markbad(struct hi_nand_host *pst_host, hi_uint32 ui_block_addr)
 {

@@ -1435,7 +1435,7 @@ static int packet_rcv_spkt(struct sk_buff *skb, struct net_device *dev,
 
 	spkt->spkt_family = dev->type;
 
-	/*bridge pass up µÄarp±¨ÎÄµÄdevÒÑ¾­ÔÚbridge local inÊ±ÉèÖÃÁË*/
+	/*bridge pass up çš„arpæŠ¥æ–‡çš„devå·²ç»åœ¨bridge local inæ—¶è®¾ç½®äº†*/
 	po = pkt_sk(sk);
 	if ((htons(ETH_P_ARP) != po->num) || 0 == strlen(spkt->spkt_device))
 	{
@@ -2716,7 +2716,7 @@ out:
 }
 
 
-/* °Ñ½ÓÊÕ±¨ÎÄµÄÔ­Ê¼Éè±¸½Ó¿ÚÃû³ÆËÍÉÏÌ×½Ó×Ö²ã£¬¸øÓ¦ÓÃ²ã¶ÁÈ¡*/
+/* æŠŠæ¥æ”¶æŠ¥æ–‡çš„åŸå§‹è®¾å¤‡æ¥å£åç§°é€ä¸Šå¥—æ¥å­—å±‚ï¼Œç»™åº”ç”¨å±‚è¯»å–*/
 static int packet_cmsg_Set_InDev(struct msghdr *msg, struct sk_buff *skb)
 {
     char acOriginInDeivce[IFNAMSIZ];

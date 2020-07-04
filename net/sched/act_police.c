@@ -308,44 +308,44 @@ static int tcf_act_police(struct sk_buff *skb, const struct tc_action *a,
 	}
 
 #ifndef CONFIG_ATP_HYBRID
-    /* ԭ�޸���tc�����м�����mtu������ֵΪ64KB,mtu��ʹ������Ͱ���ľ��ȱ��,ԭ������ */
-    /* TBFʹ�õ��ǿ�����Դ�����㷨�����㷨�Ὣһ���ӿڵķ�������ת��Ϊ������Դ�����ݵ�ǰϵͳ���ÿ�����Դ�ͱ��Ľ�Ҫռ�õĿ�����Դ���������ĵ�����.
-       tick_in_usec Ϊÿ΢�뽫��ռ�õĿ�����Դ��һ������Ϊsize��������������Ϊrate��TBF�У����������ĵ���ԴΪ 1000000*((double)size/rate)*tick_in_usec.
-       ��������Ͱ��Ч����һ��������Դ�����Ĳ�����ֱ��ͨ�� 1000000*((double)size/rate)*tick_in_usec ����ģ�����ʹ������Ͱ��������ġ�
-       ����Ͱ��data[256]��һ�����ĳ����������Դ����ֵ��ӳ����ϣ��ñ�����256��ֵ��
-       ������Դ�����㷨��������mtu���ڳ�����0-2^(log2(Max(mtu))+1)֮����ȵ�ȡ 256 �����ȣ��������Ӧ�Ŀ�����Դ������ɢֵ��������Ӧ��ֵ����data[256]�У�data[256]�Ϳ��Խ���Ӧ����ӳ��ɿ�����Դ����ֵ��
-       ����ζ������data�ﲽ��Ϊ per_datalen = (2^(log2(mtu)+1)/256)���ڲ����ڵı��ļ��������Դ����ֵΪͬһ��ֵ��Ҳ����˵�����㷨�ľ����� per_datalen ������
-       ��ˣ�Max(mtu)Խ���������Ӧ����Դ����ֵ���Ⱦ�Խ�͡�
-       data[i]�ڴ��ֵΪ (per_datalen * (i+1)����Դ����ֵ
-       ����Ϊtab_size�ı��Ķ�Ӧ�� i = tab_size / per_datalen (����ȡ��)��
-       ��tab_sizeΪʵ�ʵĳ��� size - 1���� i = (size - 1) / per_datalen (����ȡ��)
-       ����ʵ����Ϊ (per_datalen * i)+1 �� (per_datalen * (i+1))-1 + 1 �ı��ĵ�����ֵȫ����ȡ data[i] ���ֵ��data[i] Ϊ (per_datalen * (i+1))����ʵ��Դ����ֵ��
+    /* 原修改在tc命令中加入了mtu参数且值为64KB,mtu会使得令牌桶表的精度变低,原因如下 */
+    /* TBF使用的是空闲资源流控算法，该算法会将一个接口的发包能力转换为空闲资源，根据当前系统可用空闲资源和报文将要占用的空闲资源来决定报文的流向.
+       tick_in_usec 为每微秒将会占用的空闲资源。一个长度为size报文在限制速率为rate的TBF中，理论上消耗的资源为 1000000*((double)size/rate)*tick_in_usec.
+       但在令牌桶生效处，一个包对资源的消耗并不是直接通过 1000000*((double)size/rate)*tick_in_usec 计算的，而是使用令牌桶表来计算的。
+       令牌桶表data[256]是一个包的长度与空闲资源消耗值的映射表上，该表仅有256个值。
+       空闲资源流控算法会根据最大mtu，在长度在0-2^(log2(Max(mtu))+1)之间均匀的取 256 个长度，计算其对应的空闲资源消耗离散值，并将对应的值存入data[256]中，data[256]就可以将对应包长映射成空闲资源消耗值。
+       这意味长度在data里步长为 per_datalen = (2^(log2(mtu)+1)/256)，在步长内的报文计算出的资源消耗值为同一个值，也即是说，该算法的精度由 per_datalen 决定。
+       因此，Max(mtu)越大，则包长对应的资源消耗值精度就越低。
+       data[i]内存的值为 (per_datalen * (i+1)的资源消耗值
+       长度为tab_size的报文对应的 i = tab_size / per_datalen (向下取整)。
+       而tab_size为实际的长度 size - 1，即 i = (size - 1) / per_datalen (向下取整)
+       即真实长度为 (per_datalen * i)+1 到 (per_datalen * (i+1))-1 + 1 的报文的消耗值全部会取 data[i] 里的值，data[i] 为 (per_datalen * (i+1))的真实资源消耗值。
 
-       ����mtu����Ϊ 65536 ��ȡ0��131072֮���256�����Ⱦ���ֵ����Դ����ֵ��
-       �򳤶ȵĲ���Ϊ per_datalen = (2^(log2(mtu)+1)/256) = 512.
-       ����ζ��512���ȼ����µ�ֵȫ����ӳ�䵽data[0]�ϣ�data[0]Ϊ512����ʵ��Դ����ֵ��
-       data[1]��Ӧ�ĳ���Ϊ513-1024��data[1]Ϊ1024����ʵ��Դ����ֵ��
-       date[2]��Ӧ1025-1536���ϣ���ֵΪ1536������ֵ��
-       ����ζ����������Ͱ���������[0]��[1]��[2]�ڶ�����������Ч���Ҵ���ʧ׼��
-       �������֪��������Ϊ��512��1024��1536��������overflow����Ϊ׼ȷ����513��1025������overflow���׼��
-       ����ȫΪsize��С���������� (size/((size/512(����ȡ��)) * 512)) * rate ��overflow
-       ������Ϊ513���������� 513/1024 rate �� overflow��
-       ����Ϊ1025���������� 1025/1536 rate �� overflow��
-       ����Խ����ʧ׼ԽС������Խ�ӽ�512�ı�������Խ׼ȷ��
+       若将mtu设置为 65536 ，取0到131072之间的256个长度均匀值的资源消耗值，
+       则长度的步长为 per_datalen = (2^(log2(mtu)+1)/256) = 512.
+       这意味着512长度及以下的值全部会映射到data[0]上，data[0]为512的真实资源消耗值。
+       data[1]对应的长度为513-1024，data[1]为1024的真实资源消耗值。
+       date[2]对应1025-1536以上，其值为1536的消耗值。
+       这意味着整个令牌桶表里面仅有[0]、[1]、[2]在多数场景下有效，且存在失准。
+       由上面可知，包长度为纯512、1024、1536的流量的overflow将最为准确。而513、1025的流量overflow将最不准。
+       包长全为size大小的流量会在 (size/((size/512(向上取整)) * 512)) * rate 处overflow
+       即长度为513的流量会在 513/1024 rate 处 overflow。
+       长度为1025的流量会在 1025/1536 rate 处 overflow。
+       长度越长，失准越小，向上越接近512的倍数，则越准确。
 
-       ��Ϊȱʡmtu����������Ͱ����mtuֵΪ2047���򲽳�Ϊ8������Ϊ8�ֽڡ�tcfp_mtu������Ͱ��mtu��ֵ���в�ͬ��ȱʡΪ2040��
-       mtu���߼����������mtu���ʴ˴��жϴ��ڸ�mtu�ı��Ĳ���������Ͱ���㣬ֱ�� overlimit��
-       mtu��ֵ���˻��������Ͱ���ļ����⣬��������ֵ����Ͱ�ļ��㡣
-       ����Hybrid overflow����δʹ�÷�ֵ����Ͱ��mtu���漰������Ͱ���ļ��㡣
-       �˴�ȥ�����жϣ���ʹ�ô���mtu�ı���Ҳ���������Ͱ�㷨�ļ���������
-       ��һ�������£����ĵ���Դռ��ֱֵ����data[i]������
-       �����ȴ���mtu�����ɳ��ȼ��������i�����255(ע:i = (size - 1) / per_datalen)��
-       ��������£���Դռ��ֵ���㷨Ϊ:
+       若为缺省mtu。参与令牌桶计算mtu值为2047，则步长为8，精度为8字节。tcfp_mtu与令牌桶的mtu的值略有不同，缺省为2040。
+       mtu的逻辑意义是最大mtu，故此处判断大于该mtu的报文不参与令牌桶计算，直接 overlimit。
+       mtu的值除了会参与令牌桶表的计算外，还会参与峰值令牌桶的计算。
+       由于Hybrid overflow功能未使用峰值令牌桶，mtu仅涉及到令牌桶表的计算。
+       此处去掉该判断，会使得大于mtu的报文也参与进令牌桶算法的计算中来。
+       在一般的情况下，报文的资源占用值直接由data[i]给出。
+       若长度大于mtu，则由长度计算出来的i会大于255(注:i = (size - 1) / per_datalen)。
+       这种情况下，资源占用值的算法为:
        data[255]*(i >> 8) + data[i & 0xFF];
-       ����Դ����ֵ�����Բ�����ǰ�ݽ�����׼�Բ�δ�ı䣬��ȥ�����жϴ�Ŀǰ�ķ��������������overflow����Ϊ���Ӱ�졣
+       即资源消耗值依旧以步长向前递进，精准性并未改变，故去掉该判断从目前的分析来看，不会对overflow的行为造成影响。
     */
-    /* Ӧ���ڴ˴������޸� */
-    /* Ĭ������£�tcfp_mtuΪ2047����skb��qdisc_pkt_len���ڸ�ֵʱ��skb��������Ͱ���㣬ֱ��overlimit����Hybrid�У��޸��жϵı�Ҫ */
+    /* 应该在此处进行修改 */
+    /* 默认情况下，tcfp_mtu为2047，当skb的qdisc_pkt_len大于该值时，skb不会令牌桶计算，直接overlimit，在Hybrid中，无该判断的必要 */
 	if (qdisc_pkt_len(skb) <= police->tcfp_mtu) {
 #endif
 		if (police->tcfp_R_tab == NULL) {

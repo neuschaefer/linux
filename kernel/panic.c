@@ -53,9 +53,9 @@ static long no_blink(int state)
 long (*panic_blink)(int state);
 EXPORT_SYMBOL(panic_blink);
 #ifdef CONFIG_BUILD_PANIC
-struct pt_regs *p_regs = NULL;/*记录保存register信息*/
+struct pt_regs *p_regs = NULL;/*璁板綍淇濆瓨register淇℃伅*/
 typedef void (* hw_write_panic_info)(char acPanicInfo[128],  struct pt_regs *regs);
-hw_write_panic_info g_pf_write_panic_info = NULL;/*注册回调函数*/
+hw_write_panic_info g_pf_write_panic_info = NULL;/*娉ㄥ唽鍥炶皟鍑芥暟*/
 
 void hw_set_write_panic_func(hw_write_panic_info  pf_write_panic_info)
 {
@@ -120,7 +120,7 @@ void panic(const char *fmt, ...)
 	if (NULL != g_pf_write_panic_info)
 	{
             snprintf(acPanicInfo, 127, "%s", buf);
-	     /*回调函数将panic信息写入到Panic内存*/		
+	     /*鍥炶皟鍑芥暟灏唒anic淇℃伅鍐欏叆鍒癙anic鍐呭瓨*/		
             g_pf_write_panic_info(acPanicInfo, p_regs);
 	}
 #endif

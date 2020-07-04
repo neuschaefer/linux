@@ -4,12 +4,12 @@
 */
 /******************************************************************************
 
-                  °æÈ¨ËùÓÐ (C), 2008-2018, º£Ë¼°ëµ¼ÌåÓÐÏÞ¹«Ë¾
+                  ç‰ˆæƒæ‰€æœ‰ (C), 2008-2018, æµ·æ€åŠå¯¼ä½“æœ‰é™å…¬å¸
 
  ******************************************************************************
-  ÎÄ ¼þ Ãû   : hi_common.c
-  °æ ±¾ ºÅ   : ³õ¸å
-  Éú³ÉÈÕÆÚ   : D2014_03_10
+  æ–‡ ä»¶ å   : hi_common.c
+  ç‰ˆ æœ¬ å·   : åˆç¨¿
+  ç”Ÿæˆæ—¥æœŸ   : D2014_03_10
 
 ******************************************************************************/
 
@@ -98,12 +98,12 @@ hi_void arch_reset(hi_char8 mode,const hi_char8 *cmd)
     switch ( ui_chipid )
     {
         case HI_CHIP_ID_H_E :
-            /* 0x14880000ÏÈÐ´Èë0x56100100,È»ºóÐ´Èë0XA9EF_FEFF.´¥·¢Èí¸´Î» */
+            /* 0x14880000å…ˆå†™å…¥0x56100100,ç„¶åŽå†™å…¥0XA9EF_FEFF.è§¦å‘è½¯å¤ä½ */
             HI_REG_WRITE( hi_io_address(HI_REG_BASE_CRG), 0x56100100);
             HI_REG_WRITE( hi_io_address(HI_REG_BASE_CRG), 0XA9EFFEFF);
             break;
         case HI_CHIP_ID_T_E :
-            /* 0x14880000ÏÈÐ´Èë0x56102100,È»ºóÐ´Èë0XA9EF_DEFF.´¥·¢Èí¸´Î» */
+            /* 0x14880000å…ˆå†™å…¥0x56102100,ç„¶åŽå†™å…¥0XA9EF_DEFF.è§¦å‘è½¯å¤ä½ */
             HI_REG_WRITE( hi_io_address(HI_REG_BASE_CRG), 0x56102100);
             HI_REG_WRITE( hi_io_address(HI_REG_BASE_CRG), 0XA9EFDEFF);
             break;

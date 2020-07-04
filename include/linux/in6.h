@@ -288,11 +288,11 @@ struct bridge_ifcid_set_msg_st
 #define IPV6_TRANSPARENT        75
 #define IPV6_UNICAST_IF         76
 
-/* start of 2010-01-29 支持接收skb的mark */
+/* start of 2010-01-29 鏀寔鎺ユ敹skb鐨刴ark */
 #define IPV6_ORIGINDEV         (97)
 #define IPV6_RECVNFMARK        (98)
 #define IPV6_NFMARK            (99)
-/* end of 2010-01-29 支持接收skb的mark */
+/* end of 2010-01-29 鏀寔鎺ユ敹skb鐨刴ark */
 
 /*
  * Multicast Routing:

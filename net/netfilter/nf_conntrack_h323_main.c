@@ -318,7 +318,7 @@ static int expect_rtp_rtcp(struct sk_buff *skb, struct nf_conn *ct,
 	struct nf_conntrack_expect *rtcp_exp;
 	typeof(nat_rtp_rtcp_hook) nat_rtp_rtcp;
 
-	/* Read RTP or RTCP address Èç¹û±¨ÎÄÖÐµÄµØÖ·ÓëÊý¾Ý°üµÄÔ´µØÖ·Ò»ÖÂ£¬Ö±½Ó·µ»Ø */
+	/* Read RTP or RTCP address å¦‚æžœæŠ¥æ–‡ä¸­çš„åœ°å€ä¸Žæ•°æ®åŒ…çš„æºåœ°å€ä¸€è‡´ï¼Œç›´æŽ¥è¿”å›ž */
 #ifndef CONFIG_ATP_COMMON
 	if (!get_h245_addr(ct, *data, taddr, &addr, &port) ||
 	    memcmp(&addr, &ct->tuplehash[dir].tuple.src.u3, sizeof(addr)) ||
@@ -351,7 +351,7 @@ static int expect_rtp_rtcp(struct sk_buff *skb, struct nf_conn *ct,
 	/* Create expect for RTP */
 	if ((rtp_exp = nf_ct_expect_alloc(ct)) == NULL)
 		return -1;
-/* Start of  H323Í¨»°Ò»¶ÎÊ±¼äÃ»ÓÐÍ¼ÏñÏÔÊ¾ */
+/* Start of  H323é€šè¯ä¸€æ®µæ—¶é—´æ²¡æœ‰å›¾åƒæ˜¾ç¤º */
 	nf_ct_expect_init(rtp_exp, NF_CT_EXPECT_CLASS_DEFAULT, nf_ct_l3num(ct),
 #ifdef CONFIG_ATP_COMMON
 			  NULL, //&ct->tuplehash[!dir].tuple.src.u3,
@@ -360,14 +360,14 @@ static int expect_rtp_rtcp(struct sk_buff *skb, struct nf_conn *ct,
 #endif
 			  &ct->tuplehash[!dir].tuple.dst.u3,
 			  IPPROTO_UDP, NULL, &rtp_port);
-/* End of  H323Í¨»°Ò»¶ÎÊ±¼äÃ»ÓÐÍ¼ÏñÏÔÊ¾ */
+/* End of  H323é€šè¯ä¸€æ®µæ—¶é—´æ²¡æœ‰å›¾åƒæ˜¾ç¤º */
 
 	/* Create expect for RTCP */
 	if ((rtcp_exp = nf_ct_expect_alloc(ct)) == NULL) {
 		nf_ct_expect_put(rtp_exp);
 		return -1;
 	}
-/* Start of  H323Í¨»°Ò»¶ÎÊ±¼äÃ»ÓÐÍ¼ÏñÏÔÊ¾ */
+/* Start of  H323é€šè¯ä¸€æ®µæ—¶é—´æ²¡æœ‰å›¾åƒæ˜¾ç¤º */
 	nf_ct_expect_init(rtcp_exp, NF_CT_EXPECT_CLASS_DEFAULT, nf_ct_l3num(ct),
 #ifdef CONFIG_ATP_COMMON
 			  NULL, //&ct->tuplehash[!dir].tuple.src.u3,
@@ -376,7 +376,7 @@ static int expect_rtp_rtcp(struct sk_buff *skb, struct nf_conn *ct,
 #endif
 			  &ct->tuplehash[!dir].tuple.dst.u3,
 			  IPPROTO_UDP, NULL, &rtcp_port);
-/* End of  H323Í¨»°Ò»¶ÎÊ±¼äÃ»ÓÐÍ¼ÏñÏÔÊ¾ */
+/* End of  H323é€šè¯ä¸€æ®µæ—¶é—´æ²¡æœ‰å›¾åƒæ˜¾ç¤º */
 
 	if (memcmp(&ct->tuplehash[dir].tuple.src.u3,
 		   &ct->tuplehash[!dir].tuple.dst.u3,
@@ -1328,12 +1328,12 @@ static int q931_help(struct sk_buff *skb, unsigned int protoff,
 	if (ctinfo != IP_CT_ESTABLISHED && ctinfo != IP_CT_ESTABLISHED_REPLY)
 		return NF_ACCEPT;
 #ifdef CONFIG_ATP_COMMON
-    /* start of  ÔÚ´ËÐÞ¸ÄTCP MSS ´óÐ¡ */
+    /* start of  åœ¨æ­¤ä¿®æ”¹TCP MSS å¤§å° */
     if (ctinfo == (IP_CT_ESTABLISHED + IP_CT_IS_REPLY))
     {
         tcpmss_modify_packet(skb);        
     }
-    /* end of  ÔÚ´ËÐÞ¸ÄTCP MSS ´óÐ¡ */
+    /* end of  åœ¨æ­¤ä¿®æ”¹TCP MSS å¤§å° */
 #endif
 	pr_debug("nf_ct_q931: skblen = %u\n", skb->len);
 

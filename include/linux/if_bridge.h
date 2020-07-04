@@ -91,7 +91,7 @@
 #define BRCTL_SET_IGMP_SNOOPING 23
 #define BRCTL_SHOW_IGMP_SNOOPING 24
 #else
-//bcmµÄ×é²¥¼ÓËÙ²ÅÓÃ
+//bcmçš„ç»„æ’­åŠ é€Ÿæ‰ç”¨
 #define BRCTL_ENABLE_SNOOPING        22
 #define BRCTL_ENABLE_PROXY_MODE      23
 #endif
@@ -101,7 +101,7 @@
 #define BRCTL_SET_MLD_SNOOPING  25
 #define BRCTL_SHOW_MLD_SNOOPING 26
 #else
-//bcmµÄ×é²¥¼ÓËÙ²ÅÓÃ
+//bcmçš„ç»„æ’­åŠ é€Ÿæ‰ç”¨
 #define BRCTL_MLD_ENABLE_SNOOPING    25
 #define BRCTL_MLD_ENABLE_PROXY_MODE  26
 #endif
@@ -168,7 +168,7 @@ struct __fdb_entry {
 #endif
 };
 
-/*ATPĞÂÔö*/
+/*ATPæ–°å¢*/
 struct __fdb_lan
 {
     __u8 mac_addr[6];

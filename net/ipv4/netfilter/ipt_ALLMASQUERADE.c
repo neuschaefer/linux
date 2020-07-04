@@ -401,7 +401,7 @@ masquerade_tg(struct sk_buff *skb, const struct xt_action_param *par)
 	write_unlock_bh(&masq_lock);
 	
 #if defined(CONFIG_BCM_KF_NETFILTER)
-/*ÕâÀïÄ¬ÈÏfullcone µÄ±ê¼Çmin_ipÎª1£¬²»È¥ÅÐ¶Ï mr->range[0].min_ip != 0  nat_mode == full cone */ 
+/*è¿™é‡Œé»˜è®¤fullcone çš„æ ‡è®°min_ipä¸º1ï¼Œä¸åŽ»åˆ¤æ–­ mr->range[0].min_ip != 0  nat_mode == full cone */ 
 	if ((nfct_help(ct) == NULL || nfct_help(ct)->helper == NULL)
 	    && nf_ct_protonum(ct) == IPPROTO_UDP) {
 		unsigned int ret;
@@ -528,7 +528,7 @@ static int masq_device_event(struct notifier_block *this,
 	struct net *net = dev_net(dev);
 
 #ifdef CONFIG_ATP_HYBRID
-	/*Á½¸ögreËíµÀ¶¼downºóÔÙÉ¾³ýct*/
+	/*ä¸¤ä¸ªgreéš§é“éƒ½downåŽå†åˆ é™¤ct*/
 	if (dev && IS_GRE_DEV(dev->name)) {
 		nf_conntrack_clean = 36;
 		return NOTIFY_DONE;

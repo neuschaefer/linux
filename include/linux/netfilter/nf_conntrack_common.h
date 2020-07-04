@@ -95,7 +95,7 @@ enum ip_conntrack_status {
 #endif
 
 #ifdef CONFIG_NF_CONNTRACK_PRI
-    /* ╦Ы╬щсеох╪╤и╬ЁЩ╠Й╪г */
+    /* Ф═╧Ф█╝Д╪≤Е┘┬Г╨╖Е┬═И≥╓Ф═┤Х╝╟ */
     IPS_DELETE_BIT = 14,
     IPS_DELETE = (1 << IPS_DELETE_BIT),
 #endif

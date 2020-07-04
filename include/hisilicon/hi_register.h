@@ -4,17 +4,17 @@
 */
 /******************************************************************************
 
-          °æÈ¨ËùÓĞ (C), 2008-2018, º£Ë¼°ëµ¼ÌåÓĞÏŞ¹«Ë¾
+          ç‰ˆæƒæ‰€æœ‰ (C), 2008-2018, æµ·æ€åŠå¯¼ä½“æœ‰é™å…¬å¸
 
 ******************************************************************************
-  ÎÄ¼şÃû³Æ: hi_register.h
-  ¹¦ÄÜÃèÊö: Í·ÎÄ¼ş
-  °æ±¾ÃèÊö: V1.0
+  æ–‡ä»¶åç§°: hi_register.h
+  åŠŸèƒ½æè¿°: å¤´æ–‡ä»¶
+  ç‰ˆæœ¬æè¿°: V1.0
 
-  ´´½¨ÈÕÆÚ: D2012_09_27
+  åˆ›å»ºæ—¥æœŸ: D2012_09_27
 
-  ĞŞ¸Ä¼ÇÂ¼: 
-            Éú³É³õ¸å.
+  ä¿®æ”¹è®°å½•: 
+            ç”Ÿæˆåˆç¨¿.
 ******************************************************************************/
 
 #ifndef __HI_REGISTER_H__
@@ -30,42 +30,42 @@ extern "C"{
 #define HI_REG_WRITE(addr, val)         (*(volatile hi_uint32*)(addr) = (val))
 #define HI_REG_READ(addr, val)          ((val) = *(volatile hi_uint32*)(addr))
 
-/* val bit Îª 1 ±» ÉèÖÃÎª 1 */
+/* val bit ä¸º 1 è¢« è®¾ç½®ä¸º 1 */
 #define HI_REG_RW_SET_MASK(addr, val, mask)  { \
         hi_uint32 ui_data=0; \
         HI_REG_READ(addr, ui_data); \
         HI_REG_WRITE(addr, (ui_data&(~(mask)))|(val)); \
     }
 
-/* val bit Îª 1 ±» ÉèÖÃÎª 1 */
+/* val bit ä¸º 1 è¢« è®¾ç½®ä¸º 1 */
 #define HI_REG_RW_SET(addr, val)  { \
         hi_uint32 ui_data=0; \
         HI_REG_READ(addr, ui_data); \
         HI_REG_WRITE(addr, (ui_data|(val))); \
     }
 
-/* val bit Îª 1 ±» ÉèÖÃÎª 0 */
+/* val bit ä¸º 1 è¢« è®¾ç½®ä¸º 0 */
 #define HI_REG_RW_CLR(addr, val)  { \
         hi_uint32 ui_data=0; \
         HI_REG_READ(addr, ui_data); \
         HI_REG_WRITE(addr, ui_data&(~(val))); \
     }
 
-/* bit 0..31 Îª 1 ±» ÉèÖÃÎª 1 */
+/* bit 0..31 ä¸º 1 è¢« è®¾ç½®ä¸º 1 */
 #define HI_REG_RW_SET_BIT(addr, bit)  { \
         hi_uint32 ui_data=0; \
         HI_REG_READ(addr, ui_data); \
         HI_REG_WRITE(addr, ui_data|(1<<(bit))); \
     }
 
-/* bit 0..31 Îª 1 ±» ÉèÖÃÎª 0 */
+/* bit 0..31 ä¸º 1 è¢« è®¾ç½®ä¸º 0 */
 #define HI_REG_RW_CLR_BIT(addr, bit)  { \
         hi_uint32 ui_data=0; \
         HI_REG_READ(addr, ui_data); \
         HI_REG_WRITE(addr, ui_data&(~(1<<(bit)))); \
     }
 
-/* 1:µ¥BIT ²Ù×÷ */
+/* 1:å•BIT æ“ä½œ */
 #define HI_BIT_GET(reg,bit)                ((0 ==  ((reg) & (bit)))  ? 0:1)
 #define HI_BIT_SET(reg,bit)                ((reg) |= (bit)) 
 #define HI_BIT_CLR(reg,bit)                ((reg) &= (~(bit))) 

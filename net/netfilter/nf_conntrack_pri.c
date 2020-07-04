@@ -3,12 +3,12 @@
 * (C) Huawei Technologies Co., Ltd. < >
 */
 /******************************************************************************
-  °æÈ¨ËùÓĞ  : 2007-2020£¬»ªÎª¼¼ÊõÓĞÏŞ¹«Ë¾
-  ÎÄ ¼ş Ãû  : nf_conntrack_pri.c
-  °æ    ±¾  : v1.0
-  ´´½¨ÈÕÆÚ  : 2013-7-19
-  Ãè    Êö  : Á¬½Ó¸ú×ÙÓÅÏÈ¼¶´¦ÀíÄ£¿é
-  º¯ÊıÁĞ±í  :
+  ç‰ˆæƒæ‰€æœ‰  : 2007-2020ï¼Œåä¸ºæŠ€æœ¯æœ‰é™å…¬å¸
+  æ–‡ ä»¶ å  : nf_conntrack_pri.c
+  ç‰ˆ    æœ¬  : v1.0
+  åˆ›å»ºæ—¥æœŸ  : 2013-7-19
+  æ    è¿°  : è¿æ¥è·Ÿè¸ªä¼˜å…ˆçº§å¤„ç†æ¨¡å—
+  å‡½æ•°åˆ—è¡¨  :
                 find_lowest_ct
                 nf_conntrack_del_used_by_pri
                 nf_conntrack_pri_ct_need_alloc
@@ -20,9 +20,9 @@
                 nf_pri_is_alg_skb
                 nf_pri_set_alg_mark
 
-  ÀúÊ·¼ÇÂ¼      :
-   1.ÈÕ    ÆÚ   : 2013-7-19
-     ĞŞ¸ÄÄÚÈİ   : Íê³É³õ¸å
+  å†å²è®°å½•      :
+   1.æ—¥    æœŸ   : 2013-7-19
+     ä¿®æ”¹å†…å®¹   : å®Œæˆåˆç¨¿
 
 *********************************************************************************/
 
@@ -55,7 +55,7 @@ static DEFINE_MUTEX(nf_ct_pri_mutex);
 HLIST_HEAD(nf_ct_pri_list);
 
 
-/*ÓÅÏÈ¼¶´ÓµÍµ½¸ßÎª:0x000,0x900,0x800,0x700,0x600,0x500,0x400,0x300,0x200,0x100£¬ÓÉQOS¹ÜÀí*/
+/*ä¼˜å…ˆçº§ä»ä½åˆ°é«˜ä¸º:0x000,0x900,0x800,0x700,0x600,0x500,0x400,0x300,0x200,0x100ï¼Œç”±QOSç®¡ç†*/
 static struct nf_conn * find_lowest_ct(struct net *net)
 {
 	unsigned int hash = 0;
@@ -76,13 +76,13 @@ static struct nf_conn * find_lowest_ct(struct net *net)
 				continue;
 			}
 
-			/*±»×¢²áĞèÒª±£ÁôµÄct²»É¾³ı*/
+			/*è¢«æ³¨å†Œéœ€è¦ä¿ç•™çš„ctä¸åˆ é™¤*/
 			if (nf_conntrack_pri_ct_reserved(ct))
 			{
 				continue;
 			}
 
-			/*·ÇÈ·ÈÏµÄct£¬²»ÄÜ±£Ö¤ct markÕıÈ·£¬Òò´ËÖ»É¾ASSURED CT*/
+			/*éç¡®è®¤çš„ctï¼Œä¸èƒ½ä¿è¯ct markæ­£ç¡®ï¼Œå› æ­¤åªåˆ ASSURED CT*/
 			if (!test_bit(IPS_ASSURED_BIT, &ct->status))
 			{
 				continue;
@@ -90,14 +90,14 @@ static struct nf_conn * find_lowest_ct(struct net *net)
 
 			ct_qos_mark = ct->mark;// & QOS_PRI_MASK;
 
-			/*Ä¬ÈÏÓÅÏÈ¼¶Æ¥Åä³É¹¦ÂÊºÜ¸ß£¬ÏÈÅĞ¶Ï´¦Àí*/
+			/*é»˜è®¤ä¼˜å…ˆçº§åŒ¹é…æˆåŠŸç‡å¾ˆé«˜ï¼Œå…ˆåˆ¤æ–­å¤„ç†*/
 			if (0)//QOS_DEFAULT_PRI == ct_qos_mark)
 			{
 				find_ct = ct;
 				break;
 			}
 
-			/*¸ßÓÅÏÈ¼¶ÒÔÉÏ¼¶±ğ²»É¾³ı*/
+			/*é«˜ä¼˜å…ˆçº§ä»¥ä¸Šçº§åˆ«ä¸åˆ é™¤*/
 			if (0)//QOS_HIGH_PRI >= ct_qos_mark)
 			{
 				continue;
@@ -109,7 +109,7 @@ static struct nf_conn * find_lowest_ct(struct net *net)
 				continue;
 			}
 
-			/*µ±Ç°ctÓÅÏÈ¼¶¸üµÍ*/
+			/*å½“å‰ctä¼˜å…ˆçº§æ›´ä½*/
 			if (0)//ct_qos_mark > (find_ct->mark & QOS_PRI_MASK))
 			{
 				find_ct = ct;
@@ -124,19 +124,19 @@ static struct nf_conn * find_lowest_ct(struct net *net)
 }
 
 
-/*RTSPĞÂ½¨±£ÕÏ£¬·µ»Ø1±íÊ¾É¾³ıÆäËûct³É¹¦£¬ÔÊĞíĞÂ½¨*/
+/*RTSPæ–°å»ºä¿éšœï¼Œè¿”å›1è¡¨ç¤ºåˆ é™¤å…¶ä»–ctæˆåŠŸï¼Œå…è®¸æ–°å»º*/
 int nf_conntrack_del_used_by_pri(struct net *net)
 {
 	struct nf_conn *ct = NULL;
 
-	/*É¾ctÊ±£¬´Ó×îµÍÓÅÏÈ¼¶¿ªÊ¼É¾³ı£¬×î¸ß´Î¸ß(markÎª0x100/0x200) ²»½øĞĞÉ¾³ı*/
+	/*åˆ ctæ—¶ï¼Œä»æœ€ä½ä¼˜å…ˆçº§å¼€å§‹åˆ é™¤ï¼Œæœ€é«˜æ¬¡é«˜(markä¸º0x100/0x200) ä¸è¿›è¡Œåˆ é™¤*/
 	ct = find_lowest_ct(net);
 	if (NULL == ct)
 	{
 		return 0;
 	}
 
-	/*ctºÜ¿ÉÄÜÕıÔÚÊ¹ÓÃ£¬Ê¹ÓÃÑÓ³ÙÉ¾³ıµÄ·½Ê½½øĞĞÉ¾³ı*/
+	/*ctå¾ˆå¯èƒ½æ­£åœ¨ä½¿ç”¨ï¼Œä½¿ç”¨å»¶è¿Ÿåˆ é™¤çš„æ–¹å¼è¿›è¡Œåˆ é™¤*/
 	set_bit(IPS_DELETE_BIT, &ct->status);
 	//nf_conntrack_clean = IPS_DELETE;
 
@@ -184,7 +184,7 @@ void nf_pri_set_alg_mark(struct sk_buff *skb)
 		return;
 	}
 
-	/*´Óct»ñÈ¡mark*/
+	/*ä»ctè·å–mark*/
 	skb->mark = ct->mark;
 
 	return;
@@ -193,7 +193,7 @@ EXPORT_SYMBOL_GPL(nf_pri_set_alg_mark);
 
 
 
-/*¼ì²éctÊÇ·ñ±»×¢²áÎªÓÅÏÈ±£Áôct*/
+/*æ£€æŸ¥ctæ˜¯å¦è¢«æ³¨å†Œä¸ºä¼˜å…ˆä¿ç•™ct*/
 int nf_conntrack_pri_ct_reserved(struct nf_conn *ct)
 {
 	struct nf_conntrack_proto_pri *proto_pri = NULL;
@@ -219,7 +219,7 @@ int nf_conntrack_pri_ct_reserved(struct nf_conn *ct)
 }
 
 
-/*¼ì²étupleÊÇ·ñÊôÓÚĞèÈ·±£´´½¨³É¹¦µÄ¸ßÓÅÏÈ¼¶Á¬½Ó*/
+/*æ£€æŸ¥tupleæ˜¯å¦å±äºéœ€ç¡®ä¿åˆ›å»ºæˆåŠŸçš„é«˜ä¼˜å…ˆçº§è¿æ¥*/
 int nf_conntrack_pri_ct_need_alloc(struct net *net, const struct nf_conntrack_tuple *orig)
 {
 	struct nf_conntrack_proto_pri *proto_pri = NULL;

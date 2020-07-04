@@ -4,12 +4,12 @@
 */
 /******************************************************************************
 
-                  °æÈ¨ËùÓĞ (C), 2009-2019, »ªÎª¼¼ÊõÓĞÏŞ¹«Ë¾
+                  ç‰ˆæƒæ‰€æœ‰ (C), 2009-2019, åä¸ºæŠ€æœ¯æœ‰é™å…¬å¸
 
  ******************************************************************************
-  ÎÄ ¼ş Ãû   : hi_kernel_eth0_qos.h
-  °æ ±¾ ºÅ   : ³õ¸å
-  Éú³ÉÈÕÆÚ   : D2012_02_27
+  æ–‡ ä»¶ å   : hi_kernel_eth0_qos.h
+  ç‰ˆ æœ¬ å·   : åˆç¨¿
+  ç”Ÿæˆæ—¥æœŸ   : D2012_02_27
 
 ******************************************************************************/
 #ifndef __HI_KERNEL_SOFT_QOS_H__
@@ -25,7 +25,7 @@ extern "C"{
 /***************************************************************************/
 /***************************************************************************/
 
-/* ÊÇ·ñÊÇÃ»ÓĞÊı¾İµÄACK±¨ÎÄ */
+/* æ˜¯å¦æ˜¯æ²¡æœ‰æ•°æ®çš„ACKæŠ¥æ–‡ */
 static int is_ack(struct sk_buff* skb);
 
 static void set_highest_priority( struct sk_buff *skb);
@@ -36,45 +36,45 @@ static void set_highest_priority( struct sk_buff *skb);
 /*----------|----------|--------------|----|-----|-----|------|-----------*/
 /* policy route|policy  route|default qos mark|wmm|policer|queue|802.1p|downlinkQos */
 
-#define SKB_MARK_8021P_REMARK_ENABLE    0x00000010          //ÊÇ·ñĞèÒª½øĞĞ802.1p Remark
-#define SKB_MARK_8021P_REMARK_MASK      0x000000E0          //802.1p RemarkÖµ
-#define SKB_MARK_8021P_REMARK_OFFSET    5                   //802.1p RemarkÖµµÄoffset
+#define SKB_MARK_8021P_REMARK_ENABLE    0x00000010          //æ˜¯å¦éœ€è¦è¿›è¡Œ802.1p Remark
+#define SKB_MARK_8021P_REMARK_MASK      0x000000E0          //802.1p Remarkå€¼
+#define SKB_MARK_8021P_REMARK_OFFSET    5                   //802.1p Remarkå€¼çš„offset
 
 #define SKB_MARK_QUEUE_MASK             0x00000F00          //queue id MASK
-#define SKB_MARK_QUEUE_OFFSET           8                   //queue idÖµµÄoffset
+#define SKB_MARK_QUEUE_OFFSET           8                   //queue idå€¼çš„offset
 
 #define SKB_MARK_POLICER_MASK           0x0000F000          //policer id MASK
-#define SKB_MARK_POLICER_OFFSET         12                  //policer idÖµµÄoffset
+#define SKB_MARK_POLICER_OFFSET         12                  //policer idå€¼çš„offset
 
 
 /* skb->accelmark */
 /*----------|----------|--------------|----|-----|-----|------|--------------*/
 /*                                          reserved                                                 |acceleration tyep */
 
-#define SKB_ACCEL_MARK_ENABLE           0x00000001          //ÊÇ·ñĞèÒª¹Ø×¢¸Ã±êÖ¾
-#define SKB_ACCEL_MARK_MASK             0x00000006          //¼ÓËÙ±êÖ¾µÄMASK    
-#define SKB_ACCEL_MARK_OFFSET           1                   //¼ÓËÙ±êÖ¾µÄOFFSET
-#define SKB_ACCEL_MARK_NONE             0x00000000          //²»ĞèÒª¼ÓËÙ
-#define SKB_ACCEL_MARK_SW               0x00000002          //Èí¼ÓËÙ
-#define SKB_ACCEL_MARK_HW               0x00000004          //Ó²¼ÓËÙ
-#define SKB_ACCEL_MARK_CFI_ENABLE       0x00000008          //ÊÇ·ñÎª¿ØÖÆ±¨ÎÄ
+#define SKB_ACCEL_MARK_ENABLE           0x00000001          //æ˜¯å¦éœ€è¦å…³æ³¨è¯¥æ ‡å¿—
+#define SKB_ACCEL_MARK_MASK             0x00000006          //åŠ é€Ÿæ ‡å¿—çš„MASK    
+#define SKB_ACCEL_MARK_OFFSET           1                   //åŠ é€Ÿæ ‡å¿—çš„OFFSET
+#define SKB_ACCEL_MARK_NONE             0x00000000          //ä¸éœ€è¦åŠ é€Ÿ
+#define SKB_ACCEL_MARK_SW               0x00000002          //è½¯åŠ é€Ÿ
+#define SKB_ACCEL_MARK_HW               0x00000004          //ç¡¬åŠ é€Ÿ
+#define SKB_ACCEL_MARK_CFI_ENABLE       0x00000008          //æ˜¯å¦ä¸ºæ§åˆ¶æŠ¥æ–‡
 
 #define SKB_ACCEL_MARK_CFI_BIT          0x1000              //CFI BIT
-#define SKB_ACCEL_MARK_PRIORITY_MASK    0xE000              //TCIÖĞPRIORITYµÄMASK
-#define SKB_ACCEL_MARK_PRIORITY_OFFSET  13                  //TCIÖĞPRIORITYµÄÆ«ÒÆ
+#define SKB_ACCEL_MARK_PRIORITY_MASK    0xE000              //TCIä¸­PRIORITYçš„MASK
+#define SKB_ACCEL_MARK_PRIORITY_OFFSET  13                  //TCIä¸­PRIORITYçš„åç§»
 
 
-#define SKB_ACCEL_GRE_MARK		0x40000000		// ĞèÒªGRE´òÉÏ±ê¼Ç
+#define SKB_ACCEL_GRE_MARK		0x40000000		// éœ€è¦GREæ‰“ä¸Šæ ‡è®°
 
 /***************************************************************************/
 
-#define SKB_UPLINK_BASE_VLAN               4000                  //ÓÃÀ´Çø·ÖÉÏĞĞcar idÌí¼ÓµÄ»ùvlan
-#define SKB_DOWNLINK_BASE_VLAN         4017                  //ÓÃÀ´Çø·ÖÏÂĞĞcar idÌí¼ÓµÄ»ùvlan
+#define SKB_UPLINK_BASE_VLAN               4000                  //ç”¨æ¥åŒºåˆ†ä¸Šè¡Œcar idæ·»åŠ çš„åŸºvlan
+#define SKB_DOWNLINK_BASE_VLAN         4017                  //ç”¨æ¥åŒºåˆ†ä¸‹è¡Œcar idæ·»åŠ çš„åŸºvlan
 
-/* ×¢£º skb->accelmark µÚ0-2Î»±êÊ¶¼ÓËÙ×´Ì¬¡¢ µÚ3Î»±êÊ¶ÊÇ·ñ×ödscp mark */
+/* æ³¨ï¼š skb->accelmark ç¬¬0-2ä½æ ‡è¯†åŠ é€ŸçŠ¶æ€ã€ ç¬¬3ä½æ ‡è¯†æ˜¯å¦åšdscp mark */
 /* skb->accelmark */
 /* reserved | dscp mark(1 bit) |acceleration type(3 bit) */
-#define SKB_MARK_DSCP_REMARK_ENABLE    0x8          //ÊÇ·ñĞèÒª½øĞĞdscp Remark
+#define SKB_MARK_DSCP_REMARK_ENABLE    0x8          //æ˜¯å¦éœ€è¦è¿›è¡Œdscp Remark
 
 #ifdef __cplusplus
 #if __cplusplus

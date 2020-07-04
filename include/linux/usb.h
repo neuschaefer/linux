@@ -688,7 +688,7 @@ static inline int usb_make_path(struct usb_device *dev, char *buf, size_t size)
 		(USB_DEVICE_ID_MATCH_INT_CLASS | \
 		USB_DEVICE_ID_MATCH_INT_SUBCLASS | \
 		USB_DEVICE_ID_MATCH_INT_PROTOCOL)
-/*<  Í¨¹ý½ÓÈëË³ÐòÀ´ÅÐ¶ÏusbÉè±¸begin*/
+/*<  é€šè¿‡æŽ¥å…¥é¡ºåºæ¥åˆ¤æ–­usbè®¾å¤‡begin*/
 #define USB_DEVICE_ID_MATCH_HUAWEI  (USB_DEVICE_ID_MATCH_INT_SEQUENCE | USB_DEVICE_ID_MATCH_VENDOR)
 
 #define USB_DEVICE_MATCH_HUAWEI_NDIS(intseq,vend,prod) \
@@ -801,10 +801,10 @@ static inline int usb_make_path(struct usb_device *dev, char *buf, size_t size)
 	.bInterfaceProtocol = (pr)
 
 
-/* 2010-12-13:W45260 ¼æÈÝÖ§³ÖJungo/ ¸ßÍ¨Á½ÖÖ·½°¸Êý¾Ý¿¨µÄ´®¿ÚµÄUSB interface ¶¨Òå
-E352s Jungo Êý¾Ý¿¨
+/* 2010-12-13:W45260 å…¼å®¹æ”¯æŒJungo/ é«˜é€šä¸¤ç§æ–¹æ¡ˆæ•°æ®å¡çš„ä¸²å£çš„USB interface å®šä¹‰
+E352s Jungo æ•°æ®å¡
         09 02 BC 00 05 01 00 80 FA (configuration)
-MDM 09 04 00 00 03 02 02 FF 00  (interface:Interface class 02,sub interface class 02,protocol FF,ÓëMicrosoft's pet nonstandard Ethernet-over-USB protocols ³åÍ»)
+MDM 09 04 00 00 03 02 02 FF 00  (interface:Interface class 02,sub interface class 02,protocol FF,ä¸ŽMicrosoft's pet nonstandard Ethernet-over-USB protocols å†²çª)
             05 24 00 10 01 
             04 24 02 03 
             05 24 01 00 00
@@ -815,7 +815,7 @@ MDM 09 04 00 00 03 02 02 FF 00  (interface:Interface class 02,sub interface clas
 DIAG    ....
 PCUI    ....
 
-E1756 ¸ßÍ¨Êý¾Ý¿¨
+E1756 é«˜é€šæ•°æ®å¡
         09 02 83 00 05 01 01 E0 FA  (configuration)
 MDM 09 04 00 00 03 FF FF FF 00   (interface:Interface class FF,sub interface class FF,protocol FF)
             07 05 81 03 40 00 05 (endpoint)

@@ -437,14 +437,14 @@ void br_port_state_selection(struct net_bridge *br)
 		if (p->state == BR_STATE_FORWARDING)
 			++liveports;
 	}
-    /* start  IPv6¶ª°ü */
+    /* start  IPv6ä¸¢åŒ… */
 #ifndef CONFIG_SUPPORT_ATP
 	if (liveports == 0)
 		netif_carrier_off(br->dev);
 	else
 		netif_carrier_on(br->dev);
 #endif   
-    /* end  IPv6¶ª°ü */
+    /* end  IPv6ä¸¢åŒ… */
 }
 
 /* called under bridge lock */

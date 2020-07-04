@@ -50,7 +50,7 @@ unsigned int hi_kernel_imq_mark_set(struct sk_buff *skb, unsigned int * mark)
         return 1;
     }
 
-    //mark ¸³Öµ
+    //mark èµ‹å€¼
     skb->mark = *mark;
     skb->accelmark = *(mark+1);
     
@@ -80,7 +80,7 @@ unsigned int hi_kernel_imq_mark_get(struct sk_buff *skb, unsigned int * mark)
             ulwmmQueue = QOS_WMM_QUEUE_NUM -((ct->mark &0xf00)>>8);
             if(QOS_WMM_QUEUE_NUM == ulwmmQueue)
             {   
-                //Ã»ÓÐÆ¥ÅäÉÏÈÎºÎ¹æÔòÊ±±ØÐëÎª0
+                //æ²¡æœ‰åŒ¹é…ä¸Šä»»ä½•è§„åˆ™æ—¶å¿…é¡»ä¸º0
                 ulwmmQueue = 0;
             }
             skb->mark |=  (ct->mark&QOS_POLICER_MASK)|(ulwmmQueue<<16); 
@@ -91,7 +91,7 @@ unsigned int hi_kernel_imq_mark_get(struct sk_buff *skb, unsigned int * mark)
 
     //printk("the ct->mark is %0x/%s/%0x.\n",skb->mark,dev->name,skb->accelmark);
 
-    //markÑ§Ï°
+    //markå­¦ä¹ 
     *mark = skb->mark;
     *(mark+1) = skb->accelmark;
 
@@ -114,7 +114,7 @@ unsigned int hi_kernel_imq_pro(struct sk_buff *skb, struct net_device *dev)
         return 1;
     }
 
-    //ÅÐ¶ÏÊÇ·ñÎªlan²à·¢Æð
+    //åˆ¤æ–­æ˜¯å¦ä¸ºlanä¾§å‘èµ·
     ulLanLanPktFlag = !(skb->mark &0x200000);
 
     //printk("the mark/dev is %0x/%s/%d.\n",skb->mark,dev->name,ulLanLanPktFlag);
@@ -134,7 +134,7 @@ unsigned int hi_kernel_imq_pro(struct sk_buff *skb, struct net_device *dev)
 
             ret = imq_nf_queue(skb);
 
-            //½øÈëimqÕý³£´¦Àí
+            //è¿›å…¥imqæ­£å¸¸å¤„ç†
             if (1 != ret)
             {
                 return 0;
@@ -142,7 +142,7 @@ unsigned int hi_kernel_imq_pro(struct sk_buff *skb, struct net_device *dev)
         }
     }
     
-    //ÉÏÏÂÐÐ·¢°ü
+    //ä¸Šä¸‹è¡Œå‘åŒ…
     dev->netdev_ops->ndo_start_xmit(skb, dev);
 
     return 0;
@@ -167,11 +167,11 @@ unsigned int hi_kernel_imq_pro(struct sk_buff *skb, struct net_device *dev)
 *****************************************************************************/
 static void set_accel( struct sk_buff *skb, int accel_flag)
 {
-    // ÉèÖÃ¼ÓËÙ±ê¼ÇÎ»
+    // è®¾ç½®åŠ é€Ÿæ ‡è®°ä½
     skb->accelmark &= ~SKB_ACCEL_MARK_ENABLE;
     skb->accelmark |= SKB_ACCEL_MARK_ENABLE;    
 
-    // ÉèÖÃÊµ¼Ê¼ÓËÙÄ£Ê½
+    // è®¾ç½®å®žé™…åŠ é€Ÿæ¨¡å¼
     skb->accelmark &= ~SKB_ACCEL_MARK_MASK;
     accel_flag &= SKB_ACCEL_MARK_MASK;
     skb->accelmark |= accel_flag;
@@ -242,12 +242,12 @@ unsigned int hi_kernel_qos_acceltype_handler(struct sk_buff *skb)
         
         if((!ct->mark)
 #ifdef CONFIG_DPI_PARSE
-            //Èç¹ûDPI½«¸Ã±¨ÎÄÒÑ¾­Éè±ðÔò¿ÉÒÔ½ø¼ÓËÙ
+            //å¦‚æžœDPIå°†è¯¥æŠ¥æ–‡å·²ç»è®¾åˆ«åˆ™å¯ä»¥è¿›åŠ é€Ÿ
             &&(!ct->bIsContinue)
 #endif
             )
         {
-            //dmzµÚ¶þ¸ö±¨ÎÄ²»½ø¼ÓËÙ
+            //dmzç¬¬äºŒä¸ªæŠ¥æ–‡ä¸è¿›åŠ é€Ÿ
             set_accel(skb, SKB_ACCEL_MARK_NONE);
         }
 #ifdef CONFIG_DPI_PARSE
@@ -256,14 +256,14 @@ unsigned int hi_kernel_qos_acceltype_handler(struct sk_buff *skb)
         else
 #endif
         {
-            //dmzµÚÈý¸ö±¨ÎÄ²Å½ø¼ÓËÙ
+            //dmzç¬¬ä¸‰ä¸ªæŠ¥æ–‡æ‰è¿›åŠ é€Ÿ
             set_accel(skb, SKB_ACCEL_MARK_SW);
         }
     }
 
 #ifndef CONFIG_DPI_PARSE
-    /* ÏÂÐÐqosÊ±£¬dmz Æ¥Åä²»ÉÏqos¹æÔòµÄtcp ±¨ÎÄÉÏÐÐ²»ÄÜ½øÈë¼ÓËÙ,·ñÔòµ¼ÖÂÏÂÐÐÁ¬½Ó²»ÉÏ£»
-    dpiÓÐack ²»Ð£Ñé±£»¤»úÖÆ£¬È¡Ïû´Ë´¦ÄÜ±£Ö¤ÉÏÏÂÐÐ¼ÓËÙ */
+    /* ä¸‹è¡Œqosæ—¶ï¼Œdmz åŒ¹é…ä¸ä¸Šqosè§„åˆ™çš„tcp æŠ¥æ–‡ä¸Šè¡Œä¸èƒ½è¿›å…¥åŠ é€Ÿ,å¦åˆ™å¯¼è‡´ä¸‹è¡Œè¿žæŽ¥ä¸ä¸Šï¼›
+    dpiæœ‰ack ä¸æ ¡éªŒä¿æŠ¤æœºåˆ¶ï¼Œå–æ¶ˆæ­¤å¤„èƒ½ä¿è¯ä¸Šä¸‹è¡ŒåŠ é€Ÿ */
     if(downqos_enable&&ct&&(!ct->mark)&&dev&&IS_HISI_WAN(dev->name))
     {
         set_accel(skb, SKB_ACCEL_MARK_NONE);
@@ -321,7 +321,7 @@ unsigned int hi_kernel_qos_status_handler(struct sk_buff *skb)
 unsigned int hi_kernel_qos_queue_handler(struct sk_buff *skb)
 {
 #ifdef CONFIG_DOWN_RATE_CONTROL
-    //ÉÏÐÐtcp ack±¨ÎÄ×ß×î¸ßÓÅÏÈ¼¶,´Ë´¦ÎªÄÚºË/¼ÓËÙ±Ø¾­Ö®µØ
+    //ä¸Šè¡Œtcp ackæŠ¥æ–‡èµ°æœ€é«˜ä¼˜å…ˆçº§,æ­¤å¤„ä¸ºå†…æ ¸/åŠ é€Ÿå¿…ç»ä¹‹åœ°
     if (is_ack(skb))
     {
         set_highest_priority(skb);
@@ -334,7 +334,7 @@ unsigned int hi_kernel_qos_queue_handler(struct sk_buff *skb)
     if( ui_queue_id > 7 )
     {
 #ifdef CONFIG_DPI_PARSE
-        //Ã»ÓÐÆ¥Åäsmartqos¹æÔòµÄÁ÷ÓÅÏÈ¼¶Òª¸ßÓÚP2P
+        //æ²¡æœ‰åŒ¹é…smartqosè§„åˆ™çš„æµä¼˜å…ˆçº§è¦é«˜äºŽP2P
         ui_queue_id = 4;
 #else
         ui_queue_id = 7;
@@ -363,7 +363,7 @@ unsigned int hi_kernel_qos_car_handler(struct sk_buff *skb, unsigned int *pui_vl
 
     if (NULL==dev)
     {
-        *pui_vlan_id = SKB_UPLINK_BASE_VLAN;  //car id Îª0£¬²»ÏÞËÙ
+        *pui_vlan_id = SKB_UPLINK_BASE_VLAN;  //car id ä¸º0ï¼Œä¸é™é€Ÿ
         return 0;
     }
 
@@ -404,13 +404,13 @@ unsigned int hi_kernel_qos_car_handler(struct sk_buff *skb, unsigned int *pui_vl
     }
 #else
     {
-        //lan->lanµÄ±¨ÎÄ£¬ÓÅÏÈ¼¶mark ´òÉÏ8£¬¼´½ø¶ÓÁÐ7
+        //lan->lançš„æŠ¥æ–‡ï¼Œä¼˜å…ˆçº§mark æ‰“ä¸Š8ï¼Œå³è¿›é˜Ÿåˆ—7
         if(skb->mark&0x200000)
         {
             skb->mark = (skb->mark & (~0x00000f00)) ;
             skb->mark = skb->mark |0x00000800;
         }
-        //wan->lanµÄ±¨ÎÄ£¬·Ç×î¸ßÓÅÏÈ¼¶±¨ÎÄ£¬ÓÅÏÈ¼¶mark ´òÉÏ7£¬¼´½ø¶ÓÁÐ6
+        //wan->lançš„æŠ¥æ–‡ï¼Œéžæœ€é«˜ä¼˜å…ˆçº§æŠ¥æ–‡ï¼Œä¼˜å…ˆçº§mark æ‰“ä¸Š7ï¼Œå³è¿›é˜Ÿåˆ—6
         else
         {
             if(0x100!=(skb->mark & 0x00000f00))
@@ -420,7 +420,7 @@ unsigned int hi_kernel_qos_car_handler(struct sk_buff *skb, unsigned int *pui_vl
             }
         }
         
-        *pui_vlan_id = SKB_DOWNLINK_BASE_VLAN;  //²»Ö§³ÖÏÂÐÐÏÞËÙ£¬²»ÏÞËÙ
+        *pui_vlan_id = SKB_DOWNLINK_BASE_VLAN;  //ä¸æ”¯æŒä¸‹è¡Œé™é€Ÿï¼Œä¸é™é€Ÿ
     }
 #endif
 
@@ -484,18 +484,18 @@ unsigned int hi_kernel_qos_vlan_handler(struct sk_buff *skb, unsigned short *vla
 	}
 	else
 #endif
-    //ÐèÒªremark
+    //éœ€è¦remark
     if (skb->mark & SKB_MARK_8021P_REMARK_ENABLE)
     {
         uspriority = (skb->mark & SKB_MARK_8021P_REMARK_MASK) >> SKB_MARK_8021P_REMARK_OFFSET;
         *vlan = (*vlan & (~SKB_ACCEL_MARK_PRIORITY_MASK)) | (uspriority << SKB_ACCEL_MARK_PRIORITY_OFFSET);
     }
-	/*Start for   ²»ÐèÒªremark Ê±£¬ÐèÒª·µ»Ø1 */
+	/*Start for   ä¸éœ€è¦remark æ—¶ï¼Œéœ€è¦è¿”å›ž1 */
     else
     {
         return 1;
     }
-	/*End for   ²»ÐèÒªremark Ê±£¬ÐèÒª·µ»Ø1 */
+	/*End for   ä¸éœ€è¦remark æ—¶ï¼Œéœ€è¦è¿”å›ž1 */
     
 
     return 0;
@@ -503,12 +503,12 @@ unsigned int hi_kernel_qos_vlan_handler(struct sk_buff *skb, unsigned short *vla
 
 /*****************************************************************************
  Prototype    : hi_kernel_qos_dscp_handler
- Description  : Í¨ÖªhisiÊÇ·ñ×ödscp remark
+ Description  : é€šçŸ¥hisiæ˜¯å¦åšdscp remark
  Input          : struct sk_buff *skb
  Output        : 
                     
- Return Value : 1 : ²»×ödscp remark
-                    2 : ×ödscp remark
+ Return Value : 1 : ä¸åšdscp remark
+                    2 : åšdscp remark
 
   1.Date         : 2014-03-12
     Modification : Created function
@@ -520,7 +520,7 @@ unsigned int hi_kernel_qos_dscp_handler(struct sk_buff *skb)
         return 1;
     }
     
-    //ÐèÒªdscp remark
+    //éœ€è¦dscp remark
     if (skb->accelmark & SKB_MARK_DSCP_REMARK_ENABLE)
     {
         return 0;
@@ -631,10 +631,10 @@ static int is_ack(struct sk_buff* skb)
     		tcp_len =  __constant_htons(ip_h->tot_len) - tcp_h->doff * 4 - ip_h->ihl * 4; 	
 
 
-            //dpi´¦ÀíÊ±,ËùÓÐµÄÎÞpayloadµÄtcp±¨ÎÄ¶¼×ß×î¸ßÓÅÏÈ¼¶,±ÜÃâÓµÈûÊ±tcpÁ¬½Ó²»ÉÏ
+            //dpiå¤„ç†æ—¶,æ‰€æœ‰çš„æ— payloadçš„tcpæŠ¥æ–‡éƒ½èµ°æœ€é«˜ä¼˜å…ˆçº§,é¿å…æ‹¥å¡žæ—¶tcpè¿žæŽ¥ä¸ä¸Š
     		if ((0 == tcp_len)
 #ifndef CONFIG_DPI_PARSE
-                //dpi½«ËùÓÐµÄtcpÎÞpayload±¨ÎÄ¶¼×ß×î¸ßÓÅÏÈ¼¶
+                //dpiå°†æ‰€æœ‰çš„tcpæ— payloadæŠ¥æ–‡éƒ½èµ°æœ€é«˜ä¼˜å…ˆçº§
                 && (tcp_h->ack)
 #endif
                 )

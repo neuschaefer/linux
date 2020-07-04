@@ -3,14 +3,14 @@
 * (C) Huawei Technologies Co., Ltd. < >
 */
 /******************************************************************************
-  ÎÄ¼şÃû³Æ: hi_nand.c
-  ¹¦ÄÜÃèÊö: nand³õÊ¼»¯Èë¿Ú¼°¶ÔÍâ½Ó¿Ú¶¨Òå
-  °æ±¾ÃèÊö: V1.0
+  æ–‡ä»¶åç§°: hi_nand.c
+  åŠŸèƒ½æè¿°: nandåˆå§‹åŒ–å…¥å£åŠå¯¹å¤–æ¥å£å®šä¹‰
+  ç‰ˆæœ¬æè¿°: V1.0
 
-  ´´½¨ÈÕÆÚ: D2013_04_20
+  åˆ›å»ºæ—¥æœŸ: D2013_04_20
 
-  ĞŞ¸Ä¼ÇÂ¼: 
-            Éú³É³õ¸å.
+  ä¿®æ”¹è®°å½•: 
+            ç”Ÿæˆåˆç¨¿.
 ******************************************************************************/
 #include <asm/setup.h>
 #include <linux/slab.h>
@@ -63,12 +63,12 @@ extern int hi_setup_mtd_partitions( struct mtd_info *mtd,
 static struct hi_nand_host *g_pst_nand_host = HI_NULL;
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  nand get flash spec info from boot parameter
-  ÊäÈë²ÎÊı:  
+  å‡½æ•°åŠŸèƒ½:  nand get flash spec info from boot parameter
+  è¾“å…¥å‚æ•°:  
                              pst_chip : nand chip structure
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:  uint       
-  º¯Êı±¸×¢:  
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:  uint       
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 static hi_void hi_nand_kernel_get_spec(struct hi_nand_chip *pst_chip)
 {
@@ -125,14 +125,14 @@ static hi_void hi_nand_kernel_get_spec(struct hi_nand_chip *pst_chip)
 }
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  nand setup mtd partitions
-  ÊäÈë²ÎÊı:  
+  å‡½æ•°åŠŸèƒ½:  nand setup mtd partitions
+  è¾“å…¥å‚æ•°:  
                              mtd  : lmtd device structure
                              parts: mtd patition structure
                              i_nparts : partition numbers
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:  uint       
-  º¯Êı±¸×¢:  
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:  uint       
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 static hi_void hi_nand_setup_mtd_partitions(struct mtd_info *pst_mtd,
                             struct mtd_partition **ppst_parts, hi_int32 *i_nparts)
@@ -158,11 +158,11 @@ static hi_void hi_nand_setup_mtd_partitions(struct mtd_info *pst_mtd,
 }
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  nand get chip size
-  ÊäÈë²ÎÊı:  ÎŞ
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:  chip size
-  º¯Êı±¸×¢:  
+  å‡½æ•°åŠŸèƒ½:  nand get chip size
+  è¾“å…¥å‚æ•°:  æ— 
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:  chip size
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 hi_uint32 hi_nand_get_total_size(hi_void)
 {
@@ -172,11 +172,11 @@ hi_uint32 hi_nand_get_total_size(hi_void)
 }
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  nand get block size
-  ÊäÈë²ÎÊı:  ÎŞ
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:  block size
-  º¯Êı±¸×¢:  
+  å‡½æ•°åŠŸèƒ½:  nand get block size
+  è¾“å…¥å‚æ•°:  æ— 
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:  block size
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 hi_uint32 hi_nand_get_block_size(hi_void)
 {
@@ -186,11 +186,11 @@ hi_uint32 hi_nand_get_block_size(hi_void)
 }
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  nand get page size
-  ÊäÈë²ÎÊı:  ÎŞ
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:  page size
-  º¯Êı±¸×¢:  
+  å‡½æ•°åŠŸèƒ½:  nand get page size
+  è¾“å…¥å‚æ•°:  æ— 
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:  page size
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 hi_uint32 hi_nand_get_page_size(hi_void)
 {
@@ -200,11 +200,11 @@ hi_uint32 hi_nand_get_page_size(hi_void)
 }
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  nand get oob size
-  ÊäÈë²ÎÊı:  ÎŞ
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:  oob size
-  º¯Êı±¸×¢:  
+  å‡½æ•°åŠŸèƒ½:  nand get oob size
+  è¾“å…¥å‚æ•°:  æ— 
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:  oob size
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 hi_uint32 hi_nand_get_oob_size(hi_void)
 {
@@ -214,11 +214,11 @@ hi_uint32 hi_nand_get_oob_size(hi_void)
 }
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  nand get host
-  ÊäÈë²ÎÊı:  ÎŞ
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:  nand host
-  º¯Êı±¸×¢:  
+  å‡½æ•°åŠŸèƒ½:  nand get host
+  è¾“å…¥å‚æ•°:  æ— 
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:  nand host
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 struct hi_nand_host *hi_nand_get_nand_host(hi_void)
 {
@@ -227,12 +227,12 @@ struct hi_nand_host *hi_nand_get_nand_host(hi_void)
 
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  nand block check bad
-  ÊäÈë²ÎÊı:  
+  å‡½æ•°åŠŸèƒ½:  nand block check bad
+  è¾“å…¥å‚æ•°:  
                              ui_addr : block absolute address
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:  0: block not bad;    1: block is bad
-  º¯Êı±¸×¢:  
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:  0: block not bad;    1: block is bad
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 hi_int32 hi_nand_block_isbad(hi_uint32 ui_addr)
 {
@@ -240,12 +240,12 @@ hi_int32 hi_nand_block_isbad(hi_uint32 ui_addr)
 }
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  nand block mark bad
-  ÊäÈë²ÎÊı:  
+  å‡½æ•°åŠŸèƒ½:  nand block mark bad
+  è¾“å…¥å‚æ•°:  
                              ui_addr : block absolute address
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:  0:OK;  -1:NOK
-  º¯Êı±¸×¢:  
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:  0:OK;  -1:NOK
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 hi_int32 hi_nand_block_markbad(hi_uint32 ui_addr)
 {
@@ -253,13 +253,13 @@ hi_int32 hi_nand_block_markbad(hi_uint32 ui_addr)
 }
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  nand erase all page
-  ÊäÈë²ÎÊı:  
+  å‡½æ•°åŠŸèƒ½:  nand erase all page
+  è¾“å…¥å‚æ•°:  
                              ui_offset : start erase address
                              ui_len : erase len
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:  0:OK;   -1:NOK
-  º¯Êı±¸×¢:  
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:  0:OK;   -1:NOK
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 hi_int32 hi_nand_erase( hi_uint32 ui_offset, hi_uint32 ui_len )
 {
@@ -267,14 +267,14 @@ hi_int32 hi_nand_erase( hi_uint32 ui_offset, hi_uint32 ui_len )
 }
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  nand write data
-  ÊäÈë²ÎÊı:  
+  å‡½æ•°åŠŸèƒ½:  nand write data
+  è¾“å…¥å‚æ•°:  
                              puc_buf : data buffer
                              ui_offset : start address
                              ui_len : read len
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø: 0:OK;   -1:NOK
-  º¯Êı±¸×¢:  
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›: 0:OK;   -1:NOK
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 hi_int32 hi_nand_read( hi_uchar8 *puc_buf, hi_uint32 ui_offset, hi_uint32 ui_len )
 {
@@ -282,14 +282,14 @@ hi_int32 hi_nand_read( hi_uchar8 *puc_buf, hi_uint32 ui_offset, hi_uint32 ui_len
 }
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  nand read one whole page (include data & oob)
-  ÊäÈë²ÎÊı:  
+  å‡½æ•°åŠŸèƒ½:  nand read one whole page (include data & oob)
+  è¾“å…¥å‚æ•°:  
                              puc_dst_buf : the databuffer to put data
                              ui_src_addr : read start page addrs
                              ui_len : read len
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:         
-  º¯Êı±¸×¢:  
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:         
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 hi_int32 hi_nand_read_page(hi_uchar8 *puc_dst_buf, hi_uint32 ui_src_addr)
 {
@@ -297,14 +297,14 @@ hi_int32 hi_nand_read_page(hi_uchar8 *puc_dst_buf, hi_uint32 ui_src_addr)
 }
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  nand write data
-  ÊäÈë²ÎÊı:  
+  å‡½æ•°åŠŸèƒ½:  nand write data
+  è¾“å…¥å‚æ•°:  
                              puc_buf : data buffer
                              ui_offset : start address
                              ui_len : write len
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:  0:OK;   -1:NOK
-  º¯Êı±¸×¢:  
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:  0:OK;   -1:NOK
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 hi_int32 hi_nand_write( hi_uchar8 *puc_buf, hi_uint32 ui_offset, hi_uint32 ui_len )
 {
@@ -312,13 +312,13 @@ hi_int32 hi_nand_write( hi_uchar8 *puc_buf, hi_uint32 ui_offset, hi_uint32 ui_le
 }
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  nand write one whole page (include data & oob)
-  ÊäÈë²ÎÊı:  
+  å‡½æ•°åŠŸèƒ½:  nand write one whole page (include data & oob)
+  è¾“å…¥å‚æ•°:  
                              puc_src_buf : the databuffer to put data
                              ui_dst_addr : write start page addrs
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:         
-  º¯Êı±¸×¢:  
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:         
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 hi_int32 hi_nand_write_page(hi_uchar8 *puc_src_buf, hi_uint32 ui_dst_addr)
 {
@@ -326,13 +326,13 @@ hi_int32 hi_nand_write_page(hi_uchar8 *puc_src_buf, hi_uint32 ui_dst_addr)
 }
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  nand read oob only
-  ÊäÈë²ÎÊı:  
+  å‡½æ•°åŠŸèƒ½:  nand read oob only
+  è¾“å…¥å‚æ•°:  
                              puc_buf : oob input buffer
                              ui_offset : page absolute address
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:  0:OK;   -1:NOK
-  º¯Êı±¸×¢:  
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:  0:OK;   -1:NOK
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 hi_int32 hi_nand_oob_read( hi_uchar8 *puc_buf, hi_uint32 ui_offset)
 {
@@ -346,13 +346,13 @@ hi_int32 hi_nand_oob_read( hi_uchar8 *puc_buf, hi_uint32 ui_offset)
 }
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  nand write oob
-  ÊäÈë²ÎÊı:  
+  å‡½æ•°åŠŸèƒ½:  nand write oob
+  è¾“å…¥å‚æ•°:  
                              puc_buf : oob output buffer
                              ui_offset : page absolute address
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:  0:OK;   -1:NOK
-  º¯Êı±¸×¢:  
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:  0:OK;   -1:NOK
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 hi_int32 hi_nand_oob_write( hi_uchar8 *puc_buf, hi_uint32 ui_offset )
 {
@@ -366,11 +366,11 @@ hi_int32 hi_nand_oob_write( hi_uchar8 *puc_buf, hi_uint32 ui_offset )
 }
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  display bad block table
-  ÊäÈë²ÎÊı:  ÎŞ
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:  ÎŞ
-  º¯Êı±¸×¢:  
+  å‡½æ•°åŠŸèƒ½:  display bad block table
+  è¾“å…¥å‚æ•°:  æ— 
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:  æ— 
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 hi_void hi_nand_dump_bbt(hi_void)
 {
@@ -413,11 +413,11 @@ hi_void hi_nand_dump_bbt(hi_void)
 }
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  Get the flash and manufacturer id and lookup if the type is supported 
-  ÊäÈë²ÎÊı:  ÎŞ
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:  0:OK;   -1:NOK
-  º¯Êı±¸×¢:  
+  å‡½æ•°åŠŸèƒ½:  Get the flash and manufacturer id and lookup if the type is supported 
+  è¾“å…¥å‚æ•°:  æ— 
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:  0:OK;   -1:NOK
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 static hi_int32 hi_nand_chip_init(struct hi_nand_chip *pst_chip)
 {
@@ -485,11 +485,11 @@ void ATP_get_fix_part_protect_addr(struct mtd_partition *pst_parts, hi_int32 i_n
 /*<End:   monitor flash opteration>*/
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  nand flash probe entry
-  ÊäÈë²ÎÊı:  ÎŞ
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:  0:OK;   -1:NOK
-  º¯Êı±¸×¢:  
+  å‡½æ•°åŠŸèƒ½:  nand flash probe entry
+  è¾“å…¥å‚æ•°:  æ— 
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:  0:OK;   -1:NOK
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 static hi_int32 hi_nand_probe(struct platform_device *pst_pltdev)
 {
@@ -500,7 +500,7 @@ static hi_int32 hi_nand_probe(struct platform_device *pst_pltdev)
     struct hi_nand_host *pst_host   = HI_NULL;
     struct mtd_partition *pst_parts = NULL;
 
-    /* ÉêÇëÁ¬ĞøµÄÄÚ´æ¿Õ¼ä£¬·½±ãÍ³Ò»¹ÜÀí*/
+    /* ç”³è¯·è¿ç»­çš„å†…å­˜ç©ºé—´ï¼Œæ–¹ä¾¿ç»Ÿä¸€ç®¡ç†*/
     struct mtd_info *pst_mtd        = HI_NULL;
     hi_uint32 ui_host_size = sizeof(struct hi_nand_host) + sizeof(struct hi_nand_chip) + sizeof(struct mtd_info);
 

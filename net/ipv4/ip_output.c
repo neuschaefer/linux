@@ -93,7 +93,7 @@
 #include <linux/blog.h>
 #endif
 
-/*Start of Protocol:Íø¹Ø×ÔÉíÒµÎñµÄÆ½»¬ÇĞ»» */
+/*Start of Protocol:ç½‘å…³è‡ªèº«ä¸šåŠ¡çš„å¹³æ»‘åˆ‡æ¢ */
 #ifdef CONFIG_ATP_HYBRID
 #include <net/netfilter/nf_conntrack.h>
 #include "atp_interface.h"
@@ -287,7 +287,7 @@ static int ip_finish_output(struct sk_buff *skb)
 		return dst_output(skb);
 	}
 #endif
-    /*À´×ÔDSLITEËíµÀµÄ±¨ÎÄ²»½øĞĞV4·ÖÆ¬*/
+    /*æ¥è‡ªDSLITEéš§é“çš„æŠ¥æ–‡ä¸è¿›è¡ŒV4åˆ†ç‰‡*/
 	if (skb->len > ip_skb_dst_mtu(skb) && !skb_is_gso(skb) && 0 == strstr(skb->dev->name, "ip6tnl")
 #ifdef CONFIG_ATP_HYBRID_GREACCEL	
         && !IS_GRE_DEV(skb->dev->name)
@@ -374,7 +374,7 @@ int ip_output(struct sk_buff *skb)
 	struct iphdr *iph = ip_hdr(skb);
 #endif
     
-/*Start of Protocol:Íø¹Ø×ÔÉíÒµÎñµÄÆ½»¬ÇĞ»»*/
+/*Start of Protocol:ç½‘å…³è‡ªèº«ä¸šåŠ¡çš„å¹³æ»‘åˆ‡æ¢*/
 #ifdef CONFIG_ATP_HYBRID
     struct nf_conn *nfct;
 	unsigned int fonip = 0x00AC1102;

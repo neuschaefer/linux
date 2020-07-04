@@ -72,14 +72,14 @@
 #include <linux/netfilter/xt_dscp.h>
 #endif
 
-/*start of £¬Á¬½Ó¸ú×ÙĞÅÏ¢Çå¿Õ¡£by  2009-10-25*/
+/*start of ï¼Œè¿æ¥è·Ÿè¸ªä¿¡æ¯æ¸…ç©ºã€‚by  2009-10-25*/
 #ifdef CONFIG_ATP_CONNTRACK_CLEAN
 static void nf_conntrack_user_cleanup(struct net *net);
 
 int nf_conntrack_clean __read_mostly;
 EXPORT_SYMBOL_GPL(nf_conntrack_clean);
 #endif
-/*end of £¬Á¬½Ó¸ú×ÙĞÅÏ¢Çå¿Õ¡£by  2009-10-25*/
+/*end of ï¼Œè¿æ¥è·Ÿè¸ªä¿¡æ¯æ¸…ç©ºã€‚by  2009-10-25*/
 
 #if defined(CONFIG_BCM_KF_RUNNER)
 #if defined(CONFIG_BCM_RDPA) || defined(CONFIG_BCM_RDPA_MODULE)
@@ -972,7 +972,7 @@ static int regardless_drop(struct net *net, struct sk_buff *skb)
 	if (!list_empty(&lo_safe_list)) {
 		list_for_each(tmp, &lo_safe_list) {
 			ct = container_of(tmp, struct nf_conn, safe_list);
-			/*¸ßÓÅÏÈÁ¬½Ó(RTSP)²»±»É¾³ı*/
+			/*é«˜ä¼˜å…ˆè¿æ¥(RTSP)ä¸è¢«åˆ é™¤*/
 			if (nf_ct_reserved_hook && nf_ct_reserved_hook(ct)) {
 				ct = NULL;
 				continue;
@@ -988,7 +988,7 @@ static int regardless_drop(struct net *net, struct sk_buff *skb)
 	if (!ct && (blog_iq(skb) == IQOS_PRIO_HIGH) ) {
 		list_for_each(tmp, &hi_safe_list) {
 			ct = container_of(tmp, struct nf_conn, safe_list);
-			/*¸ßÓÅÏÈÁ¬½Ó(RTSP)²»±»É¾³ı*/
+			/*é«˜ä¼˜å…ˆè¿æ¥(RTSP)ä¸è¢«åˆ é™¤*/
 			if (nf_ct_reserved_hook && nf_ct_reserved_hook(ct)) {
 				ct = NULL;
 				continue;
@@ -1043,7 +1043,7 @@ static noinline int early_drop(struct net *net, unsigned int hash)
 		hlist_nulls_for_each_entry_rcu(h, n, &net->ct.hash[hash],
 					 hnnode) {
 			tmp = nf_ct_tuplehash_to_ctrack(h);
-			/*¸ßÓÅÏÈÁ¬½Ó(RTSP)²»±»É¾³ı*/
+			/*é«˜ä¼˜å…ˆè¿æ¥(RTSP)ä¸è¢«åˆ é™¤*/
 			if (nf_ct_reserved_hook && nf_ct_reserved_hook(tmp)) {
 				cnt++;
 				continue;
@@ -1074,7 +1074,7 @@ static noinline int early_drop(struct net *net, unsigned int hash)
             hlist_nulls_for_each_entry_rcu(h, n, &net->ct.hash[uiHash],
                          hnnode) {
                 ct = nf_ct_tuplehash_to_ctrack(h);
-				/*¸ßÓÅÏÈÁ¬½Ó(RTSP)²»±»É¾³ı*/
+				/*é«˜ä¼˜å…ˆè¿æ¥(RTSP)ä¸è¢«åˆ é™¤*/
 				if (nf_ct_reserved_hook && nf_ct_reserved_hook(ct)) {
 					ct = NULL;
 					cnt++;
@@ -1155,7 +1155,7 @@ __nf_conntrack_alloc(struct net *net, u16 zone,
 #if defined(CONFIG_BCM_KF_NETFILTER)
         /* Sorry, we have to kick LRU out regardlessly. */
 		if (!regardless_drop(net, skb)) {
-			/*¸ßÓÅÏÈÁ¬½Ó(RTSP)ÒªÈ·±£ĞÂ½¨³É¹¦*/
+			/*é«˜ä¼˜å…ˆè¿æ¥(RTSP)è¦ç¡®ä¿æ–°å»ºæˆåŠŸ*/
 			if (nf_ct_high_pri_hook && nf_ct_high_pri_hook(net, orig))
 			{
 				if (nf_ct_del_used_by_pri_hook)
@@ -1178,7 +1178,7 @@ __nf_conntrack_alloc(struct net *net, u16 zone,
 #else       
 
 		if (!early_drop(net, hash_bucket(hash, net))) {
-				/*¸ßÓÅÏÈÁ¬½Ó(RTSP)ÒªÈ·±£ĞÂ½¨³É¹¦*/
+				/*é«˜ä¼˜å…ˆè¿æ¥(RTSP)è¦ç¡®ä¿æ–°å»ºæˆåŠŸ*/
 				if (nf_ct_high_pri_hook && nf_ct_high_pri_hook(net, orig))
 				{
 					if (nf_ct_del_used_by_pri_hook)
@@ -1497,7 +1497,7 @@ init_conntrack(struct net *net, struct nf_conn *tmpl,
 	}
 
 #ifdef CONFIG_NF_CONNTRACK_MARK
-    /* Á¬½Ó¸ú×ÙµÄmarkÖ®Ç°Ã»ÓĞÊ¹ÓÃ£¬ÏÖÔÚÓÃÀ´¼ÇÂ¼±¨ÎÄµÄnfmarkÖµ */
+    /* è¿æ¥è·Ÿè¸ªçš„markä¹‹å‰æ²¡æœ‰ä½¿ç”¨ï¼Œç°åœ¨ç”¨æ¥è®°å½•æŠ¥æ–‡çš„nfmarkå€¼ */
     ct->mark = skb->mark;
 #endif
 
@@ -1568,7 +1568,7 @@ resolve_normal_ct(struct net *net, struct nf_conn *tmpl,
 	skb->nfctinfo = *ctinfo;
 
 #ifdef CONFIG_NF_CONNTRACK_PRI
-	/*skbºÍct¹ØÁªºó£¬ÖµALG data mark*/
+	/*skbå’Œctå…³è”åï¼Œå€¼ALG data mark*/
 	if (nf_pri_is_alg_skb(skb))
 	{
 		nf_pri_set_alg_mark(skb);
@@ -1579,7 +1579,7 @@ resolve_normal_ct(struct net *net, struct nf_conn *tmpl,
 	{
 		struct nf_conn_help * help = nfct_help(ct);
 
-		/*BRCM ·½°¸skbÊÇ·ñ²»×ß¼ÓËÙ£¬µ±Ç°Ö»ÓĞL2TPÉèÖÃskip_blog*/
+		/*BRCM æ–¹æ¡ˆskbæ˜¯å¦ä¸èµ°åŠ é€Ÿï¼Œå½“å‰åªæœ‰L2TPè®¾ç½®skip_blog*/
 #if (defined(CONFIG_PPPOL2TP) && defined(CONFIG_L2TP_FAST_FORWARD)) || defined(CONFIG_PPTP_TUNNEL)
 		if (skb->skip_blog)
 		{
@@ -2158,20 +2158,20 @@ void nf_conntrack_cleanup(struct net *net)
 
 #ifdef CONFIG_ATP_HYBRID
 /******************************************************************************
-  º¯ÊıÃû³Æ  : ipgre_need_redo_snat
-  ¹¦ÄÜÃèÊö  : ¼ì²éÊÇ·ñĞèÒªÖØĞÂ×öSNAT
-  ÊäÈë²ÎÊı  : 
-              1.  *skb:µ±Ç°Òª·¢ËÍµÄ°ü
-              2.  *dev:Òª¼ì²éµÄ½Ó¿Ú(gre1/gre2/ppp)
-              3.  src_addr:µ±Ç°°üµÄÔ´µØÖ·
-  µ÷ÓÃº¯Êı  : 
-  ±»µ÷º¯Êı  : 
-  Êä³ö²ÎÊı  : ÎŞ
-  ·µ »Ø Öµ  : ÎŞ
+  å‡½æ•°åç§°  : ipgre_need_redo_snat
+  åŠŸèƒ½æè¿°  : æ£€æŸ¥æ˜¯å¦éœ€è¦é‡æ–°åšSNAT
+  è¾“å…¥å‚æ•°  : 
+              1.  *skb:å½“å‰è¦å‘é€çš„åŒ…
+              2.  *dev:è¦æ£€æŸ¥çš„æ¥å£(gre1/gre2/ppp)
+              3.  src_addr:å½“å‰åŒ…çš„æºåœ°å€
+  è°ƒç”¨å‡½æ•°  : 
+  è¢«è°ƒå‡½æ•°  : 
+  è¾“å‡ºå‚æ•°  : æ— 
+  è¿” å› å€¼  : æ— 
 
-  ĞŞ¸ÄÀúÊ·      :
-   1.ÈÕ    ÆÚ   : 2014-1-18
-     ĞŞ¸ÄÄÚÈİ   : Íê³É³õ¸å
+  ä¿®æ”¹å†å²      :
+   1.æ—¥    æœŸ   : 2014-1-18
+     ä¿®æ”¹å†…å®¹   : å®Œæˆåˆç¨¿
 
 ******************************************************************************/
 int nf_ct_need_redo_snat(struct sk_buff *skb, struct net_device *dev, __be32 src_addr)

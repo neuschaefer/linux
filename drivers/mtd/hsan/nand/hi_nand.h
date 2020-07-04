@@ -3,14 +3,14 @@
 * (C) Huawei Technologies Co., Ltd. < >
 */
 /******************************************************************************
-  ÎÄ¼şÃû³Æ: hi_nand.h
-  ¹¦ÄÜÃèÊö: nandÇı¶¯½Ó¿Ú¹«ÓÃÍ·ÎÄ¼ş
-  °æ±¾ÃèÊö: V1.0
+  æ–‡ä»¶åç§°: hi_nand.h
+  åŠŸèƒ½æè¿°: nandé©±åŠ¨æ¥å£å…¬ç”¨å¤´æ–‡ä»¶
+  ç‰ˆæœ¬æè¿°: V1.0
 
-  ´´½¨ÈÕÆÚ: D2013_04_20
+  åˆ›å»ºæ—¥æœŸ: D2013_04_20
 
-  ĞŞ¸Ä¼ÇÂ¼: 
-            Éú³É³õ¸å.
+  ä¿®æ”¹è®°å½•: 
+            ç”Ÿæˆåˆç¨¿.
 ******************************************************************************/
 #ifndef __HI_NAND_H__
 #define __HI_NAND_H__
@@ -22,13 +22,13 @@ extern "C"{
 #endif /* __cplusplus */
 
 
-/* ×î´ónand ID³¤¶È */
+/* æœ€å¤§nand IDé•¿åº¦ */
 #define HI_NAND_ID_MAX_LEN          8
 
-/* ×î´óÖ§³Ö8KBÒ³´óĞ¡ */
+/* æœ€å¤§æ”¯æŒ8KBé¡µå¤§å° */
 #define HI_NAND_MAX_PAGE_SIZE       0x2000
 
-/* ECC0Çé¿öÏÂ×î´óÖ§³Ö512B,·ÇECC0ÏÂ³¤¶ÈÎªHI_NFC_ECC_OOB_SIZE*/
+/* ECC0æƒ…å†µä¸‹æœ€å¤§æ”¯æŒ512B,éECC0ä¸‹é•¿åº¦ä¸ºHI_NFC_ECC_OOB_SIZE*/
 #define HI_NAND_MAX_OOB_SIZE        0x200
 
 // NAND Flash Manufacturer ID Codes
@@ -164,12 +164,12 @@ struct hi_nand_hw_control
 };
 
 /*
-  * nand chip »ù±¾²ÎÊı
+  * nand chip åŸºæœ¬å‚æ•°
   */
 struct hi_nand_spec
 {
-    hi_uint32   ui_options;         /* ±£Áô¶Ô±ê×¼linuxÄÚºËµÄÖ§³Ö */
-    hi_uint32   ui_chip_size;       /* µ¥Î»ÎªBYTE£¬×î´óÖ§³Ö4GBYTE */
+    hi_uint32   ui_options;         /* ä¿ç•™å¯¹æ ‡å‡†linuxå†…æ ¸çš„æ”¯æŒ */
+    hi_uint32   ui_chip_size;       /* å•ä½ä¸ºBYTEï¼Œæœ€å¤§æ”¯æŒ4GBYTE */
     hi_uint32   ui_block_size;
     hi_uint32   ui_page_size;
     hi_uint32   ui_oob_size;
@@ -208,7 +208,7 @@ typedef struct
 {
     hi_uint32 ui_addr;
     hi_uint32 ui_data_len;
-    hi_uint32 ui_check_bad;      /* ÊÇ·ñÊ¹ÄÜÌø¹ı»µ¿é´¦Àí */
+    hi_uint32 ui_check_bad;      /* æ˜¯å¦ä½¿èƒ½è·³è¿‡åå—å¤„ç† */
 
     HI_NAND_OP_E en_op_type;
 

@@ -334,7 +334,7 @@ static void br_igmp_timeout (unsigned long ptr)
 	struct net_bridge *br = (struct net_bridge *) ptr;
 
 	
-	/*×é²¥ÒÖÖÆĞèÍ¬Ê±½â¾ölan²àÉè±¸reportÒÖÖÆºósnooping±»ÀÏ»¯ÎÊÌâ*/
+	/*ç»„æ’­æŠ‘åˆ¶éœ€åŒæ—¶è§£å†³lanä¾§è®¾å¤‡reportæŠ‘åˆ¶åsnoopingè¢«è€åŒ–é—®é¢˜*/
 #ifdef CONFIG_ATP_IGMP_DROP_LEAVE_LAN2LAN
 	return;
 #endif
@@ -692,7 +692,7 @@ int br_igmp_mc_forward(struct net_bridge *br,
 		   through for forwarding, other types should be dropped */
 		if (skb->dev)
 		{
-			/*µ±Ç°²©Í¨Çı¶¯Î´ÉèÖÃIFF_WANDEV£¬Ê¹ÓÃATPµÄWANÅĞ¶ÏÌõ¼ş*/
+			/*å½“å‰åšé€šé©±åŠ¨æœªè®¾ç½®IFF_WANDEVï¼Œä½¿ç”¨ATPçš„WANåˆ¤æ–­æ¡ä»¶*/
 #if defined(CONFIG_BCM_KF_WANDEV)
 #ifdef CONFIG_SUPPORT_ATP
 			if (( skb->dev->priv_flags & IFF_WANDEV ) || IS_WAN_DEVICE(skb->dev->name))
@@ -713,7 +713,7 @@ int br_igmp_mc_forward(struct net_bridge *br,
 				if(br_port_get_rcu(skb->dev))
 				{ 
 #ifdef CONFIG_SUPPORT_ATP
-					/*codenomicon igmp²âÊÔ¹ÒËÀĞŞ¸Ä:²©Í¨snooping´¦ÀíÖ®Ç°½øĞĞ±ØÒªµÄºÏ·¨ĞÔĞ£Ñé*/
+					/*codenomicon igmpæµ‹è¯•æŒ‚æ­»ä¿®æ”¹:åšé€šsnoopingå¤„ç†ä¹‹å‰è¿›è¡Œå¿…è¦çš„åˆæ³•æ€§æ ¡éªŒ*/
 					if (is_igmp_need_process(skb))
 					{
 					    br_igmp_process(br, skb);

@@ -622,9 +622,9 @@ ipgre_ecn_encapsulate(u8 tos, const struct iphdr *old_iph, struct sk_buff *skb)
 unsigned int gre_get_seq_num(void)
 {
     unsigned int seqno = 0;
-    /* Á½¸öËíµÀÊ¹ÓÃÍ¬Ò»¸öÐòºÅ£¬²»ÔÙÃ¿¸öËíµÀµ¥¶À±àºÅ£¬±ãÓÚÊµÏÖ±£Ðò */
+    /* ä¸¤ä¸ªéš§é“ä½¿ç”¨åŒä¸€ä¸ªåºå·ï¼Œä¸å†æ¯ä¸ªéš§é“å•ç‹¬ç¼–å·ï¼Œä¾¿äºŽå®žçŽ°ä¿åº */
     spin_lock_bh(&g_stTunOSeq.lock);
-    seqno = g_stTunOSeq.o_seqno++;/*³õÊ¼ÐòºÅ´Ó0¿ªÊ¼*/
+    seqno = g_stTunOSeq.o_seqno++;/*åˆå§‹åºå·ä»Ž0å¼€å§‹*/
     spin_unlock_bh(&g_stTunOSeq.lock);
     return seqno;
 }
@@ -965,9 +965,9 @@ static void ipgre_time_refresh(struct sk_buff *skb, struct ip_tunnel *tunnel, en
             ipv6h = ipv6_hdr(skb);
             if (IPPROTO_UDP == ipv6h->nexthdr)
             {
-                /*START MODIFY:  idle hello¹¦ÄÜ¿ª·¢*/
+                /*START MODIFY:  idle helloåŠŸèƒ½å¼€å‘*/
                 uh = (struct udphdr *)(skb->data + sizeof(struct ipv6hdr));
-                /*END MODIFY:  idle hello¹¦ÄÜ¿ª·¢*/
+                /*END MODIFY:  idle helloåŠŸèƒ½å¼€å‘*/
                 if ((htons(IPGER_DHCPV6_SERVER_PORT) == uh->dest)
                     || (htons(IPGER_DHCPV6_CLIENT_PORT) == uh->dest))
                 {
@@ -1257,7 +1257,7 @@ static netdev_tx_t ipgre_tunnel_xmit(struct sk_buff *skb, struct net_device *dev
     }
 #endif
     
-    /* ÅÐ¶ÏÊÇ·ñÊÇdhcp±¨ÎÄ */
+    /* åˆ¤æ–­æ˜¯å¦æ˜¯dhcpæŠ¥æ–‡ */
     if (IPPROTO_UDP == old_iph->protocol)
     {
         uh = (struct udphdr *)(skb->data + ip_hdrlen(skb));
@@ -1279,7 +1279,7 @@ static netdev_tx_t ipgre_tunnel_xmit(struct sk_buff *skb, struct net_device *dev
 #ifdef CONFIG_ATP_HYBRID  
 		if ((1 == is_dhcp_packet) && (tunnel->parms.o_flags&GRE_SEQ))
 		{
-		    /*dhcp±¨ÎÄ²»´øÐòºÅ*/
+		    /*dhcpæŠ¥æ–‡ä¸å¸¦åºå·*/
 		    gre_hlen -= 4;
 		}
 #endif
@@ -1479,7 +1479,7 @@ static netdev_tx_t ipgre_tunnel_xmit(struct sk_buff *skb, struct net_device *dev
             if (0 == is_dhcp_packet)
             {
                 ++tunnel->o_seqno;
-                /* Á½¸öËíµÀÊ¹ÓÃÍ¬Ò»¸öÐòºÅ£¬²»ÔÙÃ¿¸öËíµÀµ¥¶À±àºÅ£¬±ãÓÚÊµÏÖ±£Ðò */
+                /* ä¸¤ä¸ªéš§é“ä½¿ç”¨åŒä¸€ä¸ªåºå·ï¼Œä¸å†æ¯ä¸ªéš§é“å•ç‹¬ç¼–å·ï¼Œä¾¿äºŽå®žçŽ°ä¿åº */
                 spin_lock_bh(&g_stTunOSeq.lock);
 #ifdef CONFIG_ATP_BRCM
                 ++g_stTunOSeq.o_seqno;
@@ -1488,14 +1488,14 @@ static netdev_tx_t ipgre_tunnel_xmit(struct sk_buff *skb, struct net_device *dev
                 p->a16[0]=tmp.a16[0];
                 p->a16[1] = tmp.a16[1];
 #else
-                ++g_stTunOSeq.o_seqno;/*³õÊ¼ÐòºÅ´Ó0¿ªÊ¼*/
-                *ptr = htonl(g_stTunOSeq.o_seqno);/*³õÊ¼ÐòºÅ´Ó0¿ªÊ¼*/
+                ++g_stTunOSeq.o_seqno;/*åˆå§‹åºå·ä»Ž0å¼€å§‹*/
+                *ptr = htonl(g_stTunOSeq.o_seqno);/*åˆå§‹åºå·ä»Ž0å¼€å§‹*/
 #endif				
                 spin_unlock_bh(&g_stTunOSeq.lock);
             }
             else
             {
-                /*dhcp±¨ÎÄ²»´øÐòÁÐºÅ£¬ÐèÒª°ÑGREÍ·²¿ÖÐS±ê¼ÇÎ»ÖÃ0*/
+                /*dhcpæŠ¥æ–‡ä¸å¸¦åºåˆ—å·ï¼Œéœ€è¦æŠŠGREå¤´éƒ¨ä¸­Sæ ‡è®°ä½ç½®0*/
                 ((__be16 *)(iph + 1))[0] &= (~GRE_SEQ);
             }
 #else
@@ -1650,7 +1650,7 @@ ipgre_tunnel_ioctl (struct net_device *dev, struct ifreq *ifr, int cmd)
 	struct net *net = dev_net(dev);
 	struct ipgre_net *ign = net_generic(net, ipgre_net_id);
 #ifdef CONFIG_ATP_HYBRID 
-	static atomic_t tunnel_num = ATOMIC_INIT(0);/*¼ÇÂ¼ËíµÀÊýÄ¿*/
+	static atomic_t tunnel_num = ATOMIC_INIT(0);/*è®°å½•éš§é“æ•°ç›®*/
 #ifdef CONFIG_ATP_HYBRID_TUNNEL_IDLE
     unsigned long idle;
 #endif
@@ -1675,7 +1675,7 @@ ipgre_tunnel_ioctl (struct net_device *dev, struct ifreq *ifr, int cmd)
 
 	case SIOCADDTUNNEL:
 #ifdef CONFIG_ATP_HYBRID 
-        /*µÚÒ»´Î½¨ËíµÀÊ±³õÊ¼»¯·¢°üÐòºÅÎª0*/
+        /*ç¬¬ä¸€æ¬¡å»ºéš§é“æ—¶åˆå§‹åŒ–å‘åŒ…åºå·ä¸º0*/
         if (0 == atomic_read(&tunnel_num))
         {
             spin_lock_bh(&g_stTunOSeq.lock);
@@ -1789,7 +1789,7 @@ ipgre_tunnel_ioctl (struct net_device *dev, struct ifreq *ifr, int cmd)
 		t = netdev_priv(dev);
         if (NULL == t)
 			goto done;
-        //´æÔÚ·­×ªµÄÎÊÌâ
+        //å­˜åœ¨ç¿»è½¬çš„é—®é¢˜
         if ((jiffies >= t->last_xmit) && (jiffies >= t->last_rcv))
         {
             idle = (jiffies - (t->last_xmit > t->last_rcv ? t->last_xmit : t->last_rcv)) / HZ;

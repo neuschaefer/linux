@@ -142,7 +142,7 @@ MFG:HEWLETT-PACKARD;MDL:DESKJET 970C;CMD:MLC,PCL,PML;CLASS:PRINTER;DESCRIPTION:H
 
 #define SHORT_STRLEN    32
 #define STRLEN 128
-#define MAX_DISKS      4    /*¶¨ÒåÍ¬Ê±¹ÒÔØ´òÓ¡»úµÄ×î´óÊıÄ¿£¬ÁôÒÔºóÀ©Õ¹*/
+#define MAX_DISKS      4    /*å®šä¹‰åŒæ—¶æŒ‚è½½æ‰“å°æœºçš„æœ€å¤§æ•°ç›®ï¼Œç•™ä»¥åæ‰©å±•*/
 
 
 struct proc_dir_entry *proc_printermedium = NULL;
@@ -499,7 +499,7 @@ static void atp_usblp_get_proc(struct usb_interface *intf, struct usblp *usblp)
 
     dev = interface_to_usbdev (intf);
 
-    //end add by zhouyu 20101029 Ö§³Öhub·½Ê½Í¬Ê±·ÃÎÊ´òÓ¡»ú¼°USB´æ´¢Éè±¸
+    //end add by zhouyu 20101029 æ”¯æŒhubæ–¹å¼åŒæ—¶è®¿é—®æ‰“å°æœºåŠUSBå­˜å‚¨è®¾å¤‡
     disk = get_freediskslot();
      if(!disk)
      {

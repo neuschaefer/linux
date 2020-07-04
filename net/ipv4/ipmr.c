@@ -858,7 +858,7 @@ static struct mfc_cache *ipmr_cache_find2(struct mr_table *mrt,
         return NULL;
     }
 
-    /*START MODIFY:Huawei 2012-11-20 FOR igmp proxy无法组播，返回非法cache引发cpu 0*/
+    /*START MODIFY:Huawei 2012-11-20 FOR igmp proxy鏃犳硶缁勬挱锛岃繑鍥為潪娉昪ache寮曞彂cpu 0*/
     mr_ifindex = ipmr_find_vif(mrt,pstDev);
     list_for_each_entry(c, &mrt->mfc_cache_array[line], list) {
         if (c->mfc_origin==origin 
@@ -867,7 +867,7 @@ static struct mfc_cache *ipmr_cache_find2(struct mr_table *mrt,
             return c;
     }
 
-    /*list_for_each_entry 不会返回空指针，找到后return*/
+    /*list_for_each_entry 涓嶄細杩斿洖绌烘寚閽堬紝鎵惧埌鍚巖eturn*/
     line = MFC_HASH(mcastgrp, htonl(0x00000000));
     list_for_each_entry(c, &mrt->mfc_cache_array[line], list){
         if (c->mfc_mcastgrp == mcastgrp
@@ -876,7 +876,7 @@ static struct mfc_cache *ipmr_cache_find2(struct mr_table *mrt,
     }
 
     return NULL;
-    /*END MODIFY:Huawei 2012-11-20 FOR igmp proxy无法组播，返回非法cache引发cpu 0*/
+    /*END MODIFY:Huawei 2012-11-20 FOR igmp proxy鏃犳硶缁勬挱锛岃繑鍥為潪娉昪ache寮曞彂cpu 0*/
 }
 #endif
 

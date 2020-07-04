@@ -4,15 +4,15 @@
 */
 /******************************************************************************
 
-                  ��Ȩ���� (C), 2009-2019, ��˼�뵼�����޹�˾
+                  版权所有 (C), 2009-2019, 海思半导体有限公司
 
  ******************************************************************************
-  �� �� ��   : hi_sysdef.h
-  ��������   : hi_sysdef.h ��ͷ�ļ�
-  �����б�   :
-  �޸���ʷ   :
-  1.��    ��   : D2011_07_19
-    �޸�����   : �����ļ�
+  文 件 名   : hi_sysdef.h
+  功能描述   : hi_sysdef.h 的头文件
+  函数列表   :
+  修改历史   :
+  1.日    期   : D2011_07_19
+    修改内容   : 创建文件
 
 ******************************************************************************/
 #ifndef __HI_SYSDEF_H__
@@ -35,34 +35,34 @@ global retcode system defined
 31    -   28   -  20  -  12   -    8   -     0
 | precode(0xE) | system | mod  | submod | retcode | 
 ********************************************************/
-#define     HI_PRECODE_MAX          0xF   /* ���ǰ������*/
-#define     HI_SYSTEM_MAX           0xFF  /* ���ϵͳ�� */
-#define     HI_SRCMODULE_MAX        0x100 /* ���ģ���� */
-#define     HI_SUBMODULE_MAX        0xF   /* �����ģ���� */
-#define     HI_RETCODE_MAX          0xFF  /* ��󷵻����� */
-#define     HI_CMDTYPE_MAX          0xFFF /* ��������� */
+#define     HI_PRECODE_MAX          0xF   /* 最大前导码数*/
+#define     HI_SYSTEM_MAX           0xFF  /* 最大系统数 */
+#define     HI_SRCMODULE_MAX        0x100 /* 最大模块数 */
+#define     HI_SUBMODULE_MAX        0xF   /* 最大子模块数 */
+#define     HI_RETCODE_MAX          0xFF  /* 最大返回码数 */
+#define     HI_CMDTYPE_MAX          0xFFF /* 最大命令数 */
 
-#define     HI_PRECODE_MASK         0xF   /* ��ȡǰ��������*/
-#define     HI_SYSTEM_MASK          0xFF  /* ��ȡϵͳ���� */
-#define     HI_SRCMODULE_MASK       0xFF  /* ��ȡģ������ */
-#define     HI_SUBMODULE_MASK       0xF   /* ��ȡ��ģ������ */
-#define     HI_RETCODE_MASK         0xFF  /* ��ȡ����ֵ���� */
-#define     HI_CMDTYPE_MASK         0xFFF /* ��ȡ���������� */
+#define     HI_PRECODE_MASK         0xF   /* 获取前导码掩码*/
+#define     HI_SYSTEM_MASK          0xFF  /* 获取系统掩码 */
+#define     HI_SRCMODULE_MASK       0xFF  /* 获取模块掩码 */
+#define     HI_SUBMODULE_MASK       0xF   /* 获取子模块掩码 */
+#define     HI_RETCODE_MASK         0xFF  /* 获取返回值掩码 */
+#define     HI_CMDTYPE_MASK         0xFFF /* 获取命令数掩码 */
 
-#define     HI_PRECODE_OFFSET       28    /* ��ȡǰ����ƫ��ֵ */
-#define     HI_SYSTEM_OFFSET        20    /* ��ȡϵͳƫ��ֵ */
-#define     HI_SRCMODULE_OFFSET     12    /* ��ȡģ��ƫ��ֵ */
-#define     HI_SUBMODULE_OFFSET     8     /* ��ȡ��ģ��ƫ��ֵ */
+#define     HI_PRECODE_OFFSET       28    /* 获取前导码偏移值 */
+#define     HI_SYSTEM_OFFSET        20    /* 获取系统偏移值 */
+#define     HI_SRCMODULE_OFFSET     12    /* 获取模块偏移值 */
+#define     HI_SUBMODULE_OFFSET     8     /* 获取子模块偏移值 */
 
 typedef enum  {
-    HI_SYSBASE_GLB                = 0xF0000000,     /*ȫ��ͨ��*/
-    HI_SYSBASE_BASIC              = 0xF1000000,     /*�ں˻������ϵͳ*/
-    HI_SYSBASE_DRIVER             = 0xF2000000,     /*�ں�����ϵͳ*/
-    HI_SYSBASE_SOC                = 0xF3000000,     /*�ں�SOC����ϵͳ*/
-    HI_SYSBASE_SAMPLE             = 0xF4000000,     /*�ں�����ϵͳ*/
-    HI_SYSBASE_TESTSET            = 0xF5000000,     /*testsetϵͳ*/
-    HI_SYSBASE_APPS               = 0xF6000000,     /*�û�̬ͨ��Ӧ��ϵͳ*/
-    HI_SYSBASE_voice              = 0xF7000000,     /*voiceӦ��ϵͳ*/    
+    HI_SYSBASE_GLB                = 0xF0000000,     /*全局通用*/
+    HI_SYSBASE_BASIC              = 0xF1000000,     /*内核基本类库系统*/
+    HI_SYSBASE_DRIVER             = 0xF2000000,     /*内核驱动系统*/
+    HI_SYSBASE_SOC                = 0xF3000000,     /*内核SOC适配系统*/
+    HI_SYSBASE_SAMPLE             = 0xF4000000,     /*内核样例系统*/
+    HI_SYSBASE_TESTSET            = 0xF5000000,     /*testset系统*/
+    HI_SYSBASE_APPS               = 0xF6000000,     /*用户态通用应用系统*/
+    HI_SYSBASE_voice              = 0xF7000000,     /*voice应用系统*/    
 }hi_sysbase_e;
 
 typedef enum  {

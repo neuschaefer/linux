@@ -3,69 +3,69 @@
 * (C) Huawei Technologies Co., Ltd. < >
 */
 /******************************************************************************
-  ÎÄ¼şÃû³Æ: watchdog.h
-  ¹¦ÄÜÃèÊö: Í·ÎÄ¼ş
-  °æ±¾ÃèÊö: V1.0
+  æ–‡ä»¶åç§°: watchdog.h
+  åŠŸèƒ½æè¿°: å¤´æ–‡ä»¶
+  ç‰ˆæœ¬æè¿°: V1.0
 
-  ´´½¨ÈÕÆÚ: D2011_09_30
+  åˆ›å»ºæ—¥æœŸ: D2011_09_30
 
-  ĞŞ¸Ä¼ÇÂ¼: 
-            Éú³É³õ¸å.
+  ä¿®æ”¹è®°å½•: 
+            ç”Ÿæˆåˆç¨¿.
 ******************************************************************************/
 #ifndef __HI_WATCHDOG_H__
 #define __HI_WATCHDOG_H__
 
-//¹·¸´Î»Ê±¼ä¼«Öµ
+//ç‹—å¤ä½æ—¶é—´æå€¼
 #define HI_WDG_MIN_INTERVAL             1
 #define HI_WDG_MAX_INTERVAL             512
 
-/* Ä¬ÈÏÎ¹¹·Ê±¼äÒÔ¼°¹·¸´Î»Ê±¼ä */
+/* é»˜è®¤å–‚ç‹—æ—¶é—´ä»¥åŠç‹—å¤ä½æ—¶é—´ */
 #define HI_WDG_DFT_FEED_TIME            3
 #define HI_WDG_DFT_RST_TIME             30
 #define HI_WDG_CHECK_MAX_TIME           ((HI_WDG_DFT_RST_TIME-HI_WDG_DFT_FEED_TIME)*HZ)
 
 #define HI_WDG_MONITOR_CPUID            1
 
-/*crg ---- crgÕûÌå¼Ä´æÆ÷½á¹¹*/
+/*crg ---- crgæ•´ä½“å¯„å­˜å™¨ç»“æ„*/
 typedef struct
 {
-    volatile hi_uint32 ui_crg_sc_sysstat;               /* 0x0 - Èí¸´Î»¿ØÖÆ¼Ä´æÆ÷ */
-    volatile hi_uint32 ui_crg_ecsplll_ctrl0;            /* 0x4 - ECS PLL¿ØÖÆ¼Ä´æÆ÷ */
-    volatile hi_uint32 ui_crg_ecsplll_ctrl1;            /* 0x8 - ECS PLLÆµÂÊ¿ØÖÆ¼Ä´æÆ÷ */
-    volatile hi_uint32 ui_crg_ethplll_ctrl0;            /* 0xc - ETH PLL¿ØÖÆ¼Ä´æÆ÷ */
-    volatile hi_uint32 ui_crg_ethplll_ctrl1;            /* 0x10 - ETH PLLÆµÂÊ¿ØÖÆ¼Ä´æÆ÷ */
-    volatile hi_uint32 ui_crg_sc_peren0;                /* 0x14 - ÍâÉèÊ±ÖÓÊ¹ÄÜ¼Ä´æÆ÷0 */
-    volatile hi_uint32 ui_crg_sc_perdis0;               /* 0x18 - ÍâÉèÊ±ÖÓ½ûÖ¹¼Ä´æÆ÷0 */
-    volatile hi_uint32 ui_crg_sc_perclkst0;             /* 0x1c - ÍâÉèÊ±ÖÓÊ¹ÄÜ×´Ì¬¼Ä´æÆ÷ */
-    volatile hi_uint32 ui_crg_sc_peren1;                /* 0x20 - ÍâÉèÊ±ÖÓÊ¹ÄÜ¼Ä´æÆ÷1 */
-    volatile hi_uint32 ui_crg_sc_perdis1;               /* 0x24 - ÍâÉèÊ±ÖÓ½ûÖ¹¼Ä´æÆ÷1 */
-    volatile hi_uint32 ui_crg_sc_perclkst1;             /* 0x28 - ÍâÉèÊ±ÖÓÊ¹ÄÜ×´Ì¬¼Ä´æÆ÷1 */
-    volatile hi_uint32 ui_crg_sc_rst_ctrl0;             /* 0x2c - ÍâÉè¸´Î»¿ØÖÆ¼Ä´æÆ÷0 */
-    volatile hi_uint32 ui_crg_sc_rst_ctrl1;             /* 0x30 - ÍâÉè¸´Î»¿ØÖÆ¼Ä´æÆ÷1 */
-    volatile hi_uint32 ui_crg_sc_rst_ctrl2;             /* 0x34 - ÍâÉè¸´Î»¿ØÖÆ¼Ä´æÆ÷2 */
-    volatile hi_uint32 ui_crg_cpu_cfg;                  /* 0x38 - CPU¿ØÖÆ¼Ä´æÆ÷ */
-    volatile hi_uint32 ui_crg_hw_cfg;                   /* 0x3c - HW¿ØÖÆ¼Ä´æÆ÷ */
-    volatile hi_uint32 ui_crg_sc_perctrl0;              /* 0x40 - ÍâÉè¿ØÖÆ¼Ä´æÆ÷0 */
-    volatile hi_uint32 ui_crg_sc_perctrl1;              /* 0x44 - ÍâÉè¿ØÖÆ¼Ä´æÆ÷1 */
-    volatile hi_uint32 ui_crg_sc_perctrl2;              /* 0x48 - ÍâÉè¿ØÖÆ¼Ä´æÆ÷2 */
-    volatile hi_uint32 ui_crg_reserved_1[1];            /* 0x4c - ±£Áô */
-    volatile hi_uint32 ui_crg_sc_perctrl3;              /* 0x50 - ÍâÉè¿ØÖÆ¼Ä´æÆ÷3 */
-    volatile hi_uint32 ui_crg_sc_perctrl4;              /* 0x54 - ÍâÉè¿ØÖÆ¼Ä´æÆ÷4 */
-    volatile hi_uint32 ui_crg_sc_perctrl5;              /* 0x58 - ÍâÉè¿ØÖÆ¼Ä´æÆ÷5 */
-    volatile hi_uint32 ui_crg_sc_perctrl6;              /* 0x5c - ÍâÉè¿ØÖÆ¼Ä´æÆ÷6 */
-    volatile hi_uint32 ui_crg_sc_perctrl7;              /* 0x60 - ÍâÉè¿ØÖÆ¼Ä´æÆ÷7 */
-    volatile hi_uint32 ui_crg_sc_perctrl8;              /* 0x64 - ÍâÉè¿ØÖÆ¼Ä´æÆ÷8 (Ó²¼ş¿´ÃÅ¹·Ê¹ÄÜ¿ØÖÆ)*/
-    volatile hi_uint32 ui_crg_ram_ctrl_bus;             /* 0x68 - RAM¿ØÖÆ¼Ä´æÆ÷ */
-    volatile hi_uint32 ui_crg_wdg_init_cfg;             /* 0x6c - ¿´ÃÅ¹·³õÊ¼»¯ÅäÖÃĞÅºÅ */
-    volatile hi_uint32 ui_crg_osc_cfg;                  /* 0x70 - ¾§ÕñÅäÖÃĞÅºÅ */
-    volatile hi_uint32 ui_crg_reserved_2[7];            /* 0x74:8c - ±£Áô */
-    volatile hi_uint32 ui_crg_crg_stat0;                /* 0x90 - CRG×´Ì¬¼Ä´æÆ÷0 */
-    volatile hi_uint32 ui_crg_dying_gasp_pre_int;       /* 0x94 - DYING_GASPÖĞ¶Ï¼Ä´æÆ÷ */
-    volatile hi_uint32 ui_crg_dying_gasp_int_mask;      /* 0x98 - DYING_GASPÖĞ¶ÏÑÚÂë¼Ä´æÆ÷ */
-    volatile hi_uint32 ui_crg_dying_gasp_int_insert;    /* 0x9c - DYING_GASPÖĞ¶Ï²åÈë¼Ä´æÆ÷ */
-    volatile hi_uint32 ui_crg_reserved_3[24];           /* 0xa0:fc - ±£Áô */
-    volatile hi_uint32 ui_crg_sc_chip_id;               /* 0x100 - Ğ¾Æ¬ID¼Ä´æÆ÷ */
-    volatile hi_uint32 ui_crg_crg_rev0;                 /* 0x104 - ECOÔ¤Áô¼Ä´æÆ÷0 */
+    volatile hi_uint32 ui_crg_sc_sysstat;               /* 0x0 - è½¯å¤ä½æ§åˆ¶å¯„å­˜å™¨ */
+    volatile hi_uint32 ui_crg_ecsplll_ctrl0;            /* 0x4 - ECS PLLæ§åˆ¶å¯„å­˜å™¨ */
+    volatile hi_uint32 ui_crg_ecsplll_ctrl1;            /* 0x8 - ECS PLLé¢‘ç‡æ§åˆ¶å¯„å­˜å™¨ */
+    volatile hi_uint32 ui_crg_ethplll_ctrl0;            /* 0xc - ETH PLLæ§åˆ¶å¯„å­˜å™¨ */
+    volatile hi_uint32 ui_crg_ethplll_ctrl1;            /* 0x10 - ETH PLLé¢‘ç‡æ§åˆ¶å¯„å­˜å™¨ */
+    volatile hi_uint32 ui_crg_sc_peren0;                /* 0x14 - å¤–è®¾æ—¶é’Ÿä½¿èƒ½å¯„å­˜å™¨0 */
+    volatile hi_uint32 ui_crg_sc_perdis0;               /* 0x18 - å¤–è®¾æ—¶é’Ÿç¦æ­¢å¯„å­˜å™¨0 */
+    volatile hi_uint32 ui_crg_sc_perclkst0;             /* 0x1c - å¤–è®¾æ—¶é’Ÿä½¿èƒ½çŠ¶æ€å¯„å­˜å™¨ */
+    volatile hi_uint32 ui_crg_sc_peren1;                /* 0x20 - å¤–è®¾æ—¶é’Ÿä½¿èƒ½å¯„å­˜å™¨1 */
+    volatile hi_uint32 ui_crg_sc_perdis1;               /* 0x24 - å¤–è®¾æ—¶é’Ÿç¦æ­¢å¯„å­˜å™¨1 */
+    volatile hi_uint32 ui_crg_sc_perclkst1;             /* 0x28 - å¤–è®¾æ—¶é’Ÿä½¿èƒ½çŠ¶æ€å¯„å­˜å™¨1 */
+    volatile hi_uint32 ui_crg_sc_rst_ctrl0;             /* 0x2c - å¤–è®¾å¤ä½æ§åˆ¶å¯„å­˜å™¨0 */
+    volatile hi_uint32 ui_crg_sc_rst_ctrl1;             /* 0x30 - å¤–è®¾å¤ä½æ§åˆ¶å¯„å­˜å™¨1 */
+    volatile hi_uint32 ui_crg_sc_rst_ctrl2;             /* 0x34 - å¤–è®¾å¤ä½æ§åˆ¶å¯„å­˜å™¨2 */
+    volatile hi_uint32 ui_crg_cpu_cfg;                  /* 0x38 - CPUæ§åˆ¶å¯„å­˜å™¨ */
+    volatile hi_uint32 ui_crg_hw_cfg;                   /* 0x3c - HWæ§åˆ¶å¯„å­˜å™¨ */
+    volatile hi_uint32 ui_crg_sc_perctrl0;              /* 0x40 - å¤–è®¾æ§åˆ¶å¯„å­˜å™¨0 */
+    volatile hi_uint32 ui_crg_sc_perctrl1;              /* 0x44 - å¤–è®¾æ§åˆ¶å¯„å­˜å™¨1 */
+    volatile hi_uint32 ui_crg_sc_perctrl2;              /* 0x48 - å¤–è®¾æ§åˆ¶å¯„å­˜å™¨2 */
+    volatile hi_uint32 ui_crg_reserved_1[1];            /* 0x4c - ä¿ç•™ */
+    volatile hi_uint32 ui_crg_sc_perctrl3;              /* 0x50 - å¤–è®¾æ§åˆ¶å¯„å­˜å™¨3 */
+    volatile hi_uint32 ui_crg_sc_perctrl4;              /* 0x54 - å¤–è®¾æ§åˆ¶å¯„å­˜å™¨4 */
+    volatile hi_uint32 ui_crg_sc_perctrl5;              /* 0x58 - å¤–è®¾æ§åˆ¶å¯„å­˜å™¨5 */
+    volatile hi_uint32 ui_crg_sc_perctrl6;              /* 0x5c - å¤–è®¾æ§åˆ¶å¯„å­˜å™¨6 */
+    volatile hi_uint32 ui_crg_sc_perctrl7;              /* 0x60 - å¤–è®¾æ§åˆ¶å¯„å­˜å™¨7 */
+    volatile hi_uint32 ui_crg_sc_perctrl8;              /* 0x64 - å¤–è®¾æ§åˆ¶å¯„å­˜å™¨8 (ç¡¬ä»¶çœ‹é—¨ç‹—ä½¿èƒ½æ§åˆ¶)*/
+    volatile hi_uint32 ui_crg_ram_ctrl_bus;             /* 0x68 - RAMæ§åˆ¶å¯„å­˜å™¨ */
+    volatile hi_uint32 ui_crg_wdg_init_cfg;             /* 0x6c - çœ‹é—¨ç‹—åˆå§‹åŒ–é…ç½®ä¿¡å· */
+    volatile hi_uint32 ui_crg_osc_cfg;                  /* 0x70 - æ™¶æŒ¯é…ç½®ä¿¡å· */
+    volatile hi_uint32 ui_crg_reserved_2[7];            /* 0x74:8c - ä¿ç•™ */
+    volatile hi_uint32 ui_crg_crg_stat0;                /* 0x90 - CRGçŠ¶æ€å¯„å­˜å™¨0 */
+    volatile hi_uint32 ui_crg_dying_gasp_pre_int;       /* 0x94 - DYING_GASPä¸­æ–­å¯„å­˜å™¨ */
+    volatile hi_uint32 ui_crg_dying_gasp_int_mask;      /* 0x98 - DYING_GASPä¸­æ–­æ©ç å¯„å­˜å™¨ */
+    volatile hi_uint32 ui_crg_dying_gasp_int_insert;    /* 0x9c - DYING_GASPä¸­æ–­æ’å…¥å¯„å­˜å™¨ */
+    volatile hi_uint32 ui_crg_reserved_3[24];           /* 0xa0:fc - ä¿ç•™ */
+    volatile hi_uint32 ui_crg_sc_chip_id;               /* 0x100 - èŠ¯ç‰‡IDå¯„å­˜å™¨ */
+    volatile hi_uint32 ui_crg_crg_rev0;                 /* 0x104 - ECOé¢„ç•™å¯„å­˜å™¨0 */
 }hi_crg_reg_s;
 
 /*
@@ -76,19 +76,19 @@ typedef union
     hi_uint32 ui_value;
     struct
     {
-        hi_uint32 ui_sfc_freq_sel           : 2   ; // [1..0] SFC½Ó¿ÚµÄ¹¤×÷ÆµÂÊÑ¡Ôñ
-        hi_uint32 ui_ddr_clk_freq           : 1   ; // [2] ³õÊ¼ÉÏµçÊ±£¬DDRC¹¤×÷Ê±ÖÓÆµÂÊÑ¡Ôñ
-        hi_uint32 ui_Reserved_0             : 1   ; // [3]  ±£Áô
-        hi_uint32 ui_ecs_ddr_freq           : 2   ; // [5..4] A9ºÍDDRCµÄÊ±ÖÓ±ÈÀı¹ØÏµÅäÖÃ
-        hi_uint32 ui_Reserved_1             : 1   ; // [6]  ±£Áô
-        hi_uint32 ui_ddrc_aclk_freq_sel     : 1   ; // [7] DDRC¹¤×÷Ê±ÖÓÆµÂÊºÍDDRPHYµÄÊ±ÖÓ±ÈÀıÑ¡Ôñ
-        hi_uint32 ui_Reserved_2             : 2   ; // [9..8]  ±£Áô
-        hi_uint32 ui_wdg_rst_time_cfg       : 9   ; // [18..10] ¿´ÃÅ¹·¸´Î»Ê±¼äÅäÖÃ
-        hi_uint32 ui_test_clk_ctrl          : 5   ; // [23..19] ²âÊÔÊ±ÖÓTEST_CLKÊä³ö£¬ÒÔ¼°Ê±ÖÓ¼ì²âÄ£¿é¼ì²âÊ±ÖÓÔ´Ñ¡Ôñ¿ØÖÆĞÅºÅ
-        hi_uint32 ui_det_clk_en             : 1   ; // [24] Ê±ÖÓ¼ì²âÄ£¿éµÄ¼ì²âÊ¹ÄÜĞÅºÅ
-        hi_uint32 ui_Reserved_3             : 3   ; // [27..25]  ±£Áô
-        hi_uint32 ui_fephy_clk_det_sel      : 2   ; // [29..28] FEPHYµÄ²Î¿¼Ê±ÖÓµÄ²âÊÔÊä³ö£¨°üÀ¨TXºÍRX)
-        hi_uint32 ui_Reserved_4             : 2   ; // [31..30]  ±£Áô
+        hi_uint32 ui_sfc_freq_sel           : 2   ; // [1..0] SFCæ¥å£çš„å·¥ä½œé¢‘ç‡é€‰æ‹©
+        hi_uint32 ui_ddr_clk_freq           : 1   ; // [2] åˆå§‹ä¸Šç”µæ—¶ï¼ŒDDRCå·¥ä½œæ—¶é’Ÿé¢‘ç‡é€‰æ‹©
+        hi_uint32 ui_Reserved_0             : 1   ; // [3]  ä¿ç•™
+        hi_uint32 ui_ecs_ddr_freq           : 2   ; // [5..4] A9å’ŒDDRCçš„æ—¶é’Ÿæ¯”ä¾‹å…³ç³»é…ç½®
+        hi_uint32 ui_Reserved_1             : 1   ; // [6]  ä¿ç•™
+        hi_uint32 ui_ddrc_aclk_freq_sel     : 1   ; // [7] DDRCå·¥ä½œæ—¶é’Ÿé¢‘ç‡å’ŒDDRPHYçš„æ—¶é’Ÿæ¯”ä¾‹é€‰æ‹©
+        hi_uint32 ui_Reserved_2             : 2   ; // [9..8]  ä¿ç•™
+        hi_uint32 ui_wdg_rst_time_cfg       : 9   ; // [18..10] çœ‹é—¨ç‹—å¤ä½æ—¶é—´é…ç½®
+        hi_uint32 ui_test_clk_ctrl          : 5   ; // [23..19] æµ‹è¯•æ—¶é’ŸTEST_CLKè¾“å‡ºï¼Œä»¥åŠæ—¶é’Ÿæ£€æµ‹æ¨¡å—æ£€æµ‹æ—¶é’Ÿæºé€‰æ‹©æ§åˆ¶ä¿¡å·
+        hi_uint32 ui_det_clk_en             : 1   ; // [24] æ—¶é’Ÿæ£€æµ‹æ¨¡å—çš„æ£€æµ‹ä½¿èƒ½ä¿¡å·
+        hi_uint32 ui_Reserved_3             : 3   ; // [27..25]  ä¿ç•™
+        hi_uint32 ui_fephy_clk_det_sel      : 2   ; // [29..28] FEPHYçš„å‚è€ƒæ—¶é’Ÿçš„æµ‹è¯•è¾“å‡ºï¼ˆåŒ…æ‹¬TXå’ŒRX)
+        hi_uint32 ui_Reserved_4             : 2   ; // [31..30]  ä¿ç•™
     }st_bits;
 } hi_crg_sc_perctrl4_u;
 

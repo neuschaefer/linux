@@ -3,14 +3,14 @@
 * (C) Huawei Technologies Co., Ltd. < >
 */
 /******************************************************************************
-  ÎÄ¼şÃû³Æ: hi_nand_util.c
-  ¹¦ÄÜÃèÊö: nandÖ±½Ó²Ù×÷½Ó¿Ú£¬Ö§³Ånandcmd/nandutilµÈ
-  °æ±¾ÃèÊö: V1.0
+  æ–‡ä»¶åç§°: hi_nand_util.c
+  åŠŸèƒ½æè¿°: nandç›´æ¥æ“ä½œæ¥å£ï¼Œæ”¯æ’‘nandcmd/nandutilç­‰
+  ç‰ˆæœ¬æè¿°: V1.0
 
-  ´´½¨ÈÕÆÚ: D2013_04_20
+  åˆ›å»ºæ—¥æœŸ: D2013_04_20
 
-  ĞŞ¸Ä¼ÇÂ¼: 
-            Éú³É³õ¸å.
+  ä¿®æ”¹è®°å½•: 
+            ç”Ÿæˆåˆç¨¿.
 ******************************************************************************/
 #include <linux/mtd/mtd.h>
 
@@ -27,14 +27,14 @@ extern "C"{
 
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  nand erase
-  ÊäÈë²ÎÊı:  
+  å‡½æ•°åŠŸèƒ½:  nand erase
+  è¾“å…¥å‚æ•°:  
                              host : nand driver host structure
                              ui_dst_addr : srase start block addrs
                              ui_len : erase len
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:         
-  º¯Êı±¸×¢:  
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:         
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 hi_int32 hi_nand_util_erase(struct hi_nand_host *pst_host, hi_uint32 ui_dst_addr, hi_uint32 ui_len)
 {
@@ -137,13 +137,13 @@ hi_int32 hi_nand_util_erase(struct hi_nand_host *pst_host, hi_uint32 ui_dst_addr
 }
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  nand read & write & read/write whole page entry (do not support read/write oob only!)
-  ÊäÈë²ÎÊı:  
+  å‡½æ•°åŠŸèƒ½:  nand read & write & read/write whole page entry (do not support read/write oob only!)
+  è¾“å…¥å‚æ•°:  
                              host : nand driver host structure
                              pst_nand_ops : nand operation structure
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:         
-  º¯Êı±¸×¢:  
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:         
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 static hi_int32 hi_nand_util_rw(struct hi_nand_host *pst_host, hi_nand_ops *pst_nand_ops)
 {
@@ -291,15 +291,15 @@ static hi_int32 hi_nand_util_rw(struct hi_nand_host *pst_host, hi_nand_ops *pst_
 }
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  nand read (data only!)
-  ÊäÈë²ÎÊı:  
+  å‡½æ•°åŠŸèƒ½:  nand read (data only!)
+  è¾“å…¥å‚æ•°:  
                              host : nand driver host structure
                              puc_dst_buf : the databuffer to put data
                              ui_src_addr : read start page addrs
                              ui_len : read len
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:         
-  º¯Êı±¸×¢:  
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:         
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 hi_int32 hi_nand_util_read(struct hi_nand_host *pst_host, hi_uchar8 *puc_dst_buf, hi_uint32 ui_src_addr, hi_uint32 ui_len)
 {
@@ -316,15 +316,15 @@ hi_int32 hi_nand_util_read(struct hi_nand_host *pst_host, hi_uchar8 *puc_dst_buf
 }
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  nand read one whole page (include data & oob)
-  ÊäÈë²ÎÊı:  
+  å‡½æ•°åŠŸèƒ½:  nand read one whole page (include data & oob)
+  è¾“å…¥å‚æ•°:  
                              host : nand driver host structure
                              puc_dst_buf : the databuffer to put data
                              ui_src_addr : read start page addrs
                              ui_len : read len
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:         
-  º¯Êı±¸×¢:  
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:         
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 hi_int32 hi_nand_util_read_page(struct hi_nand_host *pst_host, hi_uchar8 *puc_dst_buf, hi_uint32 ui_src_addr)
 {
@@ -342,14 +342,14 @@ hi_int32 hi_nand_util_read_page(struct hi_nand_host *pst_host, hi_uchar8 *puc_ds
 }
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  nand write (data only)
-  ÊäÈë²ÎÊı:  
+  å‡½æ•°åŠŸèƒ½:  nand write (data only)
+  è¾“å…¥å‚æ•°:  
                              host : nand driver host structure
                              puc_src_buf : the databuffer to put data
                              ui_dst_addr : write start page addrs
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:         
-  º¯Êı±¸×¢:  
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:         
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 hi_int32 hi_nand_util_write(struct hi_nand_host *pst_host, hi_uchar8 *puc_src_buf, hi_uint32 ui_dst_addr, hi_uint32 ui_len)
 {
@@ -369,14 +369,14 @@ hi_int32 hi_nand_util_write(struct hi_nand_host *pst_host, hi_uchar8 *puc_src_bu
 }
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  nand write one whole page (include data & oob)
-  ÊäÈë²ÎÊı:  
+  å‡½æ•°åŠŸèƒ½:  nand write one whole page (include data & oob)
+  è¾“å…¥å‚æ•°:  
                              host : nand driver host structure
                              puc_src_buf : the databuffer to put data
                              ui_dst_addr : write start page addrs
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:         
-  º¯Êı±¸×¢:  
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:         
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 hi_int32 hi_nand_util_write_page(struct hi_nand_host *pst_host, hi_uchar8 *puc_src_buf, hi_uint32 ui_dst_addr)
 {

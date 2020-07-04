@@ -274,7 +274,7 @@ extern void ip_mc_dec_group(struct in_device *in_dev, __be32 addr);
 extern void ip_mc_inc_group(struct in_device *in_dev, __be32 addr);
 extern void ip_mc_rejoin_groups(struct in_device *in_dev);
 
-/*Start of ATP 2013-1-31 for RFC4604 : SSM模式下只能发type 1/5/6报文*/
+/*Start of ATP 2013-1-31 for RFC4604 : SSM妯″紡涓嬪彧鑳藉彂type 1/5/6鎶ユ枃*/
 #ifdef CONFIG_IGMP_SSM
 extern int ip_mc_add_ssm(__be32 multiaddr);
 extern int ip_mc_del_ssm(__be32 multiaddr);

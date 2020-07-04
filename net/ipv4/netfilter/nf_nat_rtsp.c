@@ -515,7 +515,7 @@ rtsp_mangle_xnataddr(struct sk_buff *skb, struct nf_conn *ct,
         u_int16_t   port;
         uint        numlen;
     
-        /* ĞèÒªÌæ»»µÄÄÚÈİºÍ³¤¶È */
+        /* éœ€è¦æ›¿æ¢çš„å†…å®¹å’Œé•¿åº¦ */
         rbuflen = snprintf(rbuf, 32, "%s:%u", extaddr, dport);
         
         pr_debug("rtsp_mangle_xnat: rbuf=%s rbufalen:%d\n", rbuf, rbuflen);

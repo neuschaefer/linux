@@ -92,27 +92,27 @@ struct mld2_reportpkt {
 struct net_bridge_mld_snooping_entry
 {
     struct list_head 		  list;
-	struct net_bridge_port	  *dev_dst;             /*Ä¿µÄÇÅ¶Ë¿Ú¶ÔÓ¦µÄµØÖ·£¬Èçeth0.**/
-	unsigned char			  grp_mac[ETH_ALEN];  /*×é²¥µØÖ·¶ÔÓ¦µÄMACµØÖ·£¬Èç33:33:xx:xx:xx:xx*/
-	unsigned char			  host_mac[ETH_ALEN];   /*PC»úµÄMACµØÖ·*/
-	unsigned long			  time;                  /*¶¨Ê±Æ÷*/
+	struct net_bridge_port	  *dev_dst;             /*ç›®çš„æ¡¥ç«¯å£å¯¹åº”çš„åœ°å€ï¼Œå¦‚eth0.**/
+	unsigned char			  grp_mac[ETH_ALEN];  /*ç»„æ’­åœ°å€å¯¹åº”çš„MACåœ°å€ï¼Œå¦‚33:33:xx:xx:xx:xx*/
+	unsigned char			  host_mac[ETH_ALEN];   /*PCæœºçš„MACåœ°å€*/
+	unsigned long			  time;                  /*å®šæ—¶å™¨*/
 };
 
 struct net_bridge_mld_snooping
 {
-	struct list_head		mld_list;         /*Á´±íÍ·*/
-	struct timer_list 		mld_timer;        /*¶¨Ê±Æ÷*/
-	int		                mld_snooping_enable;         /*0:±íÊ¾IGMP Snooping¿ªÆô*/
-	spinlock_t		        mld_lock;         /*Á´±íËø*/
-	int		 	            mld_start_timer; /*¶¨Ê±Æ÷ÊÇ·ñ¿ªÆôµÄ±êÖ¾*/
+	struct list_head		mld_list;         /*é“¾è¡¨å¤´*/
+	struct timer_list 		mld_timer;        /*å®šæ—¶å™¨*/
+	int		                mld_snooping_enable;         /*0:è¡¨ç¤ºIGMP Snoopingå¼€å¯*/
+	spinlock_t		        mld_lock;         /*é“¾è¡¨é”*/
+	int		 	            mld_start_timer; /*å®šæ—¶å™¨æ˜¯å¦å¼€å¯çš„æ ‡å¿—*/
 };
 
 extern  void  br_mld_snooping_clear(void);
 extern  int   br_mld_snooping_forward(struct sk_buff *skb, struct net_bridge *br,
                                     const unsigned char *dest,int forward);
-/*start of  ĞŞ¸Äwifi×é²¥crashÎÊÌâ  at  20100929*/
+/*start of  ä¿®æ”¹wifiç»„æ’­crashé—®é¢˜  at  20100929*/
 extern  int br_mld_snooping_del_by_nbp(struct net_bridge_port *dev_port);
-/*end of  ĞŞ¸Äwifi×é²¥crashÎÊÌâ  at  20100929*/
+/*end of  ä¿®æ”¹wifiç»„æ’­crashé—®é¢˜  at  20100929*/
 extern  void  br_mld_snooping_set_enable(int enable);
 extern  void  br_mld_snooping_show(void);
 extern  void  br_mld_snooping_init(void);

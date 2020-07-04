@@ -1391,12 +1391,12 @@ skip_linkparms:
 	}
 
 #ifdef CONFIG_ATP_COMMON
-    /*Start:wan���ַ����ͨ��RAǰ׺����*/
-	/*accept_ra()�˺����������ж�ra�����Ǵ�����br0���ģ����Ǵ�wan�����ģ�ǰ��1302���Ѿ��ж��ˣ��˴�����ͬ�����жϻᵼ��
-	wan���ַ����ͨ��raǰ׺���ɣ��Լ�ǰ׺·��Ҳ��������*/
+    /*Start:wan测地址不能通过RA前缀生成*/
+	/*accept_ra()此函数是用于判断ra报文是从网关br0来的，还是从wan侧来的，前面1302行已经判断了，此处在做同样的判断会导致
+	wan侧地址不能通过ra前缀生成，以及前缀路由也不能生成*/
 	if (accept_ra(in6_dev))
 		goto out;
-	/*End:wan���ַ����ͨ��RAǰ׺����*/
+	/*End:wan测地址不能通过RA前缀生成*/
 #else
 	if (!accept_ra(in6_dev))
 		goto out;

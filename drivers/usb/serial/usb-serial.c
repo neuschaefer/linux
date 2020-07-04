@@ -145,19 +145,19 @@ static struct usb_serial *get_free_serial_for_QHB(struct usb_serial *serial,
 
 	dbg("%s %d", __func__, num_ports);
 
-    if (0 == strcmp(serial->type->driver.name,"option1"))  //·ÖÅättyUSB0-ttyUSB7
+    if (0 == strcmp(serial->type->driver.name,"option1"))  //åˆ†é…ttyUSB0-ttyUSB7
     {
         istartMinorNum = 0;
         iendMinorIdx =  8;
         printk("This option1 GSM device\n");
     }
-    else if (0 == strcmp(serial->type->driver.name,"xr_usb_serial"))   //·ÖÅättyUSB8-ttyUSB9
+    else if (0 == strcmp(serial->type->driver.name,"xr_usb_serial"))   //åˆ†é…ttyUSB8-ttyUSB9
     {
         istartMinorNum = 8; 
         iendMinorIdx = 10; 
         printk("This xr_usb_serial device\n");
     }
-    else //·ÖÅättyUSB10--
+    else //åˆ†é…ttyUSB10--
     {
         istartMinorNum = 10; 
         iendMinorIdx = SERIAL_TTY_MINORS;

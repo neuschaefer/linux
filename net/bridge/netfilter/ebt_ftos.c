@@ -52,12 +52,12 @@ Boston, MA 02111-1307, USA.
 #define PPP_TYPE_IPV4   0x0021  /* IPv4 in PPP */
 #define PPP_TYPE_IPV6   0x0057  /* IPv6 in PPP */
 
-/* START OF Add:   FOR “∆÷≤BCM Eth…œ––µƒQoS */
+/* START OF Add:   FOR ÁßªÊ§çBCM Eth‰∏äË°åÁöÑQoS */
 #ifdef CONFIG_IP_PREC_TOS_REMARK
 /* start IP precedence and TOS remark  */
 #define QOS_IPP_MARK_ZERO   0x100 
 #define QOS_TOS_MARK_ZERO   0x200  
-#define QOS_DSCP_MARK       0x1 /* «¯∑÷ebtables ftos  «dscpªπ «tosªÚ’ﬂipp */
+#define QOS_DSCP_MARK       0x1 /* Âå∫ÂàÜebtables ftos ÊòØdscpËøòÊòØtosÊàñËÄÖipp */
 
 #define IPTOS_IPP_MASK		0xE0
 /* end IP precedence and TOS remark */
@@ -66,15 +66,15 @@ Boston, MA 02111-1307, USA.
 #endif
 /* END OF Add  */
 
-/*Start   2.4G …Ë÷√Œ™20M WMMπ¶ƒ‹≤ª…˙–ß */
+/*Start   2.4G ËÆæÁΩÆ‰∏∫20M WMMÂäüËÉΩ‰∏çÁîüÊïà */
 #if defined(CONFIG_ARCH_SD56XX) 
 #define SKB_MARK_DSCP_REMARK_ENABLE    0x8 
 #endif
-/*End   2.4G …Ë÷√Œ™20M WMMπ¶ƒ‹≤ª…˙–ß */
+/*End   2.4G ËÆæÁΩÆ‰∏∫20M WMMÂäüËÉΩ‰∏çÁîüÊïà */
 
-/* START OF Add:  FOR “∆÷≤BCM Eth…œ––µƒQoS≈‰÷√√¸¡Ó */
+/* START OF Add:  FOR ÁßªÊ§çBCM Eth‰∏äË°åÁöÑQoSÈÖçÁΩÆÂëΩ‰ª§ */
 #ifdef CONFIG_IP_PREC_TOS_REMARK
-/* start of protocol mark precedence ªÚ’ﬂtos◊÷∂Œ–Ë“™±£¡Ù‘≠÷µA36D02507 
+/* start of protocol mark precedence ÊàñËÄÖtosÂ≠óÊÆµÈúÄË¶Å‰øùÁïôÂéüÂÄºA36D02507 
 iph->tos = ftosinfo->ftos;
 ** NOTE:          tos field
 **                bit 7 ~ bit 5 = precedence (0 = normal, 7 = extremely high)
@@ -139,7 +139,7 @@ void ebt_get_DSCP_ftos(struct iphdr *iph, const struct ebt_ftos_t_info *ftosinfo
     }
 }
     /* end IP precedence and TOS remark  */
-	/* end of protocol mark precedence ªÚ’ﬂtos◊÷∂Œ–Ë“™±£¡Ù‘≠÷µA36D02507 */
+	/* end of protocol mark precedence ÊàñËÄÖtosÂ≠óÊÆµÈúÄË¶Å‰øùÁïôÂéüÂÄºA36D02507 */
 #endif
 /* END OF Add */
 
@@ -185,7 +185,7 @@ static unsigned int ebt_ftos_tg(struct sk_buff *skb, const struct xt_action_para
 	if ((ftosinfo->ftos_set & FTOS_SETFTOS) && (iph->tos != ftosinfo->ftos)) {
                 //printk("ebt_target_ftos:FTOS_SETFTOS .....\n");
 		diffs[0] = htons(iph->tos) ^ 0xFFFF;
-/* START OF Add:  2011-05-21 FOR “∆÷≤BCM Eth…œ––µƒQoS */
+/* START OF Add:  2011-05-21 FOR ÁßªÊ§çBCM Eth‰∏äË°åÁöÑQoS */
 #ifdef CONFIG_IP_PREC_TOS_REMARK        
         ebt_get_DSCP_ftos(iph, ftosinfo);
 #else

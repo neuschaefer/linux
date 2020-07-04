@@ -4,13 +4,13 @@
 */
 /******************************************************************************
 
-                  ��Ȩ���� (C), 2009-2019, ��˼�뵼�����޹�˾
+                  版权所有 (C), 2009-2019, 海思半导体有限公司
 
  ******************************************************************************
-  �� �� ��   : hi_logdef.h
-  �� �� ��   : ����
-  ��������   : D2011_07_28
-  ����޸�   :
+  文 件 名   : hi_logdef.h
+  版 本 号   : 初稿
+  生成日期   : D2011_07_28
+  最近修改   :
 
 ******************************************************************************/
 #ifndef __HI_LOGDEF_H__
@@ -45,25 +45,25 @@ typedef enum  {
     HI_LOGTYPE_PRINTMEM_E,
 }hi_logtype_e;
 
-/*���˸�����,��ΪDEBUGΪUCHAR8����*/
+/*最多八个类型,因为DEBUG为UCHAR8类型*/
 typedef enum  {
-    HI_LOG_LEVEL_DBG_E = 0, /* ���� */
-    HI_LOG_LEVEL_ALM_E,     /* �澯 */
-    HI_LOG_LEVEL_WRN_E,     /* ��ʾ */
-    HI_LOG_LEVEL_INFO_E,    /* ��Ϣ */
-    HI_LOG_LEVEL_MSG_E,     /* ��Ϣ */
-    HI_LOG_LEVEL_ERR_E,     /* ���� */
-    HI_LOG_LEVEL_EVT_E,     /* �¼� */
-    HI_LOG_LEVEL_RESV_E,    /* �ڴ��ӡ */
+    HI_LOG_LEVEL_DBG_E = 0, /* 调试 */
+    HI_LOG_LEVEL_ALM_E,     /* 告警 */
+    HI_LOG_LEVEL_WRN_E,     /* 提示 */
+    HI_LOG_LEVEL_INFO_E,    /* 信息 */
+    HI_LOG_LEVEL_MSG_E,     /* 消息 */
+    HI_LOG_LEVEL_ERR_E,     /* 错误 */
+    HI_LOG_LEVEL_EVT_E,     /* 事件 */
+    HI_LOG_LEVEL_RESV_E,    /* 内存打印 */
 }hi_dbglevel_e; 
 
 typedef struct  {
     hi_uint32 ui_srcmodule;
-    hi_uint32 ui_maskdbgflag;   /*bit0:31,ÿ�����ض�Ӧhi_dbglevel_eö��*/
-    hi_uchar8 uc_systraceflag;  /* 0x0: �رղ����; 0x1: ���������Ϣ; 0x2: ֻ���ʧ����Ϣ; 
-                                   0x3: ֻ����ɹ���Ϣ;0x4: �������÷���ֵ��ȷƥ��*/
+    hi_uint32 ui_maskdbgflag;   /*bit0:31,每个比特对应hi_dbglevel_e枚举*/
+    hi_uchar8 uc_systraceflag;  /* 0x0: 关闭不输出; 0x1: 输出所有信息; 0x2: 只输出失败信息; 
+                                   0x3: 只输出成功信息;0x4: 按照配置返回值精确匹配*/
     hi_uchar8 uc_printflag;
-    hi_uchar8 uc_flag;          /*bit0:1Զ�̴�ӡ bit0:0���ش�ӡ*/
+    hi_uchar8 uc_flag;          /*bit0:1远程打印 bit0:0本地打印*/
     hi_uchar8 uc_resv;
     hi_uint32 ui_retcode;
 }hi_log_cfg_s;

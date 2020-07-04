@@ -241,7 +241,7 @@ unsigned int ebt_do_table (unsigned int hook, struct sk_buff *skb,
 	p8021q = skb->data;
 	if (nentries > 0)
 	{
-        // 协议类型默认为IP
+        // 鍗忚绫诲瀷榛樿涓篒P
         memcpy(&eth8021q, eth_hdr(skb), sizeof(struct ethhdr));
         if (skb->protocol == __constant_htons(ETH_P_8021Q))
         {
@@ -265,7 +265,7 @@ unsigned int ebt_do_table (unsigned int hook, struct sk_buff *skb,
         }
         else 
         {
-            // 缺省的协议类型为IP
+            // 缂虹渷鐨勫崗璁被鍨嬩负IP
         }
         /* End of macfilter support QinQ by Huawei 20060714 */
 	}

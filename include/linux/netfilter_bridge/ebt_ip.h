@@ -43,7 +43,7 @@
 #define EBT_IP_8021Q    0x80
 #endif
 
-/*��ͨDSCP��δʹ�ã��ȶ���������벻��*/
+/*博通DSCP暂未使用，先定义宏避免编译不过*/
 #if defined(CONFIG_BCM_KF_NETFILTER) || !defined(CONFIG_BCM_IN_KERNEL)
 #define EBT_IP_DSCP  0x0400
 #endif

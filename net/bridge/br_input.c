@@ -87,7 +87,7 @@ static int br_pass_frame_up(struct sk_buff *skb)
 	brstats->rx_bytes += skb->len;
 	u64_stats_update_end(&brstats->syncp);
 
-    /*ipcheck½ÓÊÕarpµÄlan indev*/
+    /*ipcheckæ¥æ”¶arpçš„lan indev*/
 	ATP_HOOK_VOID(ATP_BR_LOCALIN_BF_CHG_DEV, skb, NULL, NULL);
 
 	indev = skb->dev;
@@ -229,14 +229,14 @@ int br_handle_frame_finish(struct sk_buff *skb)
 	br_fdb_update(br, p, eth_hdr(skb)->h_source);
 #endif
 
-	/*START MODIFY:Huawei 2012-11-20 FOR snooping¿ª¹ØÊ§Ğ§*/
-	/*ATP Ê¹ÓÃ×Ô¼ºµÄsnooping´¦Àí*/
+	/*START MODIFY:Huawei 2012-11-20 FOR snoopingå¼€å…³å¤±æ•ˆ*/
+	/*ATP ä½¿ç”¨è‡ªå·±çš„snoopingå¤„ç†*/
 #ifndef CONFIG_SUPPORT_ATP
 	if (!is_broadcast_ether_addr(dest) && is_multicast_ether_addr(dest) &&
 	    br_multicast_rcv(br, p, skb))
 		goto drop;
 #endif
-	/*END MODIFY:Huawei 2012-11-20 FOR snooping¿ª¹ØÊ§Ğ§*/
+	/*END MODIFY:Huawei 2012-11-20 FOR snoopingå¼€å…³å¤±æ•ˆ*/
 #if defined(CONFIG_BCM_KF_WL)
 	if ((p->state == BR_STATE_LEARNING) && (skb->protocol != htons(0x886c) /*ETHER_TYPE_BRCM*/))
 #else
@@ -286,14 +286,14 @@ int br_handle_frame_finish(struct sk_buff *skb)
 #endif
 	else if (is_multicast_ether_addr(dest)) {
 #ifdef CONFIG_SUPPORT_ATP
-		// ÏÈÄ¬ÈÏ¿ÉÒÔÔÊĞíÍø¹Ø½ÓÊÕ²¢×ª·¢¸øÆäËû½Ó¿Ú
+		// å…ˆé»˜è®¤å¯ä»¥å…è®¸ç½‘å…³æ¥æ”¶å¹¶è½¬å‘ç»™å…¶ä»–æ¥å£
 		skb2 = skb;
 #if defined(CONFIG_MLD_SNOOPING)
 		if ((0x33 == dest[0]) && (0x33 == dest[1]))
         {
 			if ((NULL != skb) && (br_mld_snooping_forward(skb,br,dest, 1)))
 			{
-				// Èç¹û±»snooping´¦ÀíÁË£¬ÄÇÃ´ÕâÖÖÇé¿öÏÂ±íÊ¾µÄÊÇ±¨ÎÄ²»ĞèÒª±»×ª·¢ÁË 
+				// å¦‚æœè¢«snoopingå¤„ç†äº†ï¼Œé‚£ä¹ˆè¿™ç§æƒ…å†µä¸‹è¡¨ç¤ºçš„æ˜¯æŠ¥æ–‡ä¸éœ€è¦è¢«è½¬å‘äº† 
 				skb = NULL;
 			}
 		}
@@ -303,7 +303,7 @@ int br_handle_frame_finish(struct sk_buff *skb)
         {
             if ((NULL != skb) && (br_igmp_snooping_forward(skb, br, (unsigned char *)dest, 1)))
             {
-                // Èç¹û±»snooping´¦ÀíÁË£¬ÄÇÃ´ÕâÖÖÇé¿öÏÂ±íÊ¾µÄÊÇ±¨ÎÄ²»ĞèÒª±»×ª·¢ÁË 
+                // å¦‚æœè¢«snoopingå¤„ç†äº†ï¼Œé‚£ä¹ˆè¿™ç§æƒ…å†µä¸‹è¡¨ç¤ºçš„æ˜¯æŠ¥æ–‡ä¸éœ€è¦è¢«è½¬å‘äº† 
                 skb = NULL;
             }
 		}

@@ -265,7 +265,7 @@ struct sadb_x_kmaddress {
 #define SADB_X_SPDDELETE2	22
 #define SADB_X_NAT_T_NEW_MAPPING	23
 #define SADB_X_MIGRATE		24
-#define SADB_X_SAIDLE_TIMEOUT   25          /* 事件: 内核向用户态报告该SA idle timeout */
+#define SADB_X_SAIDLE_TIMEOUT   25          /* 浜嬩欢: 鍐呮牳鍚戠敤鎴锋�佹姤鍛婅SA idle timeout */
 #define SADB_MAX		        25
 
 /* Security Association flags */

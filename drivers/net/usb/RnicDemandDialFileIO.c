@@ -3,26 +3,26 @@
 * (C) Huawei Technologies Co., Ltd. < >
 */
 /******************************************************************************
-  ÎÄ ¼ş Ãû   : RnicDemandDialFileIO.h
-  ¹¦ÄÜÃèÊö   : 3G°´Ğè²¦ºÅÎÄ¼ş²Ù×÷ÊµÏÖ
+  æ–‡ ä»¶ å   : RnicDemandDialFileIO.h
+  åŠŸèƒ½æè¿°   : 3GæŒ‰éœ€æ‹¨å·æ–‡ä»¶æ“ä½œå®ç°
 
 ******************************************************************************/
 
 
 /*****************************************************************************
-1 Í·ÎÄ¼ş°üº¬
+1 å¤´æ–‡ä»¶åŒ…å«
 *****************************************************************************/
 #include "RnicDemandDialFileIO.h"
 #include "msg/kcmsmonitormsgtypes.h"
 
 
-/*¼ÇÂ¼WLANÉèÖÃÃû*/
+/*è®°å½•WLANè®¾ç½®å*/
 char g_wlan_dev_name[IFNAMSIZ] = {0};
-/*¼ÇÂ¼eth0ÊÇ·ñÎªlanÉè±¸*/
+/*è®°å½•eth0æ˜¯å¦ä¸ºlanè®¾å¤‡*/
 char g_eth_is_lan[IFNAMSIZ] = {0};
 
 RNIC_DIAL_MODE_STRU  g_DialMode;
-/*Á÷Á¿¼à²â¶¨Ê±Æ÷*/
+/*æµé‡ç›‘æµ‹å®šæ—¶å™¨*/
 RNIC_FLUX_TIMER  g_flux_timer;
 
 static const struct file_operations g_stOnDemandFileOps       =
@@ -160,17 +160,17 @@ void rnic_flux_timer_delete(void)
 
 
 /*****************************************************************************
-º¯ Êı Ãû  : RNIC_TransferStringToInt
-¹¦ÄÜÃèÊö  : ½«appÊäÈëµÄ×Ö´®×ª»»ÎªÊı×Ö
-ÊäÈë²ÎÊı  : VOS_CHAR *pcString
-Êä³ö²ÎÊı  : ÎŞ
-·µ »Ø Öµ  : VOS_UINT32
-µ÷ÓÃº¯Êı  :
-±»µ÷º¯Êı  :
+å‡½ æ•° å  : RNIC_TransferStringToInt
+åŠŸèƒ½æè¿°  : å°†appè¾“å…¥çš„å­—ä¸²è½¬æ¢ä¸ºæ•°å­—
+è¾“å…¥å‚æ•°  : VOS_CHAR *pcString
+è¾“å‡ºå‚æ•°  : æ— 
+è¿” å› å€¼  : VOS_UINT32
+è°ƒç”¨å‡½æ•°  :
+è¢«è°ƒå‡½æ•°  :
 
- ĞŞ¸ÄÀúÊ·      :
- 1.ÈÕ    ÆÚ   : 2012Äê2ÔÂ10ÈÕ
- ĞŞ¸ÄÄÚÈİ   : ĞÂÉú³Éº¯Êı
+ ä¿®æ”¹å†å²      :
+ 1.æ—¥    æœŸ   : 2012å¹´2æœˆ10æ—¥
+ ä¿®æ”¹å†…å®¹   : æ–°ç”Ÿæˆå‡½æ•°
  
 *****************************************************************************/
 VOS_UINT32 RNIC_TransferStringToInt(VOS_CHAR *pcString)
@@ -196,7 +196,7 @@ VOS_UINT32 RNIC_TransferStringToInt(VOS_CHAR *pcString)
 }
 
 
-/*×Ö·û´®ÓëÕûÊı×ª»»*/
+/*å­—ç¬¦ä¸²ä¸æ•´æ•°è½¬æ¢*/
 typedef unsigned int dsat_num_item_type;
 typedef  unsigned char      byte;  
 typedef enum
@@ -209,15 +209,15 @@ typedef enum
 #define  UPCASE( c ) ( ((c) >= 'a' && (c) <= 'z') ? ((c) - 0x20) : (c) )
 #define DEC 10
 /*****************************************************************************
- º¯ Êı Ãû  : dsatutil_atoi
- ¹¦ÄÜÃèÊö  : ÊµÏÖ×Ö·û´®°²½øÖÆ×ª»»ÎªÕûÊı
- ÊäÈë²ÎÊı  : val_arg_ptr ----- Ö¸ÕëÓÃÓÚ´æ´¢×ª»»½á¹û
-             s----- Ô­Ê¼µÄ×Ö·û´®
-             r------½øÖÆ
- Êä³ö²ÎÊı  : ÎŞ
- ·µ »Ø Öµ  : ³É¹¦»òÊ§°Ü
+ å‡½ æ•° å  : dsatutil_atoi
+ åŠŸèƒ½æè¿°  : å®ç°å­—ç¬¦ä¸²å®‰è¿›åˆ¶è½¬æ¢ä¸ºæ•´æ•°
+ è¾“å…¥å‚æ•°  : val_arg_ptr ----- æŒ‡é’ˆç”¨äºå­˜å‚¨è½¬æ¢ç»“æœ
+             s----- åŸå§‹çš„å­—ç¬¦ä¸²
+             r------è¿›åˆ¶
+ è¾“å‡ºå‚æ•°  : æ— 
+ è¿” å› å€¼  : æˆåŠŸæˆ–å¤±è´¥
 
-    ĞŞ¸ÄÄÚÈİ   : ĞÂÉú³Éº¯Êı
+    ä¿®æ”¹å†…å®¹   : æ–°ç”Ÿæˆå‡½æ•°
 
 *****************************************************************************/
 atoi_enum_type dsatutil_atoi
@@ -276,18 +276,18 @@ atoi_enum_type dsatutil_atoi
 }
 
 /*****************************************************************************
-º¯ Êı Ãû  : RNIC_ReadOnDemandFile
-¹¦ÄÜÃèÊö  : OnDemandĞéÄâÎÄ¼ş¶ÁÊµÏÖ
-ÊäÈë²ÎÊı  : file --- ÎÄ¼ş¾ä±ú
-buf  --- ÓÃ»§¿Õ¼ä
-ppos --- ÎÄ¼şÆ«ÒÆ£¬²ÎÊıÎ´Ê¹ÓÃ
-Êä³ö²ÎÊı  : ÎŞ
-·µ »Ø Öµ  : ³É¹¦»òÊ§°Ü
+å‡½ æ•° å  : RNIC_ReadOnDemandFile
+åŠŸèƒ½æè¿°  : OnDemandè™šæ‹Ÿæ–‡ä»¶è¯»å®ç°
+è¾“å…¥å‚æ•°  : file --- æ–‡ä»¶å¥æŸ„
+buf  --- ç”¨æˆ·ç©ºé—´
+ppos --- æ–‡ä»¶åç§»ï¼Œå‚æ•°æœªä½¿ç”¨
+è¾“å‡ºå‚æ•°  : æ— 
+è¿” å› å€¼  : æˆåŠŸæˆ–å¤±è´¥
 
- ĞŞ¸ÄÀúÊ·      :
- 1.ÈÕ    ÆÚ   : 2012Äê01ÔÂ30ÈÕ
- ×÷    Õß   : Huawei
- ĞŞ¸ÄÄÚÈİ   : ĞÂÉú³Éº¯Êı
+ ä¿®æ”¹å†å²      :
+ 1.æ—¥    æœŸ   : 2012å¹´01æœˆ30æ—¥
+ ä½œ    è€…   : Huawei
+ ä¿®æ”¹å†…å®¹   : æ–°ç”Ÿæˆå‡½æ•°
  
 *****************************************************************************/
 ssize_t RNIC_ReadOnDemandFile(struct file *file, char __user *buf, size_t len, loff_t *ppos)
@@ -306,7 +306,7 @@ ssize_t RNIC_ReadOnDemandFile(struct file *file, char __user *buf, size_t len, l
 
     len = PS_MIN(len, strlen(acModeTemp));
 
-    /*¿½±´ÄÚºË¿Õ¼äÊı¾İµ½ÓÃ»§¿Õ¼äÉÏÃæ*/
+    /*æ‹·è´å†…æ ¸ç©ºé—´æ•°æ®åˆ°ç”¨æˆ·ç©ºé—´ä¸Šé¢*/
     lRlst = copy_to_user(buf,(VOS_VOID *)acModeTemp, len);
 
     if (lRlst < 0)
@@ -321,19 +321,19 @@ ssize_t RNIC_ReadOnDemandFile(struct file *file, char __user *buf, size_t len, l
 }
 
 /*****************************************************************************
-º¯ Êı Ãû  : RNIC_WriteOnDemandFile
-¹¦ÄÜÃèÊö  : OnDemandĞéÄâÎÄ¼şĞ´ÊµÏÖ
-ÊäÈë²ÎÊı  : file ----- ÎÄ¼ş¾ä±ú
-buf  ----- ÓÃ»§¿Õ¼äÊı¾İ
-lLength -- ÓÃ»§Êı¾İ³¤¶È
-ppos - ----ÎÄ¼şÆ«ÒÆ£¬²ÎÊıÎ´Ê¹ÓÃ
-Êä³ö²ÎÊı  : ÎŞ
-·µ »Ø Öµ  : ³É¹¦»òÊ§°Ü
+å‡½ æ•° å  : RNIC_WriteOnDemandFile
+åŠŸèƒ½æè¿°  : OnDemandè™šæ‹Ÿæ–‡ä»¶å†™å®ç°
+è¾“å…¥å‚æ•°  : file ----- æ–‡ä»¶å¥æŸ„
+buf  ----- ç”¨æˆ·ç©ºé—´æ•°æ®
+lLength -- ç”¨æˆ·æ•°æ®é•¿åº¦
+ppos - ----æ–‡ä»¶åç§»ï¼Œå‚æ•°æœªä½¿ç”¨
+è¾“å‡ºå‚æ•°  : æ— 
+è¿” å› å€¼  : æˆåŠŸæˆ–å¤±è´¥
 
- ĞŞ¸ÄÀúÊ·      :
- 1.ÈÕ    ÆÚ   : 2012Äê01ÔÂ30ÈÕ
- ×÷    Õß   : Huawei
- ĞŞ¸ÄÄÚÈİ   : ĞÂÉú³Éº¯Êı
+ ä¿®æ”¹å†å²      :
+ 1.æ—¥    æœŸ   : 2012å¹´01æœˆ30æ—¥
+ ä½œ    è€…   : Huawei
+ ä¿®æ”¹å†…å®¹   : æ–°ç”Ÿæˆå‡½æ•°
  
 *****************************************************************************/
 ssize_t RNIC_WriteOnDemandFile(struct file *file, const char __user *buf, size_t len,loff_t *ppos)
@@ -349,7 +349,7 @@ ssize_t RNIC_WriteOnDemandFile(struct file *file, const char __user *buf, size_t
         return -ENOSPC;
     }
 
-    /*¿½±´ÓÃ»§¿Õ¼äÊı¾İµ½ÄÚºË¿Õ¼äÉÏÃæ*/
+    /*æ‹·è´ç”¨æˆ·ç©ºé—´æ•°æ®åˆ°å†…æ ¸ç©ºé—´ä¸Šé¢*/
     lRlst = copy_from_user((VOS_VOID *)acModeTemp, (VOS_VOID *)buf, len);
 
     if (lRlst > 0)
@@ -418,16 +418,16 @@ ssize_t RNIC_WriteOnDemandFile(struct file *file, const char __user *buf, size_t
 }
 
 /*****************************************************************************
-º¯ Êı Ãû  : RNIC_InitOnDemandFile
-¹¦ÄÜÃèÊö  : OnDemandĞéÄâÎÄ¼ş³õÊ¼»¯
-ÊäÈë²ÎÊı  : proc_dir_entry *pstParentFileDirEntry -- ¸¸Ä¿Â¼µÄÈë¿Ú
-Êä³ö²ÎÊı  : ÎŞ
-·µ »Ø Öµ  : ³õÊ¼»¯½á¹û
+å‡½ æ•° å  : RNIC_InitOnDemandFile
+åŠŸèƒ½æè¿°  : OnDemandè™šæ‹Ÿæ–‡ä»¶åˆå§‹åŒ–
+è¾“å…¥å‚æ•°  : proc_dir_entry *pstParentFileDirEntry -- çˆ¶ç›®å½•çš„å…¥å£
+è¾“å‡ºå‚æ•°  : æ— 
+è¿” å› å€¼  : åˆå§‹åŒ–ç»“æœ
 
- ĞŞ¸ÄÀúÊ·      :
- 1.ÈÕ    ÆÚ   : 2012Äê01ÔÂ30ÈÕ
- ×÷    Õß   : Huawei
- ĞŞ¸ÄÄÚÈİ   : ĞÂÉú³Éº¯Êı
+ ä¿®æ”¹å†å²      :
+ 1.æ—¥    æœŸ   : 2012å¹´01æœˆ30æ—¥
+ ä½œ    è€…   : Huawei
+ ä¿®æ”¹å†…å®¹   : æ–°ç”Ÿæˆå‡½æ•°
  
 *****************************************************************************/
 VOS_UINT32 RNIC_InitOnDemandFile(struct proc_dir_entry *pstParentFileDirEntry)
@@ -436,7 +436,7 @@ VOS_UINT32 RNIC_InitOnDemandFile(struct proc_dir_entry *pstParentFileDirEntry)
 
     if (VOS_NULL_PTR == pstParentFileDirEntry)
     {
-        /*´´½¨OnDemandĞéÄâÎÄ¼ş*/
+        /*åˆ›å»ºOnDemandè™šæ‹Ÿæ–‡ä»¶*/
         pstOnDemandEntry = proc_create("dial/ondemand",
                                                           RNIC_VFILE_CRT_LEVEL,
                                                           pstParentFileDirEntry,
@@ -450,7 +450,7 @@ VOS_UINT32 RNIC_InitOnDemandFile(struct proc_dir_entry *pstParentFileDirEntry)
     }
     else
     {
-        /*´´½¨OnDemandĞéÄâÎÄ¼ş*/
+        /*åˆ›å»ºOnDemandè™šæ‹Ÿæ–‡ä»¶*/
         pstOnDemandEntry = proc_create("ondemand",
                                                           RNIC_VFILE_CRT_LEVEL,
                                                           pstParentFileDirEntry,
@@ -467,18 +467,18 @@ VOS_UINT32 RNIC_InitOnDemandFile(struct proc_dir_entry *pstParentFileDirEntry)
 }
 
 /*****************************************************************************
-º¯ Êı Ãû  : RNIC_ReadIdleTimerOutFile
-¹¦ÄÜÃèÊö  : ideltimeroutĞéÄâÎÄ¼ş¶ÁÊµÏÖ
-ÊäÈë²ÎÊı  : file --- ÎÄ¼ş¾ä±ú
-buf  --- ÓÃ»§¿Õ¼ä
-ppos --- ÎÄ¼şÆ«ÒÆ£¬²ÎÊıÎ´Ê¹ÓÃ
-Êä³ö²ÎÊı  : ÎŞ
-·µ »Ø Öµ  : ³É¹¦»òÊ§°Ü
+å‡½ æ•° å  : RNIC_ReadIdleTimerOutFile
+åŠŸèƒ½æè¿°  : ideltimeroutè™šæ‹Ÿæ–‡ä»¶è¯»å®ç°
+è¾“å…¥å‚æ•°  : file --- æ–‡ä»¶å¥æŸ„
+buf  --- ç”¨æˆ·ç©ºé—´
+ppos --- æ–‡ä»¶åç§»ï¼Œå‚æ•°æœªä½¿ç”¨
+è¾“å‡ºå‚æ•°  : æ— 
+è¿” å› å€¼  : æˆåŠŸæˆ–å¤±è´¥
 
- ĞŞ¸ÄÀúÊ·      :
- 1.ÈÕ    ÆÚ   : 2012Äê01ÔÂ30ÈÕ
- ×÷    Õß   : Huawei
- ĞŞ¸ÄÄÚÈİ   : ĞÂÉú³Éº¯Êı
+ ä¿®æ”¹å†å²      :
+ 1.æ—¥    æœŸ   : 2012å¹´01æœˆ30æ—¥
+ ä½œ    è€…   : Huawei
+ ä¿®æ”¹å†…å®¹   : æ–°ç”Ÿæˆå‡½æ•°
  
 *****************************************************************************/
 ssize_t RNIC_ReadIdleTimerOutFile(struct file *file, char __user *buf, size_t len, loff_t *ppos)
@@ -498,7 +498,7 @@ ssize_t RNIC_ReadIdleTimerOutFile(struct file *file, char __user *buf, size_t le
 
     len = PS_MIN(len, strlen(acModeTemp));
 
-    /*¿½±´ÄÚºË¿Õ¼äÊı¾İµ½ÓÃ»§¿Õ¼äÉÏÃæ*/
+    /*æ‹·è´å†…æ ¸ç©ºé—´æ•°æ®åˆ°ç”¨æˆ·ç©ºé—´ä¸Šé¢*/
     lRlst = copy_to_user(buf,(VOS_VOID *)acModeTemp, len);
 
     if (lRlst < 0)
@@ -514,19 +514,19 @@ ssize_t RNIC_ReadIdleTimerOutFile(struct file *file, char __user *buf, size_t le
 
 
 /*****************************************************************************
-º¯ Êı Ãû  : RNIC_WriteIdleTimerOutFile
-¹¦ÄÜÃèÊö  : idel_timeroutĞéÄâÎÄ¼şĞ´ÊµÏÖ
-ÊäÈë²ÎÊı  : file ----- ÎÄ¼ş¾ä±ú
-buf  ----- ÓÃ»§¿Õ¼äÊı¾İ
-lLength -- ÓÃ»§Êı¾İ³¤¶È
-ppos - ----ÎÄ¼şÆ«ÒÆ£¬²ÎÊıÎ´Ê¹ÓÃ
-Êä³ö²ÎÊı  : ÎŞ
-·µ »Ø Öµ  : ³É¹¦»òÊ§°Ü
+å‡½ æ•° å  : RNIC_WriteIdleTimerOutFile
+åŠŸèƒ½æè¿°  : idel_timeroutè™šæ‹Ÿæ–‡ä»¶å†™å®ç°
+è¾“å…¥å‚æ•°  : file ----- æ–‡ä»¶å¥æŸ„
+buf  ----- ç”¨æˆ·ç©ºé—´æ•°æ®
+lLength -- ç”¨æˆ·æ•°æ®é•¿åº¦
+ppos - ----æ–‡ä»¶åç§»ï¼Œå‚æ•°æœªä½¿ç”¨
+è¾“å‡ºå‚æ•°  : æ— 
+è¿” å› å€¼  : æˆåŠŸæˆ–å¤±è´¥
 
- ĞŞ¸ÄÀúÊ·      :
- 1.ÈÕ    ÆÚ   : 2012Äê01ÔÂ30ÈÕ
- ×÷    Õß   : Huawei
- ĞŞ¸ÄÄÚÈİ   : ĞÂÉú³Éº¯Êı
+ ä¿®æ”¹å†å²      :
+ 1.æ—¥    æœŸ   : 2012å¹´01æœˆ30æ—¥
+ ä½œ    è€…   : Huawei
+ ä¿®æ”¹å†…å®¹   : æ–°ç”Ÿæˆå‡½æ•°
  
 *****************************************************************************/
 ssize_t RNIC_WriteIdleTimerOutFile(struct file *file, const char __user *buf, size_t len, loff_t *ppos)
@@ -544,7 +544,7 @@ ssize_t RNIC_WriteIdleTimerOutFile(struct file *file, const char __user *buf, si
         return -ENOSPC;
     }
 
-    /*¿½±´ÓÃ»§¿Õ¼äÊı¾İµ½ÄÚºË¿Õ¼äÉÏÃæ*/
+    /*æ‹·è´ç”¨æˆ·ç©ºé—´æ•°æ®åˆ°å†…æ ¸ç©ºé—´ä¸Šé¢*/
     lRlst = copy_from_user((VOS_VOID *)acModeTemp, (VOS_VOID *)buf, len);
 
     if (lRlst > 0)
@@ -569,16 +569,16 @@ ssize_t RNIC_WriteIdleTimerOutFile(struct file *file, const char __user *buf, si
 }
 
 /*****************************************************************************
-º¯ Êı Ãû  : RNIC_InitIdleTimerOutFile
-¹¦ÄÜÃèÊö  : ideltimeroutĞéÄâÎÄ¼ş³õÊ¼»¯
-ÊäÈë²ÎÊı  : proc_dir_entry *pstParentFileDirEntry -- ¸¸Ä¿Â¼µÄÈë¿Ú
-Êä³ö²ÎÊı  : ÎŞ
-·µ »Ø Öµ  : ³õÊ¼»¯½á¹û
+å‡½ æ•° å  : RNIC_InitIdleTimerOutFile
+åŠŸèƒ½æè¿°  : ideltimeroutè™šæ‹Ÿæ–‡ä»¶åˆå§‹åŒ–
+è¾“å…¥å‚æ•°  : proc_dir_entry *pstParentFileDirEntry -- çˆ¶ç›®å½•çš„å…¥å£
+è¾“å‡ºå‚æ•°  : æ— 
+è¿” å› å€¼  : åˆå§‹åŒ–ç»“æœ
 
- ĞŞ¸ÄÀúÊ·      :
- 1.ÈÕ    ÆÚ   : 2012Äê01ÔÂ30ÈÕ
- ×÷    Õß   : Huawei
- ĞŞ¸ÄÄÚÈİ   : ĞÂÉú³Éº¯Êı
+ ä¿®æ”¹å†å²      :
+ 1.æ—¥    æœŸ   : 2012å¹´01æœˆ30æ—¥
+ ä½œ    è€…   : Huawei
+ ä¿®æ”¹å†…å®¹   : æ–°ç”Ÿæˆå‡½æ•°
  
 *****************************************************************************/
 VOS_UINT32 RNIC_InitIdleTimerOutFile(struct proc_dir_entry *pstParentFileDirEntry)
@@ -587,7 +587,7 @@ VOS_UINT32 RNIC_InitIdleTimerOutFile(struct proc_dir_entry *pstParentFileDirEntr
 
     if (VOS_NULL_PTR == pstParentFileDirEntry )
     {
-        /*´´½¨IdleTimeOutĞéÄâÎÄ¼ş*/
+        /*åˆ›å»ºIdleTimeOutè™šæ‹Ÿæ–‡ä»¶*/
         pstIdleTimeOutEntry = proc_create("dial/idle_timeout",
                                                           RNIC_VFILE_CRT_LEVEL,
                                                           pstParentFileDirEntry,
@@ -601,7 +601,7 @@ VOS_UINT32 RNIC_InitIdleTimerOutFile(struct proc_dir_entry *pstParentFileDirEntr
     }
     else
     {
-        /*´´½¨IdleTimeOutĞéÄâÎÄ¼ş*/
+        /*åˆ›å»ºIdleTimeOutè™šæ‹Ÿæ–‡ä»¶*/
         pstIdleTimeOutEntry = proc_create("idle_timeout",
                                                           RNIC_VFILE_CRT_LEVEL,
                                                           pstParentFileDirEntry,
@@ -618,18 +618,18 @@ VOS_UINT32 RNIC_InitIdleTimerOutFile(struct proc_dir_entry *pstParentFileDirEntr
 }
 
 /*****************************************************************************
-º¯ Êı Ãû  : RNIC_ReadDialEventReportFile
-¹¦ÄÜÃèÊö  : dial_event_reportĞéÄâÎÄ¼ş¶ÁÊµÏÖ
-ÊäÈë²ÎÊı  : file --- ÎÄ¼ş¾ä±ú
-buf  --- ÓÃ»§¿Õ¼ä
-ppos --- ÎÄ¼şÆ«ÒÆ£¬²ÎÊıÎ´Ê¹ÓÃ
-Êä³ö²ÎÊı  : ÎŞ
-·µ »Ø Öµ  : ³É¹¦»òÊ§°Ü
+å‡½ æ•° å  : RNIC_ReadDialEventReportFile
+åŠŸèƒ½æè¿°  : dial_event_reportè™šæ‹Ÿæ–‡ä»¶è¯»å®ç°
+è¾“å…¥å‚æ•°  : file --- æ–‡ä»¶å¥æŸ„
+buf  --- ç”¨æˆ·ç©ºé—´
+ppos --- æ–‡ä»¶åç§»ï¼Œå‚æ•°æœªä½¿ç”¨
+è¾“å‡ºå‚æ•°  : æ— 
+è¿” å› å€¼  : æˆåŠŸæˆ–å¤±è´¥
 
- ĞŞ¸ÄÀúÊ·      :
- 1.ÈÕ    ÆÚ   : 2012Äê01ÔÂ30ÈÕ
- ×÷    Õß   : Huawei
- ĞŞ¸ÄÄÚÈİ   : ĞÂÉú³Éº¯Êı
+ ä¿®æ”¹å†å²      :
+ 1.æ—¥    æœŸ   : 2012å¹´01æœˆ30æ—¥
+ ä½œ    è€…   : Huawei
+ ä¿®æ”¹å†…å®¹   : æ–°ç”Ÿæˆå‡½æ•°
  
 *****************************************************************************/
 ssize_t RNIC_ReadDialEventReportFile(struct file *file, char __user *buf, size_t len, loff_t *ppos)
@@ -649,7 +649,7 @@ ssize_t RNIC_ReadDialEventReportFile(struct file *file, char __user *buf, size_t
 
     len = PS_MIN(len, strlen(acModeTemp));
 
-    /*¿½±´ÄÚºË¿Õ¼äÊı¾İµ½ÓÃ»§¿Õ¼äÉÏÃæ*/
+    /*æ‹·è´å†…æ ¸ç©ºé—´æ•°æ®åˆ°ç”¨æˆ·ç©ºé—´ä¸Šé¢*/
     lRlst = copy_to_user(buf,(VOS_VOID *)acModeTemp, len);
 
     if (lRlst < 0)
@@ -665,19 +665,19 @@ ssize_t RNIC_ReadDialEventReportFile(struct file *file, char __user *buf, size_t
 
 
 /*****************************************************************************
-º¯ Êı Ãû  : RNIC_WriteDialEventReportFile
-¹¦ÄÜÃèÊö  : dialeventreportĞéÄâÎÄ¼şĞ´ÊµÏÖ
-ÊäÈë²ÎÊı  : file ----- ÎÄ¼ş¾ä±ú
-buf  ----- ÓÃ»§¿Õ¼äÊı¾İ
-lLength -- ÓÃ»§Êı¾İ³¤¶È
-ppos - ----ÎÄ¼şÆ«ÒÆ£¬²ÎÊıÎ´Ê¹ÓÃ
-Êä³ö²ÎÊı  : ÎŞ
-·µ »Ø Öµ  : ³É¹¦»òÊ§°Ü
+å‡½ æ•° å  : RNIC_WriteDialEventReportFile
+åŠŸèƒ½æè¿°  : dialeventreportè™šæ‹Ÿæ–‡ä»¶å†™å®ç°
+è¾“å…¥å‚æ•°  : file ----- æ–‡ä»¶å¥æŸ„
+buf  ----- ç”¨æˆ·ç©ºé—´æ•°æ®
+lLength -- ç”¨æˆ·æ•°æ®é•¿åº¦
+ppos - ----æ–‡ä»¶åç§»ï¼Œå‚æ•°æœªä½¿ç”¨
+è¾“å‡ºå‚æ•°  : æ— 
+è¿” å› å€¼  : æˆåŠŸæˆ–å¤±è´¥
 
- ĞŞ¸ÄÀúÊ·      :
- 1.ÈÕ    ÆÚ   : 2012Äê01ÔÂ30ÈÕ
- ×÷    Õß   : Huawei
- ĞŞ¸ÄÄÚÈİ   : ĞÂÉú³Éº¯Êı
+ ä¿®æ”¹å†å²      :
+ 1.æ—¥    æœŸ   : 2012å¹´01æœˆ30æ—¥
+ ä½œ    è€…   : Huawei
+ ä¿®æ”¹å†…å®¹   : æ–°ç”Ÿæˆå‡½æ•°
  
 *****************************************************************************/
 ssize_t RNIC_WriteDialEventReportFile(struct file *file, const char __user *buf, size_t len, loff_t *ppos)
@@ -694,7 +694,7 @@ ssize_t RNIC_WriteDialEventReportFile(struct file *file, const char __user *buf,
         return -ENOSPC;
     }
 
-    /*¿½±´ÓÃ»§¿Õ¼äÊı¾İµ½ÄÚºË¿Õ¼äÉÏÃæ*/
+    /*æ‹·è´ç”¨æˆ·ç©ºé—´æ•°æ®åˆ°å†…æ ¸ç©ºé—´ä¸Šé¢*/
     lRlst = copy_from_user((VOS_VOID *)acModeTemp, (VOS_VOID *)buf, len);
 
     if (lRlst > 0)
@@ -710,16 +710,16 @@ ssize_t RNIC_WriteDialEventReportFile(struct file *file, const char __user *buf,
     return len;
 }
 /*****************************************************************************
-º¯ Êı Ãû  : RNIC_InitDialEventReportFiles
-¹¦ÄÜÃèÊö  : proc_dir_entry *pstParentFileDirEntry -- ¸¸Ä¿Â¼µÄÈë¿Ú
-ÊäÈë²ÎÊı  : proc_dir_entry *pstParentFileDirEntry
-Êä³ö²ÎÊı  : ÎŞ
-·µ »Ø Öµ  : ³õÊ¼»¯½á¹û
+å‡½ æ•° å  : RNIC_InitDialEventReportFiles
+åŠŸèƒ½æè¿°  : proc_dir_entry *pstParentFileDirEntry -- çˆ¶ç›®å½•çš„å…¥å£
+è¾“å…¥å‚æ•°  : proc_dir_entry *pstParentFileDirEntry
+è¾“å‡ºå‚æ•°  : æ— 
+è¿” å› å€¼  : åˆå§‹åŒ–ç»“æœ
 
- ĞŞ¸ÄÀúÊ·      :
- 1.ÈÕ    ÆÚ   : 2012Äê01ÔÂ30ÈÕ
- ×÷    Õß   : Huawei
- ĞŞ¸ÄÄÚÈİ   : ĞÂÉú³Éº¯Êı
+ ä¿®æ”¹å†å²      :
+ 1.æ—¥    æœŸ   : 2012å¹´01æœˆ30æ—¥
+ ä½œ    è€…   : Huawei
+ ä¿®æ”¹å†…å®¹   : æ–°ç”Ÿæˆå‡½æ•°
  
 *****************************************************************************/
 VOS_UINT32 RNIC_InitDialEventReportFile(struct proc_dir_entry *pstParentFileDirEntry)
@@ -728,7 +728,7 @@ VOS_UINT32 RNIC_InitDialEventReportFile(struct proc_dir_entry *pstParentFileDirE
 
     if (VOS_NULL_PTR == pstParentFileDirEntry)
     {
-        /*´´½¨dial_event_reportĞéÄâÎÄ¼ş*/
+        /*åˆ›å»ºdial_event_reportè™šæ‹Ÿæ–‡ä»¶*/
         pstDialEventReportEntry = proc_create("dial/dial_event_report",
                                                               RNIC_VFILE_CRT_LEVEL,
                                                               pstParentFileDirEntry,
@@ -742,7 +742,7 @@ VOS_UINT32 RNIC_InitDialEventReportFile(struct proc_dir_entry *pstParentFileDirE
     }
     else
     {
-        /*´´½¨dial_event_reportĞéÄâÎÄ¼ş*/
+        /*åˆ›å»ºdial_event_reportè™šæ‹Ÿæ–‡ä»¶*/
         pstDialEventReportEntry = proc_create("dial_event_report",
                                                               RNIC_VFILE_CRT_LEVEL,
                                                               pstParentFileDirEntry,
@@ -760,13 +760,13 @@ VOS_UINT32 RNIC_InitDialEventReportFile(struct proc_dir_entry *pstParentFileDirE
 
 
 /*****************************************************************************
- º¯ Êı Ãû  : RNIC_ReadWlanDevNameFile
- ¹¦ÄÜÃèÊö  : wlan_dev_nameĞéÄâÎÄ¼ş¶ÁÊµÏÖ
- ÊäÈë²ÎÊı  : file --- ÎÄ¼ş¾ä±ú
-             buf  --- ÓÃ»§¿Õ¼ä
-             ppos --- ÎÄ¼şÆ«ÒÆ£¬²ÎÊıÎ´Ê¹ÓÃ
- Êä³ö²ÎÊı  : ÎŞ
- ·µ »Ø Öµ  : ³É¹¦»òÊ§°Ü
+ å‡½ æ•° å  : RNIC_ReadWlanDevNameFile
+ åŠŸèƒ½æè¿°  : wlan_dev_nameè™šæ‹Ÿæ–‡ä»¶è¯»å®ç°
+ è¾“å…¥å‚æ•°  : file --- æ–‡ä»¶å¥æŸ„
+             buf  --- ç”¨æˆ·ç©ºé—´
+             ppos --- æ–‡ä»¶åç§»ï¼Œå‚æ•°æœªä½¿ç”¨
+ è¾“å‡ºå‚æ•°  : æ— 
+ è¿” å› å€¼  : æˆåŠŸæˆ–å¤±è´¥
 
 *****************************************************************************/
 ssize_t RNIC_ReadWlanDevNameFile(
@@ -786,7 +786,7 @@ ssize_t RNIC_ReadWlanDevNameFile(
 
     len             = PS_MIN(len, strlen(g_wlan_dev_name));
 
-    /*¿½±´ÄÚºË¿Õ¼äÊı¾İµ½ÓÃ»§¿Õ¼äÉÏÃæ*/
+    /*æ‹·è´å†…æ ¸ç©ºé—´æ•°æ®åˆ°ç”¨æˆ·ç©ºé—´ä¸Šé¢*/
     lRlst          = copy_to_user(buf, (VOS_VOID *)g_wlan_dev_name, len);
 
 
@@ -802,14 +802,14 @@ ssize_t RNIC_ReadWlanDevNameFile(
 }
 
 /*****************************************************************************
- º¯ Êı Ãû  : RNIC_WriteWlanDevNameFile
- ¹¦ÄÜÃèÊö  : dialeventreportĞéÄâÎÄ¼şĞ´ÊµÏÖ
- ÊäÈë²ÎÊı  : file ----- ÎÄ¼ş¾ä±ú
-             buf  ----- ÓÃ»§¿Õ¼äÊı¾İ
-             lLength -- ÓÃ»§Êı¾İ³¤¶È
-             ppos - ----ÎÄ¼şÆ«ÒÆ£¬²ÎÊıÎ´Ê¹ÓÃ
- Êä³ö²ÎÊı  : ÎŞ
- ·µ »Ø Öµ  : ³É¹¦»òÊ§°Ü
+ å‡½ æ•° å  : RNIC_WriteWlanDevNameFile
+ åŠŸèƒ½æè¿°  : dialeventreportè™šæ‹Ÿæ–‡ä»¶å†™å®ç°
+ è¾“å…¥å‚æ•°  : file ----- æ–‡ä»¶å¥æŸ„
+             buf  ----- ç”¨æˆ·ç©ºé—´æ•°æ®
+             lLength -- ç”¨æˆ·æ•°æ®é•¿åº¦
+             ppos - ----æ–‡ä»¶åç§»ï¼Œå‚æ•°æœªä½¿ç”¨
+ è¾“å‡ºå‚æ•°  : æ— 
+ è¿” å› å€¼  : æˆåŠŸæˆ–å¤±è´¥
 
 *****************************************************************************/
 ssize_t RNIC_WriteWlanDevNameFile(
@@ -827,7 +827,7 @@ ssize_t RNIC_WriteWlanDevNameFile(
         return -ENOSPC;
     }
 
-    /*¿½±´ÓÃ»§¿Õ¼äÊı¾İµ½ÄÚºË¿Õ¼äÉÏÃæ*/
+    /*æ‹·è´ç”¨æˆ·ç©ºé—´æ•°æ®åˆ°å†…æ ¸ç©ºé—´ä¸Šé¢*/
     lRlst = copy_from_user((VOS_VOID *)g_wlan_dev_name, (VOS_VOID *)buf, len);
 
     if (lRlst > 0)
@@ -843,11 +843,11 @@ ssize_t RNIC_WriteWlanDevNameFile(
 
 
 /*****************************************************************************
- º¯ Êı Ãû  : RNIC_InitWlanDevNameFile
- ¹¦ÄÜÃèÊö  : proc_dir_entry *pstParentFileDirEntry -- ¸¸Ä¿Â¼µÄÈë¿Ú
- ÊäÈë²ÎÊı  : proc_dir_entry *pstParentFileDirEntry
- Êä³ö²ÎÊı  : ÎŞ
- ·µ »Ø Öµ  : ³õÊ¼»¯½á¹û
+ å‡½ æ•° å  : RNIC_InitWlanDevNameFile
+ åŠŸèƒ½æè¿°  : proc_dir_entry *pstParentFileDirEntry -- çˆ¶ç›®å½•çš„å…¥å£
+ è¾“å…¥å‚æ•°  : proc_dir_entry *pstParentFileDirEntry
+ è¾“å‡ºå‚æ•°  : æ— 
+ è¿” å› å€¼  : åˆå§‹åŒ–ç»“æœ
 
 *****************************************************************************/
 VOS_UINT32 RNIC_InitWlanDevNameFile(struct proc_dir_entry *pstParentFileDirEntry)
@@ -856,7 +856,7 @@ VOS_UINT32 RNIC_InitWlanDevNameFile(struct proc_dir_entry *pstParentFileDirEntry
 
     if (VOS_NULL_PTR == pstParentFileDirEntry)
     {
-        /*´´½¨wlan_dev_nameĞéÄâÎÄ¼ş*/
+        /*åˆ›å»ºwlan_dev_nameè™šæ‹Ÿæ–‡ä»¶*/
         pstWlanDevNameEntry             = proc_create("dial/wlan_dev_name",
                                                           RNIC_VFILE_CRT_LEVEL,
                                                           pstParentFileDirEntry,
@@ -873,7 +873,7 @@ VOS_UINT32 RNIC_InitWlanDevNameFile(struct proc_dir_entry *pstParentFileDirEntry
     else
     {
 
-        /*´´½¨wlan_dev_nameĞéÄâÎÄ¼ş*/
+        /*åˆ›å»ºwlan_dev_nameè™šæ‹Ÿæ–‡ä»¶*/
         pstWlanDevNameEntry             = proc_create("wlan_dev_name",
                                                           RNIC_VFILE_CRT_LEVEL,
                                                           pstParentFileDirEntry,
@@ -891,13 +891,13 @@ VOS_UINT32 RNIC_InitWlanDevNameFile(struct proc_dir_entry *pstParentFileDirEntry
 }
 
 /*****************************************************************************
- º¯ Êı Ãû  : RNIC_ReadEthIsLanDevFile
- ¹¦ÄÜÃèÊö  : dial_event_reportĞéÄâÎÄ¼ş¶ÁÊµÏÖ
- ÊäÈë²ÎÊı  : file --- ÎÄ¼ş¾ä±ú
-             buf  --- ÓÃ»§¿Õ¼ä
-             ppos --- ÎÄ¼şÆ«ÒÆ£¬²ÎÊıÎ´Ê¹ÓÃ
- Êä³ö²ÎÊı  : ÎŞ
- ·µ »Ø Öµ  : ³É¹¦»òÊ§°Ü
+ å‡½ æ•° å  : RNIC_ReadEthIsLanDevFile
+ åŠŸèƒ½æè¿°  : dial_event_reportè™šæ‹Ÿæ–‡ä»¶è¯»å®ç°
+ è¾“å…¥å‚æ•°  : file --- æ–‡ä»¶å¥æŸ„
+             buf  --- ç”¨æˆ·ç©ºé—´
+             ppos --- æ–‡ä»¶åç§»ï¼Œå‚æ•°æœªä½¿ç”¨
+ è¾“å‡ºå‚æ•°  : æ— 
+ è¿” å› å€¼  : æˆåŠŸæˆ–å¤±è´¥
 
 *****************************************************************************/
 ssize_t RNIC_ReadEthIsLanDevFile(
@@ -917,7 +917,7 @@ ssize_t RNIC_ReadEthIsLanDevFile(
 
     len             = PS_MIN(len, strlen(g_eth_is_lan));
 
-    /*¿½±´ÄÚºË¿Õ¼äÊı¾İµ½ÓÃ»§¿Õ¼äÉÏÃæ*/
+    /*æ‹·è´å†…æ ¸ç©ºé—´æ•°æ®åˆ°ç”¨æˆ·ç©ºé—´ä¸Šé¢*/
     lRlst          = copy_to_user(buf, (VOS_VOID *)g_eth_is_lan, len);
 
 
@@ -934,14 +934,14 @@ ssize_t RNIC_ReadEthIsLanDevFile(
 
 
 /*****************************************************************************
- º¯ Êı Ãû  : RNIC_WriteEthIsLanDevFile
- ¹¦ÄÜÃèÊö  : dialeventreportĞéÄâÎÄ¼şĞ´ÊµÏÖ
- ÊäÈë²ÎÊı  : file ----- ÎÄ¼ş¾ä±ú
-             buf  ----- ÓÃ»§¿Õ¼äÊı¾İ
-             lLength -- ÓÃ»§Êı¾İ³¤¶È
-             ppos - ----ÎÄ¼şÆ«ÒÆ£¬²ÎÊıÎ´Ê¹ÓÃ
- Êä³ö²ÎÊı  : ÎŞ
- ·µ »Ø Öµ  : ³É¹¦»òÊ§°Ü
+ å‡½ æ•° å  : RNIC_WriteEthIsLanDevFile
+ åŠŸèƒ½æè¿°  : dialeventreportè™šæ‹Ÿæ–‡ä»¶å†™å®ç°
+ è¾“å…¥å‚æ•°  : file ----- æ–‡ä»¶å¥æŸ„
+             buf  ----- ç”¨æˆ·ç©ºé—´æ•°æ®
+             lLength -- ç”¨æˆ·æ•°æ®é•¿åº¦
+             ppos - ----æ–‡ä»¶åç§»ï¼Œå‚æ•°æœªä½¿ç”¨
+ è¾“å‡ºå‚æ•°  : æ— 
+ è¿” å› å€¼  : æˆåŠŸæˆ–å¤±è´¥
 *****************************************************************************/
 ssize_t RNIC_WriteEthIsLanDevFile(
     struct file                        *file,
@@ -958,7 +958,7 @@ ssize_t RNIC_WriteEthIsLanDevFile(
         return -ENOSPC;
     }
 
-    /*¿½±´ÓÃ»§¿Õ¼äÊı¾İµ½ÄÚºË¿Õ¼äÉÏÃæ*/
+    /*æ‹·è´ç”¨æˆ·ç©ºé—´æ•°æ®åˆ°å†…æ ¸ç©ºé—´ä¸Šé¢*/
     lRlst = copy_from_user((VOS_VOID *)g_eth_is_lan, (VOS_VOID *)buf, len);
 
     if (lRlst > 0)
@@ -974,11 +974,11 @@ ssize_t RNIC_WriteEthIsLanDevFile(
 
 
 /*****************************************************************************
- º¯ Êı Ãû  : RNIC_InitEthIsLanDevFile
- ¹¦ÄÜÃèÊö  : proc_dir_entry *pstParentFileDirEntry -- ¸¸Ä¿Â¼µÄÈë¿Ú
- ÊäÈë²ÎÊı  : proc_dir_entry *pstParentFileDirEntry
- Êä³ö²ÎÊı  : ÎŞ
- ·µ »Ø Öµ  : ³õÊ¼»¯½á¹û
+ å‡½ æ•° å  : RNIC_InitEthIsLanDevFile
+ åŠŸèƒ½æè¿°  : proc_dir_entry *pstParentFileDirEntry -- çˆ¶ç›®å½•çš„å…¥å£
+ è¾“å…¥å‚æ•°  : proc_dir_entry *pstParentFileDirEntry
+ è¾“å‡ºå‚æ•°  : æ— 
+ è¿” å› å€¼  : åˆå§‹åŒ–ç»“æœ
 
 *****************************************************************************/
 VOS_UINT32 RNIC_InitEthIsLanDevFile(struct proc_dir_entry *pstParentFileDirEntry)
@@ -987,7 +987,7 @@ VOS_UINT32 RNIC_InitEthIsLanDevFile(struct proc_dir_entry *pstParentFileDirEntry
 
     if (VOS_NULL_PTR == pstParentFileDirEntry)
     {
-        /*´´½¨eth_is_lanĞéÄâÎÄ¼ş*/
+        /*åˆ›å»ºeth_is_lanè™šæ‹Ÿæ–‡ä»¶*/
         pstEthIsLanDevEntry             = proc_create("dial/eth_is_lan",
                                                           RNIC_VFILE_CRT_LEVEL,
                                                           pstParentFileDirEntry,
@@ -1003,7 +1003,7 @@ VOS_UINT32 RNIC_InitEthIsLanDevFile(struct proc_dir_entry *pstParentFileDirEntry
     else
     {
 
-        /*´´½¨eth_is_lanĞéÄâÎÄ¼ş*/
+        /*åˆ›å»ºeth_is_lanè™šæ‹Ÿæ–‡ä»¶*/
         pstEthIsLanDevEntry             = proc_create("eth_is_lan",
                                                           RNIC_VFILE_CRT_LEVEL,
                                                           pstParentFileDirEntry,
@@ -1020,17 +1020,17 @@ VOS_UINT32 RNIC_InitEthIsLanDevFile(struct proc_dir_entry *pstParentFileDirEntry
 }
 
 /*****************************************************************************
-º¯ Êı Ãû  : RNIC_InitDemandDialFile
-¹¦ÄÜÃèÊö  : ³õÊ¼»¯°´Ğè²¦ÎÄ¼ş
-ÊäÈë²ÎÊı  : VOS_VOID
-Êä³ö²ÎÊı  : ÎŞ
-·µ »Ø Öµ  : VOS_UINT32
-µ÷ÓÃº¯Êı  :
-±»µ÷º¯Êı  :
+å‡½ æ•° å  : RNIC_InitDemandDialFile
+åŠŸèƒ½æè¿°  : åˆå§‹åŒ–æŒ‰éœ€æ‹¨æ–‡ä»¶
+è¾“å…¥å‚æ•°  : VOS_VOID
+è¾“å‡ºå‚æ•°  : æ— 
+è¿” å› å€¼  : VOS_UINT32
+è°ƒç”¨å‡½æ•°  :
+è¢«è°ƒå‡½æ•°  :
 
- ĞŞ¸ÄÀúÊ·      :
- 1.ÈÕ    ÆÚ   : 2012Äê2ÔÂ1ÈÕ
- ĞŞ¸ÄÄÚÈİ   : ĞÂÉú³Éº¯Êı
+ ä¿®æ”¹å†å²      :
+ 1.æ—¥    æœŸ   : 2012å¹´2æœˆ1æ—¥
+ ä¿®æ”¹å†…å®¹   : æ–°ç”Ÿæˆå‡½æ•°
  
 *****************************************************************************/
 VOS_UINT32 RNIC_InitDemandDialFile(VOS_VOID)
@@ -1041,7 +1041,7 @@ VOS_UINT32 RNIC_InitDemandDialFile(VOS_VOID)
     int                                 error = 0;
 
     memset(&path, 0, sizeof(struct path));
-    /*³õÊ¼»¯²¦ºÅÄ£Ê½È«¾ÖÊı¾İ*/
+    /*åˆå§‹åŒ–æ‹¨å·æ¨¡å¼å…¨å±€æ•°æ®*/
     g_DialMode.enDialMode = DIAL_MODE_DEMAND_DISCONNECT;
     g_DialMode.enEventReportFlag = FORBID_EVENT_REPORT ;
     g_DialMode.disconnect_time = DEFULT_RNIC_DISCONNECT_TIME;
@@ -1086,13 +1086,13 @@ VOS_UINT32 RNIC_InitDemandDialFile(VOS_VOID)
     {
         return VOS_ERR;
     }
-    /* ĞÂÔö½Úµã »ñÈ¡WLANÖ®lanÉè±¸Ãû*/
+    /* æ–°å¢èŠ‚ç‚¹ è·å–WLANä¹‹lanè®¾å¤‡å*/
     ulRlst = RNIC_InitWlanDevNameFile(stProcDemandDialDir);
     if (VOS_ERR == ulRlst)
     {
         return VOS_ERR;
     }
-    /*ĞÂÔö  ½ÚµãÅĞ¶Ïeth0 ÊÇ·ñÎªLAN*/
+    /*æ–°å¢  èŠ‚ç‚¹åˆ¤æ–­eth0 æ˜¯å¦ä¸ºLAN*/
     ulRlst  = RNIC_InitEthIsLanDevFile(stProcDemandDialDir);
 
     if (VOS_ERR == ulRlst)

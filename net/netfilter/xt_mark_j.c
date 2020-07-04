@@ -46,7 +46,7 @@ mark_tg_v1(struct sk_buff *skb, const struct xt_target_param *par)
 	int mark = 0;
 
 #ifdef CONFIG_NF_CONNTRACK_PRI
-	/*ALG数据连接使用控制连接的mark*/
+	/*ALG鏁版嵁杩炴帴浣跨敤鎺у埗杩炴帴鐨刴ark*/
 	if (nf_pri_is_alg_skb(skb))
 	{
 		nf_pri_set_alg_mark(skb);

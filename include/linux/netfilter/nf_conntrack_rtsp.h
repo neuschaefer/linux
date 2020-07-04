@@ -2,7 +2,7 @@
 * 2017.09.07 - change this file
 * (C) Huawei Technologies Co., Ltd. < >
 */
-/*±¾ÎÄ¼þµÄËùÓÐÐÞ¸ÄÎªRTSP ALG TCPÎÊÌâµÄÐÞ¸Ä*/
+/*æœ¬æ–‡ä»¶çš„æ‰€æœ‰ä¿®æ”¹ä¸ºRTSP ALG TCPé—®é¢˜çš„ä¿®æ”¹*/
 #ifndef _NF_CONNTRACK_RTSP_H
 #define _NF_CONNTRACK_RTSP_H
 

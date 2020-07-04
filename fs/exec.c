@@ -1977,7 +1977,7 @@ static void coredump_finish(struct mm_struct *mm)
 	}
 
     printk(KERN_WARNING "======= coredump has been finished, we will send netlink msg to cms===============\n");
-    /*ÐÂ²úÉúcoredumpÎÄ¼þ£¬Í¨ÖªcmsÇå³ý¾Écoredump£¬ÒÔÏÞÖÆcoredumpÎÄ¼þ¼Ð´óÐ¡*/
+    /*æ–°äº§ç”Ÿcoredumpæ–‡ä»¶ï¼Œé€šçŸ¥cmsæ¸…é™¤æ—§coredumpï¼Œä»¥é™åˆ¶coredumpæ–‡ä»¶å¤¹å¤§å°*/
     syswatch_nl_send(ATP_MSG_MONITOR_EVT_COREDUMP_FINISH, NULL, 0);
 
 	mm->core_state = NULL;

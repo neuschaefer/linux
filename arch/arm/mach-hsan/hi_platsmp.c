@@ -3,14 +3,14 @@
 * (C) Huawei Technologies Co., Ltd. < >
 */
 /******************************************************************************
-  ÎÄ¼şÃû³Æ: smp.c
-  ¹¦ÄÜÃèÊö: SMP¶àºË¹ÜÀí½Ó¿Ú
-  °æ±¾ÃèÊö: V1.0
+  æ–‡ä»¶åç§°: smp.c
+  åŠŸèƒ½æè¿°: SMPå¤šæ ¸ç®¡ç†æ¥å£
+  ç‰ˆæœ¬æè¿°: V1.0
 
-  ´´½¨ÈÕÆÚ: D2013_10_25
+  åˆ›å»ºæ—¥æœŸ: D2013_10_25
 
-  ĞŞ¸Ä¼ÇÂ¼: 
-            Éú³É³õ¸å.
+  ä¿®æ”¹è®°å½•: 
+            ç”Ÿæˆåˆç¨¿.
 ******************************************************************************/
 
 #include <mach/hi_hsan.h>
@@ -36,11 +36,11 @@ static hi_void __cpuinit hi_write_pen_release(hi_int32 i_val)
 static DEFINE_SPINLOCK(g_st_boot_lock);
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  Perform platform specific initialisation of the specified CPU.
-  ÊäÈë²ÎÊı:  ui_cpu : CPUºÅ
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:  
-  º¯Êı±¸×¢:  
+  å‡½æ•°åŠŸèƒ½:  Perform platform specific initialisation of the specified CPU.
+  è¾“å…¥å‚æ•°:  ui_cpu : CPUå·
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:  
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 hi_void platform_secondary_init(hi_uint32 ui_cpu)
 {
@@ -118,12 +118,12 @@ hi_int32 boot_secondary(hi_uint32 ui_cpu, struct task_struct *pst_idle)
 }
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  Initialise the CPU possible map early - this describes the CPUs
+  å‡½æ•°åŠŸèƒ½:  Initialise the CPU possible map early - this describes the CPUs
                              which may be present or become present in the system
-  ÊäÈë²ÎÊı:  ÎŞ
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:  
-  º¯Êı±¸×¢:  
+  è¾“å…¥å‚æ•°:  æ— 
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:  
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 hi_void smp_init_cpus(hi_void)
 {
@@ -160,11 +160,11 @@ hi_void smp_init_cpus(hi_void)
 }
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  Prepare machine for booting other CPUs
-  ÊäÈë²ÎÊı:  ÎŞ
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:  
-  º¯Êı±¸×¢:  
+  å‡½æ•°åŠŸèƒ½:  Prepare machine for booting other CPUs
+  è¾“å…¥å‚æ•°:  æ— 
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:  
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 hi_void platform_smp_prepare_cpus(hi_uint32 ui_max_cpus)
 {

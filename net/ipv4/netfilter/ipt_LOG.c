@@ -621,12 +621,12 @@ ipt_log_packet(u_int8_t pf,
 	       const struct nf_loginfo *loginfo,
 	       const char *prefix)
 {
-    /*Start for 限制内核打印 */
+    /*Start for 闄愬埗鍐呮牳鎵撳嵃 */
     if(!net_ratelimit())
     {
         return;
     }
-	/*End for 限制内核打印 */
+	/*End for 闄愬埗鍐呮牳鎵撳嵃 */
     
 	if (!loginfo)
 		loginfo = &default_loginfo;

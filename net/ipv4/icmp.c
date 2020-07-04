@@ -1078,7 +1078,7 @@ int icmp_rcv(struct sk_buff *skb)
 		if ((icmph->type == ICMP_ECHO ||
 		     icmph->type == ICMP_TIMESTAMP) &&
 		    net->ipv4.sysctl_icmp_echo_ignore_broadcasts) {
-		    /* ·ÀSmurf¹¥»÷ */
+		    /* é˜²Smurfæ”»å‡» */
 #ifdef CONFIG_FIREWALL_LOG
 			pszLogBuf = (u_int8_t *)kmalloc(ATP_LOG_LENGTH_128, GFP_ATOMIC);
             if (NULL != pszLogBuf)

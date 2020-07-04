@@ -50,17 +50,17 @@
 #include "fib_lookup.h"
 
 #ifdef CONFIG_ATP_ROUTE_BALANCE
-#define ROUTE_BALANCE_STAT_INTERVAL  10  /*Í³¼Æ¼ä¸ô£¬µ¥Î»Ãë*/
+#define ROUTE_BALANCE_STAT_INTERVAL  10  /*ç»Ÿè®¡é—´éš”ï¼Œå•ä½ç§’*/
 
-/*¶àÂ·¾¶Â·ÓÉĞÅÏ¢*/
+/*å¤šè·¯å¾„è·¯ç”±ä¿¡æ¯*/
 struct fib_info *g_multi_gateway_fi = NULL;
 EXPORT_SYMBOL(g_multi_gateway_fi);
 
-/*Â·ÓÉËã·¨hook*/
+/*è·¯ç”±ç®—æ³•hook*/
 int (*route_balance_select)(const struct flowi *flp, struct fib_result *res) = NULL;
 EXPORT_SYMBOL(route_balance_select);
 
-/*route balance½Ó¿ÚÁ÷Á¿Í³¼Æ¼ä¸ô*/
+/*route balanceæ¥å£æµé‡ç»Ÿè®¡é—´éš”*/
 int g_route_balance_stat_interval = ROUTE_BALANCE_STAT_INTERVAL;
 EXPORT_SYMBOL(g_route_balance_stat_interval);
 #endif
@@ -1236,12 +1236,12 @@ void fib_select_multipath(struct fib_result *res)
 #ifdef CONFIG_ATP_ROUTE_BALANCE
 	int ret = 0;
 
-	/*ATP route balance Á÷³Ì*/
+	/*ATP route balance æµç¨‹*/
 	if (route_balance_select) {
 		spin_lock_bh(&fib_multipath_lock);
 		ret = route_balance_select(flp, res);
 		spin_unlock_bh(&fib_multipath_lock);
-		/*route balance³É¹¦Ôò½áÊø²éÕÒ£¬·ñÔò¼ÌĞø*/
+		/*route balanceæˆåŠŸåˆ™ç»“æŸæŸ¥æ‰¾ï¼Œå¦åˆ™ç»§ç»­*/
 		if (0 == ret) {
 			return;
 		}

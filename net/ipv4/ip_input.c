@@ -332,7 +332,7 @@ static int ip_rcv_finish(struct sk_buff *skb)
 #ifdef CONFIG_ATP_HYBRID
     __be32 saddr = iph->saddr;
 
-    /*BypassÇÐ»»µ½Bonding×´Ì¬£¬¸ù¾ÝÁ¬½Ó¸ú×ÙÈÃ¾ÉµÄÊý¾ÝÁ÷Á¿×ßÔ´IP²ßÂÔÂ·ÓÉ£¬±£³ÖºÍÔ­À´Ò»ÖÂ */
+    /*Bypassåˆ‡æ¢åˆ°BondingçŠ¶æ€ï¼Œæ ¹æ®è¿žæŽ¥è·Ÿè¸ªè®©æ—§çš„æ•°æ®æµé‡èµ°æºIPç­–ç•¥è·¯ç”±ï¼Œä¿æŒå’ŒåŽŸæ¥ä¸€è‡´ */
     struct nf_conn *ct = (struct nf_conn *)skb->nfct;    
     if (ct && (skb->mark & PPP_TRIGER_MARK)) {
         saddr = ct->tuplehash[IP_CT_DIR_REPLY].tuple.dst.u3.ip;

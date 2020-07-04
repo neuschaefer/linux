@@ -918,7 +918,7 @@ void ip6_route_input(struct sk_buff *skb)
 	fl6.flowi6_iif  = skb->dev->ifindex;
 	fl6.flowi6_mark = skb->mark;
 	fl6.flowi6_proto = iph->nexthdr;
-    /*START ADD:  FOR ´¦ÀíIPV6 ·Ç¶ÔÆë·ÃÎÊ 2014-01-24*/
+    /*START ADD:  FOR å¤„ç†IPV6 éå¯¹é½è®¿é—® 2014-01-24*/
 #ifdef CONFIG_ATP_BRCM
     //fl6.daddr = iph->daddr;
     fl6.daddr.s6_addr16[0] = iph->daddr.s6_addr16[0];
@@ -943,7 +943,7 @@ void ip6_route_input(struct sk_buff *skb)
     fl6.daddr = iph->daddr;
     fl6.saddr = iph->saddr;
 #endif	
-    /*END ADD:  FOR ´¦ÀíIPV6 ·Ç¶ÔÆë·ÃÎÊ 2014-01-24*/
+    /*END ADD:  FOR å¤„ç†IPV6 éå¯¹é½è®¿é—® 2014-01-24*/
 	memcpy(&fl6.flowlabel, iph, sizeof(__be32));
 	fl6.flowlabel &= IPV6_FLOWINFO_MASK;
 #else

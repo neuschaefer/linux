@@ -172,7 +172,7 @@ struct ppp {
     unsigned long	last_v6_recv;	/* jiffies when last IPv6 pkt rcvd */
 #endif
 
-    /*°´Ğè²¦ºÅ±£´æ´¥·¢±¨ÎÄ£¬×öNATÖ®ºóÔÙ×ª·¢³öÈ¥*/
+    /*æŒ‰éœ€æ‹¨å·ä¿å­˜è§¦å‘æŠ¥æ–‡ï¼ŒåšNATä¹‹åå†è½¬å‘å‡ºå»*/
     unsigned int closegate;
     struct sk_buff_head demand_skb_header;
 };
@@ -255,7 +255,7 @@ struct ppp_net {
 /* We limit the length of ppp->file.rq to this (arbitrary) value */
 #define PPP_MAX_RQLEN	32
 
-/*ppp°´Ğè²¦ºÅ¶ÓÁĞ×î´ó³¤¶È*/
+/*pppæŒ‰éœ€æ‹¨å·é˜Ÿåˆ—æœ€å¤§é•¿åº¦*/
 #define PPP_MAX_DLEN 64
 
 /*
@@ -274,7 +274,7 @@ struct ppp_net {
 #define seq_before(a, b)	((s32)((a) - (b)) < 0)
 #define seq_after(a, b)		((s32)((a) - (b)) > 0)
 
-/* °´Ğè²¦ºÅÖĞµÄwan lan bind¹ØÏµ*/
+/* æŒ‰éœ€æ‹¨å·ä¸­çš„wan lan bindå…³ç³»*/
 extern char g_acWanBind[8][128];
 
 /* Prototypes. */
@@ -609,7 +609,7 @@ static long ppp_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	int err = -EFAULT, val, val2, i;
 	struct ppp_idle idle;
 	struct npioctl npi;
-    struct sk_buff *skb;    /*°´Ğè²¦ºÅ°üÖØ·¢À©Õ¹*/
+    struct sk_buff *skb;    /*æŒ‰éœ€æ‹¨å·åŒ…é‡å‘æ‰©å±•*/
 #ifdef CONFIG_PPP_ONDEMAND_V4_V6_SEPARATE
 	struct ppp_v4_idle v4idle;
 	struct ppp_v6_idle v6idle;
@@ -795,7 +795,7 @@ static long ppp_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			break;
 		err = 0;
 		break;
-	/* ATP °´Ğè²¦ºÅÀ©Õ¹*/
+	/* ATP æŒ‰éœ€æ‹¨å·æ‰©å±•*/
     case PPPIOCSCLOSE:
         ppp->closegate = 1;
         err = 0;
@@ -1387,7 +1387,7 @@ static void ppp_setup(struct net_device *dev)
 	dev->hard_header_len = PPP_HDRLEN;
 	dev->mtu = PPP_MRU;
 	dev->addr_len = 0;
-	dev->tx_queue_len = 20;//@20120724 ppp»º³åÖĞÅÅ¶Ó¸ü¶àÊı¾İ°ü£¬20Îª¾­ÑéÖµ £¬ÄÚºËÔ­Ê¼ÖµÎª3
+	dev->tx_queue_len = 20;//@20120724 pppç¼“å†²ä¸­æ’é˜Ÿæ›´å¤šæ•°æ®åŒ…ï¼Œ20ä¸ºç»éªŒå€¼ ï¼Œå†…æ ¸åŸå§‹å€¼ä¸º3
 	dev->type = ARPHRD_PPP;
 	dev->flags = IFF_POINTOPOINT | IFF_NOARP | IFF_MULTICAST;
 #if defined(CONFIG_BCM_KF_WANDEV)
@@ -1493,7 +1493,7 @@ static int atp_on_demand_filter(struct sk_buff *skb)
     int i = 0;
     int proto = 0;
 
-	//´Ë´¦ÅĞ¶ÏÈç¹ûÊÇLAN²à±¨ÎÄ£¬Ôò½øĞĞ´¥·¢
+	//æ­¤å¤„åˆ¤æ–­å¦‚æœæ˜¯LANä¾§æŠ¥æ–‡ï¼Œåˆ™è¿›è¡Œè§¦å‘
     if (skb->mark & PPP_TRIGER_MARK)
     {
         //printk("receive packet from LAN.\n");
@@ -1676,7 +1676,7 @@ ppp_send_frame(struct ppp *ppp, struct sk_buff *skb)
 	++ppp->dev->stats.tx_packets;
 	ppp->dev->stats.tx_bytes += skb->len - 2;
 
-	/*´Ë²¿·ÖÎªºóĞøĞÂÔö*/
+	/*æ­¤éƒ¨åˆ†ä¸ºåç»­æ–°å¢*/
 #if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
     /* Gather extended statistics based on the packet type */
     switch (skb->pkt_type) {
@@ -1759,7 +1759,7 @@ ppp_send_frame(struct ppp *ppp, struct sk_buff *skb)
 	if (ppp->flags & SC_LOOP_TRAFFIC
 #ifdef CONFIG_PPP_ONDEMAND_V4_V6_SEPARATE
 #ifdef CONFIG_PPTP_TUNNEL
-		/*pptp½Ó¿Ú²»Ö§³Ö°´Ğè²¦ºÅ*/
+		/*pptpæ¥å£ä¸æ”¯æŒæŒ‰éœ€æ‹¨å·*/
 		|| ((ppp->v4_state==NPSTATE_DOWN && proto==PPP_IP) && strcmp(ppp->dev->name, pptpinterface))
 #else
         || (ppp->v4_state==NPSTATE_DOWN && proto==PPP_IP) 
@@ -1780,7 +1780,7 @@ ppp_send_frame(struct ppp *ppp, struct sk_buff *skb)
             }
         }
 
-	    /*´¥·¢Í¬Ò»¸öbridgeÉÏµÄËùÓĞWAN*/
+	    /*è§¦å‘åŒä¸€ä¸ªbridgeä¸Šçš„æ‰€æœ‰WAN*/
 	    for(i = 0;i < 8;i++)
         {
             if(strstr(g_acWanBind[i], ppp->dev->name))
@@ -3409,7 +3409,7 @@ ppp_create_interface(struct net *net, int unit, int *retp)
 	ppp->file.index = unit;
 	sprintf(dev->name, "ppp%d", unit);
 
-	/*´ÓDTÍ¬²½£¬Ê¹ÓÃ×Ô¼ºµÄ½Ó¿ÚÃûÉú³É·½Ê½*/
+	/*ä»DTåŒæ­¥ï¼Œä½¿ç”¨è‡ªå·±çš„æ¥å£åç”Ÿæˆæ–¹å¼*/
 #if 0 //defined(CONFIG_BCM_KF_PPP)
    if (unit >= 0)
    {
@@ -3550,7 +3550,7 @@ static void ppp_destroy_interface(struct ppp *ppp)
 #ifdef CONFIG_PPP_MULTILINK
 	skb_queue_purge(&ppp->mrq);
 #endif /* CONFIG_PPP_MULTILINK */
-	/*Çå³ı°´Ğè²¦ºÅ¶ÓÁĞ*/
+	/*æ¸…é™¤æŒ‰éœ€æ‹¨å·é˜Ÿåˆ—*/
 	skb_queue_purge(&ppp->demand_skb_header);
 #ifdef CONFIG_PPP_FILTER
 	kfree(ppp->pass_filter);

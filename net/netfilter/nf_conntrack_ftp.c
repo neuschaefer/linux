@@ -135,10 +135,10 @@ get_ipv6_addr(const char *src, size_t dlen, struct in6_addr *dst, u_int8_t term)
 #else
 
 /*
-´øscopeIDµÄipv6¸ñÊ½Îª|2|3ffe::1%10|6275|
+å¸¦scopeIDçš„ipv6æ ¼å¼ä¸º|2|3ffe::1%10|6275|
 
-º¯Êý·µ»ØÖµµÄËµÃ÷£º
-·µ»ØÕÒµ½ % µÄÎ»ÖÃ
+å‡½æ•°è¿”å›žå€¼çš„è¯´æ˜Žï¼š
+è¿”å›žæ‰¾åˆ° % çš„ä½ç½®
 */
 static char* find_scope_id_in_ipv6_addr(const char *ipv6_str, int ipv6_len)
 {
@@ -155,11 +155,11 @@ static char* find_scope_id_in_ipv6_addr(const char *ipv6_str, int ipv6_len)
 }
 
 /*
-´øscopeIDµÄipv6¸ñÊ½Îª|2|3ffe::1%10|6275|
-ÊäÈë²ÎÊýËµÃ÷:
-ipv6_str ÎªÕû¸öÕû¸öEPRTÃüÁîÖÐµÄipv6ºÍport²¿·Ö¡£Èç:3ffe::1%10|6275|
-º¯Êý·µ»ØÖµµÄËµÃ÷£º
-·µ»ØÕÒµ½µÄµÚÒ»¸ö | µÄÎ»ÖÃ
+å¸¦scopeIDçš„ipv6æ ¼å¼ä¸º|2|3ffe::1%10|6275|
+è¾“å…¥å‚æ•°è¯´æ˜Ž:
+ipv6_str ä¸ºæ•´ä¸ªæ•´ä¸ªEPRTå‘½ä»¤ä¸­çš„ipv6å’Œportéƒ¨åˆ†ã€‚å¦‚:3ffe::1%10|6275|
+å‡½æ•°è¿”å›žå€¼çš„è¯´æ˜Žï¼š
+è¿”å›žæ‰¾åˆ°çš„ç¬¬ä¸€ä¸ª | çš„ä½ç½®
 
 */
 static char* find_1st_term_in_ipv6_addr(const char *ipv6_str, int ipv6_len, u_int8_t term)
@@ -177,11 +177,11 @@ static char* find_1st_term_in_ipv6_addr(const char *ipv6_str, int ipv6_len, u_in
 	return NULL;
 }
 /*
-´øscopeIDµÄipv6¸ñÊ½Îª|2|3ffe::1%10|6275|
-ÊäÈë²ÎÊýËµÃ÷:
-ipv6_str ÎªÕû¸öÕû¸öEPRTÃüÁîÖÐµÄipv6ºÍport²¿·Ö¡£Èç:3ffe::1%10|6275|
-º¯Êý·µ»ØÖµµÄËµÃ÷£º
-È¡%ºÍ |Ö®¼äµÄ³¤¶È£¬º¬%×Ö·û£¬±»ºöÂÔµÄ³¤¶È£¬ÒòÎªºóÃæµÄº¯Êýget_portÐèÒªÕâ¸ö³¤¶È¡£
+å¸¦scopeIDçš„ipv6æ ¼å¼ä¸º|2|3ffe::1%10|6275|
+è¾“å…¥å‚æ•°è¯´æ˜Ž:
+ipv6_str ä¸ºæ•´ä¸ªæ•´ä¸ªEPRTå‘½ä»¤ä¸­çš„ipv6å’Œportéƒ¨åˆ†ã€‚å¦‚:3ffe::1%10|6275|
+å‡½æ•°è¿”å›žå€¼çš„è¯´æ˜Žï¼š
+å–%å’Œ |ä¹‹é—´çš„é•¿åº¦ï¼Œå«%å­—ç¬¦ï¼Œè¢«å¿½ç•¥çš„é•¿åº¦ï¼Œå› ä¸ºåŽé¢çš„å‡½æ•°get_portéœ€è¦è¿™ä¸ªé•¿åº¦ã€‚
 
 */
 static int get_skiped_len_of_scope_id_in_ipv6_str(const char *ipv6_str, int ipv6_len, u_int8_t term)
@@ -195,7 +195,7 @@ static int get_skiped_len_of_scope_id_in_ipv6_str(const char *ipv6_str, int ipv6
 	if( NULL != find_ptr )
 	{
 		find_1st_term = find_1st_term_in_ipv6_addr(ipv6_str, ipv6_len, term);
-		if( NULL == find_1st_term ) /*Èç¹ûÃ»ÕÒµ½£¬Ôò²»Õý³££¬ÄÇÃ´¾Í×öÒì³£´¦Àí*/
+		if( NULL == find_1st_term ) /*å¦‚æžœæ²¡æ‰¾åˆ°ï¼Œåˆ™ä¸æ­£å¸¸ï¼Œé‚£ä¹ˆå°±åšå¼‚å¸¸å¤„ç†*/
 		{
 			find_1st_term = ipv6_str;
 		}
@@ -217,7 +217,7 @@ get_ipv6_addr(const char *src, size_t dlen, struct in6_addr *dst, u_int8_t term)
 //	printk("src==[0x%x]\n",src);
 //	printk("term==[%c]\n",term);
 	skiped_len = get_skiped_len_of_scope_id_in_ipv6_str(src, dlen, term);
-	if( skiped_len > 0)/*ÕÒµ½%£¬Ò²¾ÍÊÇ´æÔÚscope id*/
+	if( skiped_len > 0)/*æ‰¾åˆ°%ï¼Œä¹Ÿå°±æ˜¯å­˜åœ¨scope id*/
 	{
 		term = '%';
 	}
@@ -226,7 +226,7 @@ get_ipv6_addr(const char *src, size_t dlen, struct in6_addr *dst, u_int8_t term)
 //	printk("ret==[%d]\n",ret);
 //	printk("(int)(end - src + skiped_len)==[%d]\n",(int)(end - src + skiped_len));
 	if (ret > 0)
-		return (int)(end - src + skiped_len);/*skiped_len ÔÚºóÃæµÄget_portµÄÊäÈë²ÎÊýÐèÒª¡£*/
+		return (int)(end - src + skiped_len);/*skiped_len åœ¨åŽé¢çš„get_portçš„è¾“å…¥å‚æ•°éœ€è¦ã€‚*/
 	return 0;
 }
 #endif
@@ -577,7 +577,7 @@ static int help(struct sk_buff *skb,
 	}
 	
 #if defined(CONFIG_TUNNEL) && defined(CONFIG_BCM_KF_NETFILTER) && defined(CONFIG_BLOG)
-	/*·¢Íùlan²àµÄ227 ±¨ÎÄ²»½øÐÐalg´¦Àí*/
+	/*å‘å¾€lanä¾§çš„227 æŠ¥æ–‡ä¸è¿›è¡Œalgå¤„ç†*/
 	if ((NF_CT_FTP_PASV == search[dir][i].ftptype)
 		&& (IP_CT_DIR_REPLY == dir)
 		&& (0 == strcmp(skb->dev->name, "br0"))) {

@@ -18,14 +18,14 @@ enum ipt_trigger_type
 	IPT_TRIGGER_OUT = 3
 };
 
-/******************Ò»´¥·¢¶à:ÄÚºËÀ©Õ¹³ÉÓÃÒ»Ìõ¹æÔòÖ§³Ö2000-2038,2050-2051,2069,2085,3010-3030¸ñÊ½µÄÄ£Ê½£¬
-    ²»ĞèÒª½«Íâ²¿¶Ë¿ÚºÅ½âÎö²¢·Ö¶Î£¬µ«±ØĞëĞ£Ñé±£Ö¤¸ñÊ½ÕıÈ·*****************************/
+/******************ä¸€è§¦å‘å¤š:å†…æ ¸æ‰©å±•æˆç”¨ä¸€æ¡è§„åˆ™æ”¯æŒ2000-2038,2050-2051,2069,2085,3010-3030æ ¼å¼çš„æ¨¡å¼ï¼Œ
+    ä¸éœ€è¦å°†å¤–éƒ¨ç«¯å£å·è§£æå¹¶åˆ†æ®µï¼Œä½†å¿…é¡»æ ¡éªŒä¿è¯æ ¼å¼æ­£ç¡®*****************************/
 #define PT_OPEN_PORT_RANGE_MAX 8
 typedef struct tatPT_OPEN_APP_PORT_RANGE
 {
 
-	u_int16_t ulStartPort;                                             /*¿ª·ÅÆôÊ¼¶Ë¿Ú*/
-	u_int16_t ulEndPort;                                               /*¿ª·Å½áÊø¶Ë¿Ú*/
+	u_int16_t ulStartPort;                                             /*å¼€æ”¾å¯å§‹ç«¯å£*/
+	u_int16_t ulEndPort;                                               /*å¼€æ”¾ç»“æŸç«¯å£*/
 
 }PT_OPEN_APP_PORT_RANGE;
 
@@ -39,7 +39,7 @@ struct ipt_trigger_info {
 	enum ipt_trigger_type type;
 	u_int16_t proto;	/* Related protocol */
     
-    /* Ôö¼ÓÁË¶ÔrelatedĞ­ÒéµÄ·ÖÀàÏŞÖÆ */
+    /* å¢åŠ äº†å¯¹relatedåè®®çš„åˆ†ç±»é™åˆ¶ */
     #ifdef ATP_SUPPORT_PRTT_RPROTOCOL
     u_int16_t rproto;
     #endif

@@ -714,11 +714,11 @@ static int pppol2tp_connect(struct socket *sock, struct sockaddr *uservaddr,
 			goto end;
 	}
 
-    /*start  for l2tpÁ¬½Ó½¨Á¢²»³É¹¦*/
+    /*start  for l2tpè¿žæŽ¥å»ºç«‹ä¸æˆåŠŸ*/
     inet = inet_sk(tunnel->sock);
     inet->inet_daddr = sp->pppol2tp.addr.sin_addr.s_addr;
     inet->inet_dport = sp->pppol2tp.addr.sin_port;
-    /*End  for l2tpÁ¬½Ó½¨Á¢²»³É¹¦*/
+    /*End  for l2tpè¿žæŽ¥å»ºç«‹ä¸æˆåŠŸ*/
 
 	if (tunnel->recv_payload_hook == NULL)
 		tunnel->recv_payload_hook = pppol2tp_recv_payload_hook;
@@ -769,9 +769,9 @@ static int pppol2tp_connect(struct socket *sock, struct sockaddr *uservaddr,
 	ps->tunnel_sock = tunnel->sock;
 
 #ifdef CONFIG_ATP_COMMON 
-       /* BEGIN: add for FON: l2tpËíµÀÄÚµÄppp°üÎÞ·¨·¢ËÍ */ 
+       /* BEGIN: add for FON: l2tpéš§é“å†…çš„pppåŒ…æ— æ³•å‘é€ */ 
        session->tunnel_addr = sp->pppol2tp;
-       /* END: add for FON: l2tpËíµÀÄÚµÄppp°üÎÞ·¨·¢ËÍ */ 
+       /* END: add for FON: l2tpéš§é“å†…çš„pppåŒ…æ— æ³•å‘é€ */ 
 #endif       
 	session->recv_skb	= pppol2tp_recv;
 	session->session_close	= pppol2tp_session_close;

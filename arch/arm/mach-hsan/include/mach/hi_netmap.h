@@ -4,13 +4,13 @@
 */
 /******************************************************************************
 
-                  °æÈ¨ËùÓĞ (C), 2009-2019, º£Ë¼°ëµ¼ÌåÓĞÏŞ¹«Ë¾
+                  ç‰ˆæƒæ‰€æœ‰ (C), 2009-2019, æµ·æ€åŠå¯¼ä½“æœ‰é™å…¬å¸
 
  ******************************************************************************
-  ÎÄ ¼ş Ãû   : hi_netmap.h
-  °æ ±¾ ºÅ   : ³õ¸å
-  ×÷    Õß   : 11
-  Éú³ÉÈÕÆÚ   : D2012_06_14
+  æ–‡ ä»¶ å   : hi_netmap.h
+  ç‰ˆ æœ¬ å·   : åˆç¨¿
+  ä½œ    è€…   : 11
+  ç”Ÿæˆæ—¥æœŸ   : D2012_06_14
 
 ******************************************************************************/
 
@@ -32,23 +32,23 @@ typedef struct {
 }hi_netmap_node_s;
 
 typedef struct {
-    hi_uint32                ui_cnt_task_charge;  // ²¹³äÄÚ´æÈÎÎñ½øÈëµ÷¶È´ÎÊı
+    hi_uint32                ui_cnt_task_charge;  // è¡¥å……å†…å­˜ä»»åŠ¡è¿›å…¥è°ƒåº¦æ¬¡æ•°
 
-    hi_uint32                ui_per_low;   // ·ÖÅä·§Öµ,µÍÓÚ¸Ã¼ÆÊıÖØĞÂ²¹³ä·ÖÅä
-    hi_uint32                ui_per_high;  // ·ÖÅä·§Öµ,¸ßÓÚ¸ÄÖµ¿ÉÒÔÔİÊ±²»²¹³ä    
+    hi_uint32                ui_per_low;   // åˆ†é…é˜€å€¼,ä½äºè¯¥è®¡æ•°é‡æ–°è¡¥å……åˆ†é…
+    hi_uint32                ui_per_high;  // åˆ†é…é˜€å€¼,é«˜äºæ”¹å€¼å¯ä»¥æš‚æ—¶ä¸è¡¥å……    
 
-    hi_uint32                ui_cnt_empty;    // ¶ÓÁĞ¿ÕÎŞ·¨»ñÈ¡ÄÚ´æ´ÎÊı
-    hi_uint32                ui_cnt_alloc;    // ³É¹¦ÉêÇëÄÚ´æ´ÎÊı
-    hi_uint32                ui_cnt_alloc_fail; // ÉêÇëÄÚ´æÊ§°Ü¼ÆÊı
+    hi_uint32                ui_cnt_empty;    // é˜Ÿåˆ—ç©ºæ— æ³•è·å–å†…å­˜æ¬¡æ•°
+    hi_uint32                ui_cnt_alloc;    // æˆåŠŸç”³è¯·å†…å­˜æ¬¡æ•°
+    hi_uint32                ui_cnt_alloc_fail; // ç”³è¯·å†…å­˜å¤±è´¥è®¡æ•°
 
-    hi_uint32                ui_cnt_idle;  // µ±Ç°¿ÕÏĞÄÚ´æ¿éÊı
+    hi_uint32                ui_cnt_idle;  // å½“å‰ç©ºé—²å†…å­˜å—æ•°
 
-    hi_uint32                ui_cnt_overlen; // ·ÖÅä³¤¶È¹ı´ó
-    hi_uint32                ui_cnt_overfree; // »ØÊÕÄÚ´æÒç³ö
-    hi_uint32                ui_cnt_skbfree;  // ÎŞ·¨»ØÊÕÄÚ´æ´ÎÊı
-    hi_uint32                ui_cnt_recycle;  // »ØÊÕÄÚ´æ´ÎÊı
+    hi_uint32                ui_cnt_overlen; // åˆ†é…é•¿åº¦è¿‡å¤§
+    hi_uint32                ui_cnt_overfree; // å›æ”¶å†…å­˜æº¢å‡º
+    hi_uint32                ui_cnt_skbfree;  // æ— æ³•å›æ”¶å†…å­˜æ¬¡æ•°
+    hi_uint32                ui_cnt_recycle;  // å›æ”¶å†…å­˜æ¬¡æ•°
 
-    hi_uint32                ui_flag;         // netmapÊ¹ÄÜ±êÖ¾, 1 enable; 0 disable
+    hi_uint32                ui_flag;         // netmapä½¿èƒ½æ ‡å¿—, 1 enable; 0 disable
 
     struct list_head         st_list_idle;
     

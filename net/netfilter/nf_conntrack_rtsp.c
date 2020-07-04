@@ -517,13 +517,13 @@ static int help(struct sk_buff *skb, unsigned int protoff,
 	msgoff = msglen = msghdrlen = 0;
 	while(get_next_message(tcpdata, tcpdatalen, &msgoff, &msglen,
 			       &msghdrlen)) {
-	    /*start  :增加DSLITE隧道时的RTSP ALG*/
+	    /*start  :澧炲姞DSLITE闅ч亾鏃剁殑RTSP ALG*/
 		/* Messages from LAN side through MASQUERADED connections */
 		if (memcmp(&ct->tuplehash[dir].tuple.src.u3,
 			   &ct->tuplehash[!dir].tuple.dst.u3,
 			   sizeof(ct->tuplehash[dir].tuple.src.u3)) != 0
 			   || (0 != strstr(skb->dev->name, "ip6tnl") && IP_CT_DIR_ORIGINAL == dir)) {
-	    /*end  :增加DSLITE隧道时的RTSP ALG*/
+	    /*end  :澧炲姞DSLITE闅ч亾鏃剁殑RTSP ALG*/
 			if(memcmp(tcpdata+msgoff, "PAUSE ", 6) == 0) {
 				int cseq = memmem(tcpdata+msgoff, msglen, "CSeq: ", 6);
 				if(cseq == -1) {
@@ -609,12 +609,12 @@ static int help(struct sk_buff *skb, unsigned int protoff,
 		while(get_next_client_port(tcpdata, tpoff, tplen,
 					   &portoff, &portlen,
 					   &rtpport, &rtcpport, &dash)) {
-            /*start :增加DSLITE隧道时的RTSP ALG*/
+            /*start :澧炲姞DSLITE闅ч亾鏃剁殑RTSP ALG*/
 			if (memcmp(&ct->tuplehash[dir].tuple.src.u3,
 			   	   &ct->tuplehash[!dir].tuple.dst.u3,
 			   	   sizeof(ct->tuplehash[dir].tuple.src.u3))
 			    != 0 || (0 != strstr(skb->dev->name, "ip6tnl") && IP_CT_DIR_ORIGINAL == dir)) {
-			/*end :增加DSLITE隧道时的RTSP ALG*/
+			/*end :澧炲姞DSLITE闅ч亾鏃剁殑RTSP ALG*/
 				/* LAN to WAN */
 				if (dash == 0) {
 					/* Single data channel */
@@ -678,13 +678,13 @@ static int help(struct sk_buff *skb, unsigned int protoff,
 		while(get_next_dest_ipport(tcpdata, tpoff, tplen,
 					   &destoff, &destlen, &dest,
 					   &portoff, &portlen, &rtpport)) {
-            /*start :增加DSLITE隧道时的RTSP ALG*/
+            /*start :澧炲姞DSLITE闅ч亾鏃剁殑RTSP ALG*/
 			/* Process the port part */
 			if (memcmp(&ct->tuplehash[dir].tuple.src.u3,
 			   	   &ct->tuplehash[!dir].tuple.dst.u3,
 			   	   sizeof(ct->tuplehash[dir].tuple.src.u3))
 			    != 0 || (0 != strstr(skb->dev->name, "ip6tnl") && IP_CT_DIR_ORIGINAL == dir)) {
-		    /*end :增加DSLITE隧道时的RTSP ALG*/
+		    /*end :澧炲姞DSLITE闅ч亾鏃剁殑RTSP ALG*/
 				/* LAN to WAN */
 				ret = expect_rtsp_channel(skb, ct, ctinfo,
 							  portoff, portlen,
@@ -839,7 +839,7 @@ int is_rtsp_tuple(struct net *net, const struct nf_conntrack_tuple *orig)
 		return 1;
 	}
 
-	/*ct还未建立，使用tuple查找是否属于RTSP数据连接*/
+	/*ct杩樻湭寤虹珛锛屼娇鐢╰uple鏌ユ壘鏄惁灞炰簬RTSP鏁版嵁杩炴帴*/
 	if (is_rtsp_data_tuple(net, orig))
 	{
 		return 1;

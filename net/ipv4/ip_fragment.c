@@ -645,8 +645,8 @@ static int ip_frag_reasm(struct ipq *qp, struct sk_buff *prev,
 			head->csum = csum_add(head->csum, fp->csum);
 		head->truesize += fp->truesize;
 #ifdef CONFIG_ATP_COMMON
-		/* 3.4´Ë´¦½øÐÐÁËÓÅ»¯,forÑ­»·Ö®ºó¼õµôµÄhead->truesizeÊÇ°üº¬ËùÓÐ·ÖÆ¬µÄ×Ü³¤¶È
-		  * Ã¿¸ö·ÖÆ¬¼ÆËã³¤¶ÈÊ±¼õµô·ÖÆ¬¸öÊý£¬forÑ­»·Ö®ºóÔÙÎªhead·ÖÆ¬°ü¼õ1
+		/* 3.4æ­¤å¤„è¿›è¡Œäº†ä¼˜åŒ–,forå¾ªçŽ¯ä¹‹åŽå‡æŽ‰çš„head->truesizeæ˜¯åŒ…å«æ‰€æœ‰åˆ†ç‰‡çš„æ€»é•¿åº¦
+		  * æ¯ä¸ªåˆ†ç‰‡è®¡ç®—é•¿åº¦æ—¶å‡æŽ‰åˆ†ç‰‡ä¸ªæ•°ï¼Œforå¾ªçŽ¯ä¹‹åŽå†ä¸ºheadåˆ†ç‰‡åŒ…å‡1
 		  */
 		atomic_sub(1, &qp->q.net->ipfrag_count);
 #endif

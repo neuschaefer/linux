@@ -59,10 +59,10 @@ struct fib_nh {
 	int			nh_weight;
 	int			nh_power;
 #ifdef CONFIG_ATP_ROUTE_BALANCE
-	unsigned long		nh_last_rx_bytes;	/*×îºóÒ»´Î¼ÇÂ¼µÄrx×Ö½ÚÊı*/
-	unsigned long		nh_traffic;			/*½Ó¿Úµ±Ç°¼´Ê±Á÷Á¿,µ¥Î»10Kbit È·±£²»Òç³ö*/
-	unsigned long		nh_bandwidth;		/*½Ó¿Ú´ø¿íµ¥Î»10Kbit È·±£²»Òç³ö*/
-	unsigned int		nh_percent;			/*first wan°Ù·Ö±È,0Îª·Çfirst wan*/
+	unsigned long		nh_last_rx_bytes;	/*æœ€åä¸€æ¬¡è®°å½•çš„rxå­—èŠ‚æ•°*/
+	unsigned long		nh_traffic;			/*æ¥å£å½“å‰å³æ—¶æµé‡,å•ä½10Kbit ç¡®ä¿ä¸æº¢å‡º*/
+	unsigned long		nh_bandwidth;		/*æ¥å£å¸¦å®½å•ä½10Kbit ç¡®ä¿ä¸æº¢å‡º*/
+	unsigned int		nh_percent;			/*first wanç™¾åˆ†æ¯”,0ä¸ºéfirst wan*/
 #endif
 #endif
 #ifdef CONFIG_IP_ROUTE_CLASSID

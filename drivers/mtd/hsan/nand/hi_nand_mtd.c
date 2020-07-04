@@ -3,14 +3,14 @@
 * (C) Huawei Technologies Co., Ltd. < >
 */
 /******************************************************************************
-  ÎÄ¼şÃû³Æ: hi_nand_mtd.c
-  ¹¦ÄÜÃèÊö: nandÇı¶¯¶Ômtd½Ó¿Ú£¬Ö§³ÅÎÄÏµÍ³
-  °æ±¾ÃèÊö: V1.0
+  æ–‡ä»¶åç§°: hi_nand_mtd.c
+  åŠŸèƒ½æè¿°: nandé©±åŠ¨å¯¹mtdæ¥å£ï¼Œæ”¯æ’‘æ–‡ç³»ç»Ÿ
+  ç‰ˆæœ¬æè¿°: V1.0
 
-  ´´½¨ÈÕÆÚ: D2013_04_20
+  åˆ›å»ºæ—¥æœŸ: D2013_04_20
 
-  ĞŞ¸Ä¼ÇÂ¼: 
-            Éú³É³õ¸å.
+  ä¿®æ”¹è®°å½•: 
+            ç”Ÿæˆåˆç¨¿.
 ******************************************************************************/
 #include <linux/sched.h>
 #include <linux/slab.h>
@@ -45,15 +45,15 @@ static struct nand_ecclayout g_st_nand_oob_32 =
 /*<Start:   monitor flash opteration>*/
 #ifdef SUPPORT_ATP_FLASH_MONITOR
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  monitor the mtd erase/write frequency and lock it for exclusive access
-  ÊäÈë²ÎÊı:  
+  å‡½æ•°åŠŸèƒ½:  monitor the mtd erase/write frequency and lock it for exclusive access
+  è¾“å…¥å‚æ•°:  
                              optmod : operation mode write/erase
                              pst_mtd: MTD device structure  
                              addr     : write/erase addr
                              ulen     : write/erase lenght
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:  uint       
-  º¯Êı±¸×¢:  
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:  uint       
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 static hi_int32 hi_nand_mtd_protect(hi_uint64 addr)
 {
@@ -67,14 +67,14 @@ static hi_int32 hi_nand_mtd_protect(hi_uint64 addr)
 #endif
 /*<End:   monitor flash opteration>*/
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  Get the device and lock it for exclusive access
-  ÊäÈë²ÎÊı:  
+  å‡½æ•°åŠŸèƒ½:  Get the device and lock it for exclusive access
+  è¾“å…¥å‚æ•°:  
                              chip:    the nand chip descriptor
                              mtd : MTD device structure
                              new_state:    the state which is requested
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:  uint       
-  º¯Êı±¸×¢:  
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:  uint       
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 static hi_int32 hi_nand_mtd_get_device(struct hi_nand_chip *pst_chip, struct mtd_info *pst_mtd, hi_int32 i_new_state)
 {
@@ -118,12 +118,12 @@ retry:
 }
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  Deselect, release chip lock and wake up anyone waiting on the device
-  ÊäÈë²ÎÊı:  
+  å‡½æ•°åŠŸèƒ½:  Deselect, release chip lock and wake up anyone waiting on the device
+  è¾“å…¥å‚æ•°:  
                              mtd : MTD device structure
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:  uint       
-  º¯Êı±¸×¢:  
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:  uint       
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 static hi_void hi_nand_mtd_release_device(struct mtd_info *pst_mtd)
 {
@@ -138,15 +138,15 @@ static hi_void hi_nand_mtd_release_device(struct mtd_info *pst_mtd)
 }
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  Transfer oob to client buffer
-  ÊäÈë²ÎÊı:  
+  å‡½æ•°åŠŸèƒ½:  Transfer oob to client buffer
+  è¾“å…¥å‚æ•°:  
                              chip : nand chip structure
                              oob : oob data buffer
                              ops : oob ops structure
                              len : size of oob to transfer
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:  uint       
-  º¯Êı±¸×¢:  
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:  uint       
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 static hi_uchar8 *hi_nand_mtd_transfer_oob(struct hi_nand_chip *pst_chip,
                 hi_uchar8 *puc_oob, struct mtd_oob_ops *pst_oob_ops, hi_uint32 ui_len)
@@ -201,14 +201,14 @@ static hi_uchar8 *hi_nand_mtd_transfer_oob(struct hi_nand_chip *pst_chip,
 }
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  Transfer client buffer to oob
-  ÊäÈë²ÎÊı:  
+  å‡½æ•°åŠŸèƒ½:  Transfer client buffer to oob
+  è¾“å…¥å‚æ•°:  
                              chip : nand chip structure
                              oob : oob data buffer
                              ops : oob ops structure
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:  uint       
-  º¯Êı±¸×¢:  
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:  uint       
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 static hi_uchar8 *hi_nand_mtd_fill_oob(struct hi_nand_chip *pst_chip, hi_uchar8 *puc_oob, struct mtd_oob_ops *pst_oob_ops)
 {
@@ -267,14 +267,14 @@ static hi_uchar8 *hi_nand_mtd_fill_oob(struct hi_nand_chip *pst_chip, hi_uchar8 
 }
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  write one ore more pages
-  ÊäÈë²ÎÊı:  
+  å‡½æ•°åŠŸèƒ½:  write one ore more pages
+  è¾“å…¥å‚æ•°:  
                              mtd : MTD device structure
                              to : offset to write to
                              ops : oob operations description structure
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:  uint       
-  º¯Êı±¸×¢:  
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:  uint       
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 static hi_int32 hi_nand_mtd_write_ops(struct mtd_info *pst_mtd, hi_uint64 ull_dst_addr, struct mtd_oob_ops *pst_oob_ops)
 {
@@ -374,14 +374,14 @@ static hi_int32 hi_nand_mtd_write_ops(struct mtd_info *pst_mtd, hi_uint64 ull_ds
 }
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  write data and/or out-of-band
-  ÊäÈë²ÎÊı:  
+  å‡½æ•°åŠŸèƒ½:  write data and/or out-of-band
+  è¾“å…¥å‚æ•°:  
                              mtd : MTD device structure
                              to : offset to write to
                              ops : oob operation description structure
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:  hi_int32       
-  º¯Êı±¸×¢:  
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:  hi_int32       
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 static hi_int32 hi_nand_mtd_do_write_oob(struct mtd_info *pst_mtd, 
                             hi_uint64 ull_dst_addr, struct mtd_oob_ops *pst_oob_ops)
@@ -463,14 +463,14 @@ static hi_int32 hi_nand_mtd_do_write_oob(struct mtd_info *pst_mtd,
 }
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  write data and/or out-of-band
-  ÊäÈë²ÎÊı:  
+  å‡½æ•°åŠŸèƒ½:  write data and/or out-of-band
+  è¾“å…¥å‚æ•°:  
                              mtd : MTD device structure
                              to : offset to write to
                              ops : oob operation description structure
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:  hi_int32       
-  º¯Êı±¸×¢:  
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:  hi_int32       
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 static hi_int32 hi_nand_mtd_write_oob(struct mtd_info *pst_mtd, hi_uint64 ull_dst_addr, struct mtd_oob_ops *pst_oob_ops)
 {
@@ -513,16 +513,16 @@ static hi_int32 hi_nand_mtd_write_oob(struct mtd_info *pst_mtd, hi_uint64 ull_ds
 }
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  write one ore more pages
-  ÊäÈë²ÎÊı:  
+  å‡½æ•°åŠŸèƒ½:  write one ore more pages
+  è¾“å…¥å‚æ•°:  
                              mtd : MTD device structure
                              from : offset to read from
                              len : number of bytes to read
                              retlen : pointer to variable to store the number of written bytes
                              buf : the databuffer to put data
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:  uint       
-  º¯Êı±¸×¢:  
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:  uint       
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 static hi_int32 hi_nand_mtd_write(struct mtd_info *pst_mtd, hi_uint64 ull_dst_addr, 
                               hi_uint32 ui_len, hi_uint32 *pui_retlen, const hi_uchar8 *puc_buf)
@@ -568,14 +568,14 @@ static hi_int32 hi_nand_mtd_write(struct mtd_info *pst_mtd, hi_uint64 ull_dst_ad
 }
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  read out-of-band data from the spare area
-  ÊäÈë²ÎÊı:  
+  å‡½æ•°åŠŸèƒ½:  read out-of-band data from the spare area
+  è¾“å…¥å‚æ•°:  
                              mtd : MTD device structure
                              from : offset to read from
                              ops : oob operation description structure
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:  hi_int32       
-  º¯Êı±¸×¢:  
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:  hi_int32       
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 static hi_int32 hi_nand_mtd_do_read_oob(struct mtd_info *pst_mtd, hi_uint64 ull_src_addr, struct mtd_oob_ops *pst_oob_ops)
 {
@@ -637,14 +637,14 @@ static hi_int32 hi_nand_mtd_do_read_oob(struct mtd_info *pst_mtd, hi_uint64 ull_
 }
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  read whole page (&oob)
-  ÊäÈë²ÎÊı:  
+  å‡½æ•°åŠŸèƒ½:  read whole page (&oob)
+  è¾“å…¥å‚æ•°:  
                              mtd : MTD device structure
                              from : offset to read from
                              ops : oob ops structure
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:  uint       
-  º¯Êı±¸×¢:  
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:  uint       
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 static hi_int32 hi_nand_mtd_read_ops(struct mtd_info *pst_mtd, hi_uint64 ull_src_addr, struct mtd_oob_ops *pst_oob_ops)
 {
@@ -753,14 +753,14 @@ static hi_int32 hi_nand_mtd_read_ops(struct mtd_info *pst_mtd, hi_uint64 ull_src
 }
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  read data and/or out-of-band
-  ÊäÈë²ÎÊı:  
+  å‡½æ•°åŠŸèƒ½:  read data and/or out-of-band
+  è¾“å…¥å‚æ•°:  
                              mtd : MTD device structure
                              from : offset to read from
                              ops : oob operation description structure
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:  hi_int32       
-  º¯Êı±¸×¢:  
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:  hi_int32       
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 static hi_int32 hi_nand_mtd_read_oob(struct mtd_info *pst_mtd, hi_uint64 ull_src_addr, struct mtd_oob_ops *pst_oob_ops)
 {
@@ -799,16 +799,16 @@ static hi_int32 hi_nand_mtd_read_oob(struct mtd_info *pst_mtd, hi_uint64 ull_src
 }
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  read one ore more pages
-  ÊäÈë²ÎÊı:  
+  å‡½æ•°åŠŸèƒ½:  read one ore more pages
+  è¾“å…¥å‚æ•°:  
                              mtd : MTD device structure
                              from : offset to read from
                              len : number of bytes to read
                              retlen : pointer to variable to store the number of read bytes
                              buf : the databuffer to put data
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:  uint       
-  º¯Êı±¸×¢:  
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:  uint       
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 static hi_int32 hi_nand_mtd_read(struct mtd_info *pst_mtd, hi_uint64 ull_src_addr, 
                                     hi_uint32 ui_len, hi_uint32 *pui_retlen, hi_uchar8 *puc_buf)
@@ -847,13 +847,13 @@ static hi_int32 hi_nand_mtd_read(struct mtd_info *pst_mtd, hi_uint64 ull_src_add
 }
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  Erase one ore more blocks
-  ÊäÈë²ÎÊı:  
+  å‡½æ•°åŠŸèƒ½:  Erase one ore more blocks
+  è¾“å…¥å‚æ•°:  
                              mtd : MTD device structure
                              instr : erase instruction
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:  uint       
-  º¯Êı±¸×¢:  
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:  uint       
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 static hi_int32 hi_nand_mtd_erase(struct mtd_info *pst_mtd, struct erase_info *pst_erase_info)
 {
@@ -970,13 +970,13 @@ erase_exit:
 }
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  Check if block at offset is bad
-  ÊäÈë²ÎÊı:  
+  å‡½æ•°åŠŸèƒ½:  Check if block at offset is bad
+  è¾“å…¥å‚æ•°:  
                              pst_host : nand driver host structure
                              ofs : offset relative to mtd start
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:  hi_int32       
-  º¯Êı±¸×¢:  
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:  hi_int32       
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 static hi_int32 hi_nand_mtd_block_isbad(struct mtd_info *pst_mtd, hi_uint64 ull_block_addr)
 {
@@ -984,13 +984,13 @@ static hi_int32 hi_nand_mtd_block_isbad(struct mtd_info *pst_mtd, hi_uint64 ull_
 }
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  Mark block at the given offset as bad
-  ÊäÈë²ÎÊı:  
+  å‡½æ•°åŠŸèƒ½:  Mark block at the given offset as bad
+  è¾“å…¥å‚æ•°:  
                              mtd : MTD device structure
                              ofs : offset relative to mtd start
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:  hi_int32       
-  º¯Êı±¸×¢:  
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:  hi_int32       
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 static hi_int32 hi_nand_mtd_block_markbad(struct mtd_info *pst_mtd, hi_uint64 ull_block_addr)
 {
@@ -998,12 +998,12 @@ static hi_int32 hi_nand_mtd_block_markbad(struct mtd_info *pst_mtd, hi_uint64 ul
 }
 
 /******************************************************************************
-  º¯Êı¹¦ÄÜ:  NAND device init
-  ÊäÈë²ÎÊı:  
+  å‡½æ•°åŠŸèƒ½:  NAND device init
+  è¾“å…¥å‚æ•°:  
                              mtd : MTD device structure
-  Êä³ö²ÎÊı:  ÎŞ
-  º¯Êı·µ»Ø:  uint       
-  º¯Êı±¸×¢:  
+  è¾“å‡ºå‚æ•°:  æ— 
+  å‡½æ•°è¿”å›:  uint       
+  å‡½æ•°å¤‡æ³¨:  
 ******************************************************************************/
 hi_int32 hi_nand_mtd_contact(struct mtd_info *pst_mtd)
 {

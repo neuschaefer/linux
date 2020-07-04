@@ -24,9 +24,9 @@
 # include <linux/rwlock_types_rt.h>
 #endif
 #ifdef CONFIG_SUPPORT_ATP
-/* START ADD : Huawei : 解决Hybrid编译问题，临时规避手段，后期清理 */
+/* START ADD : Huawei : 瑙ｅ喅Hybrid缂栬瘧闂锛屼复鏃惰閬挎墜娈碉紝鍚庢湡娓呯悊 */
 #define SPIN_LOCK_UNLOCKED	__SPIN_LOCK_UNLOCKED(old_style_spin_init)
 #define RW_LOCK_UNLOCKED	__RW_LOCK_UNLOCKED(old_style_rw_init)
-/* END ADD : Huawei : 解决Hybrid编译问题，临时规避手段，后期清理 */
+/* END ADD : Huawei : 瑙ｅ喅Hybrid缂栬瘧闂锛屼复鏃惰閬挎墜娈碉紝鍚庢湡娓呯悊 */
 #endif
 #endif /* __LINUX_SPINLOCK_TYPES_H */

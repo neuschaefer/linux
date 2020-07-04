@@ -91,7 +91,7 @@
 
 #include "msg/kcmsmonitormsgtypes.h"
 
-/*ATP新增*/
+/*ATP鏂板*/
 typedef struct pppoe_dis_msg {
     char   name[IFNAMSIZ];
     struct pppoe_hdr ph;
@@ -675,7 +675,7 @@ static int pppoe_disc_rcv(struct sk_buff *skb, struct net_device *dev,
 	po = get_item(pn, ph->sid, eth_hdr(skb)->h_source, dev->ifindex);
 	if (po) {
 
-	    //HOMEGW-15159, from W723V, 接收到PADT(无lcp terminate)报文后，向pppc发信号断开
+	    //HOMEGW-15159, from W723V, 鎺ユ敹鍒癙ADT(鏃爈cp terminate)鎶ユ枃鍚庯紝鍚憄ppc鍙戜俊鍙锋柇寮�
 	    //syswatch_nl_send(ATP_MSG_MONITOR_EVT_RCV_PADT, NULL, 0);
         pppoe_dis_msg_st padi = {0};
         snprintf(padi.name, IFNAMSIZ, dev->name);
