@@ -537,19 +537,32 @@ static void mmc_sd_remove(struct mmc_host *host)
 /*
  * Card detection callback from host.
  */
+#if 1 /* E_BOOK *//* bugfix for multiple run detecting 2011/06/17 */
+static DEFINE_MUTEX(sd_detect_mutex);
+#endif
 static void mmc_sd_detect(struct mmc_host *host)
 {
 	int err;
+#if 1 /* E_BOOK *//* for TEST 2011/07/14 */
+	extern int mxc_get_cd_status(struct mmc_host *mmc);
+#endif
 
 	BUG_ON(!host);
 	BUG_ON(!host->card);
 
+#if 1 /* E_BOOK *//* bugfix for multiple run detecting 2011/06/17 */
+	mutex_lock(&sd_detect_mutex);
+#endif	
 	mmc_claim_host(host);
 
 	/*
 	 * Just check if our card has been removed.
 	 */
+#if 1 /* E_BOOK *//* for TEST 2011/07/14 */
+	err = mxc_get_cd_status(host);
+#else
 	err = mmc_send_status(host->card, NULL);
+#endif
 
 	mmc_release_host(host);
 
@@ -560,6 +573,9 @@ static void mmc_sd_detect(struct mmc_host *host)
 		mmc_detach_bus(host);
 		mmc_release_host(host);
 	}
+#if 1 /* E_BOOK *//* bugfix for multiple run detecting 2011/06/17 */
+	mutex_unlock(&sd_detect_mutex);
+#endif	
 }
 
 /*
@@ -713,4 +729,75 @@ err:
 
 	return err;
 }
+#if 1 /* E_BOOK *//* TEST for Electrostatic 2011/08/12 */
+/*
+ * Starting point for SD card init again.
+ */
+int mmc_attach_sd_again(struct mmc_host *host, u32 ocr)
+{
+	int err;
 
+	BUG_ON(!host);
+	WARN_ON(!host->claimed);
+
+
+	/*
+	 * We need to get OCR a different way for SPI.
+	 */
+	if (mmc_host_is_spi(host)) {
+		mmc_go_idle(host);
+
+		err = mmc_spi_read_ocr(host, 0, &ocr);
+		if (err)
+			goto err;
+	}
+
+	/*
+	 * Sanity check the voltages that the card claims to
+	 * support.
+	 */
+	if (ocr & 0x7F) {
+		printk(KERN_WARNING "%s: card claims to support voltages "
+		       "below the defined range. These will be ignored.\n",
+		       mmc_hostname(host));
+		ocr &= ~0x7F;
+	}
+
+	if (ocr & MMC_VDD_165_195) {
+		printk(KERN_WARNING "%s: SD card claims to support the "
+		       "incompletely defined 'low voltage range'. This "
+		       "will be ignored.\n", mmc_hostname(host));
+		ocr &= ~MMC_VDD_165_195;
+	}
+
+	host->ocr = mmc_select_voltage(host, ocr);
+
+	/*
+	 * Can we support the voltage(s) of the card(s)?
+	 */
+	if (!host->ocr) {
+		err = -EINVAL;
+		goto err;
+	}
+
+	/*
+	 * Detect and init the card.
+	 */
+	//err = mmc_sd_init_card(host, host->ocr, NULL);
+	err = mmc_sd_init_card(host, host->ocr, host->card);
+	if (err)
+		goto err;
+
+	return 0;
+
+remove_card:
+	mmc_remove_card(host->card);
+	host->card = NULL;
+err:
+
+	printk(KERN_ERR "%s: error %d whilst initialising SD card\n",
+		mmc_hostname(host), err);
+
+	return err;
+}
+#endif

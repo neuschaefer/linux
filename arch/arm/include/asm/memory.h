@@ -24,6 +24,11 @@
  */
 #define UL(x) _AC(x, UL)
 
+#if defined(CONFIG_RUNTIME_PHYS_OFFSET) && !defined(__ASSEMBLY__)
+extern unsigned long phys_offset;
+#define PHYS_OFFSET	phys_offset
+#endif
+
 #ifdef CONFIG_MMU
 
 /*
@@ -33,7 +38,7 @@
  */
 #define PAGE_OFFSET		UL(CONFIG_PAGE_OFFSET)
 #define TASK_SIZE		(UL(CONFIG_PAGE_OFFSET) - UL(0x01000000))
-#define TASK_UNMAPPED_BASE	(UL(CONFIG_PAGE_OFFSET) / 3)
+#define TASK_UNMAPPED_BASE	UL(0x18000000)
 
 /*
  * The maximum size of a 26-bit user space task.

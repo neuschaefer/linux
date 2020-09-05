@@ -36,6 +36,8 @@
 #include <linux/dma-mapping.h>
 #include <linux/debugfs.h>
 #include <linux/slab.h>
+#include <linux/regulator/consumer.h>
+#include <linux/regulator/machine.h>
 
 #include <asm/byteorder.h>
 #include <asm/io.h>
@@ -304,8 +306,13 @@ static void end_unlink_async(struct ehci_hcd *ehci);
 static void ehci_work(struct ehci_hcd *ehci);
 
 #include "ehci-hub.c"
+#ifdef CONFIG_USB_STATIC_IRAM
+#include "ehci-mem-iram.c"
+#include "ehci-q-iram.c"
+#else
 #include "ehci-mem.c"
 #include "ehci-q.c"
+#endif
 #include "ehci-sched.c"
 
 /*-------------------------------------------------------------------------*/
@@ -687,6 +694,9 @@ static int ehci_run (struct usb_hcd *hcd)
 		((ehci->sbrn & 0xf0)>>4), (ehci->sbrn & 0x0f),
 		temp >> 8, temp & 0xff,
 		ignore_oc ? ", overcurrent ignored" : "");
+	/* Tuning TX FIFO Burst Threshold for Sony's ebook project */
+	ehci_writel(ehci, 0x110000,
+		    &ehci->regs->reserved[2]);
 
 	ehci_writel(ehci, INTR_MASK,
 		    &ehci->regs->intr_enable); /* Turn On Interrupts */
@@ -1123,6 +1133,11 @@ MODULE_LICENSE ("GPL");
 #define        PLATFORM_DRIVER         ehci_hcd_omap_driver
 #endif
 
+#if defined(CONFIG_USB_EHCI_ARC) || defined(CONFIG_USB_EHCI_ARC_MODULE)
+#include "ehci-arc.c"
+#define	PLATFORM_DRIVER		ehci_fsl_driver
+#endif
+
 #ifdef CONFIG_PPC_PS3
 #include "ehci-ps3.c"
 #define	PS3_SYSTEM_BUS_DRIVER	ps3_ehci_driver
@@ -1164,9 +1179,58 @@ MODULE_LICENSE ("GPL");
 #error "missing bus glue for ehci-hcd"
 #endif
 
+#ifdef CONFIG_REGULATOR_TWL4030 
+static struct regulator* ldo5;
+static struct regulator* ldousb;
+#endif
+
+#ifdef CONFIG_REGULATOR_WM831X
+static struct regulator* ldo8; //USBPHY 2.5V
+static struct regulator* ldo9; //USBPHY 3.1V
+#endif
+
 static int __init ehci_hcd_init(void)
 {
 	int retval = 0;
+#ifdef CONFIG_REGULATOR_TWL4030
+	//printk("get LDO5 regulator\n");
+	ldo5 = regulator_get(NULL, "LDO5");
+	if(IS_ERR(ldo5)){
+		printk(KERN_ERR"error: regulator_get LDO5\n"); 
+		ldo5 = NULL;  
+	}else{
+		regulator_enable(ldo5);
+	}
+	
+	//printk("get LDOUSB regulator\n");
+	ldousb = regulator_get(NULL, "LDOUSB");
+	if(IS_ERR(ldousb))
+	{  
+		printk(KERN_ERR"error: regulator_get LDOUSB\n");
+		ldousb = NULL; 
+	}else{  
+		regulator_enable(ldousb);
+	} 
+#endif
+	
+#ifdef CONFIG_REGULATOR_WM831X
+	ldo8 = regulator_get(NULL, "LDO8");
+	if(IS_ERR(ldo8)){
+		printk(KERN_ERR"error: regulator_get LDO8\n");
+		ldo8 = NULL;
+	}else{
+		regulator_enable(ldo8);
+	}
+
+	ldo9 = regulator_get(NULL, "LDO9");
+	if(IS_ERR(ldo9))
+	{
+		printk(KERN_ERR"error: regulator_get LDO9\n");
+		ldo9 = NULL;
+	}else{
+		regulator_enable(ldo9);
+	}
+#endif
 
 	if (usb_disabled())
 		return -ENODEV;
@@ -1273,6 +1337,31 @@ static void __exit ehci_hcd_cleanup(void)
 	debugfs_remove(ehci_debug_root);
 #endif
 	clear_bit(USB_EHCI_LOADED, &usb_hcds_loaded);
+	
+#ifdef CONFIG_REGULATOR_TWL4030
+	//printk("put LDO5 regulator\n");  
+	if(ldo5){
+		regulator_disable(ldo5);
+		regulator_put(ldo5);	
+	}
+	
+	//printk("put LDOUSB regulator\n");
+	if(ldousb) {
+		regulator_disable(ldousb);
+		regulator_put(ldousb); 
+	}
+#endif
+	
+#ifdef CONFIG_REGULATOR_WM831X
+	if(ldo8){
+		regulator_disable(ldo8);
+		regulator_put(ldo8);
+	}
+	if(ldo9){
+		regulator_disable(ldo9);
+		regulator_put(ldo9);
+	}
+#endif
 }
 module_exit(ehci_hcd_cleanup);
 

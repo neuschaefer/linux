@@ -1,9 +1,10 @@
 /*
- *  linux/drivers/char/core.c
+ *  linux/drivers/serial/serial_core.c
  *
  *  Driver core for serial ports
  *
- *  Based on drivers/char/serial.c, by Linus Torvalds, Theodore Ts'o.
+ *  Based on drivers/char/serial.c which was contained in earlier kernel,
+ *  by Linus Torvalds, Theodore Ts'o.
  *
  *  Copyright 1999 ARM Limited
  *  Copyright (C) 2000-2001 Deep Blue Solutions Ltd.
@@ -2092,7 +2093,7 @@ int uart_resume_port(struct uart_driver *drv, struct uart_port *uport)
 	 */
 	if (uart_console(uport)) {
 		uart_change_pm(state, 0);
-		uport->ops->set_termios(uport, &termios, NULL);
+		uport->ops->set_termios(uport, port->tty->termios, NULL);
 		console_start(uport->cons);
 	}
 

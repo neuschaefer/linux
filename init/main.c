@@ -82,6 +82,11 @@
 #include <asm/smp.h>
 #endif
 
+#if 1 /* E_BOOK */
+#include <linux/mix_logger.h>
+#include <linux/kernel_logger.h>
+#endif /* E_BOOK */
+
 static int kernel_init(void *);
 
 extern void init_IRQ(void);
@@ -667,6 +672,12 @@ asmlinkage void __init start_kernel(void)
 	kmemleak_init();
 	debug_objects_mem_init();
 	idr_init_cache();
+#ifdef CONFIG_MIX_LOGGER /* E_BOOK */
+	mix_log_mem_init();
+#endif /* E_BOOK */
+#ifdef	CONFIG_KERNEL_LOGGER /* E_BOOK */
+	kernel_log_mem_init();
+#endif /* E_BOOK */
 	setup_per_cpu_pageset();
 	numa_policy_init();
 	if (late_time_init)

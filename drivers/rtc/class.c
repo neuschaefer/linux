@@ -42,6 +42,8 @@ static void rtc_device_release(struct device *dev)
 
 static struct timespec	delta;
 static time_t		oldtime;
+/* 2011/08/13 FY11 : Fixed wring system clock shift. */
+static struct timespec susptime;
 
 static int rtc_suspend(struct device *dev, pm_message_t mesg)
 {
@@ -59,6 +61,9 @@ static int rtc_suspend(struct device *dev, pm_message_t mesg)
 	set_normalized_timespec(&delta,
 				ts.tv_sec - oldtime,
 				ts.tv_nsec - (NSEC_PER_SEC >> 1));
+
+/* 2011/08/13 FY11 : Fixed wring system clock shift. */
+	susptime = ts;
 
 	return 0;
 }
@@ -85,12 +90,20 @@ static int rtc_resume(struct device *dev)
 		return 0;
 	}
 
-	/* restore wall clock using delta against this RTC;
-	 * adjust again for avg 1/2 second RTC sampling error
-	 */
-	set_normalized_timespec(&time,
-				newtime + delta.tv_sec,
-				(NSEC_PER_SEC >> 1) + delta.tv_nsec);
+/* 2011/08/13 FY11 : Fixed wring system clock shift. */
+	if ( newtime > susptime.tv_sec )
+	{
+		// restore rtc to system clock 
+		// if current rtc is later than suspend clock time.
+		set_normalized_timespec(&time,
+					newtime,
+					0 );
+	}
+	else
+	{
+		// restore suspend clock time to system clock.
+		time = susptime;
+	}
 	do_settimeofday(&time);
 
 	return 0;

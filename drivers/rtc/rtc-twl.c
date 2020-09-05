@@ -30,6 +30,9 @@
 
 #include <linux/i2c/twl.h>
 
+/* 2011/01/18 FY11 :Add  for MSECURE control. */
+#include <mach/gpio.h>
+
 
 /*
  * RTC block register offsets (use TWL_MODULE_RTC)
@@ -131,6 +134,9 @@ static const u8 twl6030_rtc_reg_map[] = {
 /* REG_SECONDS_REG through REG_YEARS_REG is how many registers? */
 #define ALL_TIME_REGS		6
 
+/* 2011/01/18 FY11 :Add MSECURE control. */
+#define MSECURE (5*32 + 27) /*GPIO_6_27 */
+
 /*----------------------------------------------------------------------*/
 static u8  *rtc_reg_map;
 
@@ -154,8 +160,12 @@ static int twl_rtc_read_u8(u8 *data, u8 reg)
 static int twl_rtc_write_u8(u8 data, u8 reg)
 {
 	int ret;
-
+	
+/* 2010/01/18 FY11 :Add MSECURE control. */
+	gpio_direction_output(MSECURE, 1);
 	ret = twl_i2c_write_u8(TWL_MODULE_RTC, data, (rtc_reg_map[reg]));
+	gpio_direction_output(MSECURE, 0);
+	
 	if (ret < 0)
 		pr_err("twl_rtc: Could not write TWL"
 		       "register %X - error %d\n", reg, ret);
@@ -292,8 +302,11 @@ static int twl_rtc_set_time(struct device *dev, struct rtc_time *tm)
 		goto out;
 
 	/* update all the time registers in one shot */
+/* 2011/01/18 FY11 :Add MSECURE control. */
+	gpio_direction_output(MSECURE, 1);
 	ret = twl_i2c_write(TWL_MODULE_RTC, rtc_data,
 		(rtc_reg_map[REG_SECONDS_REG]), ALL_TIME_REGS);
+	gpio_direction_output(MSECURE, 0);
 	if (ret < 0) {
 		dev_err(dev, "rtc_set_time error %d\n", ret);
 		goto out;
@@ -317,6 +330,7 @@ static int twl_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alm)
 
 	ret = twl_i2c_read(TWL_MODULE_RTC, rtc_data,
 			(rtc_reg_map[REG_ALARM_SECONDS_REG]), ALL_TIME_REGS);
+	
 	if (ret < 0) {
 		dev_err(dev, "rtc_read_alarm error %d\n", ret);
 		return ret;
@@ -354,8 +368,12 @@ static int twl_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alm)
 	alarm_data[6] = bin2bcd(alm->time.tm_year - 100);
 
 	/* update all the alarm registers in one shot */
+/* 2010/01/18 FY11 :Add MSECURE control. */
+	gpio_direction_output(MSECURE, 1);
 	ret = twl_i2c_write(TWL_MODULE_RTC, alarm_data,
 		(rtc_reg_map[REG_ALARM_SECONDS_REG]), ALL_TIME_REGS);
+/* 2010/01/18 FY11 :Add MSECURE control. */
+	gpio_direction_output(MSECURE, 0);
 	if (ret) {
 		dev_err(dev, "rtc_set_alarm error %d\n", ret);
 		goto out;
@@ -444,6 +462,9 @@ static int __devinit twl_rtc_probe(struct platform_device *pdev)
 	int ret = 0;
 	int irq = platform_get_irq(pdev, 0);
 	u8 rd_reg;
+	
+/* 2010/01/18 FY11 :Add MSECURE control. */
+	gpio_request(MSECURE, "msecure");
 
 	if (irq <= 0)
 		return -EINVAL;

@@ -40,6 +40,10 @@
 
 #include <asm/uaccess.h>
 
+#if 1 /* E_BOOK */
+#include <linux/kernel_logger.h>
+#endif /* E_BOOK */
+
 /*
  * for_each_console() allows you to iterate on each console
  */
@@ -757,6 +761,10 @@ asmlinkage int vprintk(const char *fmt, va_list args)
 			}
 		}
 	}
+
+#ifdef CONFIG_KERNEL_LOGGER /* E_BOOK */
+	printk2logger(current_log_level, p);
+#endif /* E_BOOK */
 
 	/*
 	 * Copy the output into log_buf.  If the caller didn't provide
@@ -1544,3 +1552,152 @@ void kmsg_dump(enum kmsg_dump_reason reason)
 	spin_unlock_irqrestore(&dump_list_lock, flags);
 }
 #endif
+
+#ifdef CONFIG_PAST_LOG
+/* copy from original vprintk */
+static int pastlog_vdegug(const char *fmt, va_list args)
+{
+	int printed_len = 0;
+	int current_log_level = default_message_loglevel;
+	unsigned long flags;
+	int this_cpu;
+	char *p;
+
+	boot_delay_msec();
+	printk_delay();
+
+	preempt_disable();
+	/* This stops the holder of console_sem just where we want him */
+	raw_local_irq_save(flags);
+	this_cpu = smp_processor_id();
+
+	/*
+	 * Ouch, printk recursed into itself!
+	 */
+	if (unlikely(printk_cpu == this_cpu)) {
+		/*
+		 * If a crash is occurring during printk() on this CPU,
+		 * then try to get the crash message out but make sure
+		 * we can't deadlock. Otherwise just return to avoid the
+		 * recursion and return - but flag the recursion so that
+		 * it can be printed at the next appropriate moment:
+		 */
+		if (!oops_in_progress) {
+			recursion_bug = 1;
+			goto out_restore_irqs;
+		}
+		zap_locks();
+	}
+
+	lockdep_off();
+	spin_lock(&logbuf_lock);
+	printk_cpu = this_cpu;
+
+	if (recursion_bug) {
+		recursion_bug = 0;
+		strcpy(printk_buf, recursion_bug_msg);
+		printed_len = strlen(recursion_bug_msg);
+	}
+	/* Emit the output into the temporary buffer */
+	printed_len += vscnprintf(printk_buf + printed_len,
+				  sizeof(printk_buf) - printed_len, fmt, args);
+
+
+	p = printk_buf;
+
+	/* Do we have a loglevel in the string? */
+	if (p[0] == '<') {
+		unsigned char c = p[1];
+		if (c && p[2] == '>') {
+			switch (c) {
+			case '0' ... '7': /* loglevel */
+				current_log_level = c - '0';
+			/* Fallthrough - make sure we're on a new line */
+			case 'd': /* KERN_DEFAULT */
+				if (!new_text_line) {
+					emit_log_char('\n');
+					new_text_line = 1;
+				}
+			/* Fallthrough - skip the loglevel */
+			case 'c': /* KERN_CONT */
+				p += 3;
+				break;
+			}
+		}
+	}
+
+	/*
+	 * Copy the output into log_buf.  If the caller didn't provide
+	 * appropriate log level tags, we insert them here
+	 */
+	for ( ; *p; p++) {
+		if (new_text_line) {
+			/* Always output the token */
+			emit_log_char('<');
+			emit_log_char(current_log_level + '0');
+			emit_log_char('>');
+			printed_len += 3;
+			new_text_line = 0;
+
+			if (printk_time) {
+				/* Follow the token with the time */
+				char tbuf[50], *tp;
+				unsigned tlen;
+				unsigned long long t;
+				unsigned long nanosec_rem;
+
+				t = cpu_clock(printk_cpu);
+				nanosec_rem = do_div(t, 1000000000);
+				tlen = sprintf(tbuf, "[%5lu.%06lu] ",
+						(unsigned long) t,
+						nanosec_rem / 1000);
+
+				for (tp = tbuf; tp < tbuf + tlen; tp++)
+					emit_log_char(*tp);
+				printed_len += tlen;
+			}
+
+			if (!*p)
+				break;
+		}
+
+		emit_log_char(*p);
+		if (*p == '\n')
+			new_text_line = 1;
+	}
+
+	/*
+	 * Try to acquire and then immediately release the
+	 * console semaphore. The release will do all the
+	 * actual magic (print out buffers, wake up klogd,
+	 * etc). 
+	 *
+	 * The acquire_console_semaphore_for_printk() function
+	 * will release 'logbuf_lock' regardless of whether it
+	 * actually gets the semaphore or not.
+	 */
+	if (acquire_console_semaphore_for_printk(this_cpu))
+		release_console_sem();
+
+	lockdep_on();
+out_restore_irqs:
+	raw_local_irq_restore(flags);
+
+	preempt_enable();
+	return printed_len;
+}
+
+int pastlog_degug(const char *fmt, ...)
+{
+	va_list args;
+	int r;
+
+	va_start(args, fmt);
+	r = pastlog_vdegug(fmt, args);
+	va_end(args);
+
+	return r;
+}
+
+EXPORT_SYMBOL(pastlog_degug);
+#endif /* CONFIG_PAST_LOG */

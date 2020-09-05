@@ -34,6 +34,10 @@
 #include "ptrace.h"
 #include "signal.h"
 
+#if 1 /* E_BOOK */
+#include <linux/pastlog.h>
+#endif /* E_BOOK */
+
 static const char *handler[]= { "prefetch abort", "data abort", "address exception", "interrupt" };
 
 #ifdef CONFIG_DEBUG_USER
@@ -285,6 +289,9 @@ void die(const char *str, struct pt_regs *regs, int err)
 		panic("Fatal exception in interrupt");
 	if (panic_on_oops)
 		panic("Fatal exception");
+#ifdef CONFIG_PAST_LOG /* E_BOOK */
+	past_flush();
+#endif /* CONFIG_PAST_LOG */
 	if (ret != NOTIFY_STOP)
 		do_exit(SIGSEGV);
 }

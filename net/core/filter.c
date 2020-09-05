@@ -121,6 +121,8 @@ unsigned int sk_run_filter(struct sk_buff *skb, struct sock_filter *filter, int 
 	int k;
 	int pc;
 
+	memset(mem, 0, sizeof(mem));
+
 	/*
 	 * Process array of filter instructions.
 	 */

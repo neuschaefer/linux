@@ -22,6 +22,7 @@
 #include <linux/ioctl.h>
 #include <linux/completion.h>
 #include <linux/mfd/wm831x/core.h>
+#include <linux/mfd/wm831x/pdata.h>
 #include <linux/delay.h>
 #include <linux/platform_device.h>
 
@@ -267,6 +268,7 @@ static int wm831x_rtc_setalarm(struct device *dev, struct rtc_wkalrm *alrm)
 	struct wm831x *wm831x = wm831x_rtc->wm831x;
 	int ret;
 	unsigned long time;
+	unsigned long rtc_time;
 
 	ret = rtc_tm_to_time(&alrm->time, &time);
 	if (ret < 0) {
@@ -294,6 +296,11 @@ static int wm831x_rtc_setalarm(struct device *dev, struct rtc_wkalrm *alrm)
 	}
 
 	if (alrm->enabled) {
+		
+		// For debug
+		rtc_time = (wm831x_reg_read(wm831x, 0x4021) << 16) | wm831x_reg_read(wm831x, 0x4022);
+		printk("WM8321 RTC alarm will expire after %ld sec\n", (time - rtc_time));
+		
 		ret = wm831x_rtc_start_alarm(wm831x_rtc);
 		if (ret < 0) {
 			dev_err(dev, "Failed to start alarm: %d\n", ret);
@@ -325,7 +332,7 @@ static int wm831x_rtc_update_irq_enable(struct device *dev,
 		val = 1 << WM831X_RTC_PINT_FREQ_SHIFT;
 	else
 		val = 0;
-
+	
 	return wm831x_set_bits(wm831x_rtc->wm831x, WM831X_RTC_CONTROL,
 			       WM831X_RTC_PINT_FREQ_MASK, val);
 }
@@ -369,13 +376,29 @@ static int wm831x_rtc_suspend(struct device *dev)
 		enable = WM831X_RTC_ALM_ENA;
 	else
 		enable = 0;
-
+	
 	ret = wm831x_set_bits(wm831x_rtc->wm831x, WM831X_RTC_CONTROL,
-			      WM831X_RTC_ALM_ENA, enable);
+					WM831X_RTC_PINT_FREQ_MASK | WM831X_RTC_ALM_ENA, enable);
 	if (ret != 0)
 		dev_err(&pdev->dev, "Failed to update RTC alarm: %d\n", ret);
 
 	return 0;
+}
+
+static void wm831x_rtc_shutdown(struct platform_device *pdev)
+{
+	struct wm831x_rtc *wm831x_rtc = platform_get_drvdata(pdev);
+	struct wm831x *wm831x = wm831x_rtc->wm831x;
+	struct wm831x_pdata *pdata = wm831x->dev->platform_data;
+	int ret;
+
+	if (pdata && pdata->rtc_alarm_off_on_shutdown) {
+		if (wm831x_rtc->alarm_enabled && device_may_wakeup(&pdev->dev)) {
+			ret = wm831x_rtc_stop_alarm(wm831x_rtc);
+			if (ret != 0)
+				dev_err(&pdev->dev, "Failed to stop RTC alarm: %d\n", ret);
+		}
+	}
 }
 
 /* Enable the alarm if it should be enabled (in case it was disabled to
@@ -433,10 +456,16 @@ static int wm831x_rtc_probe(struct platform_device *pdev)
 	wm831x_rtc->wm831x = wm831x;
 
 	ret = wm831x_reg_read(wm831x, WM831X_RTC_CONTROL);
+	
 	if (ret < 0) {
 		dev_err(&pdev->dev, "Failed to read RTC control: %d\n", ret);
 		goto err;
 	}
+	
+	// Disable Preodic RTC interrupt
+	wm831x_set_bits(wm831x_rtc->wm831x, WM831X_RTC_CONTROL,
+			       WM831X_RTC_PINT_FREQ_MASK, 0);
+	
 	if (ret & WM831X_RTC_ALM_ENA)
 		wm831x_rtc->alarm_enabled = 1;
 
@@ -504,6 +533,7 @@ static struct platform_driver wm831x_rtc_driver = {
 		.name = "wm831x-rtc",
 		.pm = &wm831x_rtc_pm_ops,
 	},
+	.shutdown = wm831x_rtc_shutdown,
 };
 
 static int __init wm831x_rtc_init(void)

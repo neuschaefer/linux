@@ -308,6 +308,10 @@ static int msdos_create(struct inode *dir, struct dentry *dentry, int mode,
 		err = PTR_ERR(inode);
 		goto out;
 	}
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC /* E_BOOK */
+	if (!IS_DIRSYNC(dir) &&  MSDOS_SB(sb)->options.batch_sync)
+		mark_inode_dirty(inode);
+#endif /* CONFIG_SNSC_FS_FAT_BATCH_SYNC */
 	inode->i_mtime = inode->i_atime = inode->i_ctime = ts;
 	/* timestamp is already written, so mark_inode_dirty() is unneeded. */
 
@@ -342,6 +346,14 @@ static int msdos_rmdir(struct inode *dir, struct dentry *dentry)
 	err = fat_remove_entries(dir, &sinfo);	/* and releases bh */
 	if (err)
 		goto out;
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC /* E_BOOK */
+	/* remove dentry from disk */
+	if (MSDOS_SB(inode->i_sb)->options.batch_sync) {
+		err = fat_syncdir(dir);
+		if (err)
+			goto out;
+	}
+#endif /* CONFIG_SNSC_FS_FAT_BATCH_SYNC */
 	drop_nlink(dir);
 
 	clear_nlink(inode);
@@ -385,11 +397,27 @@ static int msdos_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 		err = cluster;
 		goto out;
 	}
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC /* E_BOOK */
+	/* flush cluster chain & first cluster of the subdir*/
+	if (MSDOS_SB(sb)->options.batch_sync) {
+		err = fat_syncdir(dir);
+		if (err)
+			goto out_free;
+	}
+#endif /* CONFIG_SNSC_FS_FAT_BATCH_SYNC */
 	err = msdos_add_entry(dir, msdos_name, 1, is_hid, cluster, &ts, &sinfo);
 	if (err)
 		goto out_free;
 	inc_nlink(dir);
 
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC /* E_BOOK */
+	/* flush dentry */
+	if (MSDOS_SB(sb)->options.batch_sync) {
+		err = fat_syncdir(dir);
+		if (err)
+			goto out_free;
+	}
+#endif /* CONFIG_SNSC_FS_FAT_BATCH_SYNC */
 	inode = fat_build_inode(sb, sinfo.de, sinfo.i_pos);
 	brelse(sinfo.bh);
 	if (IS_ERR(inode)) {
@@ -446,6 +474,9 @@ static int do_msdos_rename(struct inode *old_dir, unsigned char *old_name,
 			   struct inode *new_dir, unsigned char *new_name,
 			   struct dentry *new_dentry, int is_hid)
 {
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC /* E_BOOK */
+	struct msdos_sb_info *sbi = MSDOS_SB(old_dir->i_sb);
+#endif /* CONFIG_SNSC_FS_FAT_BATCH_SYNC */
 	struct buffer_head *dotdot_bh;
 	struct msdos_dir_entry *dotdot_de;
 	struct inode *old_inode, *new_inode;
@@ -487,7 +518,11 @@ static int do_msdos_rename(struct inode *old_dir, unsigned char *old_name,
 				MSDOS_I(old_inode)->i_attrs |= ATTR_HIDDEN;
 			else
 				MSDOS_I(old_inode)->i_attrs &= ~ATTR_HIDDEN;
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC /* E_BOOK */
+			if (IS_DIRSYNC(old_dir) || sbi->options.batch_sync) {
+#else /* CONFIG_SNSC_FS_FAT_BATCH_SYNC */
 			if (IS_DIRSYNC(old_dir)) {
+#endif /* CONFIG_SNSC_FS_FAT_BATCH_SYNC */
 				err = fat_sync_inode(old_inode);
 				if (err) {
 					MSDOS_I(old_inode)->i_attrs = old_attrs;
@@ -532,7 +567,11 @@ static int do_msdos_rename(struct inode *old_dir, unsigned char *old_name,
 		MSDOS_I(old_inode)->i_attrs |= ATTR_HIDDEN;
 	else
 		MSDOS_I(old_inode)->i_attrs &= ~ATTR_HIDDEN;
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC /* E_BOOK */
+	if (IS_DIRSYNC(new_dir) || sbi->options.batch_sync) {
+#else /* CONFIG_SNSC_FS_FAT_BATCH_SYNC */
 	if (IS_DIRSYNC(new_dir)) {
+#endif /* CONFIG_SNSC_FS_FAT_BATCH_SYNC */
 		err = fat_sync_inode(old_inode);
 		if (err)
 			goto error_inode;
@@ -544,7 +583,11 @@ static int do_msdos_rename(struct inode *old_dir, unsigned char *old_name,
 		dotdot_de->start = cpu_to_le16(start);
 		dotdot_de->starthi = cpu_to_le16(start >> 16);
 		mark_buffer_dirty_inode(dotdot_bh, old_inode);
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC /* E_BOOK */
+		if (IS_DIRSYNC(new_dir) || sbi->options.batch_sync) {
+#else /* CONFIG_SNSC_FS_FAT_BATCH_SYNC */
 		if (IS_DIRSYNC(new_dir)) {
+#endif /* CONFIG_SNSC_FS_FAT_BATCH_SYNC */
 			err = sync_dirty_buffer(dotdot_bh);
 			if (err)
 				goto error_dotdot;

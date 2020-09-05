@@ -102,14 +102,21 @@ struct wm831x_watchdog_pdata {
 #define WM831X_MAX_LDO    11
 #define WM831X_MAX_ISINK  2
 
+#define WM831X_GPIO_CONFIGURE 0x10000
+#define WM831X_GPIO_NUM 16
+
 struct wm831x_pdata {
 	/** Called before subdevices are set up */
 	int (*pre_init)(struct wm831x *wm831x);
 	/** Called after subdevices are set up */
 	int (*post_init)(struct wm831x *wm831x);
+	
+	/* if true, the rtc alarm will be turned off on shutdown */
+	bool rtc_alarm_off_on_shutdown;
 
 	int irq_base;
 	int gpio_base;
+	int gpio_defaults[WM831X_GPIO_NUM];
 	struct wm831x_backlight_pdata *backlight;
 	struct wm831x_backup_pdata *backup;
 	struct wm831x_battery_pdata *battery;

@@ -25,6 +25,18 @@
 #include <linux/gpio_keys.h>
 #include <linux/workqueue.h>
 #include <linux/gpio.h>
+#ifdef CONFIG_EARLYSUSPEND /* E_BOOK */
+#include <linux/earlysuspend.h>
+#endif /* E_BOOK */
+#ifdef CONFIG_HAS_WAKELOCK /* E_BOOK */
+#include <linux/wakelock.h>
+#endif /* E_BOOK */
+
+#define COUNT_IRQ
+
+#define ANTI_CHATTER
+#define CHATTER_MSECS		20
+#define CHATTER_JIFFIES		msecs_to_jiffies(CHATTER_MSECS)
 
 struct gpio_button_data {
 	struct gpio_keys_button *button;
@@ -32,6 +44,13 @@ struct gpio_button_data {
 	struct timer_list timer;
 	struct work_struct work;
 	bool disabled;
+#ifdef ANTI_CHATTER
+	unsigned long lastEvent;
+#endif
+#ifdef COUNT_IRQ
+	char irq_count;
+	char state;
+#endif
 };
 
 struct gpio_keys_drvdata {
@@ -40,6 +59,36 @@ struct gpio_keys_drvdata {
 	unsigned int n_buttons;
 	struct gpio_button_data data[0];
 };
+
+#ifdef CONFIG_EARLYSUSPEND /* E_BOOK */
+static bool gpio_wake_on = true;
+
+static void gpio_keys_early_suspend(struct early_suspend *h)
+{
+	gpio_wake_on = (h->pm_mode != EARLY_SUSPEND_MODE_NORMAL);
+	printk(KERN_DEBUG "%s(%d) : key wake mode : %s\n", __FUNCTION__, __LINE__, gpio_wake_on? "on": "off");
+}
+
+static void gpio_keys_late_resume(struct early_suspend *h)
+{
+	printk(KERN_DEBUG "%s(%d) : key wake mode : %s -> on\n", __FUNCTION__, __LINE__, gpio_wake_on? "on": "off");
+	gpio_wake_on = true;
+}
+
+static struct early_suspend gpio_keys_earlysuspend = {
+	.level = EARLY_SUSPEND_LEVEL_DISABLE_FB,
+	.suspend = gpio_keys_early_suspend,
+	.resume = gpio_keys_late_resume,
+};
+#endif /* E_BOOK */
+
+#ifdef CONFIG_HAS_WAKELOCK /* E_BOOK */
+static struct wake_lock gpio_keys_wake_lock;
+#endif /* E_BOOK */
+
+#ifdef COUNT_IRQ
+spinlock_t irqcounter_lock = SPIN_LOCK_UNLOCKED;
+#endif
 
 /*
  * SYSFS interface for enabling/disabling keys and switches:
@@ -113,6 +162,9 @@ static void gpio_keys_disable_button(struct gpio_button_data *bdata)
 			del_timer_sync(&bdata->timer);
 
 		bdata->disabled = true;
+#ifdef COUNT_IRQ
+		bdata->irq_count = 0;
+#endif
 	}
 }
 
@@ -131,6 +183,9 @@ static void gpio_keys_enable_button(struct gpio_button_data *bdata)
 	if (bdata->disabled) {
 		enable_irq(gpio_to_irq(bdata->button->gpio));
 		bdata->disabled = false;
+#ifdef ANTI_CHATTER
+		bdata->lastEvent = jiffies - CHATTER_JIFFIES;
+#endif
 	}
 }
 
@@ -314,14 +369,70 @@ static struct attribute_group gpio_keys_attr_group = {
 	.attrs = gpio_keys_attrs,
 };
 
+static void gpio_keys_schedule_timer(struct gpio_button_data *bdata)
+{
+	struct gpio_keys_button *button = bdata->button;
+#ifdef CONFIG_HAS_WAKELOCK /* E_BOOK */
+	if (button->debounce_interval) {
+		wake_lock_timeout(&gpio_keys_wake_lock, msecs_to_jiffies(button->debounce_interval + 500));
+		mod_timer(&bdata->timer,
+			jiffies + msecs_to_jiffies(button->debounce_interval));
+	} else {
+		wake_lock_timeout(&gpio_keys_wake_lock, msecs_to_jiffies(500));
+		schedule_work(&bdata->work);
+	}
+#else /* E_BOOK */
+	if (button->debounce_interval)
+		mod_timer(&bdata->timer,
+			jiffies + msecs_to_jiffies(button->debounce_interval));
+	else
+		schedule_work(&bdata->work);
+#endif /* E_BOOK */
+}
+
 static void gpio_keys_report_event(struct gpio_button_data *bdata)
 {
 	struct gpio_keys_button *button = bdata->button;
 	struct input_dev *input = bdata->input;
 	unsigned int type = button->type ?: EV_KEY;
+#ifdef COUNT_IRQ
+	int state, state2;
+	int count;
+	unsigned long flags;
+
+	spin_lock_irqsave(&irqcounter_lock, flags);
+	count = bdata->irq_count;
+	state = bdata->state ^ (count & 1);
+#ifdef ANTI_CHATTER
+	if (time_before(jiffies, bdata->lastEvent + CHATTER_JIFFIES)) {
+		spin_unlock_irqrestore(&irqcounter_lock, flags);
+		gpio_keys_schedule_timer(bdata);
+		printk(KERN_WARNING "GPIO chattring!! retry. (code=%d) %d %d\n", button->code, bdata->lastEvent, jiffies);
+		return;
+	}
+#endif
+	bdata->irq_count = 0;
+	spin_unlock_irqrestore(&irqcounter_lock, flags);
+
+	if (count > 0) {
+		while (count-- > 0) {
+			state = !state;
+			input_event(input, type, button->code, !!state);
+		}
+		state2 = (gpio_get_value(button->gpio) ? 1 : 0) ^ button->active_low;
+		if (state != state2 && bdata->irq_count == 0) {
+			input_event(input, type, button->code, !!state2);
+			printk(KERN_WARNING "GPIO state mismatch!! (code=%d state=%d)\n", button->code, state2);
+		}
+	} else {
+		state = (gpio_get_value(button->gpio) ? 1 : 0) ^ button->active_low;
+		input_event(input, type, button->code, !!state);
+	}
+#else
 	int state = (gpio_get_value(button->gpio) ? 1 : 0) ^ button->active_low;
 
 	input_event(input, type, button->code, !!state);
+#endif
 	input_sync(input);
 }
 
@@ -337,6 +448,9 @@ static void gpio_keys_timer(unsigned long _data)
 {
 	struct gpio_button_data *data = (struct gpio_button_data *)_data;
 
+#ifdef CONFIG_HAS_WAKELOCK /* E_BOOK */
+	wake_lock_timeout(&gpio_keys_wake_lock, msecs_to_jiffies(500));
+#endif /* E_BOOK */
 	schedule_work(&data->work);
 }
 
@@ -346,13 +460,22 @@ static irqreturn_t gpio_keys_isr(int irq, void *dev_id)
 	struct gpio_keys_button *button = bdata->button;
 
 	BUG_ON(irq != gpio_to_irq(button->gpio));
+#ifdef COUNT_IRQ
+	bdata->state = (gpio_get_value(button->gpio) ? 1 : 0) ^ button->active_low;
+#ifdef ANTI_CHATTER
+	if (time_before(jiffies, bdata->lastEvent + CHATTER_JIFFIES)) {
+		if (bdata->irq_count > 0)
+			bdata->irq_count--;
+	} else {
+		bdata->irq_count++;
+	}
+	bdata->lastEvent = jiffies;
+#else
+	bdata->irq_count++;
+#endif
+#endif
 
-	if (button->debounce_interval)
-		mod_timer(&bdata->timer,
-			jiffies + msecs_to_jiffies(button->debounce_interval));
-	else
-		schedule_work(&bdata->work);
-
+	gpio_keys_schedule_timer(bdata);
 	return IRQ_HANDLED;
 }
 
@@ -468,6 +591,14 @@ static int __devinit gpio_keys_probe(struct platform_device *pdev)
 			wakeup = 1;
 
 		input_set_capability(input, type, button->code);
+#ifdef ANTI_CHATTER
+		button->debounce_interval = CHATTER_MSECS;
+		bdata->lastEvent = jiffies - CHATTER_JIFFIES;
+#endif
+#ifdef COUNT_IRQ
+		bdata->state = (gpio_get_value(button->gpio) ? 1 : 0) ^ button->active_low;
+		bdata->irq_count = 0;
+#endif
 	}
 
 	error = sysfs_create_group(&pdev->dev.kobj, &gpio_keys_attr_group);
@@ -490,6 +621,10 @@ static int __devinit gpio_keys_probe(struct platform_device *pdev)
 	input_sync(input);
 
 	device_init_wakeup(&pdev->dev, wakeup);
+
+#ifdef CONFIG_EARLYSUSPEND /* E_BOOK */
+	register_early_suspend(&gpio_keys_earlysuspend);
+#endif /* E_BOOK */
 
 	return 0;
 
@@ -519,6 +654,10 @@ static int __devexit gpio_keys_remove(struct platform_device *pdev)
 	struct input_dev *input = ddata->input;
 	int i;
 
+#ifdef CONFIG_EARLYSUSPEND /* E_BOOK */
+	unregister_early_suspend(&gpio_keys_earlysuspend);
+#endif /* E_BOOK */
+
 	sysfs_remove_group(&pdev->dev.kobj, &gpio_keys_attr_group);
 
 	device_init_wakeup(&pdev->dev, 0);
@@ -545,6 +684,12 @@ static int gpio_keys_suspend(struct device *dev)
 	struct gpio_keys_platform_data *pdata = pdev->dev.platform_data;
 	int i;
 
+#ifdef CONFIG_EARLYSUSPEND /* E_BOOK */
+	printk(KERN_DEBUG "%s(%d) : key wake mode : %s\n", __FUNCTION__, __LINE__, gpio_wake_on? "on": "off");
+	if(!gpio_wake_on)
+		return 0;
+#endif /* E_BOOK */
+
 	if (device_may_wakeup(&pdev->dev)) {
 		for (i = 0; i < pdata->nbuttons; i++) {
 			struct gpio_keys_button *button = &pdata->buttons[i];
@@ -565,6 +710,12 @@ static int gpio_keys_resume(struct device *dev)
 	struct gpio_keys_platform_data *pdata = pdev->dev.platform_data;
 	int i;
 
+#ifdef CONFIG_EARLYSUSPEND /* E_BOOK */
+	printk(KERN_DEBUG "%s(%d) : key wake mode : %s\n", __FUNCTION__, __LINE__, gpio_wake_on? "on": "off");
+	if(!gpio_wake_on)
+		return 0;
+#endif /* E_BOOK */
+
 	for (i = 0; i < pdata->nbuttons; i++) {
 
 		struct gpio_keys_button *button = &pdata->buttons[i];
@@ -573,6 +724,13 @@ static int gpio_keys_resume(struct device *dev)
 			disable_irq_wake(irq);
 		}
 
+#ifdef ANTI_CHATTER
+		(&ddata->data[i])->lastEvent = jiffies - CHATTER_JIFFIES;
+#endif
+#ifdef COUNT_IRQ
+		(&ddata->data[i])->state = (gpio_get_value(button->gpio) ? 1 : 0) ^ button->active_low;
+		(&ddata->data[i])->irq_count = 0;
+#endif
 		gpio_keys_report_event(&ddata->data[i]);
 	}
 	input_sync(ddata->input);
@@ -600,12 +758,18 @@ static struct platform_driver gpio_keys_device_driver = {
 
 static int __init gpio_keys_init(void)
 {
+#ifdef CONFIG_HAS_WAKELOCK /* E_BOOK */
+	wake_lock_init(&gpio_keys_wake_lock, WAKE_LOCK_SUSPEND, "gpio_keys_delayed_work");
+#endif /* E_BOOK */
 	return platform_driver_register(&gpio_keys_device_driver);
 }
 
 static void __exit gpio_keys_exit(void)
 {
 	platform_driver_unregister(&gpio_keys_device_driver);
+#ifdef CONFIG_HAS_WAKELOCK /* E_BOOK */
+	wake_lock_destroy(&gpio_keys_wake_lock);
+#endif /* E_BOOK */
 }
 
 module_init(gpio_keys_init);

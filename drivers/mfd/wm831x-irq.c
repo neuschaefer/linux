@@ -356,6 +356,15 @@ static void wm831x_irq_sync_unlock(unsigned int irq)
 {
 	struct wm831x *wm831x = get_irq_chip_data(irq);
 	int i;
+	
+	for (i = 0; i < ARRAY_SIZE(wm831x->gpio_update); i++) {
+		if (wm831x->gpio_update[i]) {
+			wm831x_set_bits(wm831x, WM831X_GPIO1_CONTROL + i,
+				WM831X_GPN_INT_MODE | WM831X_GPN_POL,
+				wm831x->gpio_update[i]);
+				wm831x->gpio_update[i] = 0;
+		}
+	}
 
 	for (i = 0; i < ARRAY_SIZE(wm831x->irq_masks_cur); i++) {
 		/* If there's been a change in the mask write it back
@@ -390,29 +399,38 @@ static void wm831x_irq_mask(unsigned int irq)
 static int wm831x_irq_set_type(unsigned int irq, unsigned int type)
 {
 	struct wm831x *wm831x = get_irq_chip_data(irq);
-	int val;
 
 	irq = irq - wm831x->irq_base;
 
-	if (irq < WM831X_IRQ_GPIO_1 || irq > WM831X_IRQ_GPIO_11)
-		return -EINVAL;
-
+	if (irq < WM831X_IRQ_GPIO_1 || irq > WM831X_IRQ_GPIO_11) {
+		/* Ignore internal-only IRQs */
+		if (irq >= 0 && irq < WM831X_NUM_IRQS)
+			return 0;
+		else
+			return -EINVAL;
+	}
+	
+	irq -= WM831X_IRQ_GPIO_1;
+	
+	/* We set the high bit to flag that we need an update; don't
+	* do the update here as we can be called with the bus lock
+	* held.
+	*/
 	switch (type) {
 	case IRQ_TYPE_EDGE_BOTH:
-		val = WM831X_GPN_INT_MODE;
+		wm831x->gpio_update[irq] = 0x10000 | WM831X_GPN_INT_MODE;
 		break;
 	case IRQ_TYPE_EDGE_RISING:
-		val = WM831X_GPN_POL;
+		wm831x->gpio_update[irq] = 0x10000 | WM831X_GPN_POL;
 		break;
 	case IRQ_TYPE_EDGE_FALLING:
-		val = 0;
+		wm831x->gpio_update[irq] = 0x10000;
 		break;
 	default:
 		return -EINVAL;
 	}
 
-	return wm831x_set_bits(wm831x, WM831X_GPIO1_CONTROL + irq,
-			       WM831X_GPN_INT_MODE | WM831X_GPN_POL, val);
+	return 0;
 }
 
 static struct irq_chip wm831x_irq_chip = {
@@ -510,6 +528,17 @@ int wm831x_irq_init(struct wm831x *wm831x, int irq)
 		return 0;
 	}
 
+	/* Try to flag /IRQ as a wake source; there are a number of
+	 * unconditional wake sources in the PMIC so this isn't
+	 * conditional but we don't actually care *too* much if it
+	 * fails.
+	 */
+	ret = enable_irq_wake(irq);
+	
+	if (ret != 0) {
+		dev_warn(wm831x->dev, "Can't enable IRQ as wake source: %d\n", ret);
+	}
+	
 	wm831x->irq = irq;
 	wm831x->irq_base = pdata->irq_base;
 

@@ -41,10 +41,12 @@ static inline int iov_from_user_compat_to_kern(struct iovec *kiov,
 		compat_size_t len;
 
 		if (get_user(len, &uiov32->iov_len) ||
-		   get_user(buf, &uiov32->iov_base)) {
-			tot_len = -EFAULT;
-			break;
-		}
+		    get_user(buf, &uiov32->iov_base))
+			return -EFAULT;
+
+		if (len > INT_MAX - tot_len)
+			len = INT_MAX - tot_len;
+
 		tot_len += len;
 		kiov->iov_base = compat_ptr(buf);
 		kiov->iov_len = (__kernel_size_t) len;
@@ -88,7 +90,8 @@ int verify_compat_iovec(struct msghdr *kern_msg, struct iovec *kern_iov,
 			if (err < 0)
 				return err;
 		}
-		kern_msg->msg_name = kern_address;
+		if (kern_msg->msg_name)
+			kern_msg->msg_name = kern_address;
 	} else
 		kern_msg->msg_name = NULL;
 

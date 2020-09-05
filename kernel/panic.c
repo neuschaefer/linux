@@ -24,6 +24,10 @@
 #include <linux/nmi.h>
 #include <linux/dmi.h>
 
+#if 1 /* E_BOOK */
+#include <linux/pastlog.h>
+#endif /* E_BOOK */
+
 int panic_on_oops;
 static unsigned long tainted_mask;
 static int pause_on_oops;
@@ -96,6 +100,10 @@ NORET_TYPE void panic(const char * fmt, ...)
 #ifdef CONFIG_DEBUG_BUGVERBOSE
 	dump_stack();
 #endif
+
+#ifdef CONFIG_PAST_LOG /* E_BOOK */
+	past_flush();
+#endif /* CONFIG_PAST_LOG */
 
 	/*
 	 * If we have crashed and we have a crash kernel loaded let it handle

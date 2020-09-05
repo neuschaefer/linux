@@ -53,6 +53,9 @@ void mmc_stop_host(struct mmc_host *host);
 int mmc_attach_mmc(struct mmc_host *host, u32 ocr);
 int mmc_attach_sd(struct mmc_host *host, u32 ocr);
 int mmc_attach_sdio(struct mmc_host *host, u32 ocr);
+#if 1 /* E_BOOK *//* TEST for Electrostatic 2011/08/12 */
+int mmc_attach_sd_again(struct mmc_host *host, u32 ocr);
+#endif
 
 /* Module parameters */
 extern int use_spi_crc;

@@ -216,6 +216,12 @@ struct ep_send_events_data {
 	struct epoll_event __user *events;
 };
 
+/* Used by the ep_poll_file() function as callback private data */
+struct ep_poll_file_data {
+	struct file *file;
+	struct poll_table_struct *pt;
+};
+
 /*
  * Configuration options available inside /proc/sys/fs/epoll/
  */
@@ -671,6 +677,31 @@ static unsigned int ep_eventpoll_poll(struct file *file, poll_table *wait)
 	return pollflags != -1 ? pollflags : 0;
 }
 
+int ep_poll_file_proc(void *priv, void *cookie, int call_nests)
+{
+	struct ep_poll_file_data *data = priv;
+	return data->file->f_op->poll(data->file, data->pt);
+}
+
+static unsigned int ep_poll_file(struct eventpoll *ep, struct file *file,
+				 struct poll_table_struct *pt)
+{
+	int pollflags;
+	struct ep_poll_file_data data;
+	/*
+	 * This is merely a call to file->f_op->poll() under
+	 * ep_call_nested. This shares a nested_calls struct with
+	 * ep_eventpoll_poll in order to prevent other sites that call
+	 * ->f_op->poll from recursing back into this file and deadlocking.
+	 */
+	data.file = file;
+	data.pt   = pt;
+	pollflags = ep_call_nested(&poll_readywalk_ncalls, EP_MAX_NESTS,
+				   ep_poll_file_proc, &data, ep, current);
+
+	return pollflags != -1 ? pollflags : 0;
+}
+
 /* File callbacks that implement the eventpoll file behaviour */
 static const struct file_operations eventpoll_fops = {
 	.release	= ep_eventpoll_release,
@@ -930,7 +961,7 @@ static int ep_insert(struct eventpoll *ep, struct epoll_event *event,
 	 * this operation completes, the poll callback can start hitting
 	 * the new item.
 	 */
-	revents = tfile->f_op->poll(tfile, &epq.pt);
+	revents = ep_poll_file(ep, tfile, &epq.pt);
 
 	/*
 	 * We have to check if something went wrong during the poll wait queue
@@ -1016,7 +1047,7 @@ static int ep_modify(struct eventpoll *ep, struct epitem *epi, struct epoll_even
 	 * Get current event bits. We can safely use the file* here because
 	 * its usage count has been increased by the caller of this function.
 	 */
-	revents = epi->ffd.file->f_op->poll(epi->ffd.file, NULL);
+	revents = ep_poll_file(ep, epi->ffd.file, NULL);
 
 	/*
 	 * If the item is "hot" and it is not registered inside the ready
@@ -1063,7 +1094,7 @@ static int ep_send_events_proc(struct eventpoll *ep, struct list_head *head,
 
 		list_del_init(&epi->rdllink);
 
-		revents = epi->ffd.file->f_op->poll(epi->ffd.file, NULL) &
+		revents = ep_poll_file(ep, epi->ffd.file, NULL) &
 			epi->event.events;
 
 		/*

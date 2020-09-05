@@ -1908,11 +1908,42 @@ config 68360_ENET
 config FEC
 	bool "FEC ethernet controller (of ColdFire and some i.MX CPUs)"
 	depends on M523x || M527x || M5272 || M528x || M520x || M532x || \
-		MACH_MX27 || ARCH_MX35 || ARCH_MX25 || ARCH_MX5
+		MACH_MX27 || ARCH_MX35 || ARCH_MX25 || ARCH_MX5 || ARCH_MX28
 	select PHYLIB
 	help
 	  Say Y here if you want to use the built-in 10/100 Fast ethernet
 	  controller on some Motorola ColdFire and Freescale i.MX processors.
+
+config FEC_1588
+	bool "Enable FEC 1588 timestamping"
+	depends on FEC
+
+choice
+	prompt "IEEE 1588 operation mode"
+	depends on ARCH_MX5 && FEC_1588
+	default OUT_OF_BAND
+
+config OUT_OF_BAND
+	bool "out-of-band mode"
+	help
+	  IEEE 1588 operation mode is out-of-band, in this mode, the Tx and Rx
+	  timestamp will be caputred into special registers.
+
+config IN_BAND
+	bool "in-band mode"
+	help
+	  IEEE 1588 operation mode is in-band, in this mode, the Tx timestamp
+	  will be captured into special retisters, but the Rx timestamp will be
+	  captured into the first eight bytes of received ethernet packet.
+
+endchoice
+
+config FEC_L2SWITCH
+	bool "L2 Switch Ethernet Controller (of ColdFire CPUs)"
+	depends on ARCH_MX28 && !FEC
+	help
+	  Say Y here if you want to use the built-in 10/100 Ethernet Switch
+	  Controller on some Motorola ColdFire processors.
 
 config FEC2
 	bool "Second FEC ethernet controller (on some ColdFire CPUs)"

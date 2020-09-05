@@ -293,13 +293,29 @@
 #include <linux/usb/ch9.h>
 #include <linux/usb/gadget.h>
 
+#include <linux/mmc/rawdatatable.h>
+#include <linux/ctype.h>
+
+#include <mach/arc_otg.h>
+#include <mach/hardware.h>
+
 #include "gadget_chips.h"
 
-
+/* string buffer for SCSI Inquiry product base name */
+static	char	_scsi_inquiry_product_name[] = "PRS-XXX ";
+#define	STRING_PRODUCT_EMMC_ID_OFFSET		(0x00)
+static	char	_scsi_inquiry_sku_name[] = "        ";
+#define	STRING_SKU_EMMC_ID_OFFSET			(0x10)
 
 /*------------------------------------------------------------------------*/
 
+#ifdef CONFIG_USB_ANDROID_MASS_STORAGE
+#include <linux/usb/android_composite.h>
+#include <linux/platform_device.h>
+#define FSG_DRIVER_DESC		"usb_mass_storage"
+#else
 #define FSG_DRIVER_DESC		"Mass Storage Function"
+#endif
 #define FSG_DRIVER_VERSION	"2009/09/11"
 
 static const char fsg_string_interface[] = "Mass Storage";
@@ -310,8 +326,10 @@ static const char fsg_string_interface[] = "Mass Storage";
 #define FSG_NO_OTG               1
 #define FSG_NO_INTR_EP           1
 
-#include "storage_common.c"
 
+
+#define	FSG_BUFFHD_STATIC_BUFFER
+#include "storage_common.c"
 
 /*-------------------------------------------------------------------------*/
 
@@ -374,9 +392,11 @@ struct fsg_common {
 	/* Gadget's private data. */
 	void			*private_data;
 
-	/* Vendor (8 chars), product (16 chars), release (4
-	 * hexadecimal digits) and NUL byte */
-	char inquiry_string[8 + 16 + 4 + 1];
+	/* Vendor (8 chars), product (16 chars), release (4 hexadecimal digits)
+	   vendor spec (20 chars)
+	   and NUL byte
+	 */
+	char inquiry_string[FSG_MAX_LUNS][8 + 16 + 4 + 20 + 1];
 
 	struct kref		ref;
 };
@@ -408,6 +428,10 @@ struct fsg_config {
 	u16 release;
 
 	char			can_stall;
+
+#ifdef CONFIG_USB_ANDROID_MASS_STORAGE
+	struct platform_device *pdev;
+#endif
 };
 
 
@@ -605,6 +629,11 @@ static int fsg_setup(struct usb_function *f,
 			break;
 		if (w_index != fsg->interface_number || w_value != 0)
 			return -EDOM;
+		/* Init respond data/status */
+		req->length = 0;
+		fsg->common->ep0req->context = NULL;
+		fsg->common->ep0req_name =
+			ctrl->bRequestType & USB_DIR_IN ? "ep0-in" : "ep0-out";
 
 		/* Raise an exception to stop the current operation
 		 * and reinitialize our state. */
@@ -1170,12 +1199,12 @@ static int do_inquiry(struct fsg_common *common, struct fsg_buffhd *bh)
 	buf[1] = curlun->removable ? 0x80 : 0;
 	buf[2] = 2;		/* ANSI SCSI level 2 */
 	buf[3] = 2;		/* SCSI-2 INQUIRY data format */
-	buf[4] = 31;		/* Additional length */
+	buf[4] = 51;	/* Additional length */
 	buf[5] = 0;		/* No special options */
 	buf[6] = 0;
 	buf[7] = 0;
-	memcpy(buf + 8, common->inquiry_string, sizeof common->inquiry_string);
-	return 36;
+	memcpy(buf + 8, common->inquiry_string[common->lun], sizeof common->inquiry_string[common->lun]);
+	return 56;
 }
 
 
@@ -1491,6 +1520,13 @@ static int do_mode_select(struct fsg_common *common, struct fsg_buffhd *bh)
 
 /*-------------------------------------------------------------------------*/
 
+#ifdef	CONFIG_USB_ANDROID_MASS_STORAGE_EXTSCSI
+
+#include "f_mass_storage_extscsi.c"
+
+#endif
+
+
 static int halt_bulk_in_endpoint(struct fsg_dev *fsg)
 {
 	int	rc;
@@ -1661,6 +1697,20 @@ static int finish_reply(struct fsg_common *common)
 				return -EIO;
 			common->next_buffhd_to_fill = bh->next;
 
+
+#ifdef	CONFIG_USB_ANDROID_MASS_STORAGE_EXTSCSI
+
+		} else if ((common->cmnd[0] == SC_SONY_EXTENDED) && (!common->phase_error)) {
+			common->curlun->sense_data = SS_WRITE_ERROR;
+			bh->inreq->zero = 0;
+			START_TRANSFER_OR(common, bulk_in, bh->inreq,
+					&bh->inreq_busy, &bh->state)
+				return -EIO;
+			common->next_buffhd_to_fill = bh->next;
+
+#endif
+
+
 		/* For Bulk-only, if we're allowed to stall then send the
 		 * short packet and halt the bulk-in endpoint.  If we can't
 		 * stall, pad out the remaining data with 0's. */
@@ -1692,6 +1742,17 @@ static int finish_reply(struct fsg_common *common)
 		} else if (common->short_packet_received) {
 			raise_exception(common, FSG_STATE_ABORT_BULK_OUT);
 			rc = -EINTR;
+
+
+#ifdef	CONFIG_USB_ANDROID_MASS_STORAGE_EXTSCSI
+
+		 } else if ((common->curlun->sense_data == SS_WRITE_ERROR) && (common->residue)) {
+			raise_exception(common, FSG_STATE_ABORT_BULK_OUT);
+			mdelay(1);
+			rc = -EINTR;
+
+#endif
+
 
 		/* We haven't processed all the incoming data.  Even though
 		 * we may be allowed to stall, doing so would cause a race.
@@ -1771,6 +1832,16 @@ static int send_status(struct fsg_common *common)
 		/* Don't know what to do if common->fsg is NULL */
 		return -EIO;
 
+
+#ifdef	CONFIG_USB_ANDROID_MASS_STORAGE_EXTSCSI
+
+	if (SC_SONY_EXTENDED == common->cmnd[0]) {
+		ebook_extscsi_queue_log((char *)bh->buf, sizeof(struct bulk_cs_wrap), EL_CSW);
+	}
+
+#endif
+
+
 	common->next_buffhd_to_fill = bh->next;
 	return 0;
 }
@@ -1792,7 +1863,7 @@ static int check_command(struct fsg_common *common, int cmnd_size,
 
 	hdlen[0] = 0;
 	if (common->data_dir != DATA_DIR_UNKNOWN)
-		sprintf(hdlen, ", H%c=%u", dirletter[(int) common->data_dir],
+		snprintf(hdlen, sizeof hdlen, ", H%c=%u", dirletter[(int) common->data_dir],
 				common->data_size);
 	VDBG(common, "SCSI command: %s;  Dc=%d, D%c=%u;  Hc=%d%s\n",
 	     name, cmnd_size, dirletter[(int) data_dir],
@@ -2132,6 +2203,38 @@ static int do_scsi_command(struct fsg_common *common)
 			reply = do_write(common);
 		break;
 
+
+#ifdef	CONFIG_USB_ANDROID_MASS_STORAGE_EXTSCSI
+
+	case SC_SONY_EXTENDED:
+		common->residue = common->data_size_from_cmnd = common->data_size;
+		/* size is MAX_EXTENDED_DATA_SIZE under? */
+		if ((common->private_data) && (MAX_EXTENDED_DATA_SIZE >= common->data_size)) {
+			struct	extscsi_t*	extscsi = common->private_data;
+
+			if (extscsi->opened) {
+				if (extscsi->do_extscsi) {
+					reply = extscsi->do_extscsi(common);
+					memset(extscsi->ext_buf, 0x0, MAX_EXTENDED_DATA_SIZE);
+					extscsi->prev_stage = extscsi->next_stage = EXT_CBW_EMPTY;
+					break; /* OK */
+				}
+			}
+		}
+
+		/* ERROR */
+		common->residue = common->data_size_from_cmnd = 0;
+		snprintf(unknown, sizeof unknown, "EXTENDED(x%02x)", common->cmnd[0]);
+		if ((reply = check_command(common, common->cmnd_size,
+		        DATA_DIR_UNKNOWN, 0xff, 0, unknown)) == 0) {
+		    common->curlun->sense_data = SS_INVALID_COMMAND;
+		    reply = -EINVAL;
+		}
+		break;
+
+#endif
+
+
 	/* Some mandatory commands that we recognize but don't implement.
 	 * They don't mean much in this setting.  It's left as an exercise
 	 * for anyone interested to implement RESERVE and RELEASE in terms
@@ -2145,7 +2248,7 @@ static int do_scsi_command(struct fsg_common *common)
 	default:
 unknown_cmnd:
 		common->data_size_from_cmnd = 0;
-		sprintf(unknown, "Unknown x%02x", common->cmnd[0]);
+		snprintf(unknown, sizeof unknown, "Unknown x%02x", common->cmnd[0]);
 		reply = check_command(common, common->cmnd_size,
 				      DATA_DIR_UNKNOWN, 0xff, 0, unknown);
 		if (reply == 0) {
@@ -2235,6 +2338,24 @@ static int received_cbw(struct fsg_dev *fsg, struct fsg_buffhd *bh)
 		common->data_dir = DATA_DIR_NONE;
 	common->lun = cbw->Lun;
 	common->tag = cbw->Tag;
+
+
+#ifdef	CONFIG_USB_ANDROID_MASS_STORAGE_EXTSCSI
+
+	if (SC_SONY_EXTENDED == common->cmnd[0]) {
+		if (common->private_data) {
+			struct	extscsi_t*	extscsi = common->private_data;
+
+			if ((extscsi->opened) && (extscsi->next_stage == EXT_CBW_EMPTY)) {
+				memcpy(extscsi->ext_buf, cbw, USB_BULK_CB_WRAP_LEN);
+			}
+		}
+		ebook_extscsi_queue_log((char *)cbw, USB_BULK_CB_WRAP_LEN, EL_CBW);
+	}
+
+#endif
+
+
 	return 0;
 }
 
@@ -2306,8 +2427,9 @@ static int alloc_request(struct fsg_common *common, struct usb_ep *ep,
 static int do_set_interface(struct fsg_common *common, struct fsg_dev *new_fsg)
 {
 	const struct usb_endpoint_descriptor *d;
-	struct fsg_dev *fsg;
+	struct fsg_dev *fsg = NULL;
 	int i, rc = 0;
+	int online = 1;
 
 	if (common->running)
 		DBG(common, "reset interface\n");
@@ -2345,8 +2467,10 @@ reset:
 	}
 
 	common->running = 0;
-	if (!new_fsg || rc)
-		return rc;
+	if (!new_fsg || rc) {
+		online = 0;
+		goto out;
+	}
 
 	common->fsg = new_fsg;
 	fsg = common->fsg;
@@ -2387,6 +2511,12 @@ reset:
 	common->running = 1;
 	for (i = 0; i < common->nluns; ++i)
 		common->luns[i].unit_attention_data = SS_RESET_OCCURRED;
+out:
+	if (fsg) {
+		fsg->function.config->cdev->online = online;
+		kobject_uevent(&fsg->function.dev->kobj, KOBJ_CHANGE);
+	}
+
 	return rc;
 }
 
@@ -2397,18 +2527,45 @@ reset:
 static int fsg_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 {
 	struct fsg_dev *fsg = fsg_from_func(f);
+
+
+#ifdef	CONFIG_USB_ANDROID_MASS_STORAGE_EXTSCSI
+
+	if (fsg->common->private_data != NULL) {
+		struct	extscsi_t*	extscsi = fsg->common->private_data;
+
+		extscsi->connected = 1;		/* connect */
+	}
+
+#endif
+
 	fsg->common->new_fsg = fsg;
 	raise_exception(fsg->common, FSG_STATE_CONFIG_CHANGE);
+
 	return 0;
 }
 
 static void fsg_disable(struct usb_function *f)
 {
 	struct fsg_dev *fsg = fsg_from_func(f);
+#ifdef	CONFIG_USB_ANDROID_MASS_STORAGE_EXTSCSI
+
+	if (fsg->common->private_data != NULL) {
+		struct	extscsi_t*	extscsi = fsg->common->private_data;
+		extscsi->connected = 0;		/* disconnected */
+	}
+	
+#endif
+
 	fsg->common->new_fsg = NULL;
 	raise_exception(fsg->common, FSG_STATE_CONFIG_CHANGE);
 }
 
+static void fsg_suspend(struct usb_function *f)
+{
+	//	if (!f->disabled)
+	//		fsg_disable(f);
+}
 
 /*-------------------------------------------------------------------------*/
 
@@ -2436,7 +2593,8 @@ static void handle_exception(struct fsg_common *common)
 	}
 
 	/* Cancel all the pending transfers */
-	if (likely(common->fsg)) {
+	/* If USB controller is running.    */
+	if (likely(common->fsg) && (UOG_USBCMD & UCMD_RUN_STOP)) {
 		for (i = 0; i < FSG_NUM_BUFFERS; ++i) {
 			bh = &common->buffhds[i];
 			if (bh->inreq_busy)
@@ -2656,17 +2814,82 @@ static inline void fsg_common_put(struct fsg_common *common)
 	kref_put(&common->ref, fsg_common_release);
 }
 
+static void
+fsg_rawdata_init(struct usb_gadget* gadget, struct fsg_config* cfg)
+{
+	int				rawdata_id;
+	unsigned long	rawdata_size = 0;
+	char			product[sizeof _scsi_inquiry_product_name];
+	char			sku[sizeof _scsi_inquiry_sku_name];
+	int				index;
+
+	/* raw data access for id partition */
+	rawdata_id = rawdata_index(RAWLABEL_ID, &rawdata_size);
+	if (rawdata_size == 0) {
+		return;
+	}
+
+	/* product name */
+	memset(product, 0, sizeof product);
+	if (rawdata_read(rawdata_id, STRING_PRODUCT_EMMC_ID_OFFSET, product, sizeof product - 1) < 0) {
+		dev_warn(&gadget->dev, "Can't read product-name\n");
+	} else {
+		for (index = 0; index < (sizeof product - 1); index++) {
+			if (isprint(product[index]) == 0) {
+				dev_warn(&gadget->dev, "No product-name setting: %s(default)\n", _scsi_inquiry_product_name);
+				break;
+			}
+		}
+		if (index == strlen(_scsi_inquiry_product_name)) {
+			strncpy(_scsi_inquiry_product_name, product, sizeof _scsi_inquiry_product_name);
+		}
+	}
+
+	/* SKU name */
+	memset(sku, 0, sizeof sku);
+	if (rawdata_read(rawdata_id, STRING_SKU_EMMC_ID_OFFSET, sku, sizeof sku - 1) < 0) {
+		dev_warn(&gadget->dev, "Can't read sku-name\n");
+	} else {
+		static	struct	_sku_country_code_map {
+			const	char*	sku_name;
+			int				country_code;
+			int				nluns;
+		}  sku_country_code_map[] = {
+			{	"UC,CEW",	0x01,	3,	},
+			{	"RU",		0x07,	2,	},
+			{	"JP",		0x81,	3,	},
+			{	NULL,		0x00,	0,	},
+		};
+
+		for (index = 0; ; index++) {
+			const	struct	_sku_country_code_map*	map = &sku_country_code_map[index];
+
+			if (map->sku_name == NULL) {
+				dev_warn(&gadget->dev, "Can't match sku-name: [%s]\n", sku);
+				break;
+			}
+			if (strcasecmp(map->sku_name, sku) == 0) {
+				cfg->release |= map->country_code;
+				cfg->nluns = map->nluns;
+				break;
+			}
+		}
+	}
+}
 
 static struct fsg_common *fsg_common_init(struct fsg_common *common,
 					  struct usb_composite_dev *cdev,
 					  struct fsg_config *cfg)
 {
+	struct usb_mass_storage_platform_data* pdata = cfg->pdev->dev.platform_data;
 	struct usb_gadget *gadget = cdev->gadget;
 	struct fsg_buffhd *bh;
 	struct fsg_lun *curlun;
 	struct fsg_lun_config *lcfg;
-	int nluns, i, rc;
-	char *pathbuf;
+	int nluns, i, rc, release;
+
+	/* rawdata initialize */
+	fsg_rawdata_init(gadget, cfg);
 
 	/* Find out how many LUNs there should be */
 	nluns = cfg->nluns;
@@ -2686,7 +2909,7 @@ static struct fsg_common *fsg_common_init(struct fsg_common *common,
 		common->free_storage_on_release = 0;
 	}
 
-	common->private_data = cfg->private_data;
+	common->private_data = NULL;
 
 	common->gadget = gadget;
 	common->ep0 = gadget->ep0;
@@ -2712,12 +2935,47 @@ static struct fsg_common *fsg_common_init(struct fsg_common *common,
 
 	init_rwsem(&common->filesem);
 
+
+	/* Prepare inquiryString */
+	if (cfg->release != 0xffff) {
+		release = cfg->release;
+	} else {
+		release = usb_gadget_controller_number(gadget);
+		if (release >= 0) {
+			release = 0x0300 + release;
+		} else {
+			WARNING(common, "controller '%s' not recognized\n",
+				gadget->name);
+			release = 0x0399;
+		}
+	}
+	if (cfg->product_name == NULL) {
+		cfg->product_name = _scsi_inquiry_product_name;
+	}
+
 	for (i = 0, lcfg = cfg->luns; i < nluns; ++i, ++curlun, ++lcfg) {
+		static	const	char	lun_name[FSG_MAX_LUNS][8] = {
+			"",
+			"SD",
+			"Setting",
+		};
+		static	const	char	vendor_name[FSG_MAX_LUNS][20] = {
+			"",		// "internal,,",
+			"",		// "slot,sd,",
+			"",		// "setting,,",
+		};
+
 		curlun->cdrom = !!lcfg->cdrom;
 		curlun->ro = lcfg->cdrom || lcfg->ro;
 		curlun->removable = lcfg->removable;
 		curlun->dev.release = fsg_lun_release;
+
+#ifdef CONFIG_USB_ANDROID_MASS_STORAGE
+		/* use "usb_mass_storage" platform device as parent */
+		curlun->dev.parent = &cfg->pdev->dev;
+#else
 		curlun->dev.parent = &gadget->dev;
+#endif
 		/* curlun->dev.driver = &fsg_driver.driver; XXX */
 		dev_set_drvdata(&curlun->dev, &common->filesem);
 		dev_set_name(&curlun->dev,
@@ -2749,6 +3007,16 @@ static struct fsg_common *fsg_common_init(struct fsg_common *common,
 			rc = -EINVAL;
 			goto error_luns;
 		}
+
+		snprintf(
+			common->inquiry_string[i], sizeof common->inquiry_string[i],
+			"%-8s%-8s%-8s%04x%-20s",
+			cfg->vendor_name,
+			cfg->product_name,
+			lun_name[i],
+			release,
+			vendor_name[i]
+		);
 	}
 	common->nluns = nluns;
 
@@ -2761,37 +3029,19 @@ static struct fsg_common *fsg_common_init(struct fsg_common *common,
 		bh->next = bh + 1;
 		++bh;
 buffhds_first_it:
+
+#ifdef	FSG_BUFFHD_STATIC_BUFFER
+		bh->buf = pdata->xfer_buffer + ((sizeof pdata->xfer_buffer) / FSG_NUM_BUFFERS) * (FSG_NUM_BUFFERS - i);
+#else
 		bh->buf = kmalloc(FSG_BUFLEN, GFP_KERNEL);
 		if (unlikely(!bh->buf)) {
 			rc = -ENOMEM;
 			goto error_release;
 		}
+#endif
+
 	} while (--i);
 	bh->next = common->buffhds;
-
-
-	/* Prepare inquiryString */
-	if (cfg->release != 0xffff) {
-		i = cfg->release;
-	} else {
-		i = usb_gadget_controller_number(gadget);
-		if (i >= 0) {
-			i = 0x0300 + i;
-		} else {
-			WARNING(common, "controller '%s' not recognized\n",
-				gadget->name);
-			i = 0x0399;
-		}
-	}
-#define OR(x, y) ((x) ? (x) : (y))
-	snprintf(common->inquiry_string, sizeof common->inquiry_string,
-		 "%-8s%-16s%04x",
-		 OR(cfg->vendor_name, "Linux   "),
-		 /* Assume product name dependent on the first LUN */
-		 OR(cfg->product_name, common->luns->cdrom
-				     ? "File-Stor Gadget"
-				     : "File-CD Gadget  "),
-		 i);
 
 
 	/* Some peripheral controllers are known not to be able to
@@ -2805,7 +3055,7 @@ buffhds_first_it:
 	spin_lock_init(&common->lock);
 	kref_init(&common->ref);
 
-
+#define OR(x, y) ((x) ? (x) : (y))
 	/* Tell the thread to start working */
 	common->thread_exits = cfg->thread_exits;
 	common->thread_task =
@@ -2824,27 +3074,11 @@ buffhds_first_it:
 	INFO(common, FSG_DRIVER_DESC ", version: " FSG_DRIVER_VERSION "\n");
 	INFO(common, "Number of LUNs=%d\n", common->nluns);
 
-	pathbuf = kmalloc(PATH_MAX, GFP_KERNEL);
 	for (i = 0, nluns = common->nluns, curlun = common->luns;
 	     i < nluns;
 	     ++curlun, ++i) {
-		char *p = "(no medium)";
-		if (fsg_lun_is_open(curlun)) {
-			p = "(error)";
-			if (pathbuf) {
-				p = d_path(&curlun->filp->f_path,
-					   pathbuf, PATH_MAX);
-				if (IS_ERR(p))
-					p = "(error)";
-			}
-		}
-		LINFO(curlun, "LUN: %s%s%sfile: %s\n",
-		      curlun->removable ? "removable " : "",
-		      curlun->ro ? "read only " : "",
-		      curlun->cdrom ? "CD-ROM " : "",
-		      p);
+		LINFO(curlun, "[%s]\n", common->inquiry_string[i]);
 	}
-	kfree(pathbuf);
 
 	DBG(common, "I/O thread pid: %d\n", task_pid_nr(common->thread_task));
 
@@ -2892,6 +3126,7 @@ static void fsg_common_release(struct kref *ref)
 		kfree(common->luns);
 	}
 
+#ifndef	FSG_BUFFHD_STATIC_BUFFER
 	{
 		struct fsg_buffhd *bh = common->buffhds;
 		unsigned i = FSG_NUM_BUFFERS;
@@ -2899,6 +3134,7 @@ static void fsg_common_release(struct kref *ref)
 			kfree(bh->buf);
 		} while (++bh, --i);
 	}
+#endif
 
 	if (common->free_storage_on_release)
 		kfree(common);
@@ -2907,11 +3143,17 @@ static void fsg_common_release(struct kref *ref)
 
 /*-------------------------------------------------------------------------*/
 
-
 static void fsg_unbind(struct usb_configuration *c, struct usb_function *f)
 {
 	struct fsg_dev		*fsg = fsg_from_func(f);
 	struct fsg_common	*common = fsg->common;
+
+#ifdef	CONFIG_USB_ANDROID_MASS_STORAGE_EXTSCSI
+
+	extscsi_finalize(fsg);
+
+#endif
+
 
 	DBG(fsg, "unbind\n");
 	if (fsg->common->fsg == fsg) {
@@ -2921,7 +3163,7 @@ static void fsg_unbind(struct usb_configuration *c, struct usb_function *f)
 		wait_event(common->fsg_wait, common->fsg != fsg);
 	}
 
-	fsg_common_put(common);
+	fsg_common_release(&common->ref);
 	usb_free_descriptors(fsg->function.descriptors);
 	usb_free_descriptors(fsg->function.hs_descriptors);
 	kfree(fsg);
@@ -2975,6 +3217,17 @@ static int fsg_bind(struct usb_configuration *c, struct usb_function *f)
 		}
 	}
 
+
+#ifdef	CONFIG_USB_ANDROID_MASS_STORAGE_EXTSCSI
+
+	if (unlikely(extscsi_initialize(fsg))) {
+		extscsi_finalize(fsg);
+		goto autoconf_fail;
+	}
+
+#endif
+
+
 	return 0;
 
 autoconf_fail:
@@ -3008,6 +3261,7 @@ static int fsg_add(struct usb_composite_dev *cdev,
 	fsg->function.setup       = fsg_setup;
 	fsg->function.set_alt     = fsg_set_alt;
 	fsg->function.disable     = fsg_disable;
+	fsg->function.suspend     = fsg_suspend;
 
 	fsg->common               = common;
 	/* Our caller holds a reference to common structure so we
@@ -3117,4 +3371,69 @@ fsg_common_from_params(struct fsg_common *common,
 	fsg_config_from_params(&cfg, params);
 	return fsg_common_init(common, cdev, &cfg);
 }
+
+#ifdef CONFIG_USB_ANDROID_MASS_STORAGE
+
+static struct fsg_config fsg_cfg;
+
+static int fsg_probe(struct platform_device *pdev)
+{
+	struct usb_mass_storage_platform_data *pdata = pdev->dev.platform_data;
+	int i, nluns;
+
+	if (!pdata)
+		return -1;
+
+	nluns = pdata->nluns;
+	if (nluns > FSG_MAX_LUNS)
+		nluns = FSG_MAX_LUNS;
+	fsg_cfg.nluns = nluns;
+	for (i = 0; i < nluns; i++)
+		fsg_cfg.luns[i].removable = 1;
+
+	fsg_cfg.vendor_name = pdata->vendor;
+	fsg_cfg.product_name = pdata->product;
+	fsg_cfg.release = pdata->release;
+	fsg_cfg.can_stall = 0;
+	fsg_cfg.pdev = pdev;
+
+	return 0;
+}
+
+static struct platform_driver fsg_platform_driver = {
+	.driver = { .name = FSG_DRIVER_DESC, },
+	.probe = fsg_probe,
+};
+
+int mass_storage_bind_config(struct usb_configuration *c)
+{
+	struct fsg_common *common = fsg_common_init(NULL, c->cdev, &fsg_cfg);
+	if (IS_ERR(common))
+		return -1;
+	return fsg_add(c->cdev, c, common);
+}
+
+static struct android_usb_function mass_storage_function = {
+	.name = FSG_DRIVER_DESC,
+	.bind_config = mass_storage_bind_config,
+};
+
+int __init f_ums_init(void)
+{
+	int rc;
+
+	rc = platform_driver_register(&fsg_platform_driver);
+	if (rc != 0)
+		return rc;
+	android_register_function(&mass_storage_function);
+	return 0;
+}
+
+void __exit f_ums_exit(void)
+{
+	platform_driver_unregister(&fsg_platform_driver);
+}
+//module_init(init);
+
+#endif /* CONFIG_USB_ANDROID_MASS_STORAGE */
 

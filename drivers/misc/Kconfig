@@ -353,9 +353,35 @@ config VMWARE_BALLOON
 	  To compile this driver as a module, choose M here: the
 	  module will be called vmware_balloon.
 
+config TWL6030_VBUS_DRIVER
+	tristate "Simple Driver for twl6030 VBUS IRQ"
+	depends on TWL4030_CORE && !TWL6030_USB
+	help
+	  This is a simple driver that hooks to the VBUS detect irq on
+          twl6030 devices.
+
+config MXS_PERSISTENT
+	tristate "MX23/MX28 persistent bit"
+	depends on ARCH_MXS
+	default y
+
+config ANDROID_PMEM
+	bool "Android pmem allocator"
+	default n
+
+config UID_STAT
+	bool "UID based statistics tracking exported to /proc/uid_stat"
+	default n
+
+config FSL_CACHE
+	tristate "Freescale Cache manipulate driver"
+	default n
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"
 source "drivers/misc/iwmc3200top/Kconfig"
+
+source "drivers/misc/wwan_ctrl/Kconfig"
 
 endif # MISC_DEVICES

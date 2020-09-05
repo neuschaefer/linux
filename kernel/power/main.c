@@ -173,7 +173,11 @@ static ssize_t state_store(struct kobject *kobj, struct kobj_attribute *attr,
 			   const char *buf, size_t n)
 {
 #ifdef CONFIG_SUSPEND
+#ifdef CONFIG_EARLYSUSPEND
+	suspend_state_t state = PM_SUSPEND_ON;
+#else
 	suspend_state_t state = PM_SUSPEND_STANDBY;
+#endif
 	const char * const *s;
 #endif
 	char *p;
@@ -195,7 +199,14 @@ static ssize_t state_store(struct kobject *kobj, struct kobj_attribute *attr,
 			break;
 	}
 	if (state < PM_SUSPEND_MAX && *s)
+#ifdef CONFIG_EARLYSUSPEND
+		if (state == PM_SUSPEND_ON || valid_state(state)) {
+			error = 0;
+			request_suspend_state(state);
+		}
+#else
 		error = enter_state(state);
+#endif
 #endif
 
  Exit:
@@ -229,15 +240,60 @@ pm_trace_store(struct kobject *kobj, struct kobj_attribute *attr,
 power_attr(pm_trace);
 #endif /* CONFIG_PM_TRACE */
 
+#ifdef CONFIG_SUSPEND_DEVICE_TIME_DEBUG
+/*
+ * threshold of device suspend time consumption in microsecond(0.5ms), the
+ * driver suspend/resume time longer than this threshold will be
+ * print to console, 0 to disable */
+int device_suspend_time_threshold;
+
+static ssize_t
+device_suspend_time_threshold_show(struct kobject *kobj,
+				   struct kobj_attribute *attr, char *buf)
+{
+	if (device_suspend_time_threshold == 0)
+		return sprintf(buf, "off\n");
+	else
+		return sprintf(buf, "%d usecs\n",
+			       device_suspend_time_threshold);
+}
+
+static ssize_t
+device_suspend_time_threshold_store(struct kobject *kobj,
+				    struct kobj_attribute *attr,
+				    const char *buf, size_t n)
+{
+	int val;
+	if (sscanf(buf, "%d", &val) > 0) {
+		device_suspend_time_threshold = val;
+		return n;
+	}
+	return -EINVAL;
+}
+power_attr(device_suspend_time_threshold);
+#endif
+
+#ifdef CONFIG_USER_WAKELOCK
+power_attr(wake_lock);
+power_attr(wake_unlock);
+#endif
+
 static struct attribute * g[] = {
 	&state_attr.attr,
 #ifdef CONFIG_PM_TRACE
 	&pm_trace_attr.attr,
 #endif
+#ifdef CONFIG_SUSPEND_DEVICE_TIME_DEBUG
+	&device_suspend_time_threshold_attr.attr,
+#endif
 #ifdef CONFIG_PM_SLEEP
 	&pm_async_attr.attr,
 #ifdef CONFIG_PM_DEBUG
 	&pm_test_attr.attr,
+#endif
+#ifdef CONFIG_USER_WAKELOCK
+	&wake_lock_attr.attr,
+	&wake_unlock_attr.attr,
 #endif
 #endif
 	NULL,

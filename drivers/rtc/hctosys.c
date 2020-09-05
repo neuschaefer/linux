@@ -43,8 +43,18 @@ static int __init rtc_hctosys(void)
 	if (err) {
 		dev_err(rtc->dev.parent,
 			"hctosys: unable to read the hardware clock\n");
-		goto err_read;
-
+		
+		//Set RTC clock to 2010-01-01 00:00:00
+		tm.tm_year = 110;
+		tm.tm_mon = 0;
+		tm.tm_mday = 1;
+		tm.tm_hour = 0;
+		tm.tm_min = 0, 
+		tm.tm_sec = 0,
+		rtc_set_time(rtc, &tm);
+		err = rtc_read_time(rtc, &tm);
+		if(err)
+			goto err_read;
 	}
 
 	err = rtc_valid_tm(&tm);

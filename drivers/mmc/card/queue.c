@@ -145,6 +145,13 @@ int mmc_init_queue(struct mmc_queue *mq, struct mmc_card *card, spinlock_t *lock
 			bouncesz = host->max_blk_count * 512;
 
 		if (bouncesz > 512) {
+#if 0 /* E_BOOK *//* for DEBUG 2011/06/16 */
+		  if ( mq->bounce_buf ) {
+		    printk("mmc_init_queue: did not free bounce_buf\n");
+		  } else {
+		    printk("mmc_init_queue: alloc bounce_buf\n");
+		  }
+#endif
 			mq->bounce_buf = kmalloc(bouncesz, GFP_KERNEL);
 			if (!mq->bounce_buf) {
 				printk(KERN_WARNING "%s: unable to "
@@ -159,6 +166,9 @@ int mmc_init_queue(struct mmc_queue *mq, struct mmc_card *card, spinlock_t *lock
 			blk_queue_max_segments(mq->queue, bouncesz / 512);
 			blk_queue_max_segment_size(mq->queue, bouncesz);
 
+#if 0 /* E_BOOK *//* for DEBUG 2011/06/16 */
+			printk("mmc_init_queue: alloc sg\n");
+#endif
 			mq->sg = kmalloc(sizeof(struct scatterlist),
 				GFP_KERNEL);
 			if (!mq->sg) {

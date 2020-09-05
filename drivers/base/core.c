@@ -26,6 +26,10 @@
 #include "base.h"
 #include "power/power.h"
 
+#if 1 /* E_BOOK */
+#include <linux/pastlog.h>
+#endif /* E_BOOK */
+
 int (*platform_notify)(struct device *dev) = NULL;
 int (*platform_notify_remove)(struct device *dev) = NULL;
 static struct kobject *dev_kobj;
@@ -1787,6 +1791,10 @@ EXPORT_SYMBOL_GPL(device_move);
 void device_shutdown(void)
 {
 	struct device *dev;
+
+#ifdef CONFIG_PAST_LOG /* E_BOOK */
+	past_wait_flush();
+#endif /* CONFIG_PAST_LOG */
 
 	spin_lock(&devices_kset->list_lock);
 	/*

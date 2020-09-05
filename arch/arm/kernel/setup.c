@@ -44,6 +44,10 @@
 #include <asm/traps.h>
 #include <asm/unwind.h>
 
+#if 1 /* E_BOOK */
+#include <linux/mix_logger.h>
+#endif /* E_BOOK */
+
 #include "compat.h"
 #include "atags.h"
 #include "tcm.h"
@@ -66,6 +70,12 @@ __setup("fpe=", fpe_setup);
 
 extern void paging_init(struct machine_desc *desc);
 extern void reboot_setup(char *str);
+
+#if defined(CONFIG_RUNTIME_PHYS_OFFSET)
+/* assign a value to prevent phys_offset from ending in up bss */
+unsigned long phys_offset = 0xdeadbeef;
+EXPORT_SYMBOL(phys_offset);
+#endif
 
 unsigned int processor_id;
 EXPORT_SYMBOL(processor_id);
@@ -148,8 +158,49 @@ static struct resource mem_res[] = {
 		.start = 0,
 		.end = 0,
 		.flags = IORESOURCE_MEM
+#ifdef CONFIG_MIX_LOGGER_STATIC /* E_BOOK */
+	},
+	{
+		.name = "Mix loger",
+		.start = 0,
+		.end = 0,
+		.flags = IORESOURCE_MEM
+#endif /* E_BOOK */
+#ifdef CONFIG_EPD_STATIC_MEM_WAVEFORM /* E_BOOK */
+	},
+	{
+		.name = "EPD Waveform",
+		.start = 0,
+		.end = 0,
+		.flags = IORESOURCE_MEM
+#endif /* E_BOOK */
+#ifdef CONFIG_EPD_STATIC_MEM_WORKBUFF /* E_BOOK */
+	},
+	{
+		.name = "EPD Working buffer",
+		.start = 0,
+		.end = 0,
+		.flags = IORESOURCE_MEM
+#endif /* E_BOOK */
 	}
 };
+
+#if 1 /* E_BOOK */
+enum MEMRES_ID {
+	MEMRES_VIDEO_RAM,
+	MEMRES_KERNEL_CODE,
+	MEMRES_KERNEL_DATA,
+#ifdef CONFIG_MIX_LOGGER_STATIC /* E_BOOK */
+	MEMRES_MIX_LOGGER,
+#endif /* E_BOOK */
+#ifdef CONFIG_EPD_STATIC_MEM_WAVEFORM /* E_BOOK */
+	MEMRES_EPD_WAVEFORM,
+#endif /* E_BOOK */
+#ifdef CONFIG_EPD_STATIC_MEM_WORKBUFF /* E_BOOK */
+	MEMRES_EPD_WORKBUFF,
+#endif /* E_BOOK */
+};
+#endif /* E_BOOK */
 
 #define video_ram   mem_res[0]
 #define kernel_code mem_res[1]
@@ -534,7 +585,30 @@ __tagtable(ATAG_CORE, parse_tag_core);
 
 static int __init parse_tag_mem32(const struct tag *tag)
 {
+#if 1 /* E_BOOK */
+	__u32	start = tag->u.mem.start + tag->u.mem.size;
+
+#ifdef CONFIG_MIX_LOGGER_STATIC
+	start -= MIX_LOG_RESERVE_SIZE;
+	mix_log_set_mem_addr(start, &mem_res[MEMRES_MIX_LOGGER]);
+#endif
+#ifdef CONFIG_EPD_STATIC_MEM_WAVEFORM
+	mem_res[MEMRES_EPD_WAVEFORM].end   = start - 1;
+	start -= (2 * 1024 * 1024); /* 2MB */
+	mem_res[MEMRES_EPD_WAVEFORM].start = start;
+	request_resource(&iomem_resource, &mem_res[MEMRES_EPD_WAVEFORM]);
+#endif
+#ifdef CONFIG_EPD_STATIC_MEM_WORKBUFF
+	mem_res[MEMRES_EPD_WORKBUFF].end   = start - 1;
+	start -= (1 * 1024 * 1024); /* 1MB */
+	mem_res[MEMRES_EPD_WORKBUFF].start = start;
+	request_resource(&iomem_resource, &mem_res[MEMRES_EPD_WORKBUFF]);
+#endif
+
+	return arm_add_memory(tag->u.mem.start, start - tag->u.mem.start);
+#else /* E_BOOK */
 	return arm_add_memory(tag->u.mem.start, tag->u.mem.size);
+#endif /* E_BOOK */
 }
 
 __tagtable(ATAG_MEM, parse_tag_mem32);
@@ -648,7 +722,7 @@ static struct init_tags {
 	{ tag_size(tag_core), ATAG_CORE },
 	{ 1, PAGE_SIZE, 0xff },
 	{ tag_size(tag_mem32), ATAG_MEM },
-	{ MEM_SIZE, PHYS_OFFSET },
+	{ MEM_SIZE, },
 	{ 0, ATAG_NONE }
 };
 
@@ -682,6 +756,8 @@ void __init setup_arch(char **cmdline_p)
 		tags = phys_to_virt(__atags_pointer);
 	else if (mdesc->boot_params)
 		tags = phys_to_virt(mdesc->boot_params);
+	else
+		init_tags.mem.start = PHYS_OFFSET;
 
 	/*
 	 * If we have the old style parameters, convert them to
@@ -874,3 +950,16 @@ const struct seq_operations cpuinfo_op = {
 	.stop	= c_stop,
 	.show	= c_show
 };
+
+#ifdef CONFIG_EPD_STATIC_MEM_WAVEFORM /* E_BOOK */
+struct resource* get_res_epd_waveform(void)
+{
+	return &mem_res[MEMRES_EPD_WAVEFORM];
+}
+#endif /* E_BOOK */
+#ifdef CONFIG_EPD_STATIC_MEM_WORKBUFF /* E_BOOK */
+struct resource* get_res_epd_workbuff(void)
+{
+	return &mem_res[MEMRES_EPD_WORKBUFF];
+}
+#endif /* E_BOOK */

@@ -237,6 +237,17 @@
 struct regulator_dev;
 
 #define WM831X_NUM_IRQ_REGS 5
+#define WM831X_NUM_GPIO_REGS 16
+
+enum wm831x_parent {
+	WM8310 = 0x8310,
+	WM8311 = 0x8311,
+	WM8312 = 0x8312,
+	WM8320 = 0x8320,
+	WM8321 = 0x8321,
+	WM8325 = 0x8325,
+	WM8326 = 0x8326,
+};
 
 struct wm831x {
 	struct mutex io_lock;
@@ -261,6 +272,9 @@ struct wm831x {
 	unsigned charger_irq_wake:1;     /* Are charger IRQs a wake source? */
 
 	int num_gpio;
+	
+	/* Used by the interrupt controller code to post writes */
+	int gpio_update[WM831X_NUM_GPIO_REGS];
 
 	struct mutex auxadc_lock;
 	struct completion auxadc_done;
@@ -285,6 +299,9 @@ int wm831x_set_bits(struct wm831x *wm831x, unsigned short reg,
 int wm831x_bulk_read(struct wm831x *wm831x, unsigned short reg,
 		     int count, u16 *buf);
 
+int wm831x_device_init(struct wm831x *wm831x, unsigned long id, int irq);
+void wm831x_device_exit(struct wm831x *wm831x);
+int wm831x_device_suspend(struct wm831x *wm831x);
 int wm831x_irq_init(struct wm831x *wm831x, int irq);
 void wm831x_irq_exit(struct wm831x *wm831x);
 

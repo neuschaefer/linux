@@ -23,11 +23,21 @@
 #include "core.h"
 #include "host.h"
 
+#if 1 /* E_BOOK *//* for multiple wake lock 2011/06/29 */
+#include <linux/wakelock.h>
+#endif
+
 #define cls_dev_to_mmc_host(d)	container_of(d, struct mmc_host, class_dev)
 
 static void mmc_host_classdev_release(struct device *dev)
 {
 	struct mmc_host *host = cls_dev_to_mmc_host(dev);
+#if 1 /* E_BOOK *//* for multiple wake lock 2011/06/29 */
+	wake_lock_destroy(&host->mmc_delayed_work_wake_lock);
+#endif
+#if 1 /* E_BOOK *//*  bugfix for stall at quickly SD insert/remove 2011/08/11 */
+	wake_lock_destroy(&host->block_dev_wake_lock);
+#endif
 	kfree(host);
 }
 
@@ -85,6 +95,16 @@ struct mmc_host *mmc_alloc_host(int extra, struct device *dev)
 	init_waitqueue_head(&host->wq);
 	INIT_DELAYED_WORK(&host->detect, mmc_rescan);
 	INIT_DELAYED_WORK_DEFERRABLE(&host->disable, mmc_host_deeper_disable);
+
+#if 1 /* E_BOOK *//* bugfix for ATOMIC running deferred resume. 2011/06/27 */
+	mutex_init(&host->resume_lock);
+#endif
+#if 1 /* E_BOOK *//* for multiple wake lock 2011/06/29 */
+	wake_lock_init(&host->mmc_delayed_work_wake_lock, WAKE_LOCK_SUSPEND, "mmc_delayed_work");
+#endif
+#if 1 /* E_BOOK *//*  bugfix for stall at quickly SD insert/remove 2011/08/11 */
+	wake_lock_init(&host->block_dev_wake_lock, WAKE_LOCK_SUSPEND, "mmcblock");
+#endif
 
 	/*
 	 * By default, hosts do not support SGIO or large requests.

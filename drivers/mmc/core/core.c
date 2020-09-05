@@ -22,6 +22,7 @@
 #include <linux/scatterlist.h>
 #include <linux/log2.h>
 #include <linux/regulator/consumer.h>
+#include <linux/wakelock.h>
 
 #include <linux/mmc/card.h>
 #include <linux/mmc/host.h>
@@ -38,7 +39,16 @@
 #include "sdio_ops.h"
 
 static struct workqueue_struct *workqueue;
+#if 0 /* E_BOOK *//* delete for multiple wake lock 2011/06/29 */
+static struct wake_lock mmc_delayed_work_wake_lock;
+#endif
 
+#if 1 /* E_BOOK *//* for suspend/resume 2011/06/13 */
+int dont_suspend=0;
+int dont_suspend_by_IO=0;
+EXPORT_SYMBOL(dont_suspend);
+EXPORT_SYMBOL(dont_suspend_by_IO);
+#endif
 /*
  * Enabling software CRCs on the data blocks can be a significant (30%)
  * performance cost, and for other reasons may not always be desired.
@@ -66,12 +76,21 @@ MODULE_PARM_DESC(
 /*
  * Internal function. Schedule delayed work in the MMC work queue.
  */
+#if 1 /* E_BOOK *//* for multiple wake lock 2011/06/29 */
+static int mmc_schedule_delayed_work(struct delayed_work *work,
+				     unsigned long delay,struct mmc_host *host)
+{
+	wake_lock(&host->mmc_delayed_work_wake_lock);
+	return queue_delayed_work(workqueue, work, delay);
+}
+#else
 static int mmc_schedule_delayed_work(struct delayed_work *work,
 				     unsigned long delay)
 {
+	wake_lock(&mmc_delayed_work_wake_lock);
 	return queue_delayed_work(workqueue, work, delay);
 }
-
+#endif
 /*
  * Internal function. Flush all scheduled work from the MMC work queue.
  */
@@ -418,7 +437,11 @@ static int mmc_host_do_disable(struct mmc_host *host, int lazy)
 		if (err > 0) {
 			unsigned long delay = msecs_to_jiffies(err);
 
+#if 1 /* E_BOOK *//* for multiple wake lock 2011/06/29 */
+			mmc_schedule_delayed_work(&host->disable, delay, host);
+#else
 			mmc_schedule_delayed_work(&host->disable, delay);
+#endif
 		}
 	}
 	host->enabled = 0;
@@ -545,9 +568,16 @@ void mmc_host_deeper_disable(struct work_struct *work)
 
 	/* If the host is claimed then we do not want to disable it anymore */
 	if (!mmc_try_claim_host(host))
-		return;
+		goto out;
 	mmc_host_do_disable(host, 1);
 	mmc_do_release_host(host);
+
+out:
+#if 1 /* E_BOOK *//* for multiple wake lock 2011/06/29 */
+	wake_unlock(&host->mmc_delayed_work_wake_lock);
+#else
+	wake_unlock(&mmc_delayed_work_wake_lock);
+#endif
 }
 
 /**
@@ -573,8 +603,13 @@ int mmc_host_lazy_disable(struct mmc_host *host)
 		return 0;
 
 	if (host->disable_delay) {
+#if 1 /* E_BOOK *//* for multiple wake lock 2011/06/29 */
+		mmc_schedule_delayed_work(&host->disable,
+					  msecs_to_jiffies(host->disable_delay),host );
+#else
 		mmc_schedule_delayed_work(&host->disable,
 				msecs_to_jiffies(host->disable_delay));
+#endif
 		return 0;
 	} else
 		return mmc_host_do_disable(host, 1);
@@ -977,6 +1012,48 @@ static inline void mmc_bus_put(struct mmc_host *host)
 	spin_unlock_irqrestore(&host->lock, flags);
 }
 
+#ifdef CONFIG_MMC_BLOCK_DEFERRED_RESUME
+int mmc_resume_bus(struct mmc_host *host)
+{
+	unsigned long flags;
+
+#if 1 /* E_BOOK *//* bugfix for ATOMIC running deferred resume. 2011/06/27 */
+	mutex_lock(&host->resume_lock);
+	if (!host->deferred_resume || !host->need_resume) {
+		mutex_unlock(&host->resume_lock);
+		return -EINVAL;
+	}
+#else
+	if (!host->deferred_resume || !host->need_resume)
+		return -EINVAL;
+#endif
+
+	printk(KERN_DEBUG "%s: Starting deferred resume\n", mmc_hostname(host));
+	spin_lock_irqsave(&host->lock, flags);
+	host->need_resume = 0;
+	spin_unlock_irqrestore(&host->lock, flags);
+
+	mmc_bus_get(host);
+	if (host->bus_ops && !host->bus_dead) {
+		mmc_power_up(host);
+		BUG_ON(!host->bus_ops->resume);
+		host->bus_ops->resume(host);
+	}
+
+	if (host->bus_ops->detect && !host->bus_dead)
+		host->bus_ops->detect(host);
+
+	mmc_bus_put(host);
+	printk(KERN_DEBUG "%s: Deferred resume completed\n", mmc_hostname(host));
+#if 1 /* E_BOOK *//* bugfix for ATOMIC running deferred resume. 2011/06/27 */
+	mutex_unlock(&host->resume_lock);
+#endif
+	return 0;
+}
+
+EXPORT_SYMBOL(mmc_resume_bus);
+#endif
+
 /*
  * Assign a mmc bus handler to a host. Only one bus handler may control a
  * host at any given time.
@@ -1045,11 +1122,92 @@ void mmc_detect_change(struct mmc_host *host, unsigned long delay)
 	spin_unlock_irqrestore(&host->lock, flags);
 #endif
 
+#if 1 /* E_BOOK *//* for DEBUG 2011/06/14 */
+	printk(KERN_DEBUG "mmc_detect_change: id=%d\n",host->index);
+#endif
+#if 1 /* E_BOOK *//* for multiple wake lock 2011/06/29 */
+	mmc_schedule_delayed_work(&host->detect, delay, host);
+#else
 	mmc_schedule_delayed_work(&host->detect, delay);
+#endif
 }
 
 EXPORT_SYMBOL(mmc_detect_change);
 
+#if 1 /* E_BOOK *//* fix for Electrostatic error 2011/08/12 */
+void mmc_re_rescan(struct mmc_host *host)
+{
+	u32 ocr;
+	int err;
+	int extend_wakelock = 0;
+	int flag;
+	extern int mxc_get_cd_status(struct mmc_host *mmc);
+
+
+	mmc_power_off(host);
+	mmc_bus_get(host);
+
+	/* if there is a card registered, check whether it is still present */
+	if ((host->bus_ops != NULL) && host->bus_ops->detect && !host->bus_dead)
+		host->bus_ops->detect(host);
+
+	/* detect a newly inserted card */
+
+	/*
+	 * Only we can add a new handler, so it's safe to
+	 * release the lock here.
+	 */
+	mmc_bus_put(host);
+
+	if (host->ops->get_cd && host->ops->get_cd(host) == 0)
+		goto out;
+
+	//mmc_claim_host(host);
+
+	mmc_power_up(host);
+	sdio_reset(host);
+	mmc_go_idle(host);
+
+	mmc_send_if_cond(host, host->ocr_avail);
+
+	/*
+	 * First we search for SDIO...
+	 */
+	err = mmc_send_io_op_cond(host, 0, &ocr);
+	if (!err) {
+		if (mmc_attach_sdio(host, ocr))
+			mmc_power_off(host);
+		goto out;
+	}
+
+	/*
+	 * ...then normal SD...
+	 */
+	err = mmc_send_app_op_cond(host, 0, &ocr);
+	if (!err) {
+		if (mmc_attach_sd_again(host, ocr))
+			mmc_power_off(host);
+		goto out;
+	}
+
+	/*
+	 * ...and finally MMC.
+	 */
+	err = mmc_send_op_cond(host, 0, &ocr);
+	if (!err) {
+		if (mmc_attach_mmc(host, ocr))
+			mmc_power_off(host);
+		goto out;
+	}
+
+	mmc_power_off(host);
+	//mmc_release_host(host);
+
+out:
+	return;
+}
+EXPORT_SYMBOL(mmc_re_rescan);
+#endif  /* E_BOOK *//* TEST for Electrostatic 2011/08/12 */
 
 void mmc_rescan(struct work_struct *work)
 {
@@ -1057,6 +1215,13 @@ void mmc_rescan(struct work_struct *work)
 		container_of(work, struct mmc_host, detect.work);
 	u32 ocr;
 	int err;
+	int extend_wakelock = 0;
+#if 1 /* E_BOOK *//* for suspend/resume 2011/06/13 */
+	int flag;
+#endif
+#if 1 /* E_BOOK *//* for TEST 2011/07/14 */
+	extern int mxc_get_cd_status(struct mmc_host *mmc);
+#endif
 
 	mmc_bus_get(host);
 
@@ -1064,8 +1229,19 @@ void mmc_rescan(struct work_struct *work)
 	if ((host->bus_ops != NULL) && host->bus_ops->detect && !host->bus_dead)
 		host->bus_ops->detect(host);
 
+	/* If the card was removed the bus will be marked
+	 * as dead - extend the wakelock so userspace
+	 * can respond */
+	if (host->bus_dead)
+		extend_wakelock = 1;
+
 	mmc_bus_put(host);
 
+#if 1 /* E_BOOK *//* bugfix lead power  2011/07/26 */
+	if((host->index == 0) && mxc_get_cd_status(host)) {
+	  goto out;
+	}
+#endif
 
 	mmc_bus_get(host);
 
@@ -1101,6 +1277,7 @@ void mmc_rescan(struct work_struct *work)
 	if (!err) {
 		if (mmc_attach_sdio(host, ocr))
 			mmc_power_off(host);
+		extend_wakelock = 1;
 		goto out;
 	}
 
@@ -1111,6 +1288,7 @@ void mmc_rescan(struct work_struct *work)
 	if (!err) {
 		if (mmc_attach_sd(host, ocr))
 			mmc_power_off(host);
+		extend_wakelock = 1;
 		goto out;
 	}
 
@@ -1121,15 +1299,83 @@ void mmc_rescan(struct work_struct *work)
 	if (!err) {
 		if (mmc_attach_mmc(host, ocr))
 			mmc_power_off(host);
+		extend_wakelock = 1;
 		goto out;
 	}
 
+#if 1 /* E_BOOK *//* bugfix for power off while read/write 2011/07/27 */
+	mmc_power_off(host);
+	mmc_release_host(host);
+#else
 	mmc_release_host(host);
 	mmc_power_off(host);
+#endif
 
 out:
+#if 1 /* E_BOOK *//* for SDIO slot 2011/06/28 */
+	if ( host->index == 3 ) {
+	  /* No need process for WiFI ejected */
+	  printk(KERN_DEBUG "mmc_rescan:wifi:wake unlock (%d)\n",host->index);
+#if 1 /* E_BOOK *//* for multiple wake lock 2011/06/29 */
+	  wake_unlock(&host->mmc_delayed_work_wake_lock);
+#else
+	  wake_unlock(&mmc_delayed_work_wake_lock);
+#endif
+	} else {
+#if 1 /* E_BOOK *//* for DEBUG 2011/06/20 */
+	  if (extend_wakelock){
+	    printk(KERN_DEBUG "mmc_rescan:wake_lock_timeout (%d)\n",host->index);
+#if 1 /* E_BOOK *//* for multiple wake lock 2011/06/29 */
+	    wake_lock_timeout(&host->mmc_delayed_work_wake_lock, HZ / 2);
+#else
+	    wake_lock_timeout(&mmc_delayed_work_wake_lock, HZ / 2);
+#endif
+	  }else {
+#if 1 /* E_BOOK *//* for multiple wake lock 2011/06/29 */
+	    wake_unlock(&host->mmc_delayed_work_wake_lock);
+#else
+	    wake_unlock(&mmc_delayed_work_wake_lock);
+#endif
+	  }
+#else
+	  if (extend_wakelock)
+	    wake_lock_timeout(&mmc_delayed_work_wake_lock, HZ / 2);
+	  else
+	    wake_unlock(&mmc_delayed_work_wake_lock);
+#endif
+	}
+#else
+#if 1 /* E_BOOK *//* for DEBUG 2011/06/20 */
+	if (extend_wakelock){
+	  printk(KERN_DEBUG "mmc_rescan:wake_lock_timeout (%d)\n",host->index);
+		wake_lock_timeout(&mmc_delayed_work_wake_lock, HZ / 2);
+	}else {
+		wake_unlock(&mmc_delayed_work_wake_lock);
+	}
+#else
+	if (extend_wakelock)
+		wake_lock_timeout(&mmc_delayed_work_wake_lock, HZ / 2);
+	else
+		wake_unlock(&mmc_delayed_work_wake_lock);
+#endif
+#endif
+
+#if 1 /* E_BOOK *//* for multiple wake lock 2011/06/29 */
+	if (host->caps & MMC_CAP_NEEDS_POLL)
+	  mmc_schedule_delayed_work(&host->detect, HZ,host);
+#else
 	if (host->caps & MMC_CAP_NEEDS_POLL)
 		mmc_schedule_delayed_work(&host->detect, HZ);
+#endif
+
+#if 1 /* E_BOOK *//* for suspend/resume 2011/06/13 */
+	if ( host->index == 0 ) {
+	  local_irq_save(flag);
+	  dont_suspend=0;
+	  printk(KERN_DEBUG "mmc_rescan:detect done(id=%d)\n",host->index);
+	  local_irq_restore(flag);
+	}
+#endif
 }
 
 void mmc_start_host(struct mmc_host *host)
@@ -1257,10 +1503,24 @@ int mmc_suspend_host(struct mmc_host *host)
 {
 	int err = 0;
 
+#ifdef CONFIG_MMC_BLOCK_DEFERRED_RESUME
+	if (host->need_resume)
+		return 0;
+#endif
+
 	if (host->caps & MMC_CAP_DISABLE)
 		cancel_delayed_work(&host->disable);
+#if 0 /* E_BOOK *//* for DEBUG 2011/06/13 */
+	printk(KERN_DEBUG "mmc_suspend_host: call cancel_delayed_work\n");
+#endif
 	cancel_delayed_work(&host->detect);
+#if 0 /* E_BOOK *//* for DEBUG 2011/06/13 */
+	printk("mmc_suspend_host: call mmc_flush_scheduled_work()\n");
+#endif
 	mmc_flush_scheduled_work();
+#if 0 /* E_BOOK *//* for DEBUG 2011/06/13 */
+	printk("mmc_suspend_host: end mmc_flush_scheduled_work()\n");
+#endif
 
 	mmc_bus_get(host);
 	if (host->bus_ops && !host->bus_dead) {
@@ -1299,6 +1559,15 @@ int mmc_resume_host(struct mmc_host *host)
 	int err = 0;
 
 	mmc_bus_get(host);
+
+#ifdef CONFIG_MMC_BLOCK_DEFERRED_RESUME
+	if (host->deferred_resume) {
+		host->need_resume = 1;
+		mmc_bus_put(host);
+		return 0;
+	}
+#endif
+
 	if (host->bus_ops && !host->bus_dead) {
 		if (!(host->pm_flags & MMC_PM_KEEP_POWER)) {
 			mmc_power_up(host);
@@ -1325,8 +1594,18 @@ int mmc_resume_host(struct mmc_host *host)
 	 * We add a slight delay here so that resume can progress
 	 * in parallel.
 	 */
+#if 1 /* E_BOOK *//* DISABLE SDHC2 2011/06/28 */
+	if ( host->index == 1 ) {
+	  return 0;
+	}
+#endif
+#if 1 /* E_BOOK *//* for stop sleeping 2011/06/14 */
+	if ( host->resume_cd_flag == 0 ) {
+	  mmc_detect_change(host, 1);
+	}
+#else
 	mmc_detect_change(host, 1);
-
+#endif
 	return err;
 }
 
@@ -1338,6 +1617,9 @@ static int __init mmc_init(void)
 {
 	int ret;
 
+#if 0 /* E_BOOK *//* delete for multiple wake lock 2011/06/29 */
+	wake_lock_init(&mmc_delayed_work_wake_lock, WAKE_LOCK_SUSPEND, "mmc_delayed_work");
+#endif
 	workqueue = create_singlethread_workqueue("kmmcd");
 	if (!workqueue)
 		return -ENOMEM;
@@ -1372,6 +1654,9 @@ static void __exit mmc_exit(void)
 	mmc_unregister_host_class();
 	mmc_unregister_bus();
 	destroy_workqueue(workqueue);
+#if 0 /* E_BOOK *//* delete for multiple wake lock 2011/06/29 */
+	wake_lock_destroy(&mmc_delayed_work_wake_lock);
+#endif
 }
 
 subsys_initcall(mmc_init);

@@ -46,6 +46,10 @@ struct fat_mount_options {
 		 usefree:1,	  /* Use free_clusters for FAT32 */
 		 tz_utc:1,	  /* Filesystem timestamps are in UTC */
 		 rodir:1,	  /* allow ATTR_RO for directory */
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC /* E_BOOK */
+		 batch_sync:1,	  /* set = make sync in BATCH mode */
+		 dirsync:1,
+#endif /* CONFIG_SNSC_FS_FAT_BATCH_SYNC */
 		 discard:1;	  /* Issue discard requests on deletions */
 };
 
@@ -78,6 +82,7 @@ struct msdos_sb_info {
 	const void *dir_ops;		     /* Opaque; default directory operations */
 	int dir_per_block;	     /* dir entries per block */
 	int dir_per_block_bits;	     /* log2(dir_per_block) */
+	unsigned long vol_id;        /* volume ID */
 
 	int fatent_shift;
 	struct fatent_operations *fatent_ops;
@@ -109,6 +114,14 @@ struct msdos_inode_info {
 	int i_attrs;		/* unused attribute bits */
 	loff_t i_pos;		/* on-disk position of directory entry or 0 */
 	struct hlist_node i_fat_hash;	/* hash by i_location */
+
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC /* E_BOOK */
+	/* for Fast Sync Operation*/
+	int i_new; /*1: new inode && not SYNCed yet*/
+	int i_last_dclus; /*not SYNCed last cluster or 0*/
+	int i_new_dclus; /*new cluster to be linked at i_last*/
+#endif /* CONFIG_SNSC_FS_FAT_BATCH_SYNC */
+
 	struct inode vfs_inode;
 };
 
@@ -290,6 +303,41 @@ static inline void fatent_brelse(struct fat_entry *fatent)
 	fatent->fat_inode = NULL;
 }
 
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC /* E_BOOK */
+static inline int fatent_uptodate(struct fat_entry *fatent)
+{
+	if (fatent->nr_bhs == 2)
+		return (buffer_uptodate(fatent->bhs[0]) &&
+			buffer_uptodate(fatent->bhs[1]));
+	return buffer_uptodate(fatent->bhs[0]);
+}
+
+static inline void fatent_unlock(struct msdos_sb_info *sbi,
+				 struct fat_entry *fatent)
+{
+	if (sbi->options.batch_sync) {
+		int i;
+		for (i = 0; i < fatent->nr_bhs; i++)
+			unlock_buffer(fatent->bhs[i]);
+	}
+}
+
+static inline int fatent_lock(struct msdos_sb_info *sbi,
+			      struct fat_entry *fatent)
+{
+	if (sbi->options.batch_sync) {
+		int i;
+		for (i = 0; i < fatent->nr_bhs; i++)
+			lock_buffer(fatent->bhs[i]);
+		if (!fatent_uptodate(fatent)) {
+			fatent_unlock(sbi, fatent);
+			return 0;
+		}
+	}
+	return 1;
+}
+#endif /* CONFIG_SNSC_FS_FAT_BATCH_SYNC */
+
 extern void fat_ent_access_init(struct super_block *sb);
 extern int fat_ent_read(struct inode *inode, struct fat_entry *fatent,
 			int entry);
@@ -304,6 +352,9 @@ extern int fat_count_free_clusters(struct super_block *sb);
 extern long fat_generic_ioctl(struct file *filp, unsigned int cmd,
 			      unsigned long arg);
 extern const struct file_operations fat_file_operations;
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC /* E_BOOK */
+extern const struct file_operations fat_file_operations_nosync;
+#endif /* CONFIG_SNSC_FS_FAT_BATCH_SYNC */
 extern const struct inode_operations fat_file_inode_operations;
 extern int fat_setattr(struct dentry * dentry, struct iattr * attr);
 extern int fat_setsize(struct inode *inode, loff_t offset);
@@ -345,5 +396,19 @@ void fat_cache_destroy(void);
 
 /* helper for printk */
 typedef unsigned long long	llu;
+
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC /* E_BOOK */
+static inline int fat_syncdir(struct inode *dir)
+{
+	struct super_block *sb = dir->i_sb;
+	struct msdos_sb_info *sbi = MSDOS_SB(sb);
+	int ret = 0;
+
+	if (!IS_DIRSYNC(dir) && sbi->options.batch_sync)
+		ret = sync_blockdev(sb->s_bdev);
+
+	return ret;
+}
+#endif /* CONFIG_SNSC_FS_FAT_BATCH_SYNC */
 
 #endif /* !_FAT_H */

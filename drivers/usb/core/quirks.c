@@ -122,7 +122,11 @@ void usb_detect_quirks(struct usb_device *udev)
 	/* By default, disable autosuspend for all devices.  The hub driver
 	 * will enable it for hubs.
 	 */
+#if 0	/*E_BOOK*/
+	usb_enable_autosuspend(udev);
+#else
 	usb_disable_autosuspend(udev);
+#endif
 
 	/* Autosuspend can also be disabled if the initial autosuspend_delay
 	 * is negative.

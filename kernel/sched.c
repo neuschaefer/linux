@@ -77,6 +77,7 @@
 #include <asm/irq_regs.h>
 
 #include "sched_cpupri.h"
+#include "sched_stats.h"
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/sched.h>
@@ -536,6 +537,9 @@ struct rq {
 	unsigned long long rq_cpu_time;
 	/* could above be rq->cfs_rq.exec_clock + rq->rt_rq.rt_runtime ? */
 
+	u64 skip_clock_max;
+	u64 skip_clock_set;
+
 	/* sys_sched_yield() stats */
 	unsigned int yld_count;
 
@@ -564,8 +568,11 @@ void check_preempt_curr(struct rq *rq, struct task_struct *p, int flags)
 	 * A queue event has occurred, and we're going to schedule.  In
 	 * this case, we can save a useless back to back clock update.
 	 */
-	if (test_tsk_need_resched(p))
+	if (test_tsk_need_resched(rq->curr)) {
+		schedstat_set(rq->skip_clock_set,
+			      sched_clock_cpu(cpu_of(rq)));
 		rq->skip_clock_update = 1;
+	}
 }
 
 static inline int cpu_of(struct rq *rq)
@@ -1815,8 +1822,6 @@ static const struct sched_class rt_sched_class;
 #define sched_class_highest (&rt_sched_class)
 #define for_each_class(class) \
    for (class = sched_class_highest; class; class = class->next)
-
-#include "sched_stats.h"
 
 static void inc_nr_running(struct rq *rq)
 {
@@ -3536,7 +3541,12 @@ static void put_prev_task(struct rq *rq, struct task_struct *prev)
 {
 	if (prev->se.on_rq)
 		update_rq_clock(rq);
-	rq->skip_clock_update = 0;
+	if (unlikely(rq->skip_clock_update)) {
+		schedstat_set(rq->skip_clock_max,
+			      max(rq->skip_clock_max,
+				  sched_clock_cpu(cpu_of(rq)) - rq->skip_clock_set));
+		rq->skip_clock_update = 0;
+	}
 	prev->sched_class->put_prev_task(rq, prev);
 }
 

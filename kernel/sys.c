@@ -78,6 +78,10 @@
 # define SET_TSC_CTL(a)		(-EINVAL)
 #endif
 
+#ifdef CONFIG_REGULATOR_WM831X
+extern void send_reboot_request(void);
+#endif
+
 /*
  * this is where the system-wide overflow UID and GID are defined, for
  * architectures that now have 32-bit UID/GID but didn't in the past
@@ -297,6 +301,14 @@ void kernel_restart_prepare(char *cmd)
 	sysdev_shutdown();
 }
 
+static void kernel_shutdown_prepare(enum system_states state)
+{
+	blocking_notifier_call_chain(&reboot_notifier_list,
+		(state == SYSTEM_HALT)?SYS_HALT:SYS_POWER_OFF, NULL);
+	system_state = state;
+	device_shutdown();
+}
+
 /**
  *	kernel_restart - reboot the system
  *	@cmd: pointer to buffer containing command to execute for restart
@@ -307,22 +319,28 @@ void kernel_restart_prepare(char *cmd)
  */
 void kernel_restart(char *cmd)
 {
+#ifdef CONFIG_REGULATOR_WM831X
+	printk(KERN_EMERG "Restarting system.\n");
+	kernel_shutdown_prepare(SYSTEM_POWER_OFF);
+	if (pm_power_off_prepare)
+		pm_power_off_prepare();
+	disable_nonboot_cpus();
+	sysdev_shutdown();
+	send_reboot_request();
+	while(1);
+#else	
 	kernel_restart_prepare(cmd);
 	if (!cmd)
 		printk(KERN_EMERG "Restarting system.\n");
 	else
 		printk(KERN_EMERG "Restarting system with command '%s'.\n", cmd);
+	
 	machine_restart(cmd);
+#endif
+	
 }
 EXPORT_SYMBOL_GPL(kernel_restart);
 
-static void kernel_shutdown_prepare(enum system_states state)
-{
-	blocking_notifier_call_chain(&reboot_notifier_list,
-		(state == SYSTEM_HALT)?SYS_HALT:SYS_POWER_OFF, NULL);
-	system_state = state;
-	device_shutdown();
-}
 /**
  *	kernel_halt - halt the system
  *

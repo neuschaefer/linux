@@ -364,6 +364,11 @@ static int fat_fill_inode(struct inode *inode, struct msdos_dir_entry *de)
 	inode->i_gid = sbi->options.fs_gid;
 	inode->i_version++;
 	inode->i_generation = get_seconds();
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC /* E_BOOK */
+	MSDOS_I(inode)->i_last_dclus = 0;
+	MSDOS_I(inode)->i_new = 0;
+	MSDOS_I(inode)->i_new_dclus = 0;
+#endif /* CONFIG_SNSC_FS_FAT_BATCH_SYNC */
 
 	if ((de->attr & ATTR_DIR) && !IS_FREE(de->name)) {
 		inode->i_generation &= ~1;
@@ -600,6 +605,61 @@ static inline loff_t fat_i_pos_read(struct msdos_sb_info *sbi,
 	return i_pos;
 }
 
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC /* E_BOOK */
+
+#define FAT_START(sb)	(MSDOS_SB(sb)->fat_start << (sb)->s_blocksize_bits)
+#define DIR_START(sb)	(MSDOS_SB(sb)->dir_start << (sb)->s_blocksize_bits)
+#define FAT_END(sb)		(DIR_START(sb) - 1)
+#define DIR_END(sb)		LLONG_MAX
+
+static int fat_sync_meta(struct inode *inode)
+{
+	struct super_block *sb = inode->i_sb;
+	struct address_space *mapping = sb->s_bdev->bd_inode->i_mapping;
+	int err = 0;
+
+	/* the FAT BHS update have to be ATOMIC*/
+	err = filemap_write_and_wait_range(mapping, FAT_START(sb), FAT_END(sb));
+	if (err)
+		goto error;
+
+	/* wait BODY DATA to be finished*/
+	err = filemap_write_and_wait(inode->i_mapping);
+	if (err)
+		goto error;
+
+	if (!MSDOS_I(inode)->i_new
+	    && MSDOS_I(inode)->i_last_dclus) {
+		struct fat_entry fatent;
+		int last = MSDOS_I(inode)->i_last_dclus;
+		int new = MSDOS_I(inode)->i_new_dclus;
+
+		pr_debug("%s - add chain now: %d %d\n",
+			 __func__, last, new);
+
+		fatent_init(&fatent);
+		err = fat_ent_read(inode, &fatent, last);
+		if (err < 0)
+			goto out;
+
+		err = fat_ent_write(inode, &fatent, new, 1);
+		if (err < 0)
+			goto out;
+
+	out:
+		fatent_brelse(&fatent);
+		if (err < 0)
+			goto error;
+	}
+
+	MSDOS_I(inode)->i_new = 0;
+	MSDOS_I(inode)->i_last_dclus = 0;
+
+error:
+	return err;
+}
+#endif /* CONFIG_SNSC_FS_FAT_BATCH_SYNC */
+
 static int __fat_write_inode(struct inode *inode, int wait)
 {
 	struct super_block *sb = inode->i_sb;
@@ -608,10 +668,22 @@ static int __fat_write_inode(struct inode *inode, int wait)
 	struct msdos_dir_entry *raw_entry;
 	loff_t i_pos;
 	int err;
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC /* E_BOOK */
+	struct address_space *mapping = sb->s_bdev->bd_inode->i_mapping;
+#endif
 
 	if (inode->i_ino == MSDOS_ROOT_INO)
 		return 0;
 
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC /* E_BOOK */
+	if (sbi->options.batch_sync) {
+		err = fat_sync_meta(inode);
+		if (err) {
+			printk(KERN_ERR "fat_sync_meta error: %d!\n", err);
+			return err;
+		}
+	}
+#endif /* CONFIG_SNSC_FS_FAT_BATCH_SYNC */
 retry:
 	i_pos = fat_i_pos_read(sbi, inode);
 	if (!i_pos)
@@ -623,9 +695,17 @@ retry:
 		       "for updating (i_pos %lld)\n", i_pos);
 		return -EIO;
 	}
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC /* E_BOOK */
+	if (sbi->options.batch_sync)
+		lock_buffer(bh);
+#endif /* CONFIG_SNSC_FS_FAT_BATCH_SYNC */
 	spin_lock(&sbi->inode_hash_lock);
 	if (i_pos != MSDOS_I(inode)->i_pos) {
 		spin_unlock(&sbi->inode_hash_lock);
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC /* E_BOOK */
+		if (sbi->options.batch_sync)
+			unlock_buffer(bh);
+#endif /* CONFIG_SNSC_FS_FAT_BATCH_SYNC */
 		brelse(bh);
 		goto retry;
 	}
@@ -649,8 +729,19 @@ retry:
 				  &raw_entry->adate, NULL);
 	}
 	spin_unlock(&sbi->inode_hash_lock);
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC /* E_BOOK */
+	if (sbi->options.batch_sync)
+		unlock_buffer(bh);
+#endif /* CONFIG_SNSC_FS_FAT_BATCH_SYNC */
 	mark_buffer_dirty(bh);
 	err = 0;
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC /* E_BOOK */
+	/* sync dirty direntries */
+	if (sbi->options.batch_sync)
+		err = filemap_write_and_wait_range(mapping, DIR_START(sb),
+						   DIR_END(sb));
+	else
+#endif /* CONFIG_SNSC_FS_FAT_BATCH_SYNC */
 	if (wait)
 		err = sync_dirty_buffer(bh);
 	brelse(bh);
@@ -659,12 +750,46 @@ retry:
 
 static int fat_write_inode(struct inode *inode, struct writeback_control *wbc)
 {
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC /* E_BOOK */
+	struct msdos_sb_info *sbi = MSDOS_SB(inode->i_sb);
+	int ret = 0;
+
+	if (sbi->options.batch_sync) {
+		if (!mutex_trylock(&inode->i_mutex)) {
+			/*
+			 * if we failed to acquire the lock now
+			 * then mark it dirty again.
+			 * it never fail during umount, so it will
+			 * be committed finally.
+			 */
+			pr_debug("Fail to acquire lock, mark it dirty again!\n");
+			mark_inode_dirty(inode);
+			goto out;
+		}
+
+		pr_debug("Acquire lock sucessfully!\n");
+
+		ret = __fat_write_inode(inode, 1);
+
+		mutex_unlock(&inode->i_mutex);
+	} else {
+		ret = __fat_write_inode(inode, (wbc->sync_mode == WB_SYNC_ALL));
+	}
+
+out:
+	return ret;
+#else /* CONFIG_SNSC_FS_FAT_BATCH_SYNC */
 	return __fat_write_inode(inode, wbc->sync_mode == WB_SYNC_ALL);
+#endif /* CONFIG_SNSC_FS_FAT_BATCH_SYNC */
 }
 
 int fat_sync_inode(struct inode *inode)
 {
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC /* E_BOOK */
 	return __fat_write_inode(inode, 1);
+#else /* CONFIG_SNSC_FS_FAT_BATCH_SYNC */
+	return __fat_write_inode(inode, 1);
+#endif /* CONFIG_SNSC_FS_FAT_BATCH_SYNC */
 }
 
 EXPORT_SYMBOL_GPL(fat_sync_inode);
@@ -861,6 +986,10 @@ static int fat_show_options(struct seq_file *m, struct vfsmount *mnt)
 		seq_puts(m, ",showexec");
 	if (opts->sys_immutable)
 		seq_puts(m, ",sys_immutable");
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC /* E_BOOK */
+	if (opts->batch_sync)
+		seq_puts(m, ",batch_sync");
+#endif /* CONFIG_SNSC_FS_FAT_BATCH_SYNC */
 	if (!isvfat) {
 		if (opts->dotsOK)
 			seq_puts(m, ",dotsOK=yes");
@@ -893,6 +1022,9 @@ static int fat_show_options(struct seq_file *m, struct vfsmount *mnt)
 }
 
 enum {
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC /* E_BOOK */
+	Opt_batch_dirsync, Opt_batch_sync,
+#endif /* CONFIG_SNSC_FS_FAT_BATCH_SYNC */
 	Opt_check_n, Opt_check_r, Opt_check_s, Opt_uid, Opt_gid,
 	Opt_umask, Opt_dmask, Opt_fmask, Opt_allow_utime, Opt_codepage,
 	Opt_usefree, Opt_nocase, Opt_quiet, Opt_showexec, Opt_debug,
@@ -905,6 +1037,10 @@ enum {
 };
 
 static const match_table_t fat_tokens = {
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC /* E_BOOK */
+	{Opt_batch_dirsync, "batch_dirsync"},
+	{Opt_batch_sync, "batch_sync"},
+#endif /* CONFIG_SNSC_FS_FAT_BATCH_SYNC */
 	{Opt_check_r, "check=relaxed"},
 	{Opt_check_s, "check=strict"},
 	{Opt_check_n, "check=normal"},
@@ -1004,6 +1140,17 @@ static int parse_options(char *options, int is_vfat, int silent, int *debug,
 		opts->shortname = 0;
 		opts->rodir = 1;
 	}
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC /* E_BOOK */
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC_DEFAULT_OPT
+	opts->batch_sync = 1;
+#else /* CONFIG_SNSC_FS_FAT_BATCH_SYNC_DEFAULT_OPT */
+	opts->batch_sync = 0;
+#endif /* CONFIG_SNSC_FS_FAT_BATCH_SYNC_DEFAULT_OPT */
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_DIRSYNC_DEFAULT_OPT
+	opts->dirsync = 1;
+	opts->batch_sync = 1;
+#endif /* CONFIG_SNSC_FS_FAT_BATCH_DIRSYNC_DEFAULT_OPT */
+#endif /* CONFIG_SNSC_FS_FAT_BATCH_SYNC */
 	opts->name_check = 'n';
 	opts->quiet = opts->showexec = opts->sys_immutable = opts->dotsOK =  0;
 	opts->utf8 = opts->unicode_xlate = 0;
@@ -1029,6 +1176,13 @@ static int parse_options(char *options, int is_vfat, int silent, int *debug,
 				token = match_token(p, msdos_tokens, args);
 		}
 		switch (token) {
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC /* E_BOOK */
+		case Opt_batch_dirsync:
+			opts->dirsync = 1;
+		case Opt_batch_sync:
+			opts->batch_sync = 1;
+			break;
+#endif /* CONFIG_SNSC_FS_FAT_BATCH_SYNC */
 		case Opt_check_s:
 			opts->name_check = 's';
 			break;
@@ -1211,6 +1365,11 @@ static int fat_read_root(struct inode *inode)
 	int error;
 
 	MSDOS_I(inode)->i_pos = 0;
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC /* E_BOOK */
+	MSDOS_I(inode)->i_last_dclus = 0;
+	MSDOS_I(inode)->i_new = 0;
+	MSDOS_I(inode)->i_new_dclus = 0;
+#endif /* CONFIG_SNSC_FS_FAT_BATCH_SYNC */
 	inode->i_uid = sbi->options.fs_uid;
 	inode->i_gid = sbi->options.fs_gid;
 	inode->i_version++;
@@ -1249,6 +1408,7 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 	struct inode *root_inode = NULL, *fat_inode = NULL;
 	struct buffer_head *bh;
 	struct fat_boot_sector *b;
+	struct fat_boot_bsx *bsx;
 	struct msdos_sb_info *sbi;
 	u16 logical_sector_size;
 	u32 total_sectors, total_clusters, fat_clusters, rootdir_sectors;
@@ -1279,6 +1439,14 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 	error = parse_options(data, isvfat, silent, &debug, &sbi->options);
 	if (error)
 		goto out_fail;
+
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC /* E_BOOK */
+	if (sbi->options.dirsync)
+		sb->s_flags |= MS_DIRSYNC;
+	if (sbi->options.batch_sync) {
+		sb->s_flags &= ~MS_SYNCHRONOUS;
+	}
+#endif /* CONFIG_SNSC_FS_FAT_BATCH_SYNC */
 
 	error = -EIO;
 	sb_min_blocksize(sb, 512);
@@ -1393,6 +1561,8 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 			goto out_fail;
 		}
 
+		bsx = (struct fat_boot_bsx *)(bh->b_data + FAT32_BSX_OFFSET);
+
 		fsinfo = (struct fat_boot_fsinfo *)fsinfo_bh->b_data;
 		if (!IS_FSINFO(fsinfo)) {
 			printk(KERN_WARNING "FAT: Invalid FSINFO signature: "
@@ -1408,7 +1578,13 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 		}
 
 		brelse(fsinfo_bh);
+	} else {
+		bsx = (struct fat_boot_bsx *)(bh->b_data + FAT16_BSX_OFFSET);
 	}
+
+	/* interpret volume ID as a little endian 32 bit integer */
+	sbi->vol_id = (((u32)bsx->vol_id[0]) | ((u32)bsx->vol_id[1] << 8) |
+		((u32)bsx->vol_id[2] << 16) | ((u32)bsx->vol_id[3] << 24));
 
 	sbi->dir_per_block = sb->s_blocksize / sizeof(struct msdos_dir_entry);
 	sbi->dir_per_block_bits = ffs(sbi->dir_per_block) - 1;

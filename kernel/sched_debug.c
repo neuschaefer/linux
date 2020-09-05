@@ -298,6 +298,8 @@ static void print_cpu(struct seq_file *m, int cpu)
 
 	P(bkl_count);
 
+	P64(skip_clock_max);
+
 #undef P
 #endif
 	print_cfs_stats(m, cpu);

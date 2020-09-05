@@ -123,6 +123,7 @@ static struct {
 
 static bool rfkill_epo_lock_active;
 
+static unsigned long rfkill_no;
 
 #ifdef CONFIG_RFKILL_LEDS
 static void rfkill_led_trigger_event(struct rfkill *rfkill)
@@ -736,7 +737,7 @@ static struct device_attribute rfkill_dev_attrs[] = {
 	__ATTR(type, S_IRUGO, rfkill_type_show, NULL),
 	__ATTR(index, S_IRUGO, rfkill_idx_show, NULL),
 	__ATTR(persistent, S_IRUGO, rfkill_persistent_show, NULL),
-	__ATTR(state, S_IRUGO|S_IWUSR, rfkill_state_show, rfkill_state_store),
+	__ATTR(state, S_IRUGO|S_IWUGO, rfkill_state_show, rfkill_state_store),
 	__ATTR(claim, S_IRUGO|S_IWUSR, rfkill_claim_show, rfkill_claim_store),
 	__ATTR(soft, S_IRUGO|S_IWUSR, rfkill_soft_show, rfkill_soft_store),
 	__ATTR(hard, S_IRUGO, rfkill_hard_show, NULL),
@@ -925,7 +926,6 @@ static void rfkill_sync_work(struct work_struct *work)
 
 int __must_check rfkill_register(struct rfkill *rfkill)
 {
-	static unsigned long rfkill_no;
 	struct device *dev = &rfkill->dev;
 	int error;
 
@@ -1005,8 +1005,8 @@ void rfkill_unregister(struct rfkill *rfkill)
 	mutex_lock(&rfkill_global_mutex);
 	rfkill_send_events(rfkill, RFKILL_OP_DEL);
 	list_del_init(&rfkill->node);
+	rfkill_no--;
 	mutex_unlock(&rfkill_global_mutex);
-
 	rfkill_led_trigger_unregister(rfkill);
 }
 EXPORT_SYMBOL(rfkill_unregister);

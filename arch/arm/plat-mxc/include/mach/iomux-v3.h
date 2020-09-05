@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) 2011 Freescale Semiconductor, Inc.
  * Copyright (C) 2009 by Jan Weitzel Phytec Messtechnik GmbH,
  *			<armlinux@phytec.de>
  *
@@ -54,6 +55,11 @@ struct pad_desc {
 	unsigned select_input:3;
 };
 
+struct pad_cfg {
+	struct pad_desc pd;
+	int    pad_ctrl;
+};
+
 #define IOMUX_PAD(_pad_ctrl_ofs, _mux_ctrl_ofs, _mux_mode, _select_input_ofs, \
 		_select_input, _pad_ctrl)				\
 		{							\
@@ -75,7 +81,9 @@ struct pad_desc {
 #define PAD_CTL_PKE			(1 << 7)
 #define PAD_CTL_PUE			(1 << 6)
 #define PAD_CTL_PUS_100K_DOWN		(0 << 4)
+#define PAD_CTL_PUS_360K_DOWN		(0 << 4)
 #define PAD_CTL_PUS_47K_UP		(1 << 4)
+#define PAD_CTL_PUS_75K_UP		(1 << 4)
 #define PAD_CTL_PUS_100K_UP		(2 << 4)
 #define PAD_CTL_PUS_22K_UP		(3 << 4)
 
@@ -90,15 +98,20 @@ struct pad_desc {
 #define PAD_CTL_SRE_SLOW		(0 << 0)
 
 /*
- * setups a single pad in the iomuxer
+ * read/write a single pad in the iomuxer
  */
+int mxc_iomux_v3_get_pad(struct pad_desc *pad);
 int mxc_iomux_v3_setup_pad(struct pad_desc *pad);
+int mxc_iomux_v3_setup_pad_ext(struct pad_cfg *pad);
 
 /*
- * setups mutliple pads
+ * read/write mutliple pads
  * convenient way to call the above function with tables
  */
+int mxc_iomux_v3_get_multiple_pads(struct pad_desc *pad_list, unsigned count);
 int mxc_iomux_v3_setup_multiple_pads(struct pad_desc *pad_list, unsigned count);
+int mxc_iomux_v3_setup_multiple_pads_ext(struct pad_cfg *pad_list,
+								unsigned count);
 
 /*
  * Initialise the iomux controller

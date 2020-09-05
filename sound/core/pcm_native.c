@@ -834,6 +834,59 @@ static int snd_pcm_action_nonatomic(struct action_ops *ops,
 	return res;
 }
 
+
+
+/*
+ * enable callbacks
+ */
+
+static	int
+snd_pcm_pre_enable(struct snd_pcm_substream* substream, int state)
+{
+	struct	snd_pcm_runtime*	runtime = substream->runtime;
+
+	runtime->trigger_master = substream;
+
+	return 0;
+}
+
+static	int
+snd_pcm_do_enable(struct snd_pcm_substream* substream, int state)
+{
+	if (substream->runtime->trigger_master != substream) {
+		return 0;
+	}
+
+	substream->ops->trigger(substream, SNDRV_PCM_TRIGGER_ENABLE);
+
+	return 0;
+}
+
+static	void
+snd_pcm_undo_enable(struct snd_pcm_substream* substream, int state)
+{
+}
+
+static	void
+snd_pcm_post_enable(struct snd_pcm_substream* substream, int state)
+{
+	snd_pcm_trigger_tstamp(substream);
+}
+
+static	struct	action_ops	snd_pcm_action_enable = {
+	.pre_action		= snd_pcm_pre_enable,
+	.do_action		= snd_pcm_do_enable,
+	.undo_action	= snd_pcm_undo_enable,
+	.post_action	= snd_pcm_post_enable,
+};
+
+int snd_pcm_enable(struct snd_pcm_substream *substream)
+{
+	return snd_pcm_action(&snd_pcm_action_enable, substream, SNDRV_PCM_STATE_PREPARED);
+}
+
+
+
 /*
  * start callbacks
  */
@@ -2444,6 +2497,7 @@ static int snd_pcm_sync_ptr(struct snd_pcm_substream *substream,
 	struct snd_pcm_sync_ptr sync_ptr;
 	volatile struct snd_pcm_mmap_status *status;
 	volatile struct snd_pcm_mmap_control *control;
+	snd_pcm_uframes_t	control_appl_ptr;
 	int err;
 
 	memset(&sync_ptr, 0, sizeof(sync_ptr));
@@ -2459,6 +2513,7 @@ static int snd_pcm_sync_ptr(struct snd_pcm_substream *substream,
 			return err;
 	}
 	snd_pcm_stream_lock_irq(substream);
+	control_appl_ptr = control->appl_ptr;
 	if (!(sync_ptr.flags & SNDRV_PCM_SYNC_PTR_APPL))
 		control->appl_ptr = sync_ptr.c.control.appl_ptr;
 	else
@@ -2474,6 +2529,17 @@ static int snd_pcm_sync_ptr(struct snd_pcm_substream *substream,
 	snd_pcm_stream_unlock_irq(substream);
 	if (copy_to_user(_sync_ptr, &sync_ptr, sizeof(sync_ptr)))
 		return -EFAULT;
+
+	/* ebook custom trigger */
+	if (sync_ptr.s.status.state == SNDRV_PCM_STATE_PREPARED) {
+		/* first xfer */
+		if (control_appl_ptr == 0 && sync_ptr.c.control.appl_ptr > 0) {
+			snd_pcm_enable(substream);
+			/* appointment with workqueue which trigger issue */
+			flush_scheduled_work();
+		}
+	}
+
 	return 0;
 }
 

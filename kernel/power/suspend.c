@@ -22,10 +22,14 @@
 #include <linux/mm.h>
 #include <linux/slab.h>
 #include <linux/suspend.h>
+#include <linux/wakelock.h>
 
 #include "power.h"
 
 const char *const pm_states[PM_SUSPEND_MAX] = {
+#ifdef CONFIG_EARLYSUSPEND
+	[PM_SUSPEND_ON]		= "on",
+#endif
 	[PM_SUSPEND_STANDBY]	= "standby",
 	[PM_SUSPEND_MEM]	= "mem",
 };
@@ -99,7 +103,12 @@ static int suspend_prepare(void)
 	if (error)
 		goto Finish;
 
-	error = suspend_freeze_processes();
+	if(has_wake_lock(WAKE_LOCK_SUSPEND)){
+		printk("Don't execute suspend_freeze_processes() because wake lock is acquired!!\n");
+		error = -EBUSY;
+	}else{	
+		error = suspend_freeze_processes();
+	}
 	if (!error)
 		return 0;
 
@@ -206,7 +215,7 @@ int suspend_devices_and_enter(suspend_state_t state)
 		if (error)
 			goto Close;
 	}
-	suspend_console();
+	//suspend_console();
 	saved_mask = clear_gfp_allowed_mask(GFP_IOFS);
 	suspend_test_start();
 	error = dpm_suspend_start(PMSG_SUSPEND);
@@ -225,7 +234,7 @@ int suspend_devices_and_enter(suspend_state_t state)
 	dpm_resume_end(PMSG_RESUME);
 	suspend_test_finish("resume devices");
 	set_gfp_allowed_mask(saved_mask);
-	resume_console();
+	//resume_console();
  Close:
 	if (suspend_ops->end)
 		suspend_ops->end();
@@ -270,6 +279,12 @@ int enter_state(suspend_state_t state)
 
 	if (!mutex_trylock(&pm_mutex))
 		return -EBUSY;
+	
+	if(has_wake_lock(WAKE_LOCK_SUSPEND)){
+		printk("Don't execute suspend processing because wake lock is acquired!!\n");
+		error = -EBUSY;
+		goto Unlock;
+	}
 
 	printk(KERN_INFO "PM: Syncing filesystems ... ");
 	sys_sync();

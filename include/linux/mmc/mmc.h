@@ -251,12 +251,16 @@ struct _mmc_csd {
  * EXT_CSD fields
  */
 
+#define EXT_CSD_BOOT_BUS_WIDTH 	177	/* R/W */
+#define EXT_CSD_BOOT_CONFIG 	179	/* R/W */
 #define EXT_CSD_BUS_WIDTH	183	/* R/W */
 #define EXT_CSD_HS_TIMING	185	/* R/W */
 #define EXT_CSD_CARD_TYPE	196	/* RO */
 #define EXT_CSD_REV		192	/* RO */
 #define EXT_CSD_SEC_CNT		212	/* RO, 4 bytes */
 #define EXT_CSD_S_A_TIMEOUT	217
+#define EXT_CSD_BOOT_SIZE_MULT	226	/* RO, 1 bytes */
+#define EXT_CSD_BOOT_INFO	228	/* RO, 1 bytes */
 
 /*
  * EXT_CSD field definitions
@@ -273,6 +277,31 @@ struct _mmc_csd {
 #define EXT_CSD_BUS_WIDTH_1	0	/* Card is in 1 bit mode */
 #define EXT_CSD_BUS_WIDTH_4	1	/* Card is in 4 bit mode */
 #define EXT_CSD_BUS_WIDTH_8	2	/* Card is in 8 bit mode */
+#define EXT_CSD_BUS_WIDTH_4_DDR	5	/* Card is in 4 bit ddr mode */
+#define EXT_CSD_BUS_WIDTH_8_DDR	6	/* Card is in 8 bit ddr mode */
+
+#define EXT_CSD_BOOT_BUS_WIDTH_MASK 		(0x1F)
+#define EXT_CSD_BOOT_BUS_WIDTH_MODE_MASK 	(0x3 << 3)
+#define EXT_CSD_BOOT_BUS_WIDTH_MODE_SDR_NORMAL 	(0x0)
+#define EXT_CSD_BOOT_BUS_WIDTH_MODE_SDR_HIGH 	(0x1)
+#define EXT_CSD_BOOT_BUS_WIDTH_MODE_DDR		(0x2)
+#define EXT_CSD_BOOT_BUS_WIDTH_RST_WIDTH 	(1 << 2)
+#define EXT_CSD_BOOT_BUS_WIDTH_WIDTH_MASK 	(0x3)
+#define EXT_CSD_BOOT_BUS_WIDTH_1_SDR_4_DDR 	(0x0)
+#define EXT_CSD_BOOT_BUS_WIDTH_4_SDR_4_DDR 	(0x1)
+#define EXT_CSD_BOOT_BUS_WIDTH_8_SDR_8_DDR 	(0x2)
+
+#define EXT_CSD_BOOT_ACK_ENABLE 		(0x1 << 6)
+#define EXT_CSD_BOOT_PARTITION_ENABLE_MASK      (0x7 << 3)
+#define EXT_CSD_BOOT_PARTITION_DISABLE          (0x0)
+#define EXT_CSD_BOOT_PARTITION_PART1            (0x1 << 3)
+#define EXT_CSD_BOOT_PARTITION_PART2            (0x2 << 3)
+#define EXT_CSD_BOOT_PARTITION_USER             (0x7 << 3)
+
+#define EXT_CSD_BOOT_PARTITION_ACCESS_MASK      (0x7)
+#define EXT_CSD_BOOT_PARTITION_ACCESS_DISABLE   (0x0)
+#define EXT_CSD_BOOT_PARTITION_ACCESS_PART1     (0x1)
+#define EXT_CSD_BOOT_PARTITION_ACCESS_PART2     (0x2)
 
 /*
  * MMC_SWITCH access modes

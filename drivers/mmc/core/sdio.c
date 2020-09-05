@@ -455,8 +455,9 @@ static int mmc_sdio_suspend(struct mmc_host *host)
 				err = -ENOSYS;
 			} else
 				err = pmops->suspend(&func->dev);
-			if (err)
+			if (err) {
 				break;
+			}
 		}
 	}
 	while (err && --i >= 0) {

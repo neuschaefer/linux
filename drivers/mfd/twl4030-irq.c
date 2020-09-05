@@ -35,7 +35,6 @@
 
 #include <linux/i2c/twl.h>
 
-
 /*
  * TWL4030 IRQ handling has two stages in hardware, and thus in software.
  * The Primary Interrupt Handler (PIH) stage exposes status bits saying
@@ -78,7 +77,7 @@ struct sih {
 	u8	irq_lines;		/* number of supported irq lines */
 
 	/* SIR ignored -- set interrupt, for testing only */
-	struct irq_data {
+	struct sih_irq_data {
 		u8	isr_offset;
 		u8	imr_offset;
 	} mask[2];
@@ -144,6 +143,7 @@ static const struct sih sih_modules_twl4030[6] = {
 		.name		= "bci",
 		.module		= TWL4030_MODULE_INTERRUPTS,
 		.control_offset	= TWL4030_INTERRUPTS_BCISIHCTRL,
+		.set_cor	= true,
 		.bits		= 12,
 		.bytes_ixr	= 2,
 		.edr_offset	= TWL4030_INTERRUPTS_BCIEDR1,
@@ -408,7 +408,7 @@ static int twl4030_init_sih_modules(unsigned line)
 		 * set Clear-On-Read (COR) bit.
 		 *
 		 * NOTE that sometimes COR polarity is documented as being
-		 * inverted:  for MADC and BCI, COR=1 means "clear on write".
+		 * inverted:  for MADC, COR=1 means "clear on write".
 		 * And for PWR_INT it's not documented...
 		 */
 		if (sih->set_cor) {

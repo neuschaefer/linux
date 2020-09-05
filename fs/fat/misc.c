@@ -108,6 +108,18 @@ int fat_chain_add(struct inode *inode, int new_dclus, int nr_cluster)
 
 	/* add new one to the last of the cluster chain */
 	if (last) {
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC /* E_BOOK */
+		/*the FAT will be updated until right before write_inode*/
+		if (sbi->options.batch_sync &&
+		    !MSDOS_I(inode)->i_new &&
+		    !MSDOS_I(inode)->i_last_dclus) {
+			MSDOS_I(inode)->i_last_dclus = last;
+			MSDOS_I(inode)->i_new_dclus = new_dclus;
+
+			pr_debug("%s: %d %d\n", __func__, last, new_dclus);
+		}
+		else {
+#endif /* CONFIG_SNSC_FS_FAT_BATCH_SYNC */
 		struct fat_entry fatent;
 
 		fatent_init(&fatent);
@@ -119,10 +131,16 @@ int fat_chain_add(struct inode *inode, int new_dclus, int nr_cluster)
 		}
 		if (ret < 0)
 			return ret;
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC /* E_BOOK */
+		}
+#endif /* CONFIG_SNSC_FS_FAT_BATCH_SYNC */
 //		fat_cache_add(inode, new_fclus, new_dclus);
 	} else {
 		MSDOS_I(inode)->i_start = new_dclus;
 		MSDOS_I(inode)->i_logstart = new_dclus;
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC /* E_BOOK */
+		MSDOS_I(inode)->i_new = 1;
+#endif /* CONFIG_SNSC_FS_FAT_BATCH_SYNC */
 		/*
 		 * Since generic_write_sync() synchronizes regular files later,
 		 * we sync here only directories.

@@ -28,6 +28,7 @@ obj-$(CONFIG_USB_FSL_QE)	+= fsl_qe_udc.o
 obj-$(CONFIG_USB_CI13XXX)	+= ci13xxx_udc.o
 obj-$(CONFIG_USB_S3C_HSOTG)	+= s3c-hsotg.o
 obj-$(CONFIG_USB_LANGWELL)	+= langwell_udc.o
+obj-$(CONFIG_USB_ARC)		+= arcotg_udc.o
 
 #
 # USB gadget drivers
@@ -46,6 +47,10 @@ g_multi-objs			:= multi.o
 g_hid-objs			:= hid.o
 g_nokia-objs			:= nokia.o
 g_webcam-objs			:= webcam.o
+g_android-objs			:= android.o f_mass_storage.o f_adb.o
+ifeq ($(CONFIG_USB_ANDROID_RNDIS),y)
+g_android-objs			+= f_rndis.o u_ether.o
+endif
 
 obj-$(CONFIG_USB_ZERO)		+= g_zero.o
 obj-$(CONFIG_USB_AUDIO)		+= g_audio.o
@@ -63,4 +68,7 @@ obj-$(CONFIG_USB_G_HID)		+= g_hid.o
 obj-$(CONFIG_USB_G_MULTI)	+= g_multi.o
 obj-$(CONFIG_USB_G_NOKIA)	+= g_nokia.o
 obj-$(CONFIG_USB_G_WEBCAM)	+= g_webcam.o
-
+obj-$(CONFIG_USB_ANDROID)	+= g_android.o
+#obj-$(CONFIG_USB_ANDROID_ADB)	+= f_adb.o
+#obj-$(CONFIG_USB_ANDROID_MASS_STORAGE)	+= f_mass_storage.o
+#obj-$(CONFIG_USB_ANDROID_RNDIS)	+= f_rndis.o u_ether.o

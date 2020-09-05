@@ -62,6 +62,8 @@ struct regulator {
 	struct regulator_dev *rdev;
 };
 
+static int _regulator_enable(struct regulator_dev *rdev);
+static int _regulator_set_voltage(struct regulator_dev *rdev, int min_uV, int max_uV);
 static int _regulator_is_enabled(struct regulator_dev *rdev);
 static int _regulator_disable(struct regulator_dev *rdev);
 static int _regulator_get_voltage(struct regulator_dev *rdev);
@@ -229,7 +231,21 @@ static ssize_t regulator_uV_show(struct device *dev,
 
 	return ret;
 }
-static DEVICE_ATTR(microvolts, 0444, regulator_uV_show, NULL);
+static ssize_t regulator_uV_set(struct device *dev,
+				struct device_attribute *attr, const char *buf,
+				size_t count)
+{
+	struct regulator_dev *rdev = dev_get_drvdata(dev);
+	ssize_t ret;
+	long uV;
+
+	strict_strtol(buf, 10, &uV);
+
+	ret = _regulator_set_voltage(rdev, uV, uV);
+
+	return count;
+}
+static DEVICE_ATTR(microvolts, 0644, regulator_uV_show, regulator_uV_set);
 
 static ssize_t regulator_uA_show(struct device *dev,
 				struct device_attribute *attr, char *buf)
@@ -294,7 +310,35 @@ static ssize_t regulator_state_show(struct device *dev,
 
 	return ret;
 }
-static DEVICE_ATTR(state, 0444, regulator_state_show, NULL);
+
+static ssize_t regulator_state_set(struct device *dev, struct device_attribute *attr,
+			 const char *buf, size_t count)
+{
+	struct regulator_dev *rdev = dev_get_drvdata(dev);
+	bool enabled;
+	int ret;
+
+	/*
+	 * sysfs_streq() doesn't need the \n's, but we add them so the strings
+	 * will be shared with show_state(), above.
+	 */
+	if (sysfs_streq(buf, "enabled\n") || sysfs_streq(buf, "1"))
+		enabled = true;
+	else if (sysfs_streq(buf, "disabled\n") || sysfs_streq(buf, "0"))
+		enabled = false;
+	else {
+		dev_err(dev, "Configuring invalid mode\n");
+		return count;
+	}
+	
+	if (enabled)
+		ret = _regulator_enable(rdev);
+	else
+		ret = _regulator_disable(rdev);
+
+	return count;
+}
+static DEVICE_ATTR(state, 0644, regulator_state_show, regulator_state_set);
 
 static ssize_t regulator_status_show(struct device *dev,
 				   struct device_attribute *attr, char *buf)
@@ -737,6 +781,22 @@ static int machine_constraints_voltage(struct regulator_dev *rdev,
 			}
 	}
 
+	if (rdev->constraints->uV_offset_apply) {
+		ret = ops->get_voltage(rdev);
+
+		if (ret < 0) {
+			pr_err("Failed to get voltage for offset: %d\n", ret);
+			ret = 0;
+		} else {
+			ret = ops->set_voltage(rdev,
+				ret + rdev->constraints->uV_offset,
+				ret + rdev->constraints->uV_offset);
+		}
+
+		if (ret < 0)
+			pr_err("Failed to set voltage for offset: %d\n", ret);
+	}
+
 	/* constrain machine-level voltage specs to fit
 	 * the actual range supported by this regulator.
 	 */
@@ -1105,6 +1165,11 @@ static struct regulator *_regulator_get(struct device *dev, const char *id,
 
 		if (strcmp(map->supply, id) == 0) {
 			rdev = map->regulator;
+			goto found;
+		}
+	}
+	list_for_each_entry(rdev, &regulator_list, list) {
+		if (strcmp(rdev->desc->name, id) == 0) {
 			goto found;
 		}
 	}
@@ -1595,9 +1660,25 @@ int regulator_is_supported_voltage(struct regulator *regulator,
  * Regulator system constraints must be set for this regulator before
  * calling this function otherwise this call will fail.
  */
+
 int regulator_set_voltage(struct regulator *regulator, int min_uV, int max_uV)
 {
-	struct regulator_dev *rdev = regulator->rdev;
+	int ret;
+	
+	ret = _regulator_set_voltage(regulator->rdev, min_uV, max_uV);
+
+	if (ret < 0)
+		return ret;
+
+	regulator->min_uV = min_uV;
+	regulator->max_uV = max_uV;
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(regulator_set_voltage);
+
+static int _regulator_set_voltage(struct regulator_dev *rdev, int min_uV, int max_uV)
+{
 	int ret;
 
 	mutex_lock(&rdev->mutex);
@@ -1610,10 +1691,15 @@ int regulator_set_voltage(struct regulator *regulator, int min_uV, int max_uV)
 
 	/* constraints check */
 	ret = regulator_check_voltage(rdev, &min_uV, &max_uV);
-	if (ret < 0)
+	if (ret < 0){
+		printk("%s : Couldn't change the voltage, because regulator_check_voltage() failed.\n"
+				, rdev_get_name(rdev));
 		goto out;
-	regulator->min_uV = min_uV;
-	regulator->max_uV = max_uV;
+	}
+
+	min_uV += rdev->constraints->uV_offset;
+	max_uV += rdev->constraints->uV_offset;
+	
 	ret = rdev->desc->ops->set_voltage(rdev, min_uV, max_uV);
 
 out:
@@ -1621,15 +1707,18 @@ out:
 	mutex_unlock(&rdev->mutex);
 	return ret;
 }
-EXPORT_SYMBOL_GPL(regulator_set_voltage);
 
 static int _regulator_get_voltage(struct regulator_dev *rdev)
 {
+	int ret;
+
 	/* sanity check */
-	if (rdev->desc->ops->get_voltage)
-		return rdev->desc->ops->get_voltage(rdev);
+	if (rdev->desc->ops->get_voltage) 
+		ret = rdev->desc->ops->get_voltage(rdev);
 	else
 		return -EINVAL;
+
+	return ret - rdev->constraints->uV_offset;
 }
 
 /**

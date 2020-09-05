@@ -108,7 +108,8 @@ struct serial_cfg_mem {
  * Elan VPU16551 UART with 14.7456MHz oscillator
  * manfid 0x015D, 0x4C45
  */
-static void quirk_setup_brainboxes_0104(struct pcmcia_device *link, struct uart_port *port)
+static void
+quirk_setup_brainboxes_0104(struct pcmcia_device *link, struct uart_port *port)
 {
 	port->uartclk = 14745600;
 }

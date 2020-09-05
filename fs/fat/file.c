@@ -121,6 +121,13 @@ long fat_generic_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	u32 __user *user_attr = (u32 __user *)arg;
 
 	switch (cmd) {
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC /* E_BOOK */
+	case FAT_IOCTL_CLOSE_NOSYNC:
+	{
+		filp->f_op = &fat_file_operations_nosync;
+		return 0;
+	}
+#endif /* CONFIG_SNSC_FS_FAT_BATCH_SYNC */
 	case FAT_IOCTL_GET_ATTRIBUTES:
 		return fat_ioctl_get_attributes(inode, user_attr);
 	case FAT_IOCTL_SET_ATTRIBUTES:
@@ -139,15 +146,129 @@ static long fat_generic_compat_ioctl(struct file *filp, unsigned int cmd,
 }
 #endif
 
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC /* E_BOOK */
+/*
+ * With the original SS FAT patch, this function is added to fs/fs-writeback.c.
+ * However, a build error occurs because ubifs has an equal function.
+ * In the first place it adds it here to use this function because there is
+ * only this source.
+ */
+/*
+ * earse DIRTY bit of inode
+ * and move it from dirty list to inode_inuse
+ */
+static void mark_inode_clean(struct inode *inode)
+{
+	if (!(inode->i_state & I_DIRTY))
+		return;
+
+	if (unlikely(block_dump)) {
+		struct dentry *dentry = NULL;
+		const char *name = "?";
+
+		if (!list_empty(&inode->i_dentry)) {
+			dentry = list_entry(inode->i_dentry.next,
+					    struct dentry, d_alias);
+			if (dentry && dentry->d_name.name)
+				name = (const char *) dentry->d_name.name;
+		}
+
+		if (inode->i_ino || strcmp(inode->i_sb->s_id, "bdev"))
+			printk(KERN_DEBUG
+			       "%s(%d): clean inode %lu (%s) on %s\n",
+			       current->comm, current->pid, inode->i_ino,
+			       name, inode->i_sb->s_id);
+	}
+
+	spin_lock(&inode_lock);
+
+	if (inode->i_state & I_DIRTY) {
+		inode->i_state &= ~I_DIRTY;
+
+		if (inode->i_state & (I_FREEING|I_CLEAR))
+			goto out;
+
+		list_move(&inode->i_list, &inode_in_use);
+	}
+ out:
+	spin_unlock(&inode_lock);
+}
+
+static int fat_clean_inode(struct inode *inode)
+{
+	int ret = 0;
+
+	if (!(inode->i_state & I_DIRTY))
+		return 0;
+
+	ret = fat_sync_inode(inode);
+	if (!ret) {
+		pr_debug("Sync inode ok, make it clean!\n");
+		mark_inode_clean(inode);
+	}
+
+	return ret;
+}
+#endif /* CONFIG_SNSC_FS_FAT_BATCH_SYNC */
+
 static int fat_file_release(struct inode *inode, struct file *filp)
 {
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC /* E_BOOK */
+	struct msdos_sb_info *sbi = MSDOS_SB(filp->f_mapping->host->i_sb);
+	int ret = 0;
+#endif /* CONFIG_SNSC_FS_FAT_BATCH_SYNC */
+
 	if ((filp->f_mode & FMODE_WRITE) &&
 	     MSDOS_SB(inode->i_sb)->options.flush) {
 		fat_flush_inodes(inode->i_sb, inode, NULL);
 		congestion_wait(BLK_RW_ASYNC, HZ/10);
 	}
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC /* E_BOOK */
+	if (sbi->options.batch_sync) {
+		mutex_lock(&inode->i_mutex);
+		ret = fat_clean_inode(inode);
+		mutex_unlock(&inode->i_mutex);
+	}
+	return ret;
+#else /* CONFIG_SNSC_FS_FAT_BATCH_SYNC */
+	return 0;
+#endif /* CONFIG_SNSC_FS_FAT_BATCH_SYNC */
+}
+
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC /* E_BOOK */
+static int fat_file_release_nosync(struct inode *inode, struct file *filp)
+{
+	if ((filp->f_mode & FMODE_WRITE) &&
+	     MSDOS_SB(inode->i_sb)->options.flush) {
+		fat_flush_inodes(inode->i_sb, inode, NULL);
+		congestion_wait(WRITE, HZ/10);
+	}
 	return 0;
 }
+
+static ssize_t fat_sync_write(struct file *filp, const char __user *buf, size_t len, loff_t *ppos)
+{
+	ssize_t ret;
+
+	ret = do_sync_write(filp, buf, len, ppos);
+
+	return ret;
+}
+
+static int fat_fsync(struct file *filp, int datasync)
+{
+	struct inode *inode = filp->f_mapping->host;
+	struct msdos_sb_info *sbi = MSDOS_SB(inode->i_sb);
+	int ret;
+
+	if (sbi->options.batch_sync)
+		ret = fat_clean_inode(inode);
+	else
+		ret = file_fsync(filp, datasync);
+
+	return ret;
+}
+#endif /* CONFIG_SNSC_FS_FAT_BATCH_SYNC */
 
 int fat_file_fsync(struct file *filp, int datasync)
 {
@@ -164,18 +285,44 @@ int fat_file_fsync(struct file *filp, int datasync)
 const struct file_operations fat_file_operations = {
 	.llseek		= generic_file_llseek,
 	.read		= do_sync_read,
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC /* E_BOOK */
+	.write		= fat_sync_write,
+#else /* CONFIG_SNSC_FS_FAT_BATCH_SYNC */
 	.write		= do_sync_write,
+#endif /* CONFIG_SNSC_FS_FAT_BATCH_SYNC */
 	.aio_read	= generic_file_aio_read,
 	.aio_write	= generic_file_aio_write,
 	.mmap		= generic_file_mmap,
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC /* E_BOOK */
+	.open		= generic_file_open,
+#endif /* CONFIG_SNSC_FS_FAT_BATCH_SYNC */
 	.release	= fat_file_release,
 	.unlocked_ioctl	= fat_generic_ioctl,
 #ifdef CONFIG_COMPAT
 	.compat_ioctl	= fat_generic_compat_ioctl,
 #endif
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC /* E_BOOK */
+	.fsync		= fat_fsync,
+#else /* CONFIG_SNSC_FS_FAT_BATCH_SYNC */
 	.fsync		= fat_file_fsync,
+#endif /* CONFIG_SNSC_FS_FAT_BATCH_SYNC */
 	.splice_read	= generic_file_splice_read,
 };
+
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC /* E_BOOK */
+const struct file_operations fat_file_operations_nosync = {
+	.llseek		= generic_file_llseek,
+	.read		= do_sync_read,
+	.write		= fat_sync_write,
+	.aio_read	= generic_file_aio_read,
+  	.aio_write	= generic_file_aio_write,
+	.mmap		= generic_file_mmap,
+	.open           = generic_file_open,
+	.release	= fat_file_release_nosync,
+	.unlocked_ioctl	= fat_generic_ioctl,
+	.fsync		= fat_fsync,
+};
+#endif /* CONFIG_SNSC_FS_FAT_BATCH_SYNC */
 
 static int fat_cont_expand(struct inode *inode, loff_t size)
 {
@@ -224,7 +371,11 @@ static int fat_free(struct inode *inode, int skip)
 
 	fat_cache_inval_inode(inode);
 
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC /* E_BOOK */
+	wait = IS_DIRSYNC(inode) || MSDOS_SB(sb)->options.batch_sync;
+#else /* CONFIG_SNSC_FS_FAT_BATCH_SYNC */
 	wait = IS_DIRSYNC(inode);
+#endif /* CONFIG_SNSC_FS_FAT_BATCH_SYNC */
 	i_start = free_start = MSDOS_I(inode)->i_start;
 	i_logstart = MSDOS_I(inode)->i_logstart;
 

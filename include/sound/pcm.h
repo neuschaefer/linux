@@ -101,6 +101,7 @@ struct snd_pcm_ops {
 #define SNDRV_PCM_IOCTL1_GSTATE		3
 #define SNDRV_PCM_IOCTL1_FIFO_SIZE	4
 
+#define SNDRV_PCM_TRIGGER_ENABLE	(99)	/* ebook custom trigger */
 #define SNDRV_PCM_TRIGGER_STOP		0
 #define SNDRV_PCM_TRIGGER_START		1
 #define SNDRV_PCM_TRIGGER_PAUSE_PUSH	3
@@ -483,6 +484,7 @@ int snd_pcm_info_user(struct snd_pcm_substream *substream,
 		      struct snd_pcm_info __user *info);
 int snd_pcm_status(struct snd_pcm_substream *substream,
 		   struct snd_pcm_status *status);
+int snd_pcm_enable(struct snd_pcm_substream *substream);	/* ebook custom trigger */
 int snd_pcm_start(struct snd_pcm_substream *substream);
 int snd_pcm_stop(struct snd_pcm_substream *substream, int status);
 int snd_pcm_drain_done(struct snd_pcm_substream *substream);

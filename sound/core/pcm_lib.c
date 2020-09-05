@@ -23,6 +23,7 @@
 #include <linux/slab.h>
 #include <linux/time.h>
 #include <linux/math64.h>
+#include <linux/workqueue.h>
 #include <sound/core.h>
 #include <sound/control.h>
 #include <sound/info.h>
@@ -1823,7 +1824,7 @@ static snd_pcm_sframes_t snd_pcm_lib_write1(struct snd_pcm_substream *substream,
 	runtime->twake = 1;
 	while (size > 0) {
 		snd_pcm_uframes_t frames, appl_ptr, appl_ofs;
-		snd_pcm_uframes_t avail;
+		snd_pcm_uframes_t avail, hw_avail;
 		snd_pcm_uframes_t cont;
 		if (runtime->status->state == SNDRV_PCM_STATE_RUNNING)
 			snd_pcm_update_hw_ptr(substream);
@@ -1873,11 +1874,15 @@ static snd_pcm_sframes_t snd_pcm_lib_write1(struct snd_pcm_substream *substream,
 		offset += frames;
 		size -= frames;
 		xfer += frames;
-		if (runtime->status->state == SNDRV_PCM_STATE_PREPARED &&
-		    snd_pcm_playback_hw_avail(runtime) >= (snd_pcm_sframes_t)runtime->start_threshold) {
-			err = snd_pcm_start(substream);
-			if (err < 0)
-				goto _end_unlock;
+		hw_avail = snd_pcm_playback_hw_avail(runtime);
+		if (runtime->status->state == SNDRV_PCM_STATE_PREPARED) {
+			if (hw_avail >= (snd_pcm_sframes_t)runtime->start_threshold) {
+				err = snd_pcm_start(substream);
+				if (err < 0)
+					goto _end_unlock;
+			} else if (hw_avail <= xfer) {
+				snd_pcm_enable(substream);
+			}
 		}
 	}
  _end_unlock:
@@ -1885,6 +1890,9 @@ static snd_pcm_sframes_t snd_pcm_lib_write1(struct snd_pcm_substream *substream,
 	if (xfer > 0 && err >= 0)
 		snd_pcm_update_state(substream, runtime);
 	snd_pcm_stream_unlock_irq(substream);
+	/* appointment with workqueue which trigger issue */
+	flush_scheduled_work();
+
 	return xfer > 0 ? (snd_pcm_sframes_t)xfer : err;
 }
 

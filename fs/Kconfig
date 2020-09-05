@@ -255,4 +255,12 @@ endif
 source "fs/nls/Kconfig"
 source "fs/dlm/Kconfig"
 
+# E_BOOK >>>>
+if BLOCK
+menu "SNSC Configurations"
+source "fs/Kconfig.snsc"
+endmenu
+endif
+#  <<<< E_BOOK
+
 endmenu

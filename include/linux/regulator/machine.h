@@ -99,6 +99,8 @@ struct regulation_constraints {
 	int min_uV;
 	int max_uV;
 
+	int uV_offset;
+
 	/* current output range (inclusive) - for current control */
 	int min_uA;
 	int max_uA;
@@ -125,6 +127,7 @@ struct regulation_constraints {
 	unsigned always_on:1;	/* regulator never off when system is on */
 	unsigned boot_on:1;	/* bootloader/firmware enabled regulator */
 	unsigned apply_uV:1;	/* apply uV constraint if min == max */
+	int uV_offset_apply:1;  /* introduce a uV offset during startup */
 };
 
 /**

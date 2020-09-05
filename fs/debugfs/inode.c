@@ -389,6 +389,12 @@ void debugfs_remove_recursive(struct dentry *dentry)
 	if (!parent || !parent->d_inode)
 		return;
 
+#if 1 /* E_BOOK *//* for DEBUG 2011/06/14 */
+	if ( dentry->d_inode == NULL ) {
+		printk("debugfs_remove_recursive:non d_inode\n");
+		return;
+	}
+#endif
 	parent = dentry;
 	mutex_lock(&parent->d_inode->i_mutex);
 

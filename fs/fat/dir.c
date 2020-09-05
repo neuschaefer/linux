@@ -753,6 +753,13 @@ static int fat_ioctl_readdir(struct inode *inode, struct file *filp,
 	return ret;
 }
 
+static int fat_ioctl_volume_id(struct inode *dir)
+{
+	struct super_block *sb = dir->i_sb;
+	struct msdos_sb_info *sbi = MSDOS_SB(sb);
+	return sbi->vol_id;
+}
+
 static long fat_dir_ioctl(struct file *filp, unsigned int cmd,
 			  unsigned long arg)
 {
@@ -769,6 +776,8 @@ static long fat_dir_ioctl(struct file *filp, unsigned int cmd,
 		short_only = 0;
 		both = 1;
 		break;
+	case VFAT_IOCTL_GET_VOLUME_ID:
+		return fat_ioctl_volume_id(inode);
 	default:
 		return fat_generic_ioctl(filp, cmd, arg);
 	}
@@ -948,6 +957,10 @@ static int __fat_remove_entries(struct inode *dir, loff_t pos, int nr_slots)
 	struct buffer_head *bh;
 	struct msdos_dir_entry *de, *endp;
 	int err = 0, orig_slots;
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC /* E_BOOK */
+	struct buffer_head *bhs[3]; /* 32*slots (672bytes) */
+	int i, nr_bhs = 0;
+#endif /* CONFIG_SNSC_FS_FAT_BATCH_SYNC */
 
 	while (nr_slots) {
 		bh = NULL;
@@ -964,15 +977,31 @@ static int __fat_remove_entries(struct inode *dir, loff_t pos, int nr_slots)
 			nr_slots--;
 		}
 		mark_buffer_dirty_inode(bh, dir);
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC /* E_BOOK */
+		if (MSDOS_SB(sb)->options.batch_sync) {
+			bhs[nr_bhs++] = bh;
+		} else {
+#endif /* CONFIG_SNSC_FS_FAT_BATCH_SYNC */
 		if (IS_DIRSYNC(dir))
 			err = sync_dirty_buffer(bh);
 		brelse(bh);
 		if (err)
 			break;
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC /* E_BOOK */
+		}
+#endif /* CONFIG_SNSC_FS_FAT_BATCH_SYNC */
 
 		/* pos is *next* de's position, so this does `- sizeof(de)' */
 		pos += ((orig_slots - nr_slots) * sizeof(*de)) - sizeof(*de);
 	}
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC /* E_BOOK */
+	if (nr_bhs > 0) {
+		if (!err)
+			err = fat_sync_bhs(bhs, nr_bhs);
+		for (i = 0; i < nr_bhs; i++)
+			brelse(bhs[i]);
+	}
+#endif /* CONFIG_SNSC_FS_FAT_BATCH_SYNC */
 
 	return err;
 }
@@ -992,6 +1021,15 @@ int fat_remove_entries(struct inode *dir, struct fat_slot_info *sinfo)
 	sinfo->de = NULL;
 	bh = sinfo->bh;
 	sinfo->bh = NULL;
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC /* E_BOOK */
+	if (MSDOS_SB(dir->i_sb)->options.batch_sync) {
+		err = __fat_remove_entries(dir, sinfo->slot_off, nr_slots);
+		brelse(bh);
+		if (err)
+			return err;
+		dir->i_version++;
+	} else {
+#endif /* CONFIG_SNSC_FS_FAT_BATCH_SYNC */
 	while (nr_slots && de >= (struct msdos_dir_entry *)bh->b_data) {
 		de->name[0] = DELETED_FLAG;
 		de--;
@@ -1017,6 +1055,9 @@ int fat_remove_entries(struct inode *dir, struct fat_slot_info *sinfo)
 			       "FAT: Couldn't remove the long name slots\n");
 		}
 	}
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC /* E_BOOK */
+	}
+#endif
 
 	dir->i_mtime = dir->i_atime = CURRENT_TIME_SEC;
 	if (IS_DIRSYNC(dir))
@@ -1329,6 +1370,10 @@ found:
 			fat_free_clusters(dir, cluster);
 			goto error_remove;
 		}
+#ifdef CONFIG_SNSC_FS_FAT_BATCH_SYNC /* E_BOOK */
+		if (!IS_DIRSYNC(dir) && sbi->options.batch_sync)
+			fat_sync_inode(dir);
+#endif /* CONFIG_SNSC_FS_FAT_BATCH_SYNC */
 		if (dir->i_size & (sbi->cluster_size - 1)) {
 			fat_fs_error(sb, "Odd directory size");
 			dir->i_size = (dir->i_size + sbi->cluster_size - 1)
