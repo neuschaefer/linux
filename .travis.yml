@@ -1,0 +1,16 @@
+dist: bionic
+
+install:
+  - nproc
+  - sudo apt update
+  - sudo apt install -y python3-pip python3-setuptools gcc-arm-linux-gnueabi build-essential lzop
+  - pip3 install git+https://github.com/devicetree-org/dt-schema.git@master
+
+jobs:
+  include:
+    - script:
+      - make ARCH=arm W=1 CROSS_COMPILE=arm-linux-gnueabi- imx_v6_v7_defconfig
+      - make ARCH=arm W=1 CROSS_COMPILE=arm-linux-gnueabi- dt_binding_check -j$(nproc || echo 1)
+    - script:
+      - make ARCH=arm W=1 CROSS_COMPILE=arm-linux-gnueabi- imx_v6_v7_defconfig
+      - make ARCH=arm W=1 CROSS_COMPILE=arm-linux-gnueabi- -j$(nproc || echo 1)
