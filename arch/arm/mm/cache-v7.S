@@ -15,6 +15,7 @@
 #include <asm/assembler.h>
 #include <asm/errno.h>
 #include <asm/unwind.h>
+#include <mstar/mpatch_macro.h>
 
 #include "proc-macros.S"
 
@@ -303,9 +304,9 @@ ENTRY(v7_coherent_user_range)
  * isn't mapped, fail with -EFAULT.
  */
 9001:
-#ifdef CONFIG_ARM_ERRATA_775420
+#if  (MP_PLATFORM_ARM_ERRATA_775420 == 1)
 	dsb
-#endif
+#endif/*MP_PLATFORM_ARM_ERRATA_775420*/
 	mov	r0, #-EFAULT
 	mov	pc, lr
  UNWIND(.fnend		)

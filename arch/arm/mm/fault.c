@@ -25,6 +25,7 @@
 #include <asm/system_misc.h>
 #include <asm/system_info.h>
 #include <asm/tlbflush.h>
+#include <mstar/mpatch_macro.h>
 
 #include "fault.h"
 
@@ -125,6 +126,12 @@ void show_pte(struct mm_struct *mm, unsigned long addr)
 { }
 #endif					/* CONFIG_MMU */
 
+#if (MP_DEBUG_TOOL_KDEBUG)
+#ifdef CONFIG_SHOW_FAULT_TRACE_INFO
+extern void show_info(struct task_struct *task, struct pt_regs *regs, unsigned long addr);
+#endif /*CONFIG_SHOW_FAULT_TRACE_INFO*/
+#endif /*MP_DEBUG_TOOL_KDEBUG*/
+
 /*
  * Oops.  The kernel tried to access some page that wasn't present.
  */
@@ -171,6 +178,14 @@ __do_user_fault(struct task_struct *tsk, unsigned long addr,
 		       tsk->comm, sig, addr, fsr);
 		show_pte(tsk->mm, addr);
 		show_regs(regs);
+
+#if (MP_DEBUG_TOOL_KDEBUG == 1)
+#ifdef CONFIG_SHOW_FAULT_TRACE_INFO
+	printk(KERN_ALERT "%s: unhandled page fault (%d) at 0x%08lx, code 0x%03x\n",
+							tsk->comm, sig, addr, fsr);
+	show_usr_info(tsk, regs, addr);
+#endif
+#endif /*MP_DEBUG_TOOL_KDEBUG*/
 	}
 #endif
 
@@ -276,10 +291,10 @@ do_page_fault(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
 		local_irq_enable();
 
 	/*
-	 * If we're in an interrupt or have no user
+	 * If we're in an interrupt, or have no irqs, or have no user
 	 * context, we must not take the fault..
 	 */
-	if (in_atomic() || !mm)
+	if (in_atomic() || irqs_disabled() || !mm)
 		goto no_context;
 
 	/*

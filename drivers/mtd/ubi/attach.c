@@ -15,7 +15,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  *
- * Author: Artem Bityutskiy (Битюцкий Артём)
+ * Author: Artem Bityutskiy (?и???кий ????м)
  */
 
 /*
@@ -87,7 +87,19 @@
 #include <linux/crc32.h>
 #include <linux/math64.h>
 #include <linux/random.h>
+#include <mstar/mpatch_macro.h>
 #include "ubi.h"
+
+#if defined(CONFIG_MTD_UBI_ENHANCE_INIT) && (MP_NAND_UBI == 1)
+#include <linux/init.h>
+#endif
+
+#if defined(CONFIG_MTD_UBI_BACKUP_LSB) && (MP_NAND_UBI == 1)
+#include <linux/mtd/nand.h>
+#include "drv_unfd.h"
+
+struct ubi_paired_page_map ga_tUbiPairedPageMap[512];
+#endif
 
 static int self_check_ai(struct ubi_device *ubi, struct ubi_attach_info *ai);
 
@@ -395,7 +407,11 @@ int ubi_compare_lebs(struct ubi_device *ubi, const struct ubi_ainf_peb *aeb,
 
 	mutex_lock(&ubi->buf_mutex);
 	err = ubi_io_read_data(ubi, ubi->peb_buf, pnum, 0, len);
+	#if defined (CONFIG_MTD_UBI_BITFLIPS) && (MP_NAND_UBI == 1)
+	if (err && err != UBI_IO_BITFLIPS &&  err != UBI_IO_BITFLIPS_BAD && err != UBI_IO_BITFLIPS_TORTURE && !mtd_is_eccerr(err))
+	#else
 	if (err && err != UBI_IO_BITFLIPS && !mtd_is_eccerr(err))
+	#endif
 		goto out_unlock;
 
 	data_crc = be32_to_cpu(vid_hdr->data_crc);
@@ -821,12 +837,20 @@ static int scan_peb(struct ubi_device *ubi, struct ubi_attach_info *ai,
 
 	dbg_bld("scan PEB %d", pnum);
 
+#if defined(CONFIG_MTD_UBI_ENHANCE_INIT) && (MP_NAND_UBI == 1)
+	ubi->trn[pnum].rcd_page_idx = -1;
+#endif
+
 	/* Skip bad physical eraseblocks */
 	err = ubi_io_is_bad(ubi, pnum);
 	if (err < 0)
 		return err;
 	else if (err) {
 		ai->bad_peb_count += 1;
+#if defined(CONFIG_MTD_UBI_ENHANCE_INIT) && (MP_NAND_UBI == 1)
+		ubi->trn[pnum].etr.is_bad = 1;
+		ubi->trn[pnum].etr.pnum = cpu_to_be16(pnum);
+#endif
 		return 0;
 	}
 
@@ -874,6 +898,12 @@ static int scan_peb(struct ubi_device *ubi, struct ubi_attach_info *ai,
 		}
 
 		ec = be64_to_cpu(ech->ec);
+
+#if defined(CONFIG_MTD_UBI_ENHANCE_INIT) && (MP_NAND_UBI == 1)
+		ubi->trn[pnum].etr.ec = ech->ec;
+		ubi->trn[pnum].etr.pnum = cpu_to_be16(pnum);
+		//printk("[%s]\t pnum %d, ec is %lld\n", __FUNCTION__, pnum, be64_to_cpu(ubi->trn[pnum].etr.ec));
+#endif
 		if (ec > UBI_MAX_ERASECOUNTER) {
 			/*
 			 * Erase counter overflow. The EC headers have 64 bits
@@ -923,6 +953,9 @@ static int scan_peb(struct ubi_device *ubi, struct ubi_attach_info *ai,
 		bitflips = 1;
 		break;
 	case UBI_IO_BAD_HDR_EBADMSG:
+#if defined(CONFIG_MTD_UBI_ENHANCE_INIT) && (MP_NAND_UBI == 1)
+		ubi->trn[pnum].etr.has_vid = 0;
+#endif
 		if (ec_err == UBI_IO_BAD_HDR_EBADMSG)
 			/*
 			 * Both EC and VID headers are corrupted and were read
@@ -932,6 +965,9 @@ static int scan_peb(struct ubi_device *ubi, struct ubi_attach_info *ai,
 			 */
 			ai->maybe_bad_peb_count += 1;
 	case UBI_IO_BAD_HDR:
+#if defined(CONFIG_MTD_UBI_ENHANCE_INIT) && (MP_NAND_UBI == 1)
+		ubi->trn[pnum].etr.has_vid = 0;
+#endif
 		if (ec_err)
 			/*
 			 * Both headers are corrupted. There is a possibility
@@ -966,12 +1002,18 @@ static int scan_peb(struct ubi_device *ubi, struct ubi_attach_info *ai,
 			return err;
 		goto adjust_mean_ec;
 	case UBI_IO_FF_BITFLIPS:
+#if defined(CONFIG_MTD_UBI_ENHANCE_INIT) && (MP_NAND_UBI == 1)
+		ubi->trn[pnum].etr.has_vid = 0;
+#endif
 		err = add_to_list(ai, pnum, UBI_UNKNOWN, UBI_UNKNOWN,
 				  ec, 1, &ai->erase);
 		if (err)
 			return err;
 		goto adjust_mean_ec;
 	case UBI_IO_FF:
+#if defined(CONFIG_MTD_UBI_ENHANCE_INIT) && (MP_NAND_UBI == 1)
+		ubi->trn[pnum].etr.has_vid = 0;
+#endif
 		if (ec_err || bitflips)
 			err = add_to_list(ai, pnum, UBI_UNKNOWN,
 					  UBI_UNKNOWN, ec, 1, &ai->erase);
@@ -986,6 +1028,10 @@ static int scan_peb(struct ubi_device *ubi, struct ubi_attach_info *ai,
 			err);
 		return -EINVAL;
 	}
+
+#if defined(CONFIG_MTD_UBI_ENHANCE_INIT) && (MP_NAND_UBI == 1)
+	ubi->trn[pnum].etr.has_vid = 1;
+#endif
 
 	vol_id = be32_to_cpu(vidh->vol_id);
 	if (vid)
@@ -1007,6 +1053,9 @@ static int scan_peb(struct ubi_device *ubi, struct ubi_attach_info *ai,
 					  ec, 1, &ai->erase);
 			if (err)
 				return err;
+#if defined(CONFIG_MTD_UBI_ENHANCE_INIT) && (MP_NAND_UBI == 1)
+			ubi->trn[pnum].etr.has_vid = 0;
+#endif
 			return 0;
 
 		case UBI_COMPAT_RO:
@@ -1034,6 +1083,24 @@ static int scan_peb(struct ubi_device *ubi, struct ubi_attach_info *ai,
 	if (ec_err)
 		ubi_warn("valid VID header but corrupted EC header at PEB %d",
 			 pnum);
+#if defined(CONFIG_MTD_UBI_ENHANCE_INIT) && (MP_NAND_UBI == 1)
+	ubi->trn[pnum].etr.compact = vidh->compat;
+	ubi->trn[pnum].etr.copy_flag =vidh->copy_flag;
+	ubi->trn[pnum].etr.data_crc =vidh->data_crc;
+	ubi->trn[pnum].etr.data_pad =vidh->data_pad;
+	ubi->trn[pnum].etr.data_size =vidh->data_size;
+	ubi->trn[pnum].etr.lnum =vidh->lnum;
+	ubi->trn[pnum].etr.sqnum =vidh->sqnum;
+	ubi->trn[pnum].etr.used_ebs =vidh->used_ebs;
+	ubi->trn[pnum].etr.vol_id =vidh->vol_id;
+	ubi->trn[pnum].etr.vol_type = vidh->vol_type;
+	//printk("[%s]\t pnum %d, lnum is %d\n", __FUNCTION__, pnum, be32_to_cpu(vidh->lnum));
+
+	/*Dear Tao Please Add full block checking*/
+//  if(full block program)
+//		ubi->trn[pnum].etr.is_bad = 2;  // add to scrub list in kernel
+
+#endif
 	err = ubi_add_to_av(ubi, ai, pnum, ec, vidh, bitflips);
 	if (err)
 		return err;
@@ -1046,6 +1113,27 @@ adjust_mean_ec:
 			ai->max_ec = ec;
 		if (ec < ai->min_ec)
 			ai->min_ec = ec;
+#if (MP_NAND_UBI == 1)
+		{
+			int idx;
+			for(idx = 0; idx < 10; idx ++)
+			{
+				if(ubi->top_ec[idx] < ec)
+				{
+					ubi->top_ec[idx] = ec;
+					break;
+				}
+			}
+			for(idx = 0; idx < 10; idx ++)
+			{
+				if(ubi->last_ec[idx] > ec)
+				{
+					ubi->last_ec[idx] = ec;
+					break;
+				}
+			}
+		}
+#endif
 	}
 
 	return 0;
@@ -1232,6 +1320,11 @@ static int scan_all(struct ubi_device *ubi, struct ubi_attach_info *ai,
 
 	err = -ENOMEM;
 
+#if defined(CONFIG_MTD_UBI_ENHANCE_INIT) && (MP_NAND_UBI == 1)
+	if(ubi->tsm->valid_groups)
+		memset(ubi->tsm->valid_groups, 0, ubi->tsm->groups_num);
+#endif
+
 	ech = kzalloc(ubi->ec_hdr_alsize, GFP_KERNEL);
 	if (!ech)
 		return err;
@@ -1288,6 +1381,15 @@ static int scan_all(struct ubi_device *ubi, struct ubi_attach_info *ai,
 
 	ubi_free_vid_hdr(ubi, vidh);
 	kfree(ech);
+
+#if defined(CONFIG_MTD_UBI_ENHANCE_INIT) && (MP_NAND_UBI == 1)
+	if(!ubi->tsm->disable_flag)
+	{
+		eninit_msg("Sync dirty tbl and bitmap");
+		sync_dirty_tbl_storage(ubi, 0);
+		sync_bitmap_storage(ubi);
+	}
+#endif
 
 	return 0;
 
@@ -1423,7 +1525,16 @@ int ubi_attach(struct ubi_device *ubi, int force_scan)
 		}
 	}
 #else
+#if defined(CONFIG_MTD_UBI_ENHANCE_INIT) && (MP_NAND_UBI == 1)
+	err = ubi_en_init_scan(ubi, ai);
+	if(err)
+	{
+		ubi_msg("Original UBI scan");
+		err = scan_all(ubi, ai, 0);
+	}
+#else
 	err = scan_all(ubi, ai, 0);
+#endif
 #endif
 	if (err)
 		goto out_ai;
@@ -1434,6 +1545,12 @@ int ubi_attach(struct ubi_device *ubi, int force_scan)
 	ubi->max_ec = ai->max_ec;
 	ubi->mean_ec = ai->mean_ec;
 	dbg_gen("max. sequence number:       %llu", ai->max_sqnum);
+	
+#if defined(CONFIG_MTD_UBI_BACKUP_LSB) && (MP_NAND_UBI == 1)
+	err = ubi_backup_init_scan(ubi, ai);
+	if (err)
+		goto out_ai;
+#endif
 
 	err = ubi_read_volume_table(ubi, ai);
 	if (err)
@@ -1752,3 +1869,742 @@ out:
 	dump_stack();
 	return -EINVAL;
 }
+
+#if defined(CONFIG_MTD_UBI_ENHANCE_INIT) && (MP_NAND_UBI == 1)
+extern int dump_tbl_rcd(struct ubi_en_tbl_record etr);
+extern int print_buf(__u8 * Buf, int len);
+extern struct mtd_info * ctrl_mtd;
+extern struct mtd_info * tbl_mtd;
+struct ubi_en_tbl_record tmp_ebr __attribute__((aligned(0x80)));
+char speeduppart[16];
+
+int check_rescan_peb(struct ubi_device *ubi, struct ubi_attach_info * ai)
+{
+	int pnum, err;
+	//for statistic
+	int rescan_pnum_num = 0;
+	struct tbl_storage_manager *tsm = ubi->tsm;
+
+	for(pnum =0; pnum < ubi->peb_count; pnum ++)
+	{
+		if(tsm->re_scan_pnums[pnum])
+		{
+			rescan_pnum_num ++;
+			tsm->valid_groups[pnum/tsm->tbl_rcds_num] = 0;
+			eninit_msg("peb %d needs rescan by ubi", pnum);
+			err = scan_peb(ubi, ai, pnum, NULL, NULL);
+			if(err < 0)
+				return err;
+		}
+	}
+	ubi_msg("miss rate = %d/%d\n", rescan_pnum_num, ubi->peb_count);
+	ubi_msg("hit rate = %d/%d\n", (ubi->peb_count - rescan_pnum_num), ubi->peb_count);
+
+	return 0;
+}
+
+int process_tbl_page(struct ubi_device *ubi, struct ubi_attach_info *ai, __u8 *pu8_DataBuf, __u32 page_idx)
+{
+	int ttl_rcd, idx, pnum, vol_id, err;
+	long long uninitialized_var(ec);
+	__u16* pnums;
+	struct ubi_en_tbl_record * ebr;
+	struct tbl_storage_manager *tsm = ubi->tsm;
+
+	ttl_rcd = 	tbl_mtd->writesize / (sizeof(struct ubi_en_tbl_record) + 2);
+
+	pnums = (__u16*)pu8_DataBuf;
+	ebr = (struct ubi_en_tbl_record*)(pu8_DataBuf + ttl_rcd * 2);
+	//print_buf(pu8_DataBuf, tbl_mtd->writesize);
+	for(idx = 0; idx < ttl_rcd; idx ++)
+	{
+		ebr = (struct ubi_en_tbl_record*)(pu8_DataBuf + ttl_rcd * 2 + idx * sizeof(struct ubi_en_tbl_record));
+		memcpy(&tmp_ebr, ebr, sizeof(struct ubi_en_tbl_record));
+		//assign vid hdr
+		ec = be64_to_cpu(tmp_ebr.ec);
+		pnum = pnums[idx];
+		if(pnum == 0xFFFF)
+			continue;
+
+		if( pnum < 0 || pnum >= ubi->peb_count || pnum != be16_to_cpu(tmp_ebr.pnum))
+		{
+			err = -1;
+			return err;
+		}
+		if(tsm->re_scan_pnums[pnum])
+		{
+			ubi->trn[pnum].pnum = pnum;
+			ubi->trn[pnum].rcd_page_idx = page_idx;
+			ubi->trn[pnum].etr.ec = cpu_to_be64(ec);
+			ubi->trn[pnum].etr.pnum = cpu_to_be16(pnum);
+			ubi->trn[pnum].etr.has_vid = tmp_ebr.has_vid;
+			ubi->trn[pnum].etr.is_bad = tmp_ebr.is_bad;
+			tsm->re_scan_pnums[pnum] = 0;
+		}
+		else
+		{
+			//print_buf(pu8_DataBuf, tbl_mtd->writesize);
+			return -1;
+		}
+		//dump_tbl_rcd(tmp_ebr);
+		if (!ubi->image_seq && tmp_ebr.image_seq)
+			ubi->image_seq = tmp_ebr.image_seq;
+		if (ubi->image_seq && tmp_ebr.image_seq &&
+		    ubi->image_seq != tmp_ebr.image_seq) {
+			ubi_err("bad image sequence number %d in PEB %d, "
+				"expected %d", tmp_ebr.image_seq, pnum, ubi->image_seq);
+			err = add_to_list(ai, pnum, UBI_UNKNOWN, UBI_UNKNOWN, UBI_SCAN_UNKNOWN_EC, 0, &ai->erase);
+			if (err)
+				return err;
+			continue;
+		}
+		if(tmp_ebr.is_bad == 1)
+		{
+			ai->bad_peb_count += 1;
+			continue;
+		}
+
+		if(!tmp_ebr.has_vid)
+		{
+			err = add_to_list(ai, pnum, UBI_UNKNOWN,  UBI_UNKNOWN, ec, 0, &ai->free);
+			goto adjust_mean_ec;
+		}
+		ubi->trn[pnum].etr.compact = vidh->compat = tmp_ebr.compact;
+		ubi->trn[pnum].etr.copy_flag =vidh->copy_flag =tmp_ebr.copy_flag;
+		ubi->trn[pnum].etr.data_crc =vidh->data_crc = tmp_ebr.data_crc;
+		ubi->trn[pnum].etr.data_pad =vidh->data_pad = tmp_ebr.data_pad;
+		ubi->trn[pnum].etr.data_size =vidh->data_size = tmp_ebr.data_size;
+		ubi->trn[pnum].etr.lnum =vidh->lnum= tmp_ebr.lnum;
+		ubi->trn[pnum].etr.sqnum =vidh->sqnum = tmp_ebr.sqnum;
+		ubi->trn[pnum].etr.used_ebs =vidh->used_ebs = tmp_ebr.used_ebs;
+		ubi->trn[pnum].etr.vol_id =vidh->vol_id = tmp_ebr.vol_id;
+		ubi->trn[pnum].etr.vol_type = vidh->vol_type = tmp_ebr.vol_type;
+		//dump_tbl_rcd(ubi->trn[pnum].etr);
+
+		vol_id = tmp_ebr.vol_id;
+		if (vol_id > UBI_MAX_VOLUMES && vol_id != UBI_LAYOUT_VOLUME_ID) {
+			int lnum = be32_to_cpu(vidh->lnum);
+
+			/* Unsupported internal volume */
+			switch (vidh->compat) {
+				if (vol_id != UBI_FM_SB_VOLUME_ID
+				    && vol_id != UBI_FM_DATA_VOLUME_ID) {
+					ubi_msg("\"delete\" compatible internal volume %d:%d found, will remove it",
+						vol_id, lnum);
+				}
+				err = add_to_list(ai, pnum, vol_id, lnum,
+						  ec, 1, &ai->erase);
+				if (err)
+					return err;
+				continue;
+
+			case UBI_COMPAT_RO:
+				ubi_msg("read-only compatible internal volume %d:%d"
+					" found, switch to read-only mode",
+					vol_id, lnum);
+				ubi->ro_mode = 1;
+				break;
+
+			case UBI_COMPAT_PRESERVE:
+				ubi_msg("\"preserve\" compatible internal volume %d:%d"
+					" found", vol_id, lnum);
+				err = add_to_list(ai, pnum, vol_id, lnum,
+					  ec, 0, &ai->alien);
+				if (err)
+					return err;
+				continue;
+			}
+
+		}
+
+		err = ubi_add_to_av(ubi, ai, pnum, ec, vidh, (ubi->trn[pnum].etr.is_bad == 2));
+		if (err)
+			return err;
+adjust_mean_ec:
+		ai->ec_sum += ec;
+		ai->ec_count += 1;
+		if (ec > ai->max_ec)
+			ai->max_ec = ec;
+		if (ec < ai->min_ec)
+			ai->min_ec = ec;
+		{
+			int idx;
+			for(idx = 0; idx < 10; idx ++)
+			{
+				if(ubi->top_ec[idx] < ec)
+				{
+					ubi->top_ec[idx] = ec;
+					break;
+				}
+			}
+			for(idx = 0; idx < 10; idx ++)
+			{
+				if(ubi->last_ec[idx] > ec)
+				{
+					ubi->last_ec[idx] = ec;
+					break;
+				}
+			}
+		}
+		if(pnum == ubi->peb_count -1)
+			break;
+	}
+	return 0;
+}
+
+int ubi_en_init_scan(struct ubi_device *ubi, struct ubi_attach_info* ai)
+{
+	int err = 0, tbl_rcds, group_num;
+	__u8 * pu8_DataBuf;
+	struct ubi_ainf_volume *av;
+	struct ubi_ainf_peb *aeb;
+	struct rb_node *rb1, *rb2;
+	struct ubi_en_bitmap_record * ebr = ubi->ebr;
+	struct tbl_storage_manager *tsm = ubi->tsm;
+
+	if(strncmp(ubi->mtd->name, speeduppart, strlen(speeduppart)) || strlen(ubi->mtd->name) != strlen(speeduppart) || speeduppart[0] == 0)
+	{
+		printk("Current partition %s is not desired partition, named %s.\n", ubi->mtd->name, speeduppart);
+		ubi->tsm->disable_flag = 1;
+		return -EINVAL;
+	}
+
+	err = en_init();
+	if(err)
+	{
+		ubi->tsm->disable_flag = 1;
+		return err;
+	}
+
+	ech = kzalloc(ubi->ec_hdr_alsize, GFP_KERNEL);
+	if (!ech)
+		return -ENOMEM;
+
+	vidh = ubi_zalloc_vid_hdr(ubi, GFP_KERNEL);
+	if (!vidh)
+		goto out_ech;
+
+	pu8_DataBuf = kzalloc(ctrl_mtd->writesize, GFP_KERNEL);
+	if(!pu8_DataBuf)
+		goto out_vidh;
+	tbl_rcds = tbl_mtd->writesize / (sizeof(struct ubi_en_tbl_record) + 2);
+
+	group_num = ubi->peb_count / tbl_rcds;
+	group_num = (ubi->peb_count % tbl_rcds) ?  group_num + 1: group_num;
+
+	tsm->groups_num = group_num;
+	tsm->tbl_rcds_num = tbl_rcds;
+
+	tsm->valid_groups = vmalloc(group_num);
+
+	tsm->dirty_pages = vmalloc(group_num * sizeof(__u16));
+
+	tsm->re_scan_pnums = vmalloc(ubi->peb_count);
+
+	ubi->ebr->avail_tbl_blk_num = tbl_mtd->size >> tbl_mtd->erasesize_shift;
+	tsm->val_tbl_blk = vmalloc(ubi->ebr->avail_tbl_blk_num);
+
+	if(!tsm->valid_groups || !tsm->dirty_pages || !tsm->re_scan_pnums || !tsm->val_tbl_blk)
+	{
+		tsm->disable_flag = 1;
+		goto out_no_en;
+	}
+
+	memset(tsm->valid_groups, 1, group_num);
+	memset(tsm->dirty_pages, 0, group_num * sizeof(__u16));
+	memset(tsm->re_scan_pnums,1, ubi->peb_count);
+	memset(tsm->val_tbl_blk, 1, ubi->ebr->avail_tbl_blk_num);
+
+	err = process_ctrl_record(ubi, pu8_DataBuf);
+
+	//if no vaild bitmap return to original ubi scan
+	if(err != ERR_CTRL_RECORD_FOUND)
+	{
+		vfree(tsm->re_scan_pnums);
+		eninit_err("Find no bit map, errcode %X\n", err);
+		err = -EINVAL;
+		goto out_vidh;
+	}
+	err = 0;
+
+	err = process_valid_tbl_record(ubi, ai, ebr);
+	if(err)
+	{
+		memset(ubi->ebr->bitmap, 0, ctrl_mtd->writesize - sizeof(struct ubi_en_bitmap_hdr));
+		eninit_err("process page error, errcode %X\n", err);
+		vfree(tsm->re_scan_pnums);
+		err = -EINVAL;
+		goto out_vidh;
+	}
+	//check rescan peb
+
+	err = check_rescan_peb(ubi, ai);
+	if(err)
+	{
+		vfree(tsm->re_scan_pnums);
+		err = -EINVAL;
+		goto out_vidh;
+	}
+	vfree(tsm->re_scan_pnums);
+
+	eninit_msg("scanning is finished");
+
+	/* Calculate mean erase counter */
+	if (ai->ec_count)
+		ai->mean_ec = div_u64(ai->ec_sum, ai->ec_count);
+
+	err = late_analysis(ubi, ai);
+	if (err)
+		goto out_vidh;
+
+	/*
+	 * In case of unknown erase counter we use the mean erase counter
+	 * value.
+	 */
+	ubi_rb_for_each_entry(rb1, av, &ai->volumes, rb) {
+		ubi_rb_for_each_entry(rb2, aeb, &av->root, u.rb)
+			if (aeb->ec == UBI_SCAN_UNKNOWN_EC)
+				aeb->ec = ai->mean_ec;
+	}
+
+	list_for_each_entry(aeb, &ai->free, u.list) {
+		if (aeb->ec == UBI_SCAN_UNKNOWN_EC)
+			aeb->ec = ai->mean_ec;
+	}
+
+	list_for_each_entry(aeb, &ai->corr, u.list)
+		if (aeb->ec == UBI_SCAN_UNKNOWN_EC)
+			aeb->ec = ai->mean_ec;
+
+	list_for_each_entry(aeb, &ai->erase, u.list)
+		if (aeb->ec == UBI_SCAN_UNKNOWN_EC)
+			aeb->ec = ai->mean_ec;
+		
+	err = self_check_ai(ubi, ai);
+	if (err)
+		goto out_vidh;
+
+	ubi_free_vid_hdr(ubi, vidh);
+	kfree(ech);
+
+	if(!ubi->tsm->disable_flag)
+	{
+		eninit_msg("Sync dirty tbl and bitmap");
+		sync_dirty_tbl_storage(ubi, 0);
+		sync_bitmap_storage(ubi);
+	}
+
+	return 0;
+
+out_no_en:
+	if(pu8_DataBuf)
+		kfree(pu8_DataBuf);
+	if(tsm->valid_groups)
+		vfree(tsm->valid_groups);
+	if(tsm->dirty_pages)
+		vfree(tsm->dirty_pages);
+	if(tsm->re_scan_pnums)
+		vfree(tsm->re_scan_pnums);
+    if(tsm->val_tbl_blk)
+        vfree(tsm->val_tbl_blk);
+out_vidh:
+	ubi_free_vid_hdr(ubi, vidh);
+out_ech:
+	kfree(ech);
+	return err;
+}
+
+static int __init ubispeedup_setup(char * str)
+{
+	if(str != NULL)
+	{
+		strncpy(speeduppart, str, strlen(str));
+		printk("ubispeedup = %s\n", speeduppart);
+	}
+	else
+	{
+		memset(speeduppart, 0, 16);
+	}
+	return 0;
+}
+
+early_param("ubispeedup", ubispeedup_setup);
+
+#endif
+
+#if defined(CONFIG_MTD_UBI_BACKUP_LSB) && (MP_NAND_UBI == 1)
+enum
+{
+	RECOVERY_NONE = 0,
+	RECOVERY_FROM_VOLUME,
+	RECOVERY_FROM_CORR
+};
+
+/**
+ * ubi_backup_search_empty - search first empty page in the block.
+ * @ubi: ubi structure
+ * @pnum: the pnum to search
+ *
+ * This function returns offset of first empty page in the block.
+ */
+static int ubi_backup_search_empty(const struct ubi_device *ubi, int pnum)
+{
+	int low, high, mid;
+	int first = ubi->peb_size;
+	int offset, err = 0;
+
+	low = ubi->leb_start/ubi->min_io_size;
+	high = ubi->peb_size/ubi->min_io_size -1;
+
+	while(low <= high)
+	{
+		mid = (low+high)/2;
+		offset = mid * ubi->min_io_size;
+		err = ubi_io_read_oob(ubi, ubi->databuf, ubi->oobbuf, pnum, offset);
+		if(ubi_check_pattern(ubi->oobbuf, 0xFF, ubi->mtd->oobavail) && ubi_check_pattern(ubi->databuf, 0xFF, ubi->min_io_size)) {
+			first = offset;
+			high = mid-1;
+		}
+		else {
+			low = mid+1;
+		}
+	}
+
+	return first;
+}
+
+int ubi_backup_init_scan(struct ubi_device *ubi, struct ubi_attach_info *ai)
+{
+	int i, offset, err = 0;
+	struct ubi_vid_hdr *vid_hdr = NULL;
+	//struct ubi_scan_volume *sv;
+	struct ubi_ainf_volume *sv;
+	//struct ubi_scan_leb *seb, *backup_seb, *old_seb, *new_seb;
+	struct ubi_ainf_peb *seb, *backup_seb, *old_seb, *new_seb;
+	struct rb_node *rb;
+	struct ubi_backup_lsb_spare *p_backup_lsb_spare;
+	int pnum = 0;
+	int source_pnum = 0, source_lnum = 0, source_vol_id = 0, source_page = 0, sqnum = 0;
+	int corrupt, recovery, tries = 0;
+	int data_size;
+	uint32_t crc;
+	struct nand_chip *chip = (struct nand_chip *)ubi->mtd->priv;
+
+	ubi->is_mlc = 1;
+	if(!(chip->options & NAND_IS_SPI))
+	{
+		for(i=0 ; i<(sizeof(ga_tUbiPairedPageMap)/sizeof(ga_tUbiPairedPageMap[0])) ; i++) {
+			if(i!=0 && ga_tPairedPageMap[i].u16_MSB==0 && ga_tPairedPageMap[i].u16_LSB==0)
+				break;
+
+			ga_tUbiPairedPageMap[ga_tPairedPageMap[i].u16_MSB].lsb = 0;
+			ga_tUbiPairedPageMap[ga_tPairedPageMap[i].u16_MSB].paired_page = ga_tPairedPageMap[i].u16_LSB;
+
+			ga_tUbiPairedPageMap[ga_tPairedPageMap[i].u16_LSB].lsb = 1;
+			ga_tUbiPairedPageMap[ga_tPairedPageMap[i].u16_LSB].paired_page = ga_tPairedPageMap[i].u16_MSB;
+		}
+	}
+	else
+	{
+		for(i=0 ; i<(sizeof(ga_tUbiPairedPageMap)/sizeof(ga_tUbiPairedPageMap[0])) ; i++) {
+			ga_tUbiPairedPageMap[i].lsb = 1;
+			ga_tUbiPairedPageMap[i].paired_page = i;
+		}
+
+	}
+
+//	for(j=0 ; j<2*i ; j++)
+//		ubi_msg("[%d] lsb(%d), paired_page(%d)\r\n", j, ga_tUbiPairedPageMap[j].lsb, ga_tUbiPairedPageMap[j].paired_page);
+	if(!ga_tUbiPairedPageMap[0].paired_page)
+		ubi->is_mlc = 0;
+
+	ubi->databuf = kmalloc(ubi->min_io_size, GFP_KERNEL);
+	ubi->oobbuf = kmalloc(ubi->mtd->oobavail, GFP_KERNEL);
+	if(!ubi->databuf || !ubi->oobbuf) {
+			err = -ENOMEM;
+			goto out_free;
+	}
+	ubi->backup_leb_scrub = 0;
+	ubi->backup_next_offset = 0;
+
+	sv = ubi_find_av(ai, UBI_BACKUP_VOLUME_ID);
+	if (!sv) {
+		/*
+		 * No logical eraseblocks belonging to the backup volume were
+		 * found.
+		 */
+		ubi_msg("the backup volume was not found");
+	} else {
+		ubi_msg("check backup volume(%d):%d", UBI_BACKUP_VOLUME_ID, sv->vol_id);
+
+		p_backup_lsb_spare = (struct ubi_backup_lsb_spare *)ubi->oobbuf;
+		/* Read LEB 0 into memory */
+		ubi_rb_for_each_entry(rb, seb, &sv->root, u.rb) {
+			ubi_assert(seb->lnum == 0);
+			pnum = seb->pnum;
+			backup_seb = seb;
+			/*
+			for (offset = ubi->peb_size - ubi->min_io_size; offset >= ubi->leb_start; offset-=ubi->min_io_size) {
+				err = ubi_io_read_oob(ubi, ubi->databuf, ubi->oobbuf, pnum, offset);
+				if (err == UBI_IO_BITFLIPS)
+					ubi->backup_leb_scrub = 1;
+				if (err >= 0) {
+					if(!check_pattern(ubi->databuf, 0xFF, ubi->min_io_size) || !check_pattern(ubi->oobbuf, 0xFF, ubi->mtd->oobavail))
+					{
+						source_page = be16_to_cpu(p_backup_lsb_spare->page);
+						sqnum = be16_to_cpu(p_backup_lsb_spare->sqnum);
+						source_vol_id = be16_to_cpu(p_backup_lsb_spare->vol_id);
+						source_pnum = be16_to_cpu(p_backup_lsb_spare->pnum);
+						source_lnum = be16_to_cpu(p_backup_lsb_spare->lnum);
+						break;
+					}
+				}
+
+			}
+			ubi->backup_next_offset = offset + ubi->min_io_size;
+			*/
+			ubi->backup_next_offset = ubi_backup_search_empty(ubi, pnum);
+			err = ubi_io_read_oob(ubi, ubi->databuf, ubi->oobbuf, pnum, ubi->backup_next_offset-ubi->min_io_size);
+			if (err >= 0) {
+				source_page = be16_to_cpu(p_backup_lsb_spare->page);
+				sqnum = be16_to_cpu(p_backup_lsb_spare->sqnum);
+				source_vol_id = be16_to_cpu(p_backup_lsb_spare->vol_id);
+				source_pnum = be16_to_cpu(p_backup_lsb_spare->pnum);
+				source_lnum = be16_to_cpu(p_backup_lsb_spare->lnum);
+			}
+			else {
+				ubi_msg("the backup volume was scrubbed or WL, no need to restore");
+				return 0;
+			}
+		}
+		ubi_msg("Spare Strut page: %X, sqnum: %X, vol_id: %X, pnum: %X, lnum: %X",
+			p_backup_lsb_spare->page, p_backup_lsb_spare->sqnum, p_backup_lsb_spare->vol_id,
+			p_backup_lsb_spare->pnum, p_backup_lsb_spare->lnum);
+
+		ubi_msg("backup @pnum %d, offset %d", pnum, ubi->backup_next_offset);
+		ubi_msg("backup source @pnum %d, lnum %d, vol_id %d, page %d, sq %d",
+			    source_pnum, source_lnum, source_vol_id, source_page, sqnum);
+
+		if(p_backup_lsb_spare->page==0xFFFF && p_backup_lsb_spare->sqnum==0xFFFF &&
+			p_backup_lsb_spare->vol_id==0xFFFF && p_backup_lsb_spare->pnum==0xFFFF &&
+			p_backup_lsb_spare->lnum==0xFFFF) {
+
+			ubi_msg("the backup volume was scrubbed or WL, no need to restore");
+			return 0;
+		}
+		// Check if source page corrupts, and recover
+		corrupt = 0;
+		for(i=0 ; i<sqnum ; i++) {
+			// read backup page
+			ubi_msg("check backup @pnum %d, offset %d", pnum, ubi->backup_next_offset-(i+1)*ubi->min_io_size);
+			err = ubi_io_read_oob(ubi, ubi->databuf, ubi->oobbuf, pnum, ubi->backup_next_offset-(i+1)*ubi->min_io_size);
+			if(err < 0)
+			{
+				corrupt = 0;
+				ubi->backup_leb_scrub = 0;
+				break;
+			}
+			source_page = be16_to_cpu(p_backup_lsb_spare->page);
+			source_vol_id = be16_to_cpu(p_backup_lsb_spare->vol_id);
+			source_pnum = be16_to_cpu(p_backup_lsb_spare->pnum);
+			source_lnum = be16_to_cpu(p_backup_lsb_spare->lnum);
+
+			// read source page
+			ubi_msg("check source @pnum %d, offset %d", source_pnum, source_page*ubi->min_io_size);
+			err = ubi_io_read_oob(ubi, ubi->databuf, NULL, source_pnum, source_page*ubi->min_io_size);
+			if(err < 0) {
+				ubi_msg("source @pnum %d, offset %d correct=%d", source_pnum, source_page*ubi->min_io_size, err);
+				corrupt = 1;
+				break;
+			}
+		}
+
+		if(corrupt) {
+			ubi_msg("corrupt");
+			recovery = RECOVERY_NONE;
+			sv = ubi_find_av(ai, source_vol_id);
+			if (!sv) {
+				ubi_msg("volume id %d was not found", source_vol_id);
+				err = -EINVAL;
+				goto out_free;
+			}
+
+			// check from volume
+			ubi_rb_for_each_entry(rb, old_seb, &sv->root, u.rb) {
+				if( old_seb->pnum == source_pnum && old_seb->lnum == source_lnum) {
+					recovery = RECOVERY_FROM_VOLUME;
+					break;
+				}
+			}
+
+			if(recovery == RECOVERY_NONE) {
+				list_for_each_entry(old_seb, &ai->corr, u.list)
+					if (old_seb->pnum == source_pnum) {
+						recovery = RECOVERY_FROM_CORR;
+						list_del(&old_seb->u.list);
+						ai->corr_peb_count -= 1;
+						break;
+					}
+			}
+
+			if(recovery != RECOVERY_NONE) {
+				ubi_msg("recovery from %d", recovery);
+
+				data_size = ubi->leb_size - be32_to_cpu(sv->data_pad);
+				for(offset=0 ; offset<data_size; offset+=ubi->min_io_size) {
+					//ubi_msg("read source(%d) from %d, %d bytes", old_seb->pnum, offset, ubi->min_io_size);
+					err = ubi_io_read_data(ubi, (void*)(((char*)ubi->peb_buf)+offset),
+							old_seb->pnum, offset, ubi->min_io_size);
+					if(err < 0)
+						ubi_warn("error %d while reading data from PEB %d:%d", err, old_seb->pnum, offset);
+				}
+
+				for(i=0 ; i<sqnum ; i++) {
+					ubi_msg("read backup(%d) from %d", pnum, ubi->backup_next_offset-(i+1)*ubi->min_io_size);
+					err = ubi_io_read_oob(ubi, ubi->databuf, ubi->oobbuf, pnum, ubi->backup_next_offset-(i+1)*ubi->min_io_size);
+					source_page = be16_to_cpu(p_backup_lsb_spare->page);
+					if(source_page >= ubi->leb_start/ubi->min_io_size) {
+						ubi_msg("copy backup page %d to offset %d", source_page, (source_page*ubi->min_io_size)-ubi->leb_start);
+						memcpy((void *) (((char*)ubi->peb_buf)+(source_page*ubi->min_io_size)-ubi->leb_start),
+								(const void *)ubi->databuf, ubi->min_io_size);
+					}
+				}
+
+				data_size = ubi_calc_data_len(ubi, (char*)ubi->peb_buf, data_size);
+				ubi_msg("calc CRC data size %d", data_size);
+				crc = crc32(UBI_CRC32_INIT, (char*)ubi->peb_buf, data_size);
+
+				vid_hdr = ubi_zalloc_vid_hdr(ubi, GFP_KERNEL);
+				if (!vid_hdr) {
+					err = -ENOMEM;
+					goto out_free;
+				}
+
+				vid_hdr->sqnum = cpu_to_be64(++ai->max_sqnum);
+				vid_hdr->vol_id = cpu_to_be32(source_vol_id);
+				vid_hdr->lnum = cpu_to_be32(source_lnum);
+				vid_hdr->compat = ubi_get_compat(ubi, source_vol_id);
+				vid_hdr->data_pad = cpu_to_be32(sv->data_pad);
+				vid_hdr->used_ebs = cpu_to_be32(sv->used_ebs);
+				vid_hdr->vol_type = UBI_VID_DYNAMIC;
+				if (data_size > 0) {
+					vid_hdr->copy_flag = 1;
+					vid_hdr->data_size = cpu_to_be32(data_size);
+					vid_hdr->data_crc = cpu_to_be32(crc);
+				}
+
+			retry:
+				new_seb = ubi_early_get_peb(ubi, ai);
+				if (IS_ERR(new_seb)) {
+					err = -EINVAL;
+					goto out_free;
+				}
+
+				err = ubi_io_write_vid_hdr(ubi, new_seb->pnum, vid_hdr);
+				if (err) {
+					//ubi_free_vid_hdr(ubi, vid_hdr);
+					goto write_error;
+				}
+
+				if (data_size > 0) {
+					err = ubi_io_write_data(ubi, ubi->peb_buf, new_seb->pnum, 0, data_size);
+					if (err) {
+						//ubi_free_vid_hdr(ubi, vid_hdr);
+						goto write_error;
+					}
+				}
+
+				err = add_to_list(ai, old_seb->pnum, old_seb->vol_id,
+						old_seb->lnum, old_seb->ec, 0, &ai->erase);
+
+				if (err){
+					ubi_free_vid_hdr(ubi, vid_hdr);
+					goto out_free;
+				}
+				if( recovery == RECOVERY_FROM_VOLUME ) {
+					old_seb->pnum = new_seb->pnum;
+					old_seb->ec = new_seb->ec;
+					old_seb->sqnum = vid_hdr->sqnum;
+				}
+				else {
+					err = ubi_add_to_av(ubi, ai, new_seb->pnum, new_seb->ec, vid_hdr, 0);
+					if (err) {
+						ubi_free_vid_hdr(ubi, vid_hdr);
+						goto out_free;
+					}
+				}
+				kfree(new_seb);
+				ubi_free_vid_hdr(ubi, vid_hdr);
+			}
+			else
+			{
+				list_for_each_entry(old_seb, &ai->free, u.list)
+				if (old_seb->pnum == source_pnum) {
+					list_del(&old_seb->u.list);
+					ubi_msg("add corrept peb %d, ec %d from free to erase list", old_seb->pnum, old_seb->ec);
+					err = add_to_list(ai, old_seb->pnum, old_seb->vol_id,
+						old_seb->lnum, old_seb->ec, 0, &ai->erase);
+			                	if (err){
+						goto out_free;
+			                	}
+					break;
+				}
+
+				list_for_each_entry(old_seb, &ai->alien, u.list)
+				if (old_seb->pnum == source_pnum) {
+					list_del(&old_seb->u.list);
+					ubi_msg("add corrept peb %d, ec %d from alien to erase list", old_seb->pnum, old_seb->ec);
+					err = add_to_list(ai, old_seb->pnum, old_seb->vol_id,
+						old_seb->lnum, old_seb->ec, 0, &ai->erase);
+					if (err){
+						goto out_free;
+					}
+					break;
+		                }
+			}
+		}
+	}
+	return 0;
+
+write_error:
+	if (err != -EIO || !ubi->bad_allowed) {
+		ubi_ro_mode(ubi);
+		if (new_seb)
+		{
+			kfree(new_seb);
+		}
+		goto out_free;
+	}
+
+	/*
+	 * Fortunately, this is the first write operation to this physical
+	 * eraseblock, so just put it and request a new one. We assume that if
+	 * this physical eraseblock went bad, the erase code would handle that.
+	 */
+	err = add_to_list(ai, new_seb->pnum, new_seb->vol_id,
+					  new_seb->lnum, new_seb->pnum, 0,
+						  &ai->corr);
+	if (err || ++tries > UBI_IO_RETRIES) {
+		ubi_ro_mode(ubi);
+		if (new_seb)
+		{
+			kfree(new_seb);
+		}
+		goto out_free;
+	}
+
+	vid_hdr->sqnum = cpu_to_be64(++ai->max_sqnum);
+	ubi_msg("try another PEB");
+	goto retry;
+
+out_free:
+	if(ubi->databuf)
+		kfree(ubi->databuf);
+	if(ubi->oobbuf)
+		kfree(ubi->oobbuf);
+	if(vid_hdr)
+		ubi_free_vid_hdr(ubi, vid_hdr);
+
+	return err;
+}
+#endif

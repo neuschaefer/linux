@@ -6,7 +6,7 @@
  *  GK 2/5/95  -  Changed to support mounting root fs via NFS
  *  Added initrd & change_root: Werner Almesberger & Hans Lermen, Feb '96
  *  Moan early if gcc is old, avoiding bogus kernels - Paul Gortmaker, May '96
- *  Simplified starting of init:  Michael A. Griffith <grif@acm.org> 
+ *  Simplified starting of init:  Michael A. Griffith <grif@acm.org>
  */
 
 #define DEBUG		/* Enable initcall_debug */
@@ -81,6 +81,7 @@
 #include <asm/setup.h>
 #include <asm/sections.h>
 #include <asm/cacheflush.h>
+#include <mstar/mpatch_macro.h>
 
 #ifdef CONFIG_X86_LOCAL_APIC
 #include <asm/smp.h>
@@ -93,6 +94,13 @@ extern void fork_init(unsigned long);
 extern void mca_init(void);
 extern void sbus_init(void);
 extern void radix_tree_init(void);
+
+#if (MP_PLATFORM_ARM == 1)
+#if (MP_PLATFORM_INT_1_to_1_SPI != 1)
+extern int __init init_irq_fiq_merge(void);
+#endif/*MP_PLATFORM_INT_1_to_1_SPI*/
+extern void __init serial_init(void);
+#endif /* MP_PLATFORM_ARM */
 #ifndef CONFIG_DEBUG_RODATA
 static inline void mark_rodata_ro(void) { }
 #endif
@@ -101,6 +109,9 @@ static inline void mark_rodata_ro(void) { }
 extern void tc_init(void);
 #endif
 
+#if (MP_CHECKPT_BOOT == 1)
+extern int Mstar_Timer1_GetMs(void);
+#endif // MP_CHECKPT_BOOT
 /*
  * Debug helper: via this flag we know that we are in 'early bootup code'
  * where only the boot processor is running with IRQ disabled.  This means
@@ -118,6 +129,9 @@ EXPORT_SYMBOL(system_state);
  */
 #define MAX_INIT_ARGS CONFIG_INIT_ENV_ARG_LIMIT
 #define MAX_INIT_ENVS CONFIG_INIT_ENV_ARG_LIMIT
+
+#define Kernel_time  1300
+unsigned int Mboot_time=0;
 
 extern void time_init(void);
 /* Default late time init is NULL. archs can override this later. */
@@ -469,6 +483,212 @@ static void __init mm_init(void)
 	vmalloc_init();
 }
 
+/* extern by "check_points.c" for "performance index" */
+unsigned int kr_PiuTime=0;
+
+#define CACHE_FLUSH_TEST 0
+#if CACHE_FLUSH_TEST==1
+#define K_SIZE 0x100
+#define kprintk(key) printk("\033[1;34m%s\033[0m", key)
+
+//#define RIU_BASE    mstar_pm_base
+#define VA_BA_OFF   (0xffffffc000000000-0x200000)
+
+#define BDMA_BANK   0x100900
+#define BDMA_TRI    0x0
+#define BDMA_STAT   0x2
+#define BDMA_COMM   0x4
+#define BDMA_SRC_L  0x8
+#define BDMA_SRC_H  0xa
+#define BDMA_DES_L  0xc
+#define BDMA_DES_H  0xe
+#define BDMA_SIZE_L 0x10
+#define BDMA_SIZE_H 0x12
+#define BDMA_CLR    0xE0
+
+
+extern void Chip_Flush_Cache_Range_VA_PA(unsigned long u32VAddr,unsigned long u32PAddr,unsigned long u32Size);
+extern void Chip_Flush_Cache_All(void);
+extern void Chip_Inv_Cache_Range_VA_PA(unsigned long u32Addr, unsigned long u32PAddr, unsigned long u32Size);
+
+unsigned int kkk_array[K_SIZE/4];
+unsigned int bdma_ver[K_SIZE/4];
+
+void K_test_bdma_move_data(unsigned int *src, unsigned int *dest, unsigned long size)
+{
+    unsigned long k_src, k_dest;
+    unsigned long bdma_done=0;    
+    unsigned long RIU_BASE = (ptrdiff_t)ioremap(0x000000001f000000, 0x400000);
+
+    k_src = (unsigned long)src - VA_BA_OFF;
+    k_dest = (unsigned long)dest - VA_BA_OFF;
+
+   // printk("XXX RIU_BASE = %016lx k_src = %016lx k_dest = %016lx \n", RIU_BASE, k_src, k_dest);
+   // printk("XXX total = %016lx BANK = %016lx  COMM = %016lx \n", (RIU_BASE+(BDMA_BANK+BDMA_COMM)*2), BDMA_BANK, BDMA_COMM);
+   // printk("k_src = 0x%08x, k_dest = 0x%08x\n", k_src, k_dest);
+    
+   // Set command 0404 >> miu0 - miu0
+   *((unsigned int *)(RIU_BASE+(BDMA_BANK+BDMA_COMM)*2)) = 0x4040;
+   
+   // Set src address
+   *((unsigned int *)(RIU_BASE+(BDMA_BANK+BDMA_SRC_L)*2)) = k_src&0xffff;
+   *((unsigned int *)(RIU_BASE+(BDMA_BANK+BDMA_SRC_H)*2)) = k_src>>16;
+
+   // Set dest address 
+   *((unsigned int *)(RIU_BASE+(BDMA_BANK+BDMA_DES_L)*2)) = k_dest&0xffff;
+   *((unsigned int *)(RIU_BASE+(BDMA_BANK+BDMA_DES_H)*2)) = k_dest>>16;
+
+   //Set size 
+   *((unsigned int *)(RIU_BASE+(BDMA_BANK+BDMA_SIZE_L)*2)) = size&0xffff;
+   *((unsigned int *)(RIU_BASE+(BDMA_BANK+BDMA_SIZE_H)*2)) = size>>16;
+
+   // Set trigger
+   *((unsigned int *)(RIU_BASE+(BDMA_BANK+BDMA_TRI)*2)) = 0x1;
+
+   while(!bdma_done)
+   {
+       bdma_done = ((*((unsigned int *)(RIU_BASE+(BDMA_BANK+BDMA_STAT)*2))) & 0x8)>>3;
+       udelay(1000);
+   }
+ 
+   (*((unsigned int *)(RIU_BASE+(BDMA_BANK+BDMA_STAT)*2))) = BDMA_CLR;
+  
+   return;
+}
+
+
+void K_test_dump_area(unsigned int *addr, unsigned int size)
+{
+    int i, nl=4;
+   
+    for(i=0; i<size/4; i++)
+    {  
+        if(i%nl==0)
+            printk("\n");
+        printk("0x%016lx ", addr[i]);
+    }
+
+    return;
+}
+
+unsigned int  K_test_check_area(unsigned int *src, unsigned int *dest, unsigned long size)
+{
+    int i, res=0;
+   
+    //for(i=0; i<size/4; i++)
+    for(i==((size/4)-1);i==0; i--)
+    {  
+        //PATCH!!
+        if (((unsigned int)src&0xf)==8)
+        {
+		if(i==2 || i==3)
+		{
+			if (src[i] != dest[i])
+			{
+			    res = 1;
+			    break;
+			}
+		}
+        }
+        else
+	{
+                if(i==0 || i==1)
+                {
+			if (src[i] != dest[i])
+			{
+			    res = 1;
+			    break;
+			}
+                }
+	}
+
+    }
+   
+    if (res == 1)
+        printk("Check fail! Size = %lx\n", size);
+    else
+        printk("Check success! Size = %lx\n", size);
+
+    return res;
+
+}
+
+void K_test_write_area(unsigned int *addr, unsigned int size)
+{
+    int i;
+    
+    for (i=0;i<size/4;i++)
+    {
+        addr[i] = i;
+    }
+
+    return;
+}
+
+unsigned int K_test_cache_flush_all_test(unsigned int *src, unsigned int *dest, unsigned long size)
+{
+        unsigned int ret=0;
+
+        kprintk("1. Start to write pattern by CPU\n");
+        K_test_dump_area(src, size);
+        K_test_write_area(src, size);
+        K_test_dump_area(src, size);
+        K_test_write_area(src, size);
+        kprintk("2. Use BDMA to move data to bdma_ver\n");
+        K_test_bdma_move_data(src, dest, size);
+        kprintk("3. Inv the destnation for CPU\n");
+        Chip_Inv_Cache_Range_VA_PA(dest, __pa(dest), size);
+        kprintk("4. Check the pattern is reasonable from bdma_ver or not\n");
+        ret = K_test_check_area(src, dest, size);
+        if (ret==0)
+        {
+            kprintk("Data already in ram, leave test...\n");
+            return 0;
+        }
+        kprintk("5. Flush start using flush all\n");
+        Chip_Flush_Cache_All();
+        kprintk("6 Use BDMA to move data to bdma_ver after flush\n");
+        K_test_bdma_move_data(src, dest, size);
+        kprintk("7. Inv the destnation for CPU\n");
+        Chip_Inv_Cache_Range_VA_PA(dest, __pa(dest), size);
+        kprintk("8. Check the pattern again.\n");
+        ret = K_test_check_area(src, dest, size);
+ 
+        if (ret == 0)
+        {
+            kprintk("Data correct!!\n");
+            return 1;
+        }else
+        {
+            kprintk("Data fail\n");
+            return 0;
+        }
+}
+
+void K_test_cache_flush_va_test(unsigned int *src, unsigned int *dest, unsigned long size)
+{
+        kprintk("1. Start to write pattern by CPU\n");
+        K_test_write_area(src, size);      
+        kprintk("2. Use BDMA to move data to bdma_ver\n");
+        K_test_bdma_move_data(src, dest, size);
+        kprintk("3. Inv the destnation for CPU\n");
+        Chip_Inv_Cache_Range_VA_PA(dest, __pa(dest), size);
+        kprintk("4. Check the pattern is reasonable from bdma_ver or not\n");
+        K_test_check_area(src, dest, size);
+        kprintk("5. Flush start using flush va_pa range\n");
+        Chip_Flush_Cache_Range_VA_PA(src, __pa(src), size);
+        kprintk("6. Use BDMA to move data to bdma_ver after flush\n");
+        K_test_bdma_move_data(src, dest, size);
+        kprintk("7. Inv the destnation for CPU\n");
+        Chip_Inv_Cache_Range_VA_PA(dest, __pa(dest), size);
+        kprintk("8. Check the pattern again.\n");
+        K_test_check_area(src, dest, size);
+
+        return;
+}
+
+
+#endif
 asmlinkage void __init start_kernel(void)
 {
 	char * command_line;
@@ -556,6 +776,14 @@ asmlinkage void __init start_kernel(void)
 	softirq_init();
 	timekeeping_init();
 	time_init();
+
+#ifndef CONFIG_ARM64
+#if (MP_CHECKPT_BOOT == 1)
+	/* checkpoint for autotest boottime, plz dont remove it */
+        kr_PiuTime = Mstar_Timer1_GetMs();
+	printk("[AT][KR][reset timer][%u]\n", kr_PiuTime);
+#endif // MP_CHECKPT_BOOT
+#endif
 	profile_init();
 	call_function_init();
 	WARN(!irqs_disabled(), "Interrupts were enabled early\n");
@@ -563,6 +791,14 @@ asmlinkage void __init start_kernel(void)
 	local_irq_enable();
 
 	kmem_cache_init_late();
+#if (MP_PLATFORM_ARM == 1)
+#if defined(CONFIG_ARM) | defined(CONFIG_ARM64) 
+#if (MP_PLATFORM_INT_1_to_1_SPI != 1)
+	init_irq_fiq_merge();
+#endif
+	serial_init();
+#endif
+#endif /* MP_PLATFORM_ARM */
 
 	/*
 	 * HACK ALERT! This is early. We're enabling the console before
@@ -638,6 +874,40 @@ asmlinkage void __init start_kernel(void)
 
 	ftrace_init();
 
+#if CACHE_FLUSH_TEST==1
+  
+        printk("=========================================\n");
+        printk("| Cache flush test\n");
+        printk("=========================================\n");
+   
+        // Disable miu protect
+        // *((unsigned long *)(0xFD000000+(0x101200+0xd2)*2)) = 0x8000;
+
+        printk("Cache flush test kkk_array = %016lx (MIU0:%016lx) bdma_ver = %016lx (MIU0:%016lx)\n", 
+                                    kkk_array, ((unsigned long)kkk_array-0xffffffc000000000)+0x200000,
+                                    bdma_ver, ((unsigned long)bdma_ver-0xffffffc000000000)+0x200000);
+
+        printk("=========================================\n");
+        printk("Flush all test\n");
+        while(!K_test_cache_flush_all_test(kkk_array, bdma_ver, K_SIZE))
+        {
+            printk("Memory set relative area\n");
+            memset(kkk_array, 0, K_SIZE);
+            memset(bdma_ver, 1, K_SIZE);
+        }
+        printk("=========================================\n");
+        printk("Memory set relative area\n");
+        memset(kkk_array, 0, K_SIZE);
+        memset(bdma_ver, 1, K_SIZE);
+
+        printk("=========================================\n");
+        printk("Flush va_pa test\n");
+        K_test_cache_flush_va_test(kkk_array, bdma_ver, K_SIZE);
+
+        printk("Stop here %s, %d\n", __FUNCTION__, __LINE__);
+        printk("=========================================\n");
+        while(1);
+#endif
 	/* Do the rest non-__init'ed, we're now alive */
 	rest_init();
 }
@@ -812,16 +1082,61 @@ static noinline void __init kernel_init_freeable(void);
 
 static int __ref kernel_init(void *unused)
 {
+#if (MP_CHECKPT_BOOT == 1)
+	unsigned int PiuTick;
+	unsigned int PiuTime;
+#endif
 	kernel_init_freeable();
 	/* need to finish all async __init code before freeing the memory */
 	async_synchronize_full();
+#if !defined(CONFIG_MP_MSTAR_STR_BASE)
 	free_initmem();
+#endif
 	mark_rodata_ro();
 	system_state = SYSTEM_RUNNING;
 	numa_default_policy();
 
 	flush_delayed_fput();
 
+#ifdef CONFIG_MP_PLATFORM_ARM
+#ifdef CONFIG_ARCH_SPARSEMEM_ENABLE
+#ifdef CONFIG_MP_SPARSE_MEM_ENABLE_HOLES_IN_ZONE_CHECK
+#if !defined(CONFIG_HOLES_IN_ZONE) && !defined(CONFIG_ARM64)  
+    printk("\033[31m[Error]Function = %s, Line = %d, while using ARM chips and SPARSE_MEMORY, you need to enable CONFIG_HOLES_IN_ZONE\033[m\n", __PRETTY_FUNCTION__, __LINE__);
+    printk("\033[31m[Error]Function = %s, Line = %d, while using ARM chips and SPARSE_MEMORY, you need to enable CONFIG_HOLES_IN_ZONE\033[m\n", __PRETTY_FUNCTION__, __LINE__);
+    printk("\033[31m[Error]Function = %s, Line = %d, while using ARM chips and SPARSE_MEMORY, you need to enable CONFIG_HOLES_IN_ZONE\033[m\n", __PRETTY_FUNCTION__, __LINE__);
+#endif
+#endif
+#endif
+#endif
+
+#if (MP_CHECKPT_BOOT == 1)
+    /* checkpoint for autotest boottime, plz dont remove it */
+#if (MP_PLATFORM_ARM == 1 && MP_PLATFORM_MIPS == 1)
+#error "Error, both CONFIG_MP_PLATFORM_ARM and CONFIG_MP_PLATFORM_MIPS are set, please select only one"
+#endif
+
+#ifndef CONFIG_ARM64
+#ifdef CONFIG_MP_PLATFORM_ARM
+    PiuTick = reg_readw(0x1f006090);
+    PiuTick += (reg_readw(0x1f006094) << 16);
+	Mboot_time = (reg_readw(0x1f007b74));
+#else
+    PiuTick = *(volatile unsigned short *)(0xbf006090);
+    PiuTick += (*(volatile unsigned short *)(0xbf006094)) << 16;
+#endif
+    PiuTime = ((PiuTick/12000) - Mboot_time) ;
+    printk(KERN_ALERT "[Mstar Boot up time check] Kernel Total Time:[%u]\n", PiuTime);
+	(reg_readw(0x1f007b70))=PiuTime;
+    printk(KERN_ALERT "[Mstar Boot up time check] System Boot up time[%u]\n", (PiuTick/12000)); 
+    if(Kernel_time<PiuTime)
+    {
+        printk(KERN_ALERT " \n");
+        printk(KERN_ALERT "This is bug!!! Kernel boot up time surpass maximum time:[%u] \n", Kernel_time);
+    }
+
+#endif
+#endif
 	if (ramdisk_execute_command) {
 		if (!run_init_process(ramdisk_execute_command))
 			return 0;
@@ -894,7 +1209,7 @@ static noinline void __init kernel_init_freeable(void)
 
 	if (!ramdisk_execute_command)
 		ramdisk_execute_command = "/init";
-
+        
 	if (sys_access((const char __user *) ramdisk_execute_command, 0) != 0) {
 		ramdisk_execute_command = NULL;
 		prepare_namespace();

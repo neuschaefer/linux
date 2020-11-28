@@ -329,6 +329,9 @@ dbg_port_buf (char *buf, unsigned len, const char *label, int port, u32 status)
 static inline void create_debug_files (struct ehci_hcd *bus) { }
 static inline void remove_debug_files (struct ehci_hcd *bus) { }
 
+#if (MP_USB_MSTAR==1) && defined(DEBUG)
+static struct dentry *ehci_debug_root;
+#endif
 #else
 
 /* troubleshooting help: expose state in debugfs */

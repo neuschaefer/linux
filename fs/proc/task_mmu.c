@@ -16,6 +16,7 @@
 #include <asm/uaccess.h>
 #include <asm/tlbflush.h>
 #include "internal.h"
+#include <mstar/mpatch_macro.h>
 
 void task_mem(struct seq_file *m, struct mm_struct *mm)
 {
@@ -133,6 +134,56 @@ static void release_task_mempolicy(struct proc_maps_private *priv)
 {
 }
 #endif
+
+static void seq_print_vma_name(struct seq_file *m, struct vm_area_struct *vma)
+{
+	const char __user *name = vma_get_anon_name(vma);
+	struct mm_struct *mm = vma->vm_mm;
+
+	unsigned long page_start_vaddr;
+	unsigned long page_offset;
+	unsigned long num_pages;
+	unsigned long max_len = NAME_MAX;
+	int i;
+
+	page_start_vaddr = (unsigned long)name & PAGE_MASK;
+	page_offset = (unsigned long)name - page_start_vaddr;
+	num_pages = DIV_ROUND_UP(page_offset + max_len, PAGE_SIZE);
+
+	seq_puts(m, "[anon:");
+
+	for (i = 0; i < num_pages; i++) {
+		int len;
+		int write_len;
+		const char *kaddr;
+		long pages_pinned;
+		struct page *page;
+
+		pages_pinned = get_user_pages(current, mm, page_start_vaddr,
+				1, 0, 0, &page, NULL);
+		if (pages_pinned < 1) {
+			seq_puts(m, "<fault>]");
+			return;
+		}
+
+		kaddr = (const char *)kmap(page);
+		len = min(max_len, PAGE_SIZE - page_offset);
+		write_len = strnlen(kaddr + page_offset, len);
+		seq_write(m, kaddr + page_offset, write_len);
+		kunmap(page);
+		put_page(page);
+
+		/* if strnlen hit a null terminator then we're done */
+		if (write_len != len)
+			break;
+
+		max_len -= len;
+		page_offset = 0;
+		page_start_vaddr += PAGE_SIZE;
+	}
+
+	seq_putc(m, ']');
+}
 
 static void vma_stop(struct proc_maps_private *priv, struct vm_area_struct *vma)
 {
@@ -335,6 +386,12 @@ show_map_vma(struct seq_file *m, struct vm_area_struct *vma, int is_pid)
 				pad_len_spaces(m, len);
 				seq_printf(m, "[stack:%d]", tid);
 			}
+			goto done;
+		}
+
+		if (vma_get_anon_name(vma)) {
+			pad_len_spaces(m, len);
+			seq_print_vma_name(m, vma);
 		}
 	}
 
@@ -496,8 +553,13 @@ static void smaps_pte_entry(pte_t ptent, unsigned long addr,
 	}
 }
 
+#if (MP_DEBUG_TOOL_KDEBUG == 1) && defined(CONFIG_VD_MEMINFO)
+int smaps_pte_range(pmd_t *pmd, unsigned long addr, unsigned long end,
+		    struct mm_walk *walk)
+#else
 static int smaps_pte_range(pmd_t *pmd, unsigned long addr, unsigned long end,
 			   struct mm_walk *walk)
+#endif /*MP_DEBUG_TOOL_KDEBUG*/
 {
 	struct mem_size_stats *mss = walk->private;
 	struct vm_area_struct *vma = mss->vma;
@@ -634,6 +696,12 @@ static int show_smap(struct seq_file *m, void *v, int is_pid)
 
 	show_smap_vma_flags(m, vma);
 
+	if (vma_get_anon_name(vma)) {
+		seq_puts(m, "Name:           ");
+		seq_print_vma_name(m, vma);
+		seq_putc(m, '\n');
+	}
+
 	if (m->count < m->size)  /* vma is copied successfully */
 		m->version = (vma != get_gate_vma(task->mm))
 			? vma->vm_start : 0;
@@ -688,6 +756,117 @@ const struct file_operations proc_tid_smaps_operations = {
 	.release	= seq_release_private,
 };
 
+#if (MP_DEBUG_TOOL_KDEBUG == 1)
+#ifdef CONFIG_MEMSTAT_INFO
+
+struct smap_mem
+{
+	unsigned long total;
+	unsigned long vmag[VMAG_CNT];
+};
+
+#define K(x) ((x) << (PAGE_SHIFT-10))
+
+static int show_memstat(struct seq_file *m, void *v)
+{
+	struct proc_maps_private *priv = m->private;
+	struct task_struct *task = priv->task;
+	struct vm_area_struct *vma = v;
+	struct mem_size_stats mss;
+	struct mm_walk smaps_walk = {
+		.pmd_entry = smaps_pte_range,
+		.private = &mss,
+	};
+
+	int idx = 0;
+	static struct smap_mem vmem;
+	static struct smap_mem rss;
+	static struct smap_mem pss;
+	static struct smap_mem shared;
+	static struct smap_mem private;
+	static struct smap_mem swap;
+
+	if (!vma || !vma->vm_mm) return 0;
+
+	smaps_walk.mm = vma->vm_mm;
+
+	memset(&mss, 0, sizeof mss);
+	mss.vma = vma;
+	if (vma->vm_mm && !is_vm_hugetlb_page(vma))
+		walk_page_range(vma->vm_start, vma->vm_end, &smaps_walk);
+
+//	show_map_vma(m, vma);
+
+	vmem.total    += (vma->vm_end - vma->vm_start) >> 10;
+	rss.total     += mss.resident >> 10;
+	pss.total     += (unsigned long)(mss.pss >> (10 + PSS_SHIFT));
+	shared.total  += (mss.shared_clean + mss.shared_dirty) >> 10;
+	private.total += (mss.private_clean + mss.private_dirty) >> 10;
+	swap.total    += mss.swap >> 10;
+
+	idx = get_group_idx(vma);
+	vmem.vmag[idx]    += (vma->vm_end - vma->vm_start) >> 10;
+	rss.vmag[idx]     += mss.resident >> 10;
+	pss.vmag[idx]     += (unsigned long)(mss.pss >> (10 + PSS_SHIFT));
+	shared.vmag[idx]  += (mss.shared_clean + mss.shared_dirty) >> 10;
+	private.vmag[idx] += (mss.private_clean + mss.private_dirty) >> 10;
+	swap.vmag[idx]    += mss.swap >> 10;
+
+	if (m->count < m->size)  /* vma is copied successfully */
+		m->version = (vma != get_gate_vma(task->mm)) ? vma->vm_start : 0;
+
+	if(!vma->vm_next) { /* latest vma sequence */
+		seq_printf(m,
+				" =========================================================================\n"
+				"                VMSize    Rss  Rss_max  Shared  Private    Pss   Swap\n"
+				"  Process Cur: %7lu %6lu   %6lu  %6lu   %6lu %6lu %6lu (kB)\n"
+				"     Code Cur: %7lu %6lu   %6lu  %6lu   %6lu %6lu %6lu (kB)\n"
+				"     Data Cur: %7lu %6lu   %6lu  %6lu   %6lu %6lu %6lu (kB)\n"
+				"  LibCode Cur: %7lu %6lu   %6lu  %6lu   %6lu %6lu %6lu (kB)\n"
+				"  LibData Cur: %7lu %6lu   %6lu  %6lu   %6lu %6lu %6lu (kB)\n"
+				"    Stack Cur: %7lu %6lu   %6lu  %6lu   %6lu %6lu %6lu (kB)\n"
+				"    Other Cur: %7lu %6lu   %6lu  %6lu   %6lu %6lu %6lu (kB)\n",
+				vmem.total, rss.total,
+				K(vma->vm_mm->max_rss[0]+vma->vm_mm->max_rss[1]+vma->vm_mm->max_rss[2]+
+				vma->vm_mm->max_rss[3]+vma->vm_mm->max_rss[4]+vma->vm_mm->max_rss[5]),
+				shared.total, private.total, pss.total, swap.total,
+				vmem.vmag[0], rss.vmag[0], K(vma->vm_mm->max_rss[0]), shared.vmag[0], private.vmag[0], pss.vmag[0], swap.vmag[0],
+				vmem.vmag[1], rss.vmag[1], K(vma->vm_mm->max_rss[1]), shared.vmag[1], private.vmag[1], pss.vmag[1], swap.vmag[1],
+				vmem.vmag[2], rss.vmag[2], K(vma->vm_mm->max_rss[2]), shared.vmag[2], private.vmag[2], pss.vmag[2], swap.vmag[2],
+				vmem.vmag[3], rss.vmag[3], K(vma->vm_mm->max_rss[3]), shared.vmag[3], private.vmag[3], pss.vmag[3], swap.vmag[3],
+				vmem.vmag[4], rss.vmag[4], K(vma->vm_mm->max_rss[4]), shared.vmag[4], private.vmag[4], pss.vmag[4], swap.vmag[4],
+				vmem.vmag[5], rss.vmag[5], K(vma->vm_mm->max_rss[5]), shared.vmag[5], private.vmag[5], pss.vmag[5], swap.vmag[5]
+			);
+		memset(&vmem    , 0, sizeof(struct smap_mem));
+		memset(&rss     , 0, sizeof(struct smap_mem));
+		memset(&shared  , 0, sizeof(struct smap_mem));
+		memset(&private , 0, sizeof(struct smap_mem));
+		memset(&pss     , 0, sizeof(struct smap_mem));
+		memset(&swap    , 0, sizeof(struct smap_mem));
+	}
+	return 0;
+}
+
+static const struct seq_operations proc_pid_memstat_op = {
+	.start	= m_start,
+	.next	= m_next,
+	.stop	= m_stop,
+	.show	= show_memstat
+};
+
+static int memstat_open(struct inode *inode, struct file *file)
+{
+	return do_maps_open(inode, file, &proc_pid_memstat_op);
+}
+
+const struct file_operations proc_pid_memstat_operations = {
+	.open	= memstat_open,
+	.read	= seq_read,
+	.llseek	= seq_lseek,
+	.release= seq_release_private,
+};
+#endif
+#endif /*MP_DEBUG_TOOL_KDEBUG*/
 static int clear_refs_pte_range(pmd_t *pmd, unsigned long addr,
 				unsigned long end, struct mm_walk *walk)
 {

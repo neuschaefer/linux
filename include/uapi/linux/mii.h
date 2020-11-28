@@ -24,6 +24,7 @@
 #define	MII_MMD_CTRL		0x0d	/* MMD Access Control Register */
 #define	MII_MMD_DATA		0x0e	/* MMD Access Data Register */
 #define MII_ESTATUS		0x0f	/* Extended Status             */
+#define MII_PHYSR               0x11        /* PHY specific status register  */
 #define MII_DCOUNTER		0x12	/* Disconnect counter          */
 #define MII_FCSCOUNTER		0x13	/* False carrier counter       */
 #define MII_NWAYTEST		0x14	/* N-way auto-neg test reg     */
@@ -149,6 +150,16 @@
 #define MII_MMD_CTRL_NOINCR	0x4000	/* no post increment */
 #define MII_MMD_CTRL_INCR_RDWT	0x8000	/* post increment on reads & writes */
 #define MII_MMD_CTRL_INCR_ON_WT	0xC000	/* post increment on writes only */
+
+/* PHY specific status register  */
+#define PHYSR_SPEED_MASK  0xc000         /* Speed mask*/
+#define PHYSR_RESERVED    0xc000         /* Reserved*/
+#define PHYSR_1000        0x8000         /* 1000Mbps*/
+#define PHYSR_100         0x4000         /* 100Mbps*/
+#define PHYSR_10          0x0000         /* 10Mbps*/
+#define PHYSR_DUPLEX_MASK 0x2000         /* Duplex mask*/
+#define PHYSR_FULL_DUPLEX 0x2000         /* Full duplex*/
+#define PHYSR_HALF_DUPLEX 0x0000         /* Half duplex*/
 
 /* This structure is used in all SIOCxMIIxxx ioctl calls */
 struct mii_ioctl_data {

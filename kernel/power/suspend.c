@@ -25,15 +25,35 @@
 #include <linux/suspend.h>
 #include <linux/syscore_ops.h>
 #include <linux/ftrace.h>
+#include <linux/rtc.h>
 #include <trace/events/power.h>
 
 #include "power.h"
+
+#include <mstar/mpatch_macro.h>
 
 const char *const pm_states[PM_SUSPEND_MAX] = {
 	[PM_SUSPEND_FREEZE]	= "freeze",
 	[PM_SUSPEND_STANDBY]	= "standby",
 	[PM_SUSPEND_MEM]	= "mem",
 };
+
+#if (MP_USB_STR_PATCH==1)
+typedef enum
+{
+    E_STR_NONE,
+    E_STR_IN_SUSPEND,
+    E_STR_IN_RESUME
+}EN_STR_STATUS;
+
+static EN_STR_STATUS enStrStatus=E_STR_NONE;
+
+bool is_suspending(void)
+{
+    return (enStrStatus == E_STR_IN_SUSPEND);
+}
+EXPORT_SYMBOL_GPL(is_suspending);
+#endif
 
 static const struct platform_suspend_ops *suspend_ops;
 
@@ -223,7 +243,13 @@ static int suspend_enter(suspend_state_t state, bool *wakeup)
 		if (!(suspend_test(TEST_CORE) || *wakeup)) {
 			error = suspend_ops->enter(state);
 			events_check_enabled = false;
+#if defined(CONFIG_MP_MSTAR_STR_BASE)
+            set_state_value(STENT_RESUME_FROM_SUSPEND);
+#endif
 		}
+#if (MP_USB_STR_PATCH==1)
+		enStrStatus=E_STR_IN_RESUME;
+#endif
 		syscore_resume();
 	}
 
@@ -323,13 +349,22 @@ static void suspend_finish(void)
 static int enter_state(suspend_state_t state)
 {
 	int error;
+#if defined(CONFIG_MP_MSTAR_STR_BASE)
+    int bresumefromsuspend=0;
+#endif
 
 	if (!valid_state(state))
 		return -ENODEV;
 
 	if (!mutex_trylock(&pm_mutex))
 		return -EBUSY;
-
+#if defined(CONFIG_MP_MSTAR_STR_BASE)
+    set_state_entering();
+#if (MP_USB_STR_PATCH==1)
+	enStrStatus=E_STR_IN_SUSPEND;
+#endif
+try_again:
+#endif
 	if (state == PM_SUSPEND_FREEZE)
 		freeze_begin();
 
@@ -352,10 +387,45 @@ static int enter_state(suspend_state_t state)
 
  Finish:
 	pr_debug("PM: Finishing wakeup.\n");
+#if defined(CONFIG_MP_MSTAR_STR_BASE)
+    if(STENT_RESUME_FROM_SUSPEND == get_state_value()){
+        clear_state_entering();
+        bresumefromsuspend=1;
+    }
+#endif
 	suspend_finish();
  Unlock:
+ #if defined(CONFIG_MP_MSTAR_STR_BASE)
+ #if defined(CONFIG_MSTAR_STR_ACOFF_ON_ERR)
+    if(error)
+    {
+        extern void mstar_str_notifypmerror_off(void);
+        mstar_str_notifypmerror_off(); //it won't return, wait pm to power off
+    }
+ #endif
+
+    if(is_mstar_str() && bresumefromsuspend==0){
+        schedule_timeout_interruptible(HZ);
+        goto try_again;
+    }
+ #if (MP_USB_STR_PATCH==1)
+	enStrStatus=E_STR_NONE;
+ #endif
+ #endif
 	mutex_unlock(&pm_mutex);
 	return error;
+}
+
+static void pm_suspend_marker(char *annotation)
+{
+	struct timespec ts;
+	struct rtc_time tm;
+
+	getnstimeofday(&ts);
+	rtc_time_to_tm(ts.tv_sec, &tm);
+	pr_info("PM: suspend %s %d-%02d-%02d %02d:%02d:%02d.%09lu UTC\n",
+		annotation, tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
+		tm.tm_hour, tm.tm_min, tm.tm_sec, ts.tv_nsec);
 }
 
 /**
@@ -372,6 +442,7 @@ int pm_suspend(suspend_state_t state)
 	if (state <= PM_SUSPEND_ON || state >= PM_SUSPEND_MAX)
 		return -EINVAL;
 
+	pm_suspend_marker("entry");
 	error = enter_state(state);
 	if (error) {
 		suspend_stats.fail++;
@@ -379,6 +450,7 @@ int pm_suspend(suspend_state_t state)
 	} else {
 		suspend_stats.success++;
 	}
+	pm_suspend_marker("exit");
 	return error;
 }
 EXPORT_SYMBOL(pm_suspend);

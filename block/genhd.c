@@ -19,6 +19,18 @@
 #include <linux/idr.h>
 #include <linux/log2.h>
 #include <linux/pm_runtime.h>
+#include <mstar/mpatch_macro.h>
+
+#if (MP_DEBUG_TOOL_KDEBUG == 1)
+#ifdef CONFIG_KDEBUGD_COUNTER_MONITOR
+#include <kdebugd/kdebugd.h>
+#include <linux/time.h>
+#include <kdebugd/sec_diskusage.h>
+#endif
+#endif /* MP_DEBUG_TOOL_KDEBUG */
+
+
+
 
 #include "blk.h"
 
@@ -1107,6 +1119,22 @@ static void disk_release(struct device *dev)
 		blk_put_queue(disk->queue);
 	kfree(disk);
 }
+
+static int disk_uevent(struct device *dev, struct kobj_uevent_env *env)
+{
+	struct gendisk *disk = dev_to_disk(dev);
+	struct disk_part_iter piter;
+	struct hd_struct *part;
+	int cnt = 0;
+
+	disk_part_iter_init(&piter, disk, 0);
+	while((part = disk_part_iter_next(&piter)))
+		cnt++;
+	disk_part_iter_exit(&piter);
+	add_uevent_var(env, "NPARTS=%u", cnt);
+	return 0;
+}
+
 struct class block_class = {
 	.name		= "block",
 };
@@ -1126,6 +1154,7 @@ static struct device_type disk_type = {
 	.groups		= disk_attr_groups,
 	.release	= disk_release,
 	.devnode	= block_devnode,
+	.uevent		= disk_uevent,
 };
 
 #ifdef CONFIG_PROC_FS
@@ -1832,3 +1861,25 @@ static void disk_release_events(struct gendisk *disk)
 	WARN_ON_ONCE(disk->ev && disk->ev->block != 1);
 	kfree(disk->ev);
 }
+
+#if (MP_DEBUG_TOOL_KDEBUG == 1)
+#ifdef CONFIG_KDEBUGD_COUNTER_MONITOR
+
+void sec_diskusage_update(struct sec_diskdata *pdisk_data)
+{
+       struct class_dev_iter iter;
+       struct device *dev;
+
+       mutex_lock(&block_class_lock);
+       class_dev_iter_init(&iter, &block_class, NULL, &disk_type);
+       while ((dev = class_dev_iter_next(&iter))) {
+                struct gendisk *disk = dev_to_disk(dev);
+
+                BUG_ON(!disk);
+                sec_diskstats_dump_entry(disk, pdisk_data);
+       }
+       class_dev_iter_exit(&iter);
+       mutex_unlock(&block_class_lock);
+}
+#endif
+#endif /* MP_DEBUG_TOOL_KDEBUG */

@@ -302,6 +302,57 @@ struct usb_ep *usb_ep_autoconfig_ss(
 			goto found_ep;
 #endif
 	}
+	else if (gadget_is_Mstar(gadget)) {
+		ep = NULL;
+		if ((USB_ENDPOINT_XFER_BULK == type) ||
+			(USB_ENDPOINT_XFER_ISOC == type)) {
+			if (USB_DIR_IN & desc->bEndpointAddress)
+			{
+				ep = find_ep (gadget, "ep1in-bulk");
+				if (ep && ep_matches (gadget, ep, desc,ep_comp))
+				{
+					printk("[USB]usb_ep_autoconfig bulk-in = %s\n",ep->name);
+					return ep;
+				}else
+				{
+					printk("EP IN ERROR\n");
+				}
+			}
+			else
+			{
+				ep = find_ep (gadget, "ep2out-bulk");
+				if (ep && ep_matches (gadget, ep, desc,ep_comp))
+				{
+					printk("[USB]usb_ep_autoconfig bulk-out=%s \n",ep->name);
+					return ep;
+				}else
+				{
+					printk("EP OUT ERROR\n");
+				}
+			}
+		}else if (USB_ENDPOINT_XFER_INT == type) {
+			if (USB_DIR_IN & desc->bEndpointAddress)
+			{
+				ep = find_ep(gadget, "ep3in-int");
+				if (ep && ep_matches (gadget, ep, desc,ep_comp))
+				{
+					printk("[USB]usb_ep_autoconfig int-in =%s\n",ep->name);
+					return ep;
+				}else
+				{
+					printk("EP INT ERROR\n");
+				}
+			}
+		} else
+			ep = NULL;
+		if (ep && ep_matches (gadget, ep, desc,ep_comp))
+		{
+			printk("[USB]usb_ep_autoconfig ep-match \n");
+			return ep;
+		}
+	}	
+	else
+		printk("EP NONE\n");
 
 	/* Second, look at endpoints until an unclaimed one looks usable */
 	list_for_each_entry (ep, &gadget->ep_list, ep_list) {

@@ -106,6 +106,10 @@ ifeq ("$(origin W)", "command line")
   export KBUILD_ENABLE_EXTRA_GCC_CHECKS := $(W)
 endif
 
+# convert changelist string in types.h into standard format
+TMP := $(shell grep Change include/linux/types.h && sed -i 's/$$Change: \([0-9]\{6\}\) $$\\n/\1\\n/' include/linux/types.h)
+TMP :=
+
 # That's our default target when none is given on the command line
 PHONY := _all
 _all:
@@ -165,12 +169,26 @@ export srctree objtree VPATH
 # then ARCH is assigned, getting whatever value it gets normally, and 
 # SUBARCH is subsequently ignored.
 
-SUBARCH := $(shell uname -m | sed -e s/i.86/x86/ -e s/x86_64/x86/ \
-				  -e s/sun4u/sparc64/ \
-				  -e s/arm.*/arm/ -e s/sa110/arm/ \
-				  -e s/s390x/s390/ -e s/parisc64/parisc/ \
-				  -e s/ppc.*/powerpc/ -e s/mips.*/mips/ \
-				  -e s/sh[234].*/sh/ -e s/aarch64.*/arm64/ )
+# SUBARCH := $(shell uname -m | sed -e s/i.86/x86/ -e s/x86_64/x86/ \
+#				  -e s/sun4u/sparc64/ \
+#				  -e s/arm.*/arm/ -e s/sa110/arm/ \
+#				  -e s/s390x/s390/ -e s/parisc64/parisc/ \
+#				  -e s/ppc.*/powerpc/ -e s/mips.*/mips/ \
+#				  -e s/sh[234].*/sh/ -e s/aarch64.*/arm64/ )
+#wc means count the number of CONFIG_ARM/CONFIG_MIPS
+target_ARM = $(shell cat .config | sed -n '/CONFIG_ARM=/p' | wc -l )
+target_ARM64 = $(shell cat .config | sed -n '/CONFIG_ARM64=/p' | wc -l )
+target_MIPS = $(shell cat .config | sed -n '/CONFIG_MIPS=/p' | wc -l )
+
+ifeq ($(target_ARM),1)
+        SUBARCH = arm
+endif
+ifeq ($(target_ARM64),1)
+        SUBARCH = arm64
+endif
+ifeq ($(target_MIPS),1)
+        SUBARCH = mips
+endif
 
 # Cross compiling and selecting different set of gcc/bin-utils
 # ---------------------------------------------------------------------------
@@ -192,8 +210,18 @@ SUBARCH := $(shell uname -m | sed -e s/i.86/x86/ -e s/x86_64/x86/ \
 # "make" in the configured kernel build directory always uses that.
 # Default value for CROSS_COMPILE is not to prefix executables
 # Note: Some architectures assign CROSS_COMPILE in their arch/*/Makefile
+export KBUILD_BUILDHOST := $(SUBARCH)
 ARCH		?= $(SUBARCH)
 CROSS_COMPILE	?= $(CONFIG_CROSS_COMPILE:"%"=%)
+
+# check arm toolchain version
+ifeq ($(SUBARCH),arm)
+        CC_VER := $(shell arm-none-linux-gnueabi-gcc -v 2>&1 | \grep -o "[0-9]\.[0-9]\.[0-9]" | tail -n1)
+        ifneq ($(CC_VER),4.7.2)
+                $(warning arm toolchain version 4.7.2 is required(you are using version $(CC_VER)))
+                $(error add PATH=/tools/arm/arm-2012.09/bin:$$PATH to your .bash_profile and source it)
+        endif
+endif
 
 # Architecture as present in compile.h
 UTS_MACHINE 	:= $(ARCH)
@@ -244,6 +272,9 @@ HOSTCXX      = g++
 HOSTCFLAGS   = -Wall -Wmissing-prototypes -Wstrict-prototypes -O2 -fomit-frame-pointer
 HOSTCXXFLAGS = -O2
 
+HOSTCFLAGS   += -m32
+HOSTCXXFLAGS += -m32
+HOSTLDFLAGS  += -m32
 # Decide whether to build built-in, modular, or both.
 # Normally, just do built-in.
 
@@ -385,11 +416,18 @@ KBUILD_LDFLAGS_MODULE := -T $(srctree)/scripts/module-common.lds
 KERNELRELEASE = $(shell cat include/config/kernel.release 2> /dev/null)
 KERNELVERSION = $(VERSION)$(if $(PATCHLEVEL),.$(PATCHLEVEL)$(if $(SUBLEVEL),.$(SUBLEVEL)))$(EXTRAVERSION)
 
+ifeq ($(DEBUGKERNEL),1)
+KCONFIG_DEBUG_PATH = lib/Kconfig.debug
+else
+KCONFIG_DEBUG_PATH = lib/Kconfig.debug.performance
+endif
+
 export VERSION PATCHLEVEL SUBLEVEL KERNELRELEASE KERNELVERSION
 export ARCH SRCARCH CONFIG_SHELL HOSTCC HOSTCFLAGS CROSS_COMPILE AS LD CC
 export CPP AR NM STRIP OBJCOPY OBJDUMP
 export MAKE AWK GENKSYMS INSTALLKERNEL PERL UTS_MACHINE
 export HOSTCXX HOSTCXXFLAGS LDFLAGS_MODULE CHECK CHECKFLAGS
+export HOSTLDFLAGS
 
 export KBUILD_CPPFLAGS NOSTDINC_FLAGS LINUXINCLUDE OBJCOPYFLAGS LDFLAGS
 export KBUILD_CFLAGS CFLAGS_KERNEL CFLAGS_MODULE CFLAGS_GCOV
@@ -397,6 +435,7 @@ export KBUILD_AFLAGS AFLAGS_KERNEL AFLAGS_MODULE
 export KBUILD_AFLAGS_MODULE KBUILD_CFLAGS_MODULE KBUILD_LDFLAGS_MODULE
 export KBUILD_AFLAGS_KERNEL KBUILD_CFLAGS_KERNEL
 export KBUILD_ARFLAGS
+export KCONFIG_DEBUG_PATH
 
 # When compiling out-of-tree modules, put MODVERDIR in the module
 # tree rather than in the kernel tree. The kernel tree might
@@ -500,6 +539,7 @@ config: scripts_basic outputmakefile FORCE
 	$(Q)$(MAKE) $(build)=scripts/kconfig $@
 
 %config: scripts_basic outputmakefile FORCE
+	./mpatch_gen.sh
 	$(Q)mkdir -p include/linux include/config
 	$(Q)$(MAKE) $(build)=scripts/kconfig $@
 
@@ -735,6 +775,18 @@ export mod_sign_cmd
 ifeq ($(KBUILD_EXTMOD),)
 core-y		+= kernel/ mm/ fs/ ipc/ security/ crypto/ block/
 
+#for kdebugd
+ifdef CONFIG_KDEBUGD
+KDBGINCLUDE     := -Ikernel/kdebugd\
+		-Ikernel/kdebugd/include \
+		-Ikernel/kdebugd/include/kdebugd \
+                -Ikernel/kdebugd/aop \
+                -Ikernel/kdebugd/elf \
+                -Ikernel/kdebugd/elf/dem_src
+
+LINUXINCLUDE    += $(KDBGINCLUDE)
+export LINUXINCLUDE
+endif
 vmlinux-dirs	:= $(patsubst %/,%,$(filter %/, $(init-y) $(init-m) \
 		     $(core-y) $(core-m) $(drivers-y) $(drivers-m) \
 		     $(net-y) $(net-m) $(libs-y) $(libs-m)))
@@ -1059,7 +1111,7 @@ mrproper: clean archmrproper $(mrproper-dirs)
 PHONY += distclean
 
 distclean: mrproper
-	@find $(srctree) $(RCS_FIND_IGNORE) \
+	@find -L $(srctree) $(RCS_FIND_IGNORE) \
 		\( -name '*.orig' -o -name '*.rej' -o -name '*~' \
 		-o -name '*.bak' -o -name '#*#' -o -name '.*.orig' \
 		-o -name '.*.rej' \
@@ -1087,6 +1139,9 @@ boards := $(wildcard $(srctree)/arch/$(SRCARCH)/configs/*_defconfig)
 boards := $(notdir $(boards))
 board-dirs := $(dir $(wildcard $(srctree)/arch/$(SRCARCH)/configs/*/*_defconfig))
 board-dirs := $(sort $(notdir $(board-dirs:/=)))
+
+debug:
+	@echo  'Cleaning machine:$(CLEAN_FILES)'
 
 help:
 	@echo  'Cleaning targets:'
@@ -1267,7 +1322,7 @@ endif # KBUILD_EXTMOD
 clean: $(clean-dirs)
 	$(call cmd,rmdirs)
 	$(call cmd,rmfiles)
-	@find $(if $(KBUILD_EXTMOD), $(KBUILD_EXTMOD), .) $(RCS_FIND_IGNORE) \
+	@find -L $(if $(KBUILD_EXTMOD), $(KBUILD_EXTMOD), .) $(RCS_FIND_IGNORE) \
 		\( -name '*.[oas]' -o -name '*.ko' -o -name '.*.cmd' \
 		-o -name '*.ko.*' \
 		-o -name '.*.d' -o -name '.*.tmp' -o -name '*.mod.c' \

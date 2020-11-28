@@ -82,6 +82,9 @@ config EVENT_TRACING
 	select CONTEXT_SWITCH_TRACER
 	bool
 
+config GPU_TRACEPOINTS
+	bool
+
 config CONTEXT_SWITCH_TRACER
 	bool
 
@@ -99,7 +102,7 @@ config RING_BUFFER_ALLOW_SWAP
 # hiding of the automatic options.
 
 config TRACING
-	bool
+	bool "Enable Tracing"
 	select DEBUG_FS
 	select RING_BUFFER
 	select STACKTRACE if STACKTRACE_SUPPORT

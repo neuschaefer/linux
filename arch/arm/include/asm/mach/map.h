@@ -49,6 +49,12 @@ static inline void debug_ll_io_init(void) {}
 
 struct mem_type;
 extern const struct mem_type *get_mem_type(unsigned int type);
+
+#ifdef CONFIG_MP_PLATFORM_UTOPIA2K_EXPORT_SYMBOL
+extern void map_driver_mem(unsigned long drv_ba, unsigned long len, unsigned long va, bool non_cache);
+extern int clear_driver_map(unsigned long drv_va, unsigned long len);
+#endif
+
 /*
  * external interface to remap single page with appropriate type
  */

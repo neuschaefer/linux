@@ -639,7 +639,7 @@ config ARM_THUMBEE
 config ARM_VIRT_EXT
 	bool
 	depends on MMU
-	default y if CPU_V7
+	default n
 	help
 	  Enable the kernel to make use of the ARM Virtualization
 	  Extensions to install hypervisors without run-time firmware
@@ -897,7 +897,7 @@ config CACHE_XSC3L2
 
 config ARM_L1_CACHE_SHIFT_6
 	bool
-	default y if CPU_V7
+	default y if CPU_V7 && !(ARCH_MSTAR_CA9)
 	help
 	  Setting ARM L1 cache line size to 64 Bytes.
 
@@ -932,3 +932,12 @@ config ARCH_HAS_BARRIERS
 	help
 	  This option allows the use of custom mandatory barriers
 	  included via the mach/barriers.h file.
+
+config ARCH_ENABLE_MEMORY_HOTPLUG
+        def_bool y
+        depends on SPARSEMEM && MMU
+        depends on MP_PLATFORM_ARM_MEMORY_HOTPLUG
+
+config ARCH_MEMORY_PROBE
+        def_bool y
+        depends on MEMORY_HOTPLUG

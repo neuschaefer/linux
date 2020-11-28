@@ -57,6 +57,8 @@ static void ondemand_powersave_bias_init_cpu(int cpu)
 	dbs_info->freq_lo = 0;
 }
 
+bool forcibly_set_target_flag = 0;
+
 /*
  * Not all CPUs want IO time to be accounted as busy; this depends on how
  * efficient idling at a higher frequency/voltage is.
@@ -177,19 +179,26 @@ static void od_check_cpu(int cpu, unsigned int load_freq)
 
 	dbs_info->freq_lo = 0;
 
-	/* Check for frequency increase */
+	/* Check for frequency increase, change to max cpu_freq */
 	if (load_freq > od_tuners->up_threshold * policy->cur) {
-		/* If switching to max speed, apply sampling_down_factor */
+		/* If switching to max speed, apply sampling_down_factor 
+		 * Here means the sampling_delay time can be increase or decrease (delay = sampling_rate * rate_mult)
+		 * the next sampling_delay can be changed by changing rate_mult
+		 */
 		if (policy->cur < policy->max)
-			dbs_info->rate_mult =
-				od_tuners->sampling_down_factor;
+		{
+			dbs_info->rate_mult = od_tuners->sampling_down_factor;
+		}
 		dbs_freq_increase(policy, policy->max);
 		return;
 	}
 
 	/* Check for frequency decrease */
-	/* if we cannot reduce the frequency anymore, break out early */
-	if (policy->cur == policy->min)
+	/* if we cannot reduce the frequency anymore, break out early,
+	 * the exception case that the forcibly_set_target_flag is set will cause the set_target_freq continue,
+	 * this exception case usually occurs when T_Sensor callback checking gets a unusual result
+	 */
+	if ( (policy->cur == policy->min) && (forcibly_set_target_flag == 0) )
 		return;
 
 	/*
@@ -200,7 +209,7 @@ static void od_check_cpu(int cpu, unsigned int load_freq)
 	if (load_freq < od_tuners->adj_up_threshold
 			* policy->cur) {
 		unsigned int freq_next;
-		freq_next = load_freq / od_tuners->adj_up_threshold;
+		freq_next = load_freq / od_tuners->adj_up_threshold;	/* lower freq */
 
 		/* No longer fully busy, reset rate_mult */
 		dbs_info->rate_mult = 1;

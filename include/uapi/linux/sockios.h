@@ -19,6 +19,7 @@
 #define _LINUX_SOCKIOS_H
 
 #include <asm/sockios.h>
+#include <mstar/mpatch_macro.h>
 
 /* Linux-specific socket ioctls */
 #define SIOCINQ		FIONREAD
@@ -65,6 +66,7 @@
 #define SIOCDIFADDR	0x8936		/* delete PA address		*/
 #define	SIOCSIFHWBROADCAST	0x8937	/* set hardware broadcast addr	*/
 #define SIOCGIFCOUNT	0x8938		/* get number of devices */
+#define SIOCKILLADDR	0x8939		/* kill sockets with this local addr */
 
 #define SIOCGIFBR	0x8940		/* Bridging support		*/
 #define SIOCSIFBR	0x8941		/* Set bridging options 	*/
@@ -139,6 +141,11 @@
  */
  
 #define SIOCDEVPRIVATE	0x89F0	/* to 89FF */
+
+#if (MP_COMPILER_ERROR == 1)
+#define SIOCDEVON   0x89F1  /* turn on PHY */
+#define SIOCDEVOFF  0x89F2  /* turn off PHY */
+#endif/*MP_COMPILER_ERROR*/
 
 /*
  *	These 16 ioctl calls are protocol private

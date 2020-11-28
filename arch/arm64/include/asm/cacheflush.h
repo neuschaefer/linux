@@ -21,6 +21,8 @@
 
 #include <linux/mm.h>
 
+#include <asm/outercache.h>
+
 /*
  * This flag is used to indicate that the page pointed to by a pte is clean
  * and does not require cleaning before returning it to the user.
@@ -69,6 +71,17 @@
  *		- kaddr  - page address
  *		- size   - region size
  */
+
+extern void __dma_map_area(const void *, size_t, int);
+extern void __dma_unmap_area(const void *, size_t, int);
+extern void __dma_flush_range(const void *, const void *);
+#define dmac_map_area					__dma_map_area
+#define dmac_unmap_area					__dma_unmap_area
+#define dmac_flush_range				__dma_flush_range
+
+#define __cpuc_flush_kern_all			flush_cache_all
+#define __cpuc_flush_dcache_area		__flush_dcache_area
+
 extern void flush_cache_all(void);
 extern void flush_cache_range(struct vm_area_struct *vma, unsigned long start, unsigned long end);
 extern void flush_icache_range(unsigned long start, unsigned long end);

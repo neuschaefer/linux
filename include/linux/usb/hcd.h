@@ -23,6 +23,10 @@
 
 #include <linux/rwsem.h>
 
+#if (MP_USB_MSTAR==1)
+#define HOTPLUG    //tony add for hotplug when read/write device
+#endif
+
 #define MAX_TOPO_LEVEL		6
 
 /* This file contains declarations of usbcore internals that are mostly
@@ -50,6 +54,17 @@
 #define USB_PID_STALL			0x1e
 #define USB_PID_MDATA			0x0f	/* USB 2.0 */
 
+#if (MP_USB_MSTAR==1)
+//usb port power control
+struct usb_ppc {
+	uintptr_t	port_addr;
+	u8	bit_addr;
+	u8	out_en_bit_addr; 
+	u8	out_en_hi_active;
+	u8	reserved[1];
+};
+#endif
+
 /*-------------------------------------------------------------------------*/
 
 /*
@@ -66,6 +81,14 @@
  */
 
 /*-------------------------------------------------------------------------*/
+
+#if (MP_USB_MSTAR==1)
+struct comp_port {
+	uintptr_t	comp_port_addr;
+	uintptr_t	u3top_base;
+	u8	port_index;
+};
+#endif
 
 struct usb_hcd {
 
@@ -171,6 +194,39 @@ struct usb_hcd {
 
 #define	HC_IS_RUNNING(state) ((state) & __ACTIVE)
 #define	HC_IS_SUSPENDED(state) ((state) & __SUSPEND)
+
+#if (MP_USB_MSTAR==1)
+	// Refactoring --- 2011.10.27 ---
+	u32     port_index;
+	uintptr_t     utmi_base;
+	uintptr_t     ehc_base;
+	uintptr_t     usbc_base;
+	uintptr_t     bc_base;
+
+	uintptr_t     xhci_base;
+	uintptr_t     u3top_base;
+	uintptr_t     u3dphy_base[2];
+	struct  comp_port  companion;
+	u32     ms_flag;	
+/* ms_flag */	
+#define	MS_FLAG_P0_SSC	1<<0
+#define MS_FLAG_P1_SSC	1<<1
+
+	int     root_port_devnum;
+	u8      enum_port_flag;
+	u8      enum_dbreset_flag;
+	u8      rootflag;
+	
+	u8      startup_conn_flag;  //120210, for port reset when connected at startup
+	u8      bc_enable_flag;
+	u8      bc_apple_enable_flag;
+
+	/* lock for usb reset */
+	spinlock_t usb_reset_lock;
+	spinlock_t lock_usbreset;
+	
+	struct usb_ppc  ppc;   
+#endif
 
 	/* more shared queuing code would be good; it should support
 	 * smarter scheduling, handle transaction translators, etc;

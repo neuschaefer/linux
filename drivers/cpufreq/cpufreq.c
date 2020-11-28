@@ -31,6 +31,7 @@
 #include <linux/completion.h>
 #include <linux/mutex.h>
 #include <linux/syscore_ops.h>
+#include <mstar/mpatch_macro.h>
 
 #include <trace/events/power.h>
 
@@ -40,12 +41,14 @@
  * also protects the cpufreq_cpu_data array.
  */
 static struct cpufreq_driver *cpufreq_driver;
-static DEFINE_PER_CPU(struct cpufreq_policy *, cpufreq_cpu_data);
+DEFINE_PER_CPU(struct cpufreq_policy *, cpufreq_cpu_data);
 #ifdef CONFIG_HOTPLUG_CPU
 /* This one keeps track of the previously set governor of a removed CPU */
 static DEFINE_PER_CPU(char[CPUFREQ_NAME_LEN], cpufreq_cpu_governor);
 #endif
 static DEFINE_RWLOCK(cpufreq_driver_lock);
+
+extern bool forcibly_set_target_flag;
 
 /*
  * cpu_policy_rwsem is a per CPU reader-writer semaphore designed to cure
@@ -132,6 +135,16 @@ bool have_governor_per_policy(void)
 {
 	return cpufreq_driver->have_governor_per_policy;
 }
+EXPORT_SYMBOL_GPL(have_governor_per_policy);
+
+struct kobject *get_governor_parent_kobj(struct cpufreq_policy *policy)
+{
+	if (have_governor_per_policy())
+		return &policy->kobj;
+	else
+		return cpufreq_global_kobject;
+}
+EXPORT_SYMBOL_GPL(get_governor_parent_kobj);
 
 static struct cpufreq_policy *__cpufreq_cpu_get(unsigned int cpu, bool sysfs)
 {
@@ -218,6 +231,32 @@ static void cpufreq_cpu_put_sysfs(struct cpufreq_policy *data)
  * systems as each CPU might be scaled differently. So, use the arch
  * per-CPU loops_per_jiffy value wherever possible.
  */
+#if (MP_PLATFORM_CPU_SETTING == 1) && defined (CONFIG_MSTAR_CPU_calibrating)
+static unsigned long l_p_j_ref;
+static unsigned int  l_p_j_ref_freq;
+
+static void adjust_jiffies(unsigned long val, struct cpufreq_freqs *ci)
+{
+	if (ci->flags & CPUFREQ_CONST_LOOPS)
+		return;
+
+	if (!l_p_j_ref_freq) {
+		l_p_j_ref = loops_per_jiffy;
+		l_p_j_ref_freq = ci->old;
+		pr_debug("saving %lu as reference value for loops_per_jiffy; "
+			"freq is %u kHz\n", l_p_j_ref, l_p_j_ref_freq);
+	}
+	if ((val == CPUFREQ_PRECHANGE  && ci->old < ci->new) ||
+	    (val == CPUFREQ_POSTCHANGE && ci->old > ci->new) ||
+	    (val == CPUFREQ_RESUMECHANGE || val == CPUFREQ_SUSPENDCHANGE)) {
+		loops_per_jiffy = cpufreq_scale(l_p_j_ref, l_p_j_ref_freq, ci->new);
+		pr_debug("scaling loops_per_jiffy to %lu "
+			"for frequency %u kHz\n", loops_per_jiffy, ci->new);
+	}
+}
+
+#else // defined CONFIG_MP_PLATFORM_CPU_SETTING && defined(CONFIG_MSTAR_CPU_setting || CONFIG_MSTAR_CPU_calibrating)
+
 #ifndef CONFIG_SMP
 static unsigned long l_p_j_ref;
 static unsigned int  l_p_j_ref_freq;
@@ -248,6 +287,7 @@ static inline void adjust_jiffies(unsigned long val, struct cpufreq_freqs *ci)
 }
 #endif
 
+#endif // CONFIG_MP_PLATFORM_CPU_SETTING && CONFIG_MSTAR_CPU_calibrating
 
 void __cpufreq_notify_transition(struct cpufreq_policy *policy,
 		struct cpufreq_freqs *freqs, unsigned int state)
@@ -866,7 +906,7 @@ static int cpufreq_add_dev(struct device *dev, struct subsys_interface *sif)
 	if (cpu_is_offline(cpu))
 		return 0;
 
-	pr_debug("adding CPU %u\n", cpu);
+	printk("\033[32mFunction = %s, Line = %d, adding CPU %u\033[m\n", __PRETTY_FUNCTION__, __LINE__, cpu);
 
 #ifdef CONFIG_SMP
 	/* check whether a different CPU already registered this
@@ -1460,7 +1500,9 @@ int __cpufreq_driver_target(struct cpufreq_policy *policy,
 	if (cpufreq_disabled())
 		return -ENODEV;
 
-	/* Make sure that target_freq is within supported range */
+	/* Make sure that target_freq is within supported range,
+	 * if in T_Sensor lower cpufreq case, the max may having the case: max < min ==> need to modify folling check sequence
+	 */
 	if (target_freq > policy->max)
 		target_freq = policy->max;
 	if (target_freq < policy->min)
@@ -1469,7 +1511,8 @@ int __cpufreq_driver_target(struct cpufreq_policy *policy,
 	pr_debug("target for CPU %u: %u kHz, relation %u, requested %u kHz\n",
 			policy->cpu, target_freq, relation, old_target_freq);
 
-	if (target_freq == policy->cur)
+	/* if T_Sensor exception case, do not return */
+	if ( (target_freq == policy->cur) && (forcibly_set_target_flag == 0) )
 		return 0;
 
 	if (cpufreq_driver->target)

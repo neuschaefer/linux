@@ -15,12 +15,21 @@
 #include <linux/workqueue.h>
 #include <linux/time.h>
 #include <linux/mutex.h>
+#include <mstar/mpatch_macro.h>
 
 #include "oprof.h"
 #include "event_buffer.h"
 #include "cpu_buffer.h"
 #include "buffer_sync.h"
 #include "oprofile_stats.h"
+
+#if (MP_DEBUG_TOOL_OPROFILE == 1)
+#ifdef CONFIG_ADVANCE_OPROFILE
+#include <linux/slab.h>
+#include <kdebugd/kdebugd.h>
+#include <linux/dcookies.h>
+#endif /* CONFIG_ADVANCE_OPROFILE */
+#endif /*MP_DEBUG_TOOL_OPROFILE*/
 
 struct oprofile_operations oprofile_ops;
 
@@ -33,7 +42,26 @@ static DEFINE_MUTEX(start_mutex);
    0 - use performance monitoring hardware if available
    1 - use the timer int mechanism regardless
  */
+#if (defined(CONFIG_ADVANCE_OPROFILE) && !defined(CONFIG_CACHE_ANALYZERi)) && (MP_DEBUG_TOOL_OPROFILE == 1)
+static int timer = 1;
+#else
 static int timer = 0;
+#endif /*CONFIG_ADVANCE_OPROFILE && CONFIG_CACHE_ANALYZER && MP_DEBUG_TOOL_OPROFILE*/
+
+#if (MP_DEBUG_TOOL_OPROFILE == 1)
+#ifdef CONFIG_ADVANCE_OPROFILE
+#define AOP_BUFFER_SIZE_DEFAULT     131072
+#define AOP_CPU_BUFFER_SIZE_DEFAULT     8192
+#define AOP_BUFFER_WATERSHED_DEFAULT    32768
+
+static atomic_t g_oprofile_driver_init;
+/* the fucntion return the status of oprofile init*/
+int aop_is_oprofile_init (void)
+{
+	return atomic_read (&g_oprofile_driver_init);
+}
+#endif /* CONFIG_ADVANCE_OPROFILE */
+#endif /* MP_DEBUG_TOOL_OPROFILE */
 
 int oprofile_setup(void)
 {
@@ -225,6 +253,19 @@ post_sync:
 	mutex_unlock(&start_mutex);
 }
 
+#if (MP_DEBUG_TOOL_OPROFILE == 1)
+#ifdef CONFIG_ADVANCE_OPROFILE
+void oprofile_set_backtrace(unsigned long val)
+{
+	int retval;
+
+	retval = oprofile_set_ulong(&oprofile_backtrace_depth, val);
+
+	return;
+}
+#endif
+#endif /*MP_DEBUG_TOOL_OPROFILE*/
+
 int oprofile_set_ulong(unsigned long *addr, unsigned long val)
 {
 	int err = -EBUSY;
@@ -241,6 +282,89 @@ int oprofile_set_ulong(unsigned long *addr, unsigned long val)
 
 static int timer_mode;
 
+#if (MP_DEBUG_TOOL_OPROFILE == 1)
+#ifdef CONFIG_ADVANCE_OPROFILE
+void aop_dcookie_release(void *dcookie_user_data)
+{
+	dcookie_unregister(dcookie_user_data);
+}
+
+
+int kdebugd_aop_oprofile_init(void)
+{
+	struct aop_register *reg_ptr = NULL;
+	reg_ptr = aop_alloc();
+	if (reg_ptr) {
+		reg_ptr->aop_is_oprofile_init = aop_is_oprofile_init;
+		reg_ptr->aop_oprofile_start = oprofile_start;
+		reg_ptr->aop_oprofile_stop = oprofile_stop;
+		reg_ptr->aop_event_buffer_open = aop_event_buffer_open;
+		reg_ptr->aop_read_event_buffer = aop_read_event_buffer;
+		reg_ptr->aop_event_buffer_clear = aop_event_buffer_clear;
+		reg_ptr->aop_clear_cpu_buffers = aop_clear_cpu_buffers;
+		reg_ptr->aop_wake_up_buffer_waiter = wake_up_buffer_waiter;
+		reg_ptr->aop_dcookie_release = aop_dcookie_release;
+		reg_ptr->aop_get_pc_sample_count = aop_get_pc_sample_count;
+		reg_ptr->aop_reset_pc_sample_count = aop_reset_pc_sample_count;
+		reg_ptr->aop_oprofile_buffer_size = oprofile_buffer_size;
+		return 0;
+	} else {
+		printk(KERN_INFO "AOP:AOP Init failed.\n");
+		return -1;
+	}
+}
+
+void kdebugd_aop_oprofile_exit(void)
+{
+	aop_dealloc();
+}
+
+#if (MP_DEBUG_TOOL_OPROFILE == 1)
+#ifdef CONFIG_CACHE_ANALYZER
+int aop_get_sampling_mode(void)
+{
+	if (!oprofile_ops.cpu_type)
+		return INVALID_SAMPLING_MODE;
+
+	return strcmp(oprofile_ops.cpu_type, "timer") ?
+			PERF_EVENTS_SAMPLING : TIMER_SAMPLING;
+}
+
+int aop_switch_to_timer_sampling(void)
+{
+	int ret = aop_get_sampling_mode();
+
+	if (ret == TIMER_SAMPLING)
+		return 0;
+
+	if (ret == PERF_EVENTS_SAMPLING)
+		oprofile_arch_exit();
+
+	/* else previous mode was invalid sampling mode */
+	ret = oprofile_timer_init(&oprofile_ops);
+
+	return ret;
+}
+
+int aop_switch_to_perf_events_sampling(void)
+{
+	int ret = aop_get_sampling_mode();
+
+	if (ret == PERF_EVENTS_SAMPLING)
+		return 0;
+
+	/* else previous mode was invalid sampling mode */
+	ret = oprofile_arch_init(&oprofile_ops);
+
+	/* memory is already freed in case of error */
+	return ret;
+
+}
+#endif
+#endif /*MP_DEBUG_TOOL_OPROFILE*/
+#endif /* CONFIG_ADVANCE_OPROFILE */
+#endif /*MP_DEBUG_TOOL_OPROFILE*/
+
 static int __init oprofile_init(void)
 {
 	int err;
@@ -249,8 +373,23 @@ static int __init oprofile_init(void)
 	timer_mode = 0;
 	err = oprofile_arch_init(&oprofile_ops);
 	if (!err) {
-		if (!timer && !oprofilefs_register())
+		if (!timer && !oprofilefs_register()) {
+#if (MP_DEBUG_TOOL_OPROFILE == 1)
+#ifdef CONFIG_ADVANCE_OPROFILE
+			/* for ARCH mode */
+			oprofile_buffer_size      = AOP_BUFFER_SIZE_DEFAULT;
+			oprofile_cpu_buffer_size  = AOP_CPU_BUFFER_SIZE_DEFAULT;
+			oprofile_buffer_watershed = AOP_BUFFER_WATERSHED_DEFAULT;
+
+			if (!kdebugd_aop_oprofile_init()) {
+				atomic_set (&g_oprofile_driver_init, 1);
+				printk ("AOP:Oprofile Driver init done\n");
+			}
+#endif /* CONFIG_ADVANCE_OPROFILE */
+#endif /*MP_DEBUG_TOOL_OPROFILE*/
+
 			return 0;
+		}
 		oprofile_arch_exit();
 	}
 
@@ -263,12 +402,32 @@ static int __init oprofile_init(void)
 			return err;
 	}
 
+#if (MP_DEBUG_TOOL_OPROFILE == 1)
+#ifdef CONFIG_ADVANCE_OPROFILE
+	/* called only when timer mode is set successfully */
+	oprofile_buffer_size      = AOP_BUFFER_SIZE_DEFAULT;
+	oprofile_cpu_buffer_size  = AOP_CPU_BUFFER_SIZE_DEFAULT;
+	oprofile_buffer_watershed = AOP_BUFFER_WATERSHED_DEFAULT;
+
+	if (!kdebugd_aop_oprofile_init()) {
+		atomic_set (&g_oprofile_driver_init, 1);
+		printk ("AOP:Oprofile Driver init done in timer mode\n");
+	}
+#endif /* CONFIG_ADVANCE_OPROFILE */
+#endif /* MP_DEBUG_TOOL_OPROFILE */
+
 	return oprofilefs_register();
 }
 
 
 static void __exit oprofile_exit(void)
 {
+#if (MP_DEBUG_TOOL_OPROFILE == 1)
+#ifdef CONFIG_ADVANCE_OPROFILE
+	aop_release();
+	kdebugd_aop_oprofile_exit();
+#endif /* CONFIG_ADVANCE_OPROFILE */
+#endif /*MP_DEBUG_TOOL_OPROFILE*/
 	oprofilefs_unregister();
 	if (!timer_mode)
 		oprofile_arch_exit();

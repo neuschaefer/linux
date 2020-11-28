@@ -73,6 +73,19 @@
 #include <linux/init_task.h>
 #include <linux/binfmts.h>
 #include <linux/context_tracking.h>
+#include <mstar/mpatch_macro.h>
+
+#if (MP_ANTUTU_MSTAR_HIDE_SCHED_POLICY==1)
+//For hide Antutu scheduling policy/priority                                                                                          
+#include <linux/string.h>
+#endif
+
+#if (MP_DEBUG_TOOL_KDEBUG == 1)
+#ifdef CONFIG_KDEBUGD_FTRACE
+#include <linux/irqflags.h>
+#endif /* CONFIG_KDEBUGD_FTRACE */
+#endif /*MP_DEBUG_TOOL_KDEBUG*/
+
 
 #include <asm/switch_to.h>
 #include <asm/tlb.h>
@@ -85,6 +98,14 @@
 #include "sched.h"
 #include "../workqueue_internal.h"
 #include "../smpboot.h"
+
+#if (MP_DEBUG_TOOL_KDEBUG == 1)
+#ifdef CONFIG_KDEBUGD
+#include <kdebugd/kdebugd.h>
+#include <kdebugd/sec_topthread.h>
+#include <linux/sort.h>     /* For sort() */
+#endif
+#endif /*MP_DEBUG_TOOL_KDEBUG*/
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/sched.h>
@@ -2808,7 +2829,11 @@ void __kprobes add_preempt_count(int val)
 	DEBUG_LOCKS_WARN_ON((preempt_count() & PREEMPT_MASK) >=
 				PREEMPT_MASK - 10);
 #endif
+#if (MP_DEBUG_TOOL_KDEBUG == 0) || !defined(CONFIG_KDEBUGD_FTRACE)
 	if (preempt_count() == val)
+#else
+	if (check_preempt_trace() && preempt_count() == val)
+#endif /* CONFIG_KDEBUGD_FTRACE && MP_DEBUG_TOOL_KDEBUG*/
 		trace_preempt_off(CALLER_ADDR0, get_parent_ip(CALLER_ADDR1));
 }
 EXPORT_SYMBOL(add_preempt_count);
@@ -2829,7 +2854,11 @@ void __kprobes sub_preempt_count(int val)
 		return;
 #endif
 
+#if (MP_DEBUG_TOOL_KDEBUG == 0) || !defined(CONFIG_KDEBUGD_FTRACE)
 	if (preempt_count() == val)
+#else
+	if (check_preempt_trace() && preempt_count() == val)
+#endif /* CONFIG_KDEBUGD_FTRACE && MP_DEBUG_TOOL_KDEBUG*/
 		trace_preempt_on(CALLER_ADDR0, get_parent_ip(CALLER_ADDR1));
 	preempt_count() -= val;
 }
@@ -2909,6 +2938,48 @@ pick_next_task(struct rq *rq)
 
 	BUG(); /* the idle class will always have a runnable task */
 }
+
+#if (MP_DEBUG_TOOL_KDEBUG == 1)
+#ifndef CONFIG_SMP
+#ifdef CONFIG_MEMORY_VALIDATOR
+
+static inline void memory_value_watcher(struct task_struct *prev)
+{
+	if (prev && kdbg_mem_watcher.watching && kdbg_mem_watcher.tgid == prev->tgid) {
+		mm_segment_t fs;
+		unsigned int buffer;
+
+		fs = get_fs();
+		set_fs(KERNEL_DS);
+
+		if (!access_ok(VERIFY_READ, (unsigned long *)kdbg_mem_watcher.u_addr,
+					sizeof(unsigned long *))) {
+			set_fs(fs);
+			return;
+		}
+		__get_user(buffer, (unsigned long *)kdbg_mem_watcher.u_addr);
+		set_fs(fs);
+
+		if (kdbg_mem_watcher.buff != buffer) {
+
+			kdbg_mem_watcher.watching = 0;
+
+			printk("==============================================================================\n");
+			printk(" Memory Corruption DETECTED.........!!!!!!!!!!!!!!!!!!\n");
+			printk("==============================================================================\n");
+			printk(" Original : PID:%d value:0x%08x (addr:0x%08x)\n", kdbg_mem_watcher.pid, kdbg_mem_watcher.buff, kdbg_mem_watcher.u_addr);
+			printk(" NOW      : PID:%d value:0x%08x \n" , prev->pid, buffer);
+			printk("          : PID:%d PC:0x%08x\n" , prev->pid, (unsigned)KSTK_EIP(prev));
+			printk("------------------------------------------------------------------------------\n");
+			printk("Caution: The PC value could get invalid-value.\n");
+			printk("         So don't trust that value :)\n");
+			printk("==============================================================================\n");
+		}
+	}
+}
+#endif
+#endif /*CONFIG_SMP*/
+#endif /*MP_DEBUG_TOOL_KDEBUG*/
 
 /*
  * __schedule() is the main scheduler function.
@@ -3007,6 +3078,31 @@ need_resched:
 		rq->curr = next;
 		++*switch_count;
 
+#if (MP_DEBUG_TOOL_KDEBUG == 1)
+#ifdef CONFIG_KDEBUGD_COUNTER_MONITOR
+		per_cpu(sec_topthread_ctx_cnt, cpu)++;
+#endif
+		/* For kdebugd - schedule history logger */
+#if defined(CONFIG_KDEBUGD_MISC)
+#if defined(CONFIG_SCHED_HISTORY)
+		if (next->mm) /* for excepting kernel thread */
+			schedule_history(next, cpu);
+#endif
+#ifndef CONFIG_SMP
+#ifdef CONFIG_MEMORY_VALIDATOR
+		/* For meory Value Watcher*/
+		memory_value_watcher(prev);
+#endif
+#endif /*CONFIG_SMP*/
+#endif
+
+
+#ifdef CONFIG_SCHED_HISTORY_ON_DDR
+		extern void schedule_history_on_ddr(struct task_struct *pre ,struct task_struct *next, int cpu);
+		if (next->mm) /* for excepting kernel thread */
+			schedule_history_on_ddr(prev, next, cpu);
+#endif
+#endif /*MP_DEBUG_TOOL_KDEBUG*/
 		context_switch(rq, prev, next); /* unlocks the rq */
 		/*
 		 * The context switch have flipped the stack from under us
@@ -4096,8 +4192,19 @@ SYSCALL_DEFINE1(sched_getscheduler, pid_t, pid)
 	if (p) {
 		retval = security_task_getscheduler(p);
 		if (!retval)
+#if (MP_ANTUTU_MSTAR_HIDE_SCHED_POLICY==1)
+		{	
+            		//For hide Antutu scheduling policy/priority
+            		if(strstr(p->comm, "ABenchMark") != NULL)
+                		retval = 0;
+            		else
+			    retval = p->policy
+				| (p->sched_reset_on_fork ? SCHED_RESET_ON_FORK : 0);
+        	}
+#else //(MP_ANTUTU_MSTAR_HIDE_SCHED_POLICY==1)
 			retval = p->policy
 				| (p->sched_reset_on_fork ? SCHED_RESET_ON_FORK : 0);
+#endif
 	}
 	rcu_read_unlock();
 	return retval;
@@ -4126,10 +4233,18 @@ SYSCALL_DEFINE2(sched_getparam, pid_t, pid, struct sched_param __user *, param)
 	retval = security_task_getscheduler(p);
 	if (retval)
 		goto out_unlock;
-
+#if (MP_ANTUTU_MSTAR_HIDE_SCHED_POLICY==1)    
+    	//For hide Antutu scheduling policy/priority
+    	if(strstr(p->comm, "ABenchMark") != NULL)
+        	lp.sched_priority = 0;
+    	else
+	    	lp.sched_priority = p->rt_priority;
+	
+    	rcu_read_unlock();
+#else //(MP_ANTUTU_MSTAR_HIDE_SCHED_POLICY==1)
 	lp.sched_priority = p->rt_priority;
-	rcu_read_unlock();
-
+        rcu_read_unlock();
+#endif
 	/*
 	 * This one might sleep, we cannot do it with a spinlock held ...
 	 */
@@ -4237,6 +4352,11 @@ SYSCALL_DEFINE3(sched_setaffinity, pid_t, pid, unsigned int, len,
 {
 	cpumask_var_t new_mask;
 	int retval;
+#if (MP_DEBUG_TOOL_KDEBUG == 1)
+#ifdef CONFIG_ONLY_CORE0_ENABLE
+	return -EFAULT;
+#endif
+#endif /*MP_DEBUG_TOOL_KDEBUG*/
 
 	if (!alloc_cpumask_var(&new_mask, GFP_KERNEL))
 		return -ENOMEM;
@@ -4636,15 +4756,172 @@ out_unlock:
 
 static const char stat_nam[] = TASK_STATE_TO_CHAR_STR;
 
+#if (MP_DEBUG_TOOL_KDEBUG == 1)
+#ifdef CONFIG_KDEBUGD_MISC
+static void show_task_prio(struct task_struct *p)
+{
+	unsigned state;
+	struct pt_regs *regs;
+	struct vm_area_struct *vma;
+	unsigned long stack_usage = 0;
+	unsigned long stack_size = 0;
+
+	if (p == NULL)
+		return;
+
+	state = (p->state & TASK_REPORT) | p->exit_state;
+	state =  state ? __ffs(state) + 1 : 0;
+	printk("%-16.16s", p->comm);
+#ifdef CONFIG_SMP
+	printk("[%d] ", task_cpu(p));
+#endif
+	printk(" %c", state < sizeof(stat_nam) ? stat_nam[state] : '?');
+
+#if (BITS_PER_LONG == 32)
+	printk(" %08lX ", KSTK_EIP(p));
+#else
+	printk(" %016lx ", KSTK_EIP(p));
+#endif
+	if (p != NULL && p->mm) {
+		regs = task_pt_regs(p);
+		vma = find_vma(p->mm, p->user_ssp);
+		if (vma != NULL) {
+#if defined(CONFIG_ARM)
+			stack_usage =  vma->vm_end - regs->ARM_sp; /* MF?? */
+#elif defined(CONFIG_MIPS)
+			stack_usage =  vma->vm_end - regs->regs[29];
+#else
+#error "Architecture Not Supported!!!"
+#endif
+			stack_size  =  vma->vm_end - vma->vm_start;
+			printk("%4lu/%04lu  ",
+					stack_usage >> 10,
+					stack_size  >> 10);
+		} else {
+			printk(" --------  ");
+		}
+	} else {
+
+		if (p->state == TASK_DEAD || p->state == EXIT_DEAD ||
+				p->state ==	EXIT_ZOMBIE) {
+			printk(KERN_CONT " [dead] ");
+		} else {
+			printk("  [kernel] ");
+		}
+	}
+	printk("%4d %4d  %4d    %u       %u\n",
+			p->pid,
+			p->prio,
+			p->static_prio,
+			p->policy,
+			p->rt.time_slice);
+}
+
+int show_state_prio(void)
+{
+	struct task_struct *g, *p;
+	int do_unlock = 1;
+
+	printk("\n");
+#if (BITS_PER_LONG == 32)
+	printk("                             user(kb/kb)                       \n");
+	printk("  task         ");
+
+#ifdef CONFIG_SMP
+	printk("[CPU]      ");
+#endif
+	printk("PC    stack_usage  pid prio sprio policy time_slice[x%dms]\n", 1000/HZ);
+
+#else
+	printk("                            kb/kb                         \n");
+	printk("  task         ");
+#ifdef CONFIG_SMP
+	printk("[CPU]      ");
+#endif
+	printk("PC    stack_usage  pid prio sprio policy time_slice[x%dms]\n", 1000/HZ);
+#endif
+#ifdef CONFIG_PREEMPT_RT
+	if (!read_trylock(&tasklist_lock)) {
+		printk("hm, tasklist_lock write-locked.\n");
+		printk("ignoring ...\n");
+		do_unlock = 0;
+	}
+#else
+	read_lock(&tasklist_lock);
+#endif
+
+	do_each_thread(g, p) {
+		/*
+		 * reset the NMI-timeout, listing all files on a slow
+		 * console might take alot of time:
+		 */
+		touch_nmi_watchdog();
+		show_task_prio(p);
+	} while_each_thread(g, p);
+
+	if (do_unlock)
+		read_unlock(&tasklist_lock);
+	debug_show_all_locks();
+	printk("----------------------------------------------------------------------\n");
+	/* in kdbg-base.c */
+	task_state_help();
+
+	return 1;
+}
+#endif
+
+#if defined(CONFIG_KDEBUGD_MISC)
+static inline struct task_struct *eldest_child(struct task_struct *p)
+{
+    if (list_empty(&p->children))
+	return NULL;
+    return list_entry(p->children.next, struct task_struct, sibling);
+}
+
+static inline struct task_struct *older_sibling(struct task_struct *p)
+{
+    if (p->sibling.prev == &p->parent->children)
+	return NULL;
+    return list_entry(p->sibling.prev, struct task_struct, sibling);
+}
+
+static inline struct task_struct *younger_sibling(struct task_struct *p)
+{
+    if (p->sibling.next == &p->parent->children)
+	return NULL;
+    return list_entry(p->sibling.next, struct task_struct, sibling);
+}
+#endif
+#endif /*MP_DEBUG_TOOL_KDEBUG*/
+
 void sched_show_task(struct task_struct *p)
 {
 	unsigned long free = 0;
+#if (MP_DEBUG_TOOL_KDEBUG == 0) || !defined(CONFIG_KDEBUGD_MISC)
 	int ppid;
+#endif /*CONFIG_KDEBUGD_MISC && MP_DEBUG_TOOL_KDEBUG*/
 	unsigned state;
 
+#if (MP_DEBUG_TOOL_KDEBUG == 1) && defined(CONFIG_KDEBUGD_MISC) 
+	struct task_struct *relative = NULL;
+	state = (p->state & TASK_REPORT) | p->exit_state;
+	state = state ? __ffs(state) + 1 : 0;
+#else
 	state = p->state ? __ffs(p->state) + 1 : 0;
 	printk(KERN_INFO "%-15.15s %c", p->comm,
 		state < sizeof(stat_nam) - 1 ? stat_nam[state] : '?');
+#endif /*MP_DEBUG_TOOL_KDEBUG && CONFIG_KDEBUGD_MISC*/
+
+#if (MP_DEBUG_TOOL_KDEBUG == 1)
+#ifdef CONFIG_KDEBUGD_MISC
+	printk(KERN_INFO "%-16.16s", p->comm);
+#ifdef CONFIG_SMP
+	printk(KERN_CONT "[%d]", task_cpu(p));
+#endif
+	printk(KERN_CONT " %c [%p]", state < sizeof(stat_nam) ? stat_nam[state] : '?', p);
+#endif
+#endif /*MP_DEBUG_TOOL_KDEBUG*/
+
 #if BITS_PER_LONG == 32
 	if (state == TASK_RUNNING)
 		printk(KERN_CONT " running  ");
@@ -4659,27 +4936,95 @@ void sched_show_task(struct task_struct *p)
 #ifdef CONFIG_DEBUG_STACK_USAGE
 	free = stack_not_used(p);
 #endif
+#if (MP_DEBUG_TOOL_KDEBUG == 1) && defined(CONFIG_KDEBUGD_MISC)
+	printk(KERN_CONT "%5lu %5d 0x%08lx %6d", free,
+			task_pid_nr(p),
+			(unsigned long)task_thread_info(p)->flags,
+			task_pid_nr(p->real_parent));
+#else
 	rcu_read_lock();
 	ppid = task_pid_nr(rcu_dereference(p->real_parent));
 	rcu_read_unlock();
 	printk(KERN_CONT "%5lu %5d %6d 0x%08lx\n", free,
 		task_pid_nr(p), ppid,
 		(unsigned long)task_thread_info(p)->flags);
+#endif /*MP_DEBUG_TOOL_KDEBUG && CONFIG_KDEBUGD_MISC*/
+
+#if (MP_DEBUG_TOOL_KDEBUG == 1)
+#ifdef CONFIG_KDEBUGD_MISC
+	relative = eldest_child(p);
+	if (relative)
+		printk("%7d", relative->pid);
+	else
+		printk("       ");
+
+	relative = younger_sibling(p);
+	if (relative)
+		printk("%8d", relative->pid);
+	else
+		printk("        ");
 
 	print_worker_info(KERN_INFO, p);
 	show_stack(p, NULL);
+#endif/*CONFIG_KDEBUGD_MISC*/
+#endif /*MP_DEBUG_TOOL_KDEBUG*/
+
+#if (MP_DEBUG_TOOL_KDEBUG == 1) && defined(CONFIG_KDEBUGD_MISC) && defined(CONFIG_SHOW_TASK_STATE)
+	if (!kdebugd_nobacktrace) {
+		show_stack(p, NULL);
+		printk("-------------------------------------------------------------------------------------\n");
+	}
+#else
+       show_stack(p, NULL);
+#endif/*MP_DEBUG_TOOL_KDEBUG && CONFIG_KDEBUGD_MISC && CONFIG_SHOW_TASK_STATE*/
 }
+
+EXPORT_SYMBOL(sched_show_task);
+
+#if (MP_DEBUG_TOOL_KDEBUG == 1)
+#ifdef CONFIG_TASK_STATE_BACKTRACE
+void wrap_show_task(struct task_struct *tsk)
+{
+	sched_show_task(tsk);
+}
+#endif
+#endif /*MP_DEBUG_TOOL_KDEBUG*/
 
 void show_state_filter(unsigned long state_filter)
 {
 	struct task_struct *g, *p;
 
 #if BITS_PER_LONG == 32
+#if (MP_DEBUG_TOOL_KDEBUG == 0) || !defined(CONFIG_KDEBUGD_MISC)
+
 	printk(KERN_INFO
 		"  task                PC stack   pid father\n");
 #else
 	printk(KERN_INFO
+			"                                                                                  sibling\n");
+	printk(KERN_INFO "  task         ");
+#ifdef CONFIG_SMP
+	printk(KERN_CONT "[CPU]    ");
+#else
+	printk(KERN_CONT "    ");
+#endif
+	printk(KERN_CONT "task_struct   PC   stack  pid  flag         father child younger older\n");
+#endif/*MP_DEBUG_TOOL_KDEBUG &&  CONFIG_KDEBUGD_MISC*/
+#else
+#ifndef CONFIG_KDEBUGD_MISC
+	printk(KERN_INFO
 		"  task                        PC stack   pid father\n");
+#else
+	printk(KERN_INFO
+			"                                                                                       sibling\n");
+	printk(KERN_INFO "  task         ");
+#ifdef CONFIG_SMP
+	printk(KERN_CONT "[CPU]    ");
+#endif
+	printk(KERN_CONT "task_struct   PC   stack  pid  flag         father child younger older\n");
+#endif
+
+
 #endif
 	rcu_read_lock();
 	do_each_thread(g, p) {
@@ -7093,13 +7438,24 @@ static inline int preempt_count_equals(int preempt_offset)
 	return (nested == preempt_offset);
 }
 
+static int __might_sleep_init_called;
+int __init __might_sleep_init(void)
+{
+	__might_sleep_init_called = 1;
+	return 0;
+}
+early_initcall(__might_sleep_init);
+
 void __might_sleep(const char *file, int line, int preempt_offset)
 {
 	static unsigned long prev_jiffy;	/* ratelimiting */
 
 	rcu_sleep_check(); /* WARN_ON_ONCE() by default, no rate limit reqd. */
 	if ((preempt_count_equals(preempt_offset) && !irqs_disabled()) ||
-	    system_state != SYSTEM_RUNNING || oops_in_progress)
+	    oops_in_progress)
+		return;
+	if (system_state != SYSTEM_RUNNING &&
+	    (!__might_sleep_init_called || system_state != SYSTEM_BOOTING))
 		return;
 	if (time_before(jiffies, prev_jiffy + HZ) && prev_jiffy)
 		return;
@@ -7705,6 +8061,23 @@ static void cpu_cgroup_css_offline(struct cgroup *cgrp)
 	sched_offline_group(tg);
 }
 
+static int
+cpu_cgroup_allow_attach(struct cgroup *cgrp, struct cgroup_taskset *tset)
+{
+	const struct cred *cred = current_cred(), *tcred;
+	struct task_struct *task;
+
+	cgroup_taskset_for_each(task, cgrp, tset) {
+		tcred = __task_cred(task);
+
+		if ((current != task) && !capable(CAP_SYS_NICE) &&
+		    cred->euid != tcred->uid && cred->euid != tcred->suid)
+			return -EACCES;
+	}
+
+	return 0;
+}
+
 static int cpu_cgroup_can_attach(struct cgroup *cgrp,
 				 struct cgroup_taskset *tset)
 {
@@ -8064,6 +8437,7 @@ struct cgroup_subsys cpu_cgroup_subsys = {
 	.css_offline	= cpu_cgroup_css_offline,
 	.can_attach	= cpu_cgroup_can_attach,
 	.attach		= cpu_cgroup_attach,
+	.allow_attach	= cpu_cgroup_allow_attach,
 	.exit		= cpu_cgroup_exit,
 	.subsys_id	= cpu_cgroup_subsys_id,
 	.base_cftypes	= cpu_files,

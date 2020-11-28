@@ -17,6 +17,7 @@
 #include <asm/setup.h>
 
 #include "trace.h"
+#include <mstar/mpatch_macro.h>
 
 #define STACK_TRACE_ENTRIES 500
 
@@ -451,5 +452,11 @@ static __init int stack_trace_init(void)
 
 	return 0;
 }
+#if (MP_DEBUG_TOOL_KDEBUG == 1)
+#ifdef CONFIG_KDEBUGD_FTRACE
+/* Let kdebugd have access to static functions in this file */
+#include "../kdebugd/trace/kdbg_ftrace_stack_helper.c"
+#endif /* CONFIG_KDEBUGD_FTRACE */
+#endif/*MP_DEBUG_TOOL_KDEBUG*/
 
 device_initcall(stack_trace_init);

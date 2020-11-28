@@ -29,14 +29,6 @@
 
 #include "cpufreq_governor.h"
 
-static struct kobject *get_governor_parent_kobj(struct cpufreq_policy *policy)
-{
-	if (have_governor_per_policy())
-		return &policy->kobj;
-	else
-		return cpufreq_global_kobject;
-}
-
 static struct attribute_group *get_sysfs_attr(struct dbs_data *dbs_data)
 {
 	if (have_governor_per_policy())
@@ -366,8 +358,13 @@ int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 					kcpustat_cpu(j).cpustat[CPUTIME_NICE];
 
 			mutex_init(&j_cdbs->timer_mutex);
-			INIT_DEFERRABLE_WORK(&j_cdbs->work,
-					     dbs_data->cdata->gov_dbs_timer);
+
+			/* here to initialize a timer for sampling cpu_load,
+			 * and use to do DVFS ondemand
+			 */
+			printk("\033[31mFunction = %s, Line = %d, [cpu %d] initialize cpu %d timer\033[m\n", __PRETTY_FUNCTION__, __LINE__, smp_processor_id(), j);
+
+			INIT_DEFERRABLE_WORK(&j_cdbs->work, dbs_data->cdata->gov_dbs_timer);
 		}
 
 		/*
@@ -389,6 +386,7 @@ int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 		/* Initiate timer time stamp */
 		cpu_cdbs->time_stamp = ktime_get();
 
+		printk("\033[31mFunction = %s, Line = %d, [cpu %d] do first DVFS sampling\033[m\n", __PRETTY_FUNCTION__, __LINE__, smp_processor_id());
 		gov_queue_work(dbs_data, policy,
 				delay_for_sampling_rate(sampling_rate), true);
 		break;

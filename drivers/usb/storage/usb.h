@@ -49,6 +49,7 @@
 #include <linux/mutex.h>
 #include <linux/workqueue.h>
 #include <scsi/scsi_host.h>
+#include <mstar/mpatch_macro.h>
 
 struct us_data;
 struct scsi_cmnd;
@@ -200,5 +201,8 @@ extern int usb_stor_probe1(struct us_data **pus,
 		struct us_unusual_dev *unusual_dev);
 extern int usb_stor_probe2(struct us_data *us);
 extern void usb_stor_disconnect(struct usb_interface *intf);
+#if defined(CONFIG_SUSPEND) && (MP_USB_STR_PATCH==1)
+extern bool is_suspending(void);
+#endif
 
 #endif

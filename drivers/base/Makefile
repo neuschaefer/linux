@@ -1,4 +1,7 @@
 # Makefile for the Linux device tree
+ifeq ($(CONFIG_CMA),y)
+EXTRA_CFLAGS      +=  -Idrivers/mstar2/include
+endif
 
 obj-y			:= core.o bus.o dd.o syscore.o \
 			   driver.o class.o platform.o \

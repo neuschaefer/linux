@@ -21,6 +21,11 @@ unsigned int __machine_arch_type;
 #include <linux/compiler.h>	/* for inline */
 #include <linux/types.h>
 #include <linux/linkage.h>
+#include <mstar/mpatch_macro.h>
+
+#if (MP_PLATFORM_ARM == 1)
+#include <asm/unaligned.h>
+#endif/*MP_PLATFORM_ARM*/
 
 static void putstr(const char *ptr);
 extern void error(char *x);
@@ -44,6 +49,19 @@ static void icedcc_putc(int ch)
 
 	asm("mcr p14, 0, %0, c0, c5, 0" : : "r" (ch));
 }
+
+#if (MP_PLATFORM_ARM == 1)
+#elif defined(CONFIG_CPU_V7)
+
+static void icedcc_putc(int ch)
+{
+        asm(
+        "wait:  mrc     p14, 0, pc, c0, c1, 0                   \n\
+                bcs     wait                                    \n\
+                mcr     p14, 0, %0, c0, c5, 0                   "
+        : : "r" (ch));
+}
+#endif
 
 
 #elif defined(CONFIG_CPU_XSCALE)
@@ -83,6 +101,84 @@ static void icedcc_putc(int ch)
 #define putc(ch)	icedcc_putc(ch)
 #endif
 
+#if defined(CONFIG_MP_PLATFORM_ARM)
+#define UART_RX                     (0)  // In:  Receive buffer (DLAB=0)
+#define UART_TX                     (0)  // Out: Transmit buffer (DLAB=0)
+#define UART_DLL                    (0)  // Out: Divisor Latch Low (DLAB=1)
+#define UART_DLM                    (1)  // Out: Divisor Latch High (DLAB=1)
+#define UART_IER                    (1)  // Out: Interrupt Enable Register
+#define UART_IIR                    (2)  // In:  Interrupt ID Register
+#define UART_FCR                    (2)  // Out: FIFO Control Register
+#define UART_LCR                    (3)  // Out: Line Control Register
+#define UART_LSR                    (5)  // In:  Line Status Register
+#define UART_MSR                    (6)  // In:  Modem Status Register
+#define UART_USR                    (7)
+
+
+// UART_LSR(5)
+// Line Status Register
+#define UART_LSR_DR                 0x01          // Receiver data ready
+#define UART_LSR_OE                 0x02          // Overrun error indicator
+#define UART_LSR_PE                 0x04          // Parity error indicator
+#define UART_LSR_FE                 0x08          // Frame error indicator
+#define UART_LSR_BI                 0x10          // Break interrupt indicator
+#define UART_LSR_THRE               0x20          // Transmit-hold-register empty
+#define UART_LSR_TEMT               0x40          // Transmitter empty
+
+
+
+#define UART_REG(addr) *((volatile unsigned int*)(0x1F201300 + ((addr)<< 3)))
+
+static u32 UART16550_READ(u8 addr)
+{
+        u32 data;
+
+        if (addr>80) //ERROR: Not supported
+        {
+                return(0);
+        }
+
+        data = UART_REG(addr);
+        return(data);
+}
+
+static void UART16550_WRITE(u8 addr, u8 data)
+{
+         if (addr>80) //ERROR: Not supported
+         {
+                //printk("W: %d\n",addr);
+                return;
+         }
+         UART_REG(addr) = data;
+}
+
+static inline unsigned int serial_in(int offset)
+{
+        return UART16550_READ(offset);
+}
+
+static inline void serial_out(int offset, int value)
+{
+        UART16550_WRITE(offset, value);
+}
+
+int prom_putchar(char c)
+{
+
+//       volatile int i=0;
+        while ((serial_in(UART_LSR) & UART_LSR_THRE) == 0)
+                ;
+       // for ( i=0;i<1000;i++)
+       // {
+       //     serial_in(UART_LSR);
+       // }
+        serial_out(UART_TX, c);
+
+        return 1;
+}
+
+#define putc(ch)         prom_putchar(ch);
+#endif /* CONFIG_MP_PLATFORM_ARM */
 static void putstr(const char *ptr)
 {
 	char c;
@@ -93,7 +189,9 @@ static void putstr(const char *ptr)
 		putc(c);
 	}
 
+#if (MP_PLATFORM_ARM != 1)
 	flush();
+#endif
 }
 
 /*
@@ -149,6 +247,10 @@ decompress_kernel(unsigned long output_start, unsigned long free_mem_ptr_p,
 			    output_data, error);
 	if (ret)
 		error("decompressor returned an error");
-	else
+	else{
 		putstr(" done, booting the kernel.\n");
+#if (MP_DEBUG_TOOL_CHANGELIST == 1)
+		putstr(KERN_CL);
+#endif
+	}
 }

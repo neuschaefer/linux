@@ -36,6 +36,19 @@
 #include <asm/uaccess.h>
 #include <asm/mmu_context.h>
 #include <asm/tlb.h>
+#include <mstar/mpatch_macro.h>
+
+#if (MP_DEBUG_TOOL_COREDUMP == 1)
+#include <linux/delay.h>
+
+#if (MP_DEBUG_TOOL_COREDUMP_USB_DEFAULT == 1)
+#define QUERY_MOUNT_PATH        "/proc/mounts"
+#define QUERY_MOUNT_SIZE         4000
+#define QUERY_PARTITIONS_PATH        "/proc/partitions"
+#define QUERY_PARTITIONS_SIZE         4000
+#endif /* MP_DEBUG_TOOL_COREDUMP_USB_DEFAULT  */
+
+#endif /* CONFIG_MP_DEBUG_TOOL_COREDUMP */
 #include <asm/exec.h>
 
 #include <trace/events/task.h>
@@ -481,6 +494,122 @@ static int umh_pipe_setup(struct subprocess_info *info, struct cred *new)
 
 	return err;
 }
+#if (MP_DEBUG_TOOL_COREDUMP == 1)
+	#if (MP_DEBUG_TOOL_COREDUMP_PATH_BOOTARGS_ONLY == 1 || MP_DEBUG_TOOL_COREDUMP_PATH_BACKUP == 1)
+		extern char * get_coredump_path(void);
+	#endif /*MP_DEBUG_TOOL_COREDUMP_PATH_BOOTARGS_ONLY && MP_DEBUG_TOOL_COREDUMP_PATH_BACKUP*/
+#endif/*MP_DEBUG_TOOL_COREDUMP*/
+
+#if (MP_DEBUG_TOOL_COREDUMP == 1)
+#if (MP_DEBUG_TOOL_COREDUMP_USB_DEFAULT == 1)
+bool query_mount_state(char *con_file)
+{
+    char *buf;
+    struct file *fp;
+    int ret=0,i=0;
+	bool mount_result=0;
+     char* const delim = "\n";
+     char *token = NULL;
+    //When accessing user memory, we need to make sure the entire area really is in user-level space.
+    //KERNEL_DS addr user-level space need less than TASK_SIZE
+    mm_segment_t old_fs=get_fs();
+    set_fs(KERNEL_DS);
+    //open /proc/mounts
+    fp = filp_open(con_file, O_RDONLY , 0x400);
+
+    if (!fp)
+    {
+        printk(KERN_EMERG "Can not open /proc/mounts,query fail");
+    }
+
+    buf = kzalloc(QUERY_MOUNT_SIZE+1, GFP_KERNEL);
+    if(!buf)
+	{
+		printk(KERN_EMERG "Can not read /proc/mounts data,query fail");
+    }
+    if (fp->f_op && fp->f_op->read)
+    {
+        ret = fp->f_op->read(fp, buf, QUERY_MOUNT_SIZE, &fp->f_pos);
+    }
+
+    if (ret < 0)
+    {
+		set_fs(old_fs);
+        filp_close(fp, NULL);
+    }
+
+    mount_result=0;
+
+     //seperate all the string contents to row by \n
+     while((token = strsep(&buf, delim))){
+     	for (i=0;i<=strlen(token);i++){
+		if(token[i]=='/' && token[i+1]=='u' && token[i+2]=='s' && token[i+3]=='b' && token[i+4]=='/'&& token[i+5]=='s'&& token[i+6]=='d'&& token[i+7]=='a'&& token[i+8]=='1'){
+			mount_result=1;
+			break;
+		}
+	}
+   }
+    set_fs(old_fs);
+    filp_close(fp, NULL);
+    kfree(buf);
+	return mount_result;
+}
+
+bool query_partitions_state(char *con_file)
+{
+    char *buf;
+    struct file *fp;
+    int ret=0;
+	bool partitions_result=0;
+     char* const delim = "\n";
+     char *token = NULL;
+    //When accessing user memory, we need to make sure the entire area really is in user-level space.
+    //KERNEL_DS addr user-level space need less than TASK_SIZE
+    mm_segment_t old_fs=get_fs();
+    set_fs(KERNEL_DS);
+
+    fp = filp_open(con_file, O_RDONLY , 0x400);
+
+    if (!fp)
+    {
+        printk(KERN_EMERG "Can not open /proc/partitions,query fail");
+    }
+
+    buf = kzalloc(QUERY_PARTITIONS_SIZE+1, GFP_KERNEL);
+    if(!buf)
+	{
+		printk(KERN_EMERG "Can not read /proc/partitions data,query fail");
+    }
+    if (fp->f_op && fp->f_op->read)
+    {
+        ret = fp->f_op->read(fp, buf, QUERY_PARTITIONS_SIZE, &fp->f_pos);
+    }
+
+    if (ret < 0)
+    {
+		set_fs(old_fs);
+        filp_close(fp, NULL);
+    }
+
+    partitions_result=0;
+     while((token = strsep(&buf, delim))){
+	    int j = 0;
+	    for(j = 0; j < strlen(token) ; j++){
+		if(token[j]==32 && token[j+1]=='s' && token[j+2]=='d' && ((token[j+3]=='a') || (token[j+3]=='b')))
+			partitions_result=1;
+		if(token[j]==32 && token[j+1]=='s' && token[j+2]=='d' && ((token[j+3]=='a') || (token[j+3]=='b')) && token[j+4]=='1')
+			partitions_result=1;
+
+	     }
+     }
+    set_fs(old_fs);
+    filp_close(fp, NULL);
+    kfree(buf);
+	return partitions_result;
+}
+#endif /* MP_DEBUG_TOOL_COREDUMP_USB_DEFAULT */
+#endif /* MP_DEBUG_TOOL_COREDUMP */
+
 
 void do_coredump(siginfo_t *siginfo)
 {
@@ -493,9 +622,25 @@ void do_coredump(siginfo_t *siginfo)
 	int retval = 0;
 	int flag = 0;
 	int ispipe;
+#if (MP_DEBUG_TOOL_COREDUMP == 1)
+#if (MP_DEBUG_TOOL_COREDUMP_USB_DEFAULT == 1)
+	bool mount_result=0;
+	bool partitions_result=0;
+	int mount_path_num = 0xFF; //initial value
+#elif (MP_DEBUG_TOOL_COREDUMP_PATH_BOOTARGS_ONLY == 1)
+#else/*users didn't chose any way to save core dump file*/
+	printk("Users must chose \"bootargs\" or \"usb\" to save the core dump file!!!!!!\n");
+	while(1);
+#endif /*MP_DEBUG_TOOL_COREDUMP_USB_DEFAULT */
+#endif /*MP_DEBUG_TOOL_COREDUMP*/
 	struct files_struct *displaced;
 	bool need_nonrelative = false;
 	bool core_dumped = false;
+#if (MP_DEBUG_TOOL_COREDUMP == 1)
+#if  (MP_DEBUG_TOOL_COREDUMP_PATH_BOOTARGS_ONLY == 1 || MP_DEBUG_TOOL_COREDUMP_PATH_BACKUP == 1)
+    char corename[CORENAME_MAX_SIZE] = {0};
+#endif/*MP_DEBUG_TOOL_COREDUMP_PATH_BOOTARGS_ONLY && MP_DEBUG_TOOL_COREDUMP_PATH_BACKUP*/
+#endif/*MP_DEBUG_TOOL_COREDUMP*/
 	static atomic_t core_dump_count = ATOMIC_INIT(0);
 	struct coredump_params cprm = {
 		.siginfo = siginfo,
@@ -508,6 +653,22 @@ void do_coredump(siginfo_t *siginfo)
 		 */
 		.mm_flags = mm->flags,
 	};
+
+#if (MP_DEBUG_TOOL_COREDUMP == 1)
+#ifdef CONFIG_BINFMT_ELF_COMP
+#if (MP_DEBUG_TOOL_COREDUMP_PATH_BOOTARGS_ONLY == 1)
+#else
+#define COMP_CORENAME_PATH  7
+	extern struct module *ultimate_module_check(const char * name);
+	struct module *mod_common=NULL,  *mod_usbcore=NULL, *mod_ehci=NULL, *mod_storage=NULL;
+	const char *usb_module_list[4] = {"usb_common","usbcore", "ehci_hcd", "usb_storage"};
+	unsigned char is_usbmodule_loaded = 0;
+        char comp_corename[COMP_CORENAME_PATH][CORENAME_MAX_SIZE + 1];
+        const char *usb_mount_list[6] = {"sda1", "sda", "sdb1", "sdb", "sdc1", "sdc"};
+	int cnt = 0;
+#endif /*CONFIG_MP_DEBUG_TOOL_COREDUMP_PATH_BOOTARGS_ONLY*/
+#endif/*CONFIG_BINFMT_ELF_COMP*/
+#endif /*MP_DEBUG_TOOL_COREDUMP*/
 
 	audit_core_dumps(siginfo->si_signo);
 
@@ -538,6 +699,29 @@ void do_coredump(siginfo_t *siginfo)
 		goto fail_creds;
 
 	old_cred = override_creds(cred);
+
+	/*
+	 * Clear any false indication of pending signals that might
+	 * be seen by the filesystem code called to write the core file.
+	 */
+	clear_thread_flag(TIF_SIGPENDING);
+	#if (MP_DEBUG_TOOL_COREDUMP == 1)
+		#if  (MP_DEBUG_TOOL_COREDUMP_PATH_BOOTARGS_ONLY == 1 || MP_DEBUG_TOOL_COREDUMP_PATH_BACKUP == 1)
+   			 /*
+   			  * depend on boot args to change core pattern
+		          */
+			    strcpy(corename, get_coredump_path());
+			    if(*corename!=NULL) // bootargs
+			    {
+			        snprintf(core_pattern, sizeof(core_pattern), corename);
+			    }
+   			    else
+			    {
+			        if(strcmp(core_pattern,"core")==0)
+		                snprintf(core_pattern, sizeof(core_pattern), "/var/coredump.%%p.gz");
+			    }
+		#endif /*MP_DEBUG_TOOL_COREDUMP_PATH_BOOTARGS_ONLY && MP_DEBUG_TOOL_COREDUMP_PATH_BACKUP*/
+	#endif/*MP_DEBUG_TOOL_COREDUMP*/
 
 	ispipe = format_corename(&cn, &cprm);
 
@@ -611,6 +795,134 @@ void do_coredump(siginfo_t *siginfo)
 		if (cprm.limit < binfmt->min_coredump)
 			goto fail_unlock;
 
+#if (MP_DEBUG_TOOL_COREDUMP == 1) && defined(CONFIG_BINFMT_ELF_COMP)
+#if (MP_DEBUG_TOOL_COREDUMP_PATH_BOOTARGS_ONLY == 1)
+        cprm.file = filp_open(cn.corename, O_CREAT | 2 | O_NOFOLLOW | O_LARGEFILE | flag, 0600);
+        if (!IS_ERR(cprm.file))
+        {
+            printk(KERN_ALERT "***** Create coredump file to %s ******\n", cn.corename);
+        }
+        else
+        {
+            printk(KERN_ALERT "***** Coredump Fail... can't create corefile to %s \n", cn.corename);
+        }
+#elif (MP_DEBUG_TOOL_COREDUMP_USB_DEFAULT == 1)
+	/* Change code for saving CoreDump file */
+	mod_common = (struct module *)ultimate_module_check(usb_module_list[0]);
+	mod_usbcore = (struct module *)ultimate_module_check(usb_module_list[1]);
+	mod_ehci = (struct module *)ultimate_module_check(usb_module_list[2]);
+	mod_storage = (struct module *)ultimate_module_check(usb_module_list[3]);
+#ifdef CONFIG_MP_DEBUG_TOOL_COREDUMP_WITHOUT_COMPRESS
+           for (cnt = 0; cnt < (COMP_CORENAME_PATH - 1); cnt++) {
+                  snprintf(comp_corename[cnt], sizeof(comp_corename[cnt]),
+                            "/usb/%s/Coredump.%d", usb_mount_list[cnt], current->pid);
+           }
+           snprintf(comp_corename[cnt], sizeof(comp_corename[cnt]), "/applications/Coredump.%d", current->pid);
+#else
+       for (cnt = 0; cnt < (COMP_CORENAME_PATH - 1); cnt++) {
+              snprintf(comp_corename[cnt], sizeof(comp_corename[cnt]),
+                        "/usb/%s/Coredump.%d.gz", usb_mount_list[cnt], current->pid);
+       }
+      snprintf(comp_corename[cnt], sizeof(comp_corename[cnt]), "/applications/Coredump.%d.gz", current->pid);
+#endif
+    /*check the usb devices whether is mounted or not(it shoeld be mounted after usb module inserted)*/
+	mount_result=query_mount_state(QUERY_MOUNT_PATH);
+	/*check the usb partition is created or not(it is created after users insert the usb modules)*/
+	partitions_result=query_partitions_state(QUERY_PARTITIONS_PATH);
+
+#ifdef CONFIG_MP_DEBUG_TOOL_COREDUMP_BUILD_IN_USB
+    if (partitions_result==1 && mount_result==1)
+#else
+    if (mod_common && mod_usbcore && mod_ehci && mod_storage && partitions_result==1 && mount_result==1)
+#endif
+	{
+    	is_usbmodule_loaded = 1;        /* all usb modules loaded */
+		printk(KERN_ALERT "***** Coredump : Insert USB memory stick, mount check per 10sec... *****\n");
+detect:
+       cprm.file = filp_open(comp_corename[0], O_CREAT | 2 | O_NOFOLLOW | O_LARGEFILE | flag, 0600);
+
+       if(IS_ERR(cprm.file))
+       {
+               cprm.file = filp_open(comp_corename[1], O_CREAT | 2 | O_NOFOLLOW | O_LARGEFILE | flag, 0600);
+       }
+       else
+       {
+		if (mount_path_num == 0xFF)
+	       		mount_path_num = 0;
+       }
+
+       if(IS_ERR(cprm.file))
+       {
+               cprm.file = filp_open(comp_corename[2], O_CREAT | 2 | O_NOFOLLOW | O_LARGEFILE | flag, 0600);
+       }
+       else
+       {
+	       if (mount_path_num == 0xFF)
+			mount_path_num = 1;
+       }
+
+       if(IS_ERR(cprm.file))
+       {
+               cprm.file = filp_open(comp_corename[3], O_CREAT | 2 | O_NOFOLLOW | O_LARGEFILE | flag, 0600);
+       }
+       else
+       {
+        	if (mount_path_num == 0xFF)
+	       		mount_path_num = 2;
+       }
+
+       if(IS_ERR(cprm.file))
+       {
+               cprm.file = filp_open(comp_corename[4], O_CREAT | 2 | O_NOFOLLOW | O_LARGEFILE | flag, 0600);
+       }
+       else
+       {
+        	if (mount_path_num == 0xFF)
+	       		mount_path_num = 3;
+       }
+
+       if(IS_ERR(cprm.file))
+       {
+               cprm.file = filp_open(comp_corename[5], O_CREAT | 2 | O_NOFOLLOW | O_LARGEFILE | flag, 0600);
+       }
+       else
+       {
+        	if (mount_path_num == 0xFF)
+	       		mount_path_num = 4;
+       }
+
+		if (!IS_ERR(cprm.file)){
+                      printk(KERN_ALERT "***** USB detected *****\n");
+                      printk(KERN_ALERT "***** Create pid : %d coredump file to USB mount dir %s ******\n", current->pid, comp_corename[mount_path_num]);
+		}
+		else{
+			mdelay(10 * 1000);
+			goto detect;
+		}
+
+	} else {
+		#if (MP_DEBUG_TOOL_COREDUMP_PATH_BACKUP == 1)
+		    //if usb fail, then write coredump to bootargs
+                    cprm.file = filp_open(cn.corename, O_CREAT | 2 | O_NOFOLLOW | O_LARGEFILE | flag, 0600);
+                   if (!IS_ERR(cprm.file)){
+                                   printk(KERN_ALERT "***** Create coredump file to %s ******\n", cn.corename);
+                   }
+		   else{
+		                  printk(KERN_ALERT "***** Coredump Fail... can't create corefile to %s \n", cn.corename);
+		   }
+		#else
+                                   is_usbmodule_loaded = 0;        /* return NULL, usb modules not loaded */
+		                   printk(KERN_ALERT "***** USB modules not loaded ******\n");
+                		   printk(KERN_ALERT "***** Create coredump file to tmpfs /core/Coredump.%d.gz ******\n", current->pid);
+
+		                   cprm.file = filp_open(comp_corename[6], O_CREAT | 2 | O_NOFOLLOW | O_LARGEFILE | flag, 0600);
+                		   if (IS_ERR(cprm.file))
+		                       printk(KERN_ALERT "***** Coredump Fail... can't create corefile to /core dir *****\n");
+               #endif /*MP_DEBUG_TOOL_COREDUMP_PATH_BACKUP*/
+
+	}
+#endif /*MP_DEBUG_TOOL_COREDUMP_PATH_BOOTARGS_ONLY*/
+#else /*original coredump*/
 		if (need_nonrelative && cn.corename[0] != '/') {
 			printk(KERN_WARNING "Pid %d(%s) can only dump core "\
 				"to fully qualified path!\n",
@@ -622,6 +934,7 @@ void do_coredump(siginfo_t *siginfo)
 		cprm.file = filp_open(cn.corename,
 				 O_CREAT | 2 | O_NOFOLLOW | O_LARGEFILE | flag,
 				 0600);
+#endif /*MP_DEBUG_TOOL_COREDUMP && CONFIG_BINFMT_ELF_COMP*/
 		if (IS_ERR(cprm.file))
 			goto fail_unlock;
 
@@ -654,11 +967,33 @@ void do_coredump(siginfo_t *siginfo)
 		goto close_fail;
 	if (displaced)
 		put_files_struct(displaced);
+
+#if (MP_DEBUG_TOOL_COREDUMP == 1) && defined(CONFIG_BINFMT_ELF_COMP)
+        printk(KERN_ALERT "* Ultimate CoreDump v1.0 : started dumping core into 'Coredump.%d.gz' file *\n", current->pid);
+#else
+	printk(KERN_ALERT "* Original coredump : started dumping core into Coredump file *\n");
+#endif /*MP_DEBUG_TOOL_COREDUMP && CONFIG_BINFMT_ELF_COMP*/
 	if (!dump_interrupted()) {
 		file_start_write(cprm.file);
 		core_dumped = binfmt->core_dump(&cprm);
 		file_end_write(cprm.file);
 	}
+#if (MP_DEBUG_TOOL_COREDUMP == 1)
+#ifdef  CONFIG_BINFMT_ELF_COMP
+#if (MP_DEBUG_TOOL_COREDUMP_PATH_BOOTARGS_ONLY ==1)
+#else
+	if (is_usbmodule_loaded)
+		printk(KERN_ALERT "***** Create coredump file to USB mount dir ******\n");
+	else
+		printk(KERN_ALERT "***** usb module is not loaded, so the core is saved to '%s ******\n", cn.corename);
+#endif /*MP_DEBUG_TOOL_COREDUMP_PATH_BOOTARGS_ONLY */
+#endif /*CONFIG_BINFMT_ELF_COMP*/
+#endif /*MP_DEBUG_TOOL_COREDUMP*/
+	printk(KERN_ALERT "CoreDump: finished dumping core\n");
+
+	if (core_dumped)
+		current->signal->group_exit_code |= 0x80;
+
 	if (ispipe && core_pipe_limit)
 		wait_for_dump_helpers(cprm.file);
 close_fail:
@@ -685,9 +1020,24 @@ fail:
  */
 int dump_write(struct file *file, const void *addr, int nr)
 {
+#if (MP_DEBUG_TOOL_COREDUMP == 1) && defined(CONFIG_BINFMT_ELF_COMP)
+	int r0;
+	int r1;
+
+	r0 = access_ok(VERIFY_READ, addr, nr);
+	r1 = file->f_op->write(file, addr, nr, &file->f_pos);
+
+	if (r1 < nr) {
+		printk(KERN_ALERT "##### No space left on device(disk full), check your device space \n");
+		printk(KERN_ALERT "##### rc : %d, nr : %d \n", r1, nr);
+	}
+
+	return r0 && r1 == nr;
+#else
 	return !dump_interrupted() &&
 		access_ok(VERIFY_READ, addr, nr) &&
 		file->f_op->write(file, addr, nr, &file->f_pos) == nr;
+#endif /*MP_DEBUG_TOOL_COREDUMP && CONFIG_BINFMT_ELF_COMP*/
 }
 EXPORT_SYMBOL(dump_write);
 

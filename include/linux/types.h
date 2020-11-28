@@ -4,6 +4,11 @@
 #define __EXPORTED_HEADERS__
 #include <uapi/linux/types.h>
 
+#ifdef CONFIG_MP_DEBUG_TOOL_CHANGELIST
+#define KERN_CL  "KERN-3.10.23.00976611\n"
+#define KERM_CL  "KERM-3.10.23.00976611\n"
+#endif
+
 #ifndef __ASSEMBLY__
 
 #define DECLARE_BITMAP(name,bits) \

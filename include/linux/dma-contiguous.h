@@ -59,6 +59,26 @@ struct device;
 
 #ifdef CONFIG_CMA
 
+#ifdef CONFIG_MP_CMA_PATCH_CMA_MSTAR_DRIVER_BUFFER
+#define CMA_HEAP_NAME_LENG  16
+struct CMA_BootArgs_Config {     
+     int miu;
+     int pool_id;
+     unsigned long start;  //for boot args this is miu offset
+     unsigned long size;
+     char name[CMA_HEAP_NAME_LENG];
+};
+#endif
+
+#ifdef CONFIG_MP_ION_PATCH_MSTAR
+struct cma {
+	unsigned long	base_pfn;
+	unsigned long	count;
+	unsigned long	*bitmap;
+	struct mutex    lock;	
+};
+#endif
+
 /*
  * There is always at least global CMA area and a few optional device
  * private areas configured in kernel .config.
@@ -75,6 +95,10 @@ struct page *dma_alloc_from_contiguous(struct device *dev, int count,
 				       unsigned int order);
 bool dma_release_from_contiguous(struct device *dev, struct page *pages,
 				 int count);
+
+void *dma_alloc_from_contiguous_addr(struct device *dev, unsigned long start,
+																int count, unsigned int align);
+
 
 #else
 

@@ -971,9 +971,15 @@ grow_dev_page(struct block_device *bdev, sector_t block,
 	struct buffer_head *bh;
 	sector_t end_block;
 	int ret = 0;		/* Will call free_more_memory() */
+	int flags = 0;
+	flags = (mapping_gfp_mask(inode->i_mapping) & ~__GFP_FS)|__GFP_MOVABLE;
+#ifdef CONFIG_MP_ION_PATCH_MSTAR
+	if(MAJOR(bdev->bd_dev) == 179)
+		flags = (mapping_gfp_mask(inode->i_mapping) & ~__GFP_FS);
+#endif	
 
-	page = find_or_create_page(inode->i_mapping, index,
-		(mapping_gfp_mask(inode->i_mapping) & ~__GFP_FS)|__GFP_MOVABLE);
+	page = find_or_create_page(inode->i_mapping, index,flags);
+	
 	if (!page)
 		return ret;
 
@@ -3140,6 +3146,9 @@ drop_buffers(struct page *page, struct buffer_head **buffers_to_free)
 
 	bh = head;
 	do {
+#ifdef CONFIG_MP_ION_PATCH_MSTAR		
+		invalidate_bh_lru(NULL);
+#endif
 		if (buffer_write_io_error(bh) && page->mapping)
 			set_bit(AS_EIO, &page->mapping->flags);
 		if (buffer_busy(bh))

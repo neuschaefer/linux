@@ -24,8 +24,6 @@
 #include <linux/mman.h>
 #include <linux/nodemask.h>
 #include <linux/memblock.h>
-#include <linux/fs.h>
-#include <linux/io.h>
 
 #include <asm/cputype.h>
 #include <asm/sections.h>
@@ -33,8 +31,20 @@
 #include <asm/sizes.h>
 #include <asm/tlb.h>
 #include <asm/mmu_context.h>
+#include <asm/mmu_context.h>
 
+#include <asm/io.h>
 #include "mm.h"
+
+
+/*
+ * Global variable to indicate if paging_init be excuted
+ */
+u64     is_paging_init = 0;
+
+#if defined(CONFIG_MP_CMA_PATCH_CMA_64_BIT_TEMP_MODIFICATION)
+phys_addr_t arm_lowmem_limit __initdata = 0;	/* temp, we do not calculate the arm_lowmem_limit in 64_bit */
+#endif
 
 /*
  * Empty_zero_page is a special page that is used for zero-initialized data
@@ -284,9 +294,9 @@ void __iomem * __init early_io_map(phys_addr_t phys, unsigned long virt)
 		if (pmd_none(*pmd))
 			return NULL;
 		pte = pte_offset_kernel(pmd, virt);
-		set_pte(pte, __pte((phys & mask) | PROT_DEVICE_nGnRE));
+		set_pte(pte, __pte((phys & mask) | PROT_DEVICE_nGnRnE));
 	} else {
-		set_pmd(pmd, __pmd((phys & mask) | PROT_SECT_DEVICE_nGnRE));
+		set_pmd(pmd, __pmd((phys & mask) | PROT_SECT_DEVICE_nGnRnE));
 	}
 
 	return (void __iomem *)((virt & mask) + (phys & ~mask));
@@ -327,6 +337,11 @@ void __init paging_init(void)
 	map_mem();
 
 	/*
+	 * Map mstar non-PM peripheral 
+	 */
+        early_io_map(0x00000001f200000, 0xffffffc003000000);
+
+	/*
 	 * Finally flush the caches and tlb to ensure that we're in a
 	 * consistent state.
 	 */
@@ -347,6 +362,11 @@ void __init paging_init(void)
 	 */
 	cpu_set_reserved_ttbr0();
 	flush_tlb_all();
+        
+        /*
+         * Set global variable to "is_paging_init" to indicate paging_init has been excuted
+         */
+        is_paging_init = 1;
 }
 
 /*

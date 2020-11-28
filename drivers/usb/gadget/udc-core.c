@@ -26,7 +26,6 @@
 
 #include <linux/usb/ch9.h>
 #include <linux/usb/gadget.h>
-
 /**
  * struct usb_udc - describes one usb device controller
  * @driver - the gadget driver pointer. For use by the class code
@@ -335,7 +334,15 @@ static int udc_bind_to_driver(struct usb_udc *udc, struct usb_gadget_driver *dri
 		driver->unbind(udc->gadget);
 		goto err1;
 	}
-	usb_gadget_connect(udc->gadget);
+	/*
+	 * HACK: The Android gadget driver disconnects the gadget
+	 * on bind and expects the gadget to stay disconnected until
+	 * it calls usb_gadget_connect when userspace is ready. Remove
+	 * the call to usb_gadget_connect bellow to avoid enabling the
+	 * pullup before userspace is ready.
+	 *
+	 * usb_gadget_connect(udc->gadget);
+	 */
 
 	kobject_uevent(&udc->dev.kobj, KOBJ_CHANGE);
 	return 0;
@@ -373,7 +380,7 @@ out:
 	return ret;
 }
 EXPORT_SYMBOL_GPL(udc_attach_driver);
-
+extern void usb_probe_driver(struct usb_gadget_driver *driver);
 int usb_gadget_probe_driver(struct usb_gadget_driver *driver)
 {
 	struct usb_udc		*udc = NULL;
@@ -389,16 +396,18 @@ int usb_gadget_probe_driver(struct usb_gadget_driver *driver)
 			goto found;
 	}
 
-	pr_debug("couldn't find an available UDC\n");
+	printk("couldn't find an available UDC\n");
 	mutex_unlock(&udc_lock);
 	return -ENODEV;
 found:
+#ifdef CONFIG_USB_MSB250X
+	usb_probe_driver(driver);	
+#endif
 	ret = udc_bind_to_driver(udc, driver);
 	mutex_unlock(&udc_lock);
 	return ret;
 }
 EXPORT_SYMBOL_GPL(usb_gadget_probe_driver);
-
 int usb_gadget_unregister_driver(struct usb_gadget_driver *driver)
 {
 	struct usb_udc		*udc = NULL;
@@ -414,7 +423,6 @@ int usb_gadget_unregister_driver(struct usb_gadget_driver *driver)
 			ret = 0;
 			break;
 		}
-
 	mutex_unlock(&udc_lock);
 	return ret;
 }

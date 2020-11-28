@@ -53,6 +53,15 @@ enum {
 	SD_LBP_DISABLE,		/* Discard disabled due to failed cmd */
 };
 
+#if (MP_SCSI_MSTAR_SD_CARD_HOTPLUG == 1)
+#define POLLING_INTERVAL    1*HZ        //in jiffies
+
+struct polling_t {
+        int pid;
+        struct completion polling_done;
+};
+#endif
+
 struct scsi_disk {
 	struct scsi_driver *driver;	/* always &sd_template */
 	struct scsi_device *device;
@@ -86,6 +95,9 @@ struct scsi_disk {
 	unsigned	lbpvpd : 1;
 	unsigned	ws10 : 1;
 	unsigned	ws16 : 1;
+#if (MP_SCSI_MSTAR_SD_CARD_HOTPLUG == 1)
+ 	struct polling_t polling;        //for polling media changed
+#endif	
 };
 #define to_scsi_disk(obj) container_of(obj,struct scsi_disk,dev)
 

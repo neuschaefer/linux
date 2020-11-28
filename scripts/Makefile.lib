@@ -273,6 +273,12 @@ $(obj)/%.dtb: $(src)/%.dts FORCE
 
 dtc-tmp = $(subst $(comma),_,$(dot-target).dts.tmp)
 
+# cat
+# ---------------------------------------------------------------------------
+# Concatentate multiple files together
+quiet_cmd_cat = CAT     $@
+cmd_cat = (cat $(filter-out FORCE,$^) > $@) || (rm -f $@; false)
+
 # Bzip2
 # ---------------------------------------------------------------------------
 
@@ -318,7 +324,7 @@ MKIMAGE := $(srctree)/scripts/mkuboot.sh
 
 # SRCARCH just happens to match slightly more than ARCH (on sparc), so reduces
 # the number of overrides in arch makefiles
-UIMAGE_ARCH ?= $(SRCARCH)
+UIMAGE_ARCH ?= $(subst 64,,$(SRCARCH))
 UIMAGE_COMPRESSION ?= $(if $(2),$(2),none)
 UIMAGE_OPTS-y ?=
 UIMAGE_TYPE ?= kernel

@@ -87,6 +87,12 @@ struct user_hwdebug_state {
 	}		dbg_regs[16];
 };
 
+#define ARM_cpsr	regs[16]
+#define ARM_pc		pc
+#define ARM_lr		regs[6]
+#define ARM_sp		sp
+
+
 #endif /* __ASSEMBLY__ */
 
 #endif /* _UAPI__ASM_PTRACE_H */

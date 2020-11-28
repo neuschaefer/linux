@@ -28,6 +28,7 @@
 #include <asm/highmem.h>
 #include <asm/system_info.h>
 #include <asm/traps.h>
+#include <mstar/mpatch_macro.h>
 
 #include <asm/mach/arch.h>
 #include <asm/mach/map.h>
@@ -688,7 +689,7 @@ static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
 }
 
 #ifndef CONFIG_ARM_LPAE
-static void __init create_36bit_mapping(struct map_desc *md,
+static void create_36bit_mapping(struct map_desc *md,
 					const struct mem_type *type)
 {
 	unsigned long addr, length, end;
@@ -756,7 +757,7 @@ static void __init create_36bit_mapping(struct map_desc *md,
  * offsets, and we take full advantage of sections and
  * supersections.
  */
-static void __init create_mapping(struct map_desc *md)
+static void create_mapping(struct map_desc *md)
 {
 	unsigned long addr, length, end;
 	phys_addr_t phys;
@@ -953,8 +954,14 @@ void __init debug_ll_io_init(void)
 }
 #endif
 
-static void * __initdata vmalloc_min =
-	(void *)(VMALLOC_END - (240 << 20) - VMALLOC_OFFSET);
+#ifdef CONFIG_MP_SYNC_3_1_10_SETTING_VMALLOC_SETTING
+static void * __initdata vmalloc_min = (void *)(VMALLOC_END - SZ_128M);
+unsigned long vmalloc_end_check = (VMALLOC_END - SZ_128M);
+#else
+static void * __initdata vmalloc_min = (void *)(VMALLOC_END - (240 << 20) - VMALLOC_OFFSET);
+unsigned long vmalloc_end_check = (VMALLOC_END - (240 << 20) - VMALLOC_OFFSET);
+#endif
+EXPORT_SYMBOL(vmalloc_end_check);
 
 /*
  * vmalloc=size forces the vmalloc area to be exactly 'size'
@@ -993,6 +1000,35 @@ void __init sanity_check_meminfo(void)
 	for (i = 0, j = 0; i < meminfo.nr_banks; i++) {
 		struct membank *bank = &meminfo.bank[j];
 		*bank = meminfo.bank[i];
+
+#if 1 // cyli add to fix lowmem size as miu0 size
+	if (0 == i) {
+		vmalloc_min = (void *)(PAGE_OFFSET + bank->size);
+		printk("fix lowmem size as miu0 size, vmalloc_min = 0x%p\n", vmalloc_min);
+	}
+#endif
+
+#ifdef CONFIG_SPARSEMEM
+		if (pfn_to_section_nr(bank_pfn_start(bank)) !=
+		    pfn_to_section_nr(bank_pfn_end(bank) - 1)) {
+			phys_addr_t sz;
+			unsigned long start_pfn = bank_pfn_start(bank);
+			unsigned long end_pfn = SECTION_ALIGN_UP(start_pfn + 1);
+			sz = ((phys_addr_t)(end_pfn - start_pfn) << PAGE_SHIFT);
+
+			if (meminfo.nr_banks >= NR_BANKS) {
+				pr_crit("NR_BANKS too low, ignoring %lld bytes of memory\n",
+					(unsigned long long)(bank->size - sz));
+			} else {
+				memmove(bank + 1, bank,
+					(meminfo.nr_banks - i) * sizeof(*bank));
+				meminfo.nr_banks++;
+				bank[1].size -= sz;
+				bank[1].start = __pfn_to_phys(end_pfn);
+			}
+			bank->size = sz;
+		}
+#endif
 
 		if (bank->start > ULONG_MAX)
 			highmem = 1;
@@ -1292,6 +1328,106 @@ static void __init map_lowmem(void)
 		create_mapping(&map);
 	}
 }
+
+#if (MP_PLATFORM_UTOPIA2K_EXPORT_SYMBOL == 1)
+void map_driver_mem(unsigned long drv_ba, unsigned long len, unsigned long va, bool non_cache)
+{
+    struct map_desc map;
+
+    map.pfn = __phys_to_pfn(drv_ba);
+    map.length = len;
+    map.virtual = va;
+    if(non_cache)
+        map.type = MT_MEMORY_NONCACHED;
+    else
+        map.type = MT_MEMORY;
+
+    create_mapping(&map);
+}
+EXPORT_SYMBOL(map_driver_mem);
+/*************************************************************************************************
+This function only can be used to unmap the area that created by create_mapping(MsOS_MPool_Mapping)
+The unmapping size needs to align with 0x100000, which is the same as create_mapping
+**************************************************************************************************/
+int clear_driver_map(unsigned long drv_va, unsigned long len){
+   unsigned long clear_addr;
+/*for unmapping debug,get the value of ttbr0(user) and ttbr1(kernel)*/
+#if (MP_PLATFORM_UTOPIA2K_EXPORT_SYMBOL_DEBUG == 1)
+   unsigned long ttb = 0,ttb1 = 0;
+   asm volatile(
+  	" mrc p15, 0, %0, c2, c0, 0 @ read TTBR0\n"
+   : "=r" (ttb));
+   asm volatile(
+  	" mrc p15, 0, %0, c2, c0, 1 @ read TTBR1\n"
+   : "=r" (ttb1));
+   printk("!!!!!!!!!!!!!drv_va is:%#x and ttbr0 is:%#x,ttbr1:%#x\n",drv_va,ttb,ttb1);
+#endif
+   //k means kernel
+   pgd_t *pgd, *pgd_k;
+   pud_t *pud, *pud_k;
+   pmd_t *pmd, *pmd_k;
+   pte_t *pte, *pte_k;
+   unsigned int index;
+
+   for (clear_addr = drv_va; clear_addr < (drv_va + len); clear_addr += PGDIR_SIZE){
+
+	index = pgd_index(clear_addr);
+	pgd = cpu_get_pgd()+index;
+	pgd_k = init_mm.pgd + index;
+
+	if (pgd_none(*pgd_k))
+	        goto bad_area;
+        if (!pgd_present(*pgd))
+	        set_pgd(pgd, *pgd_k);
+
+	pud = pud_offset(pgd, clear_addr);
+        pud_k = pud_offset(pgd_k, clear_addr);
+
+	if (pud_none(*pud_k))
+	        goto bad_area;
+        if (!pud_present(*pud))
+                set_pud(pud, *pud_k);
+
+	pmd = pmd_offset(pud, clear_addr);
+        pmd_k = pmd_offset(pud_k, clear_addr);
+
+
+	index = (clear_addr >> SECTION_SHIFT) & 1;
+	if (pmd_none(pmd_k[index]))
+	        goto bad_area;
+
+	//index is 1 means clear_adr is aligned with 0x100000 not 0x200000, if we want to clear a pair of pmd, we need to shift 1 index
+	if(index == 1){
+		pmd += 1;
+		pmd_k += 1;
+	}
+
+#if (MP_PLATFORM_UTOPIA2K_EXPORT_SYMBOL_DEBUG == 1)
+	printk("!!!After Unmapping pgd is:%#x, and cpu pgd is:%#x and upper pmd_k content is:%#x lower pmd_k content is:%#x,clear_addr,index:%#x,:%d!!!\n",pmd_k,pmd,pmd_k[0],pmd_k[1],clear_addr,index);
+#endif
+	if(clear_addr + PGDIR_SIZE <= drv_va + len){
+		pmd_clear(pmd);
+		/*if we didn't clear mapping that stored the pmd of process 0 by init_mm(store all the kernal mapping), do_translation_fault will copy pmd_k to pmd again*/
+	   	pmd_clear(pmd_k);
+	}
+	/*This case means the size is not aligned with 0x200000, so we only need to clear the last 1 0x100000 to prevent clearing extra 0x100000 space*/
+	else{
+		pmd_clear_upper(pmd);
+		/*if we didn't clear mapping that stored the pmd of process 0 by init_mm(store all the kernal mapping), do_translation_fault will copy pmd_k to pmd again*/
+	   	pmd_clear_upper(pmd_k);
+	}
+
+	dsb();
+	isb();
+   }
+   flush_tlb_all();
+   return 1;
+bad_area:
+	printk("pgd or pmd are not stored in init_mm, which stored all the kernel memory map");
+	return 0;
+}
+EXPORT_SYMBOL(clear_driver_map);
+#endif
 
 /*
  * paging_init() sets up the page tables, initialises the zone memory

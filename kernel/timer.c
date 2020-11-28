@@ -42,6 +42,15 @@
 #include <linux/sched/sysctl.h>
 #include <linux/slab.h>
 #include <linux/compat.h>
+#include <mstar/mpatch_macro.h>
+
+#if (MP_DEBUG_TOOL_KDEBUG == 1)
+#ifdef CONFIG_KDEBUGD_COUNTER_MONITOR
+#include <kdebugd/sec_topthread.h> /*This header file is for topthread info*/
+#include <kdebugd/sec_cpuusage.h> /*This header file is for cpuusage info*/
+#endif
+#endif/*MP_DEBUG_TOOL_KDEBUG*/
+
 
 #include <asm/uaccess.h>
 #include <asm/unistd.h>
@@ -1361,6 +1370,12 @@ void update_process_times(int user_tick)
 #endif
 	scheduler_tick();
 	run_posix_cpu_timers(p);
+
+#if (MP_DEBUG_TOOL_KDEBUG == 1)
+#ifdef CONFIG_KDEBUGD_COUNTER_MONITOR
+	sec_topthread_timer_interrupt_handler (cpu);
+#endif /*CONFIG_KDEBUGD_COUNTER_MONITOR*/
+#endif /*MP_DEBUG_TOOL_KDEBUG*/
 }
 
 /*

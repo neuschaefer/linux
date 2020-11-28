@@ -13,6 +13,7 @@
 
 #include <linux/typecheck.h>
 #include <asm/irqflags.h>
+#include <mstar/mpatch_macro.h>
 
 #ifdef CONFIG_TRACE_IRQFLAGS
   extern void trace_softirqs_on(unsigned long ip);
@@ -86,17 +87,70 @@
  * if !TRACE_IRQFLAGS.
  */
 #ifdef CONFIG_TRACE_IRQFLAGS_SUPPORT
+#if (MP_DEBUG_TOOL_KDEBUG == 1)
+#ifdef CONFIG_KDEBUGD_FTRACE
+extern int kdbg_ftrace_trace_type;
+
+enum {
+	TRACER_IRQS_OFF         = (1 << 1),
+	TRACER_PREEMPT_OFF      = (1 << 2),
+};
+
+#ifdef CONFIG_PREEMPT_TRACER
+static inline int
+check_preempt_trace(void)
+{
+	return kdbg_ftrace_trace_type & TRACER_PREEMPT_OFF;
+}
+#else
+# define check_preempt_trace() (0)
+#endif
+
+#ifdef CONFIG_IRQSOFF_TRACER
+static inline int
+check_irq_trace(void)
+{
+	return kdbg_ftrace_trace_type & TRACER_IRQS_OFF;
+}
+#else
+# define check_irq_trace() (0)
+#endif
+#endif /* CONFIG_KDEBUGD_FTRACE */
+#endif /*MP_DEBUG_TOOL_KDEBUG*/
+
+#if (MP_DEBUG_TOOL_KDEBUG == 0) || !defined(CONFIG_KDEBUGD_FTRACE)
 #define local_irq_enable() \
 	do { trace_hardirqs_on(); raw_local_irq_enable(); } while (0)
+#else
+#define local_irq_enable() \
+       do { if (!check_preempt_trace() && check_irq_trace()) trace_hardirqs_on(); raw_local_irq_enable(); } while (0)
+#endif /* MP_DEBUG_TOOL_KDEBUG && CONFIG_KDEBUGD_FTRACE */
+
+#if (MP_DEBUG_TOOL_KDEBUG == 0) || !defined(CONFIG_KDEBUGD_FTRACE)
 #define local_irq_disable() \
 	do { raw_local_irq_disable(); trace_hardirqs_off(); } while (0)
+#else
+#define local_irq_disable() \
+       do { raw_local_irq_disable(); if (!check_preempt_trace() && check_irq_trace()) trace_hardirqs_off(); } while (0)
+#endif /* MP_DEBUG_TOOL_KDEBUG && CONFIG_KDEBUGD_FTRACE */
+
+#if (MP_DEBUG_TOOL_KDEBUG == 0) || !defined(CONFIG_KDEBUGD_FTRACE)
 #define local_irq_save(flags)				\
 	do {						\
 		raw_local_irq_save(flags);		\
 		trace_hardirqs_off();			\
 	} while (0)
+#else
+#define local_irq_save(flags)                          \
+       do {                                            \
+		raw_local_irq_save(flags);              \
+		if (!check_preempt_trace() && check_irq_trace())        \
+			trace_hardirqs_off();                   \
+       } while (0)
+#endif /*MP_DEBUG_TOOL_KDEBUG &&  CONFIG_KDEBUGD_FTRACE */
 
 
+#if (MP_DEBUG_TOOL_KDEBUG == 0) || !defined(CONFIG_KDEBUGD_FTRACE)
 #define local_irq_restore(flags)			\
 	do {						\
 		if (raw_irqs_disabled_flags(flags)) {	\
@@ -107,6 +161,21 @@
 			raw_local_irq_restore(flags);	\
 		}					\
 	} while (0)
+#else
+#define local_irq_restore(flags)                        \
+	do {                                            \
+		 if (raw_irqs_disabled_flags(flags)) {   \
+			raw_local_irq_restore(flags);   \
+		 if (!check_preempt_trace() && check_irq_trace())        \
+			trace_hardirqs_off();           \
+		 } else {                                \
+		 if (!check_preempt_trace() && check_irq_trace())        \
+			trace_hardirqs_on();            \
+			raw_local_irq_restore(flags);   \
+		  }                                       \
+	} while (0)
+#endif /* MP_DEBUG_TOOL_KDEBUG && CONFIG_KDEBUGD_FTRACE */
+
 #define local_save_flags(flags)				\
 	do {						\
 		raw_local_save_flags(flags);		\
@@ -124,11 +193,20 @@
 		raw_irqs_disabled_flags(_flags);	\
 	})
 
+#if (MP_DEBUG_TOOL_KDEBUG == 0) || !defined(CONFIG_KDEBUGD_FTRACE)
 #define safe_halt()				\
 	do {					\
 		trace_hardirqs_on();		\
 		raw_safe_halt();		\
 	} while (0)
+#else
+#define safe_halt()                            \
+       do {                                    \
+		if (!check_preempt_trace() && check_irq_trace())        \
+		trace_hardirqs_on();            \
+		raw_safe_halt();                \
+       } while (0)
+#endif /* MP_DEBUG_TOOL_KDEBUG && CONFIG_KDEBUGD_FTRACE */
 
 
 #else /* !CONFIG_TRACE_IRQFLAGS_SUPPORT */

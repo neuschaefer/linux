@@ -10,7 +10,8 @@
  */
 
 #include <linux/input.h>
-
+#if 1
+#if 0
 enum rc_type {
 	RC_TYPE_UNKNOWN		= 0,	/* Protocol not known */
 	RC_TYPE_OTHER		= 1,	/* Protocol known but proprietary */
@@ -31,6 +32,48 @@ enum rc_type {
 	RC_TYPE_RC6_6A_32	= 16,	/* Philips RC6-6A-32 protocol */
 	RC_TYPE_RC6_MCE		= 17,	/* MCE (Philips RC6-6A-32 subtype) protocol */
 };
+#endif
+#define	RC_TYPE_UNKNOWN		0	/* Protocol not known */
+#define	RC_TYPE_OTHER		1	/* Protocol known but proprietary */
+#define	RC_TYPE_LIRC		2	/* Pass raw IR to lirc userspace */
+#define	RC_TYPE_RC5	        3	/* Philips RC5 protocol */
+#define	RC_TYPE_RC5X	    4	/* Philips RC5x protocol */
+#define	RC_TYPE_RC5_SZ		5	/* StreamZap variant of RC5 */
+#define	RC_TYPE_JVC		    6	/* JVC protocol */
+#define	RC_TYPE_SONY12		7	/* Sony 12 bit protocol */
+#define	RC_TYPE_SONY15		8	/* Sony 15 bit protocol */
+#define	RC_TYPE_SONY20		9	/* Sony 20 bit protocol */
+#define	RC_TYPE_NEC		    10	/* NEC protocol */
+#define	RC_TYPE_SANYO	    11	/* Sanyo protocol */
+#define	RC_TYPE_MCE_KBD		12	/* RC6-ish MCE keyboard/mouse */
+#define	RC_TYPE_RC6_0		13	/* Philips RC6-0-16 protocol */
+#define	RC_TYPE_RC6_6A_20	14	/* Philips RC6-6A-20 protocol */
+#define	RC_TYPE_RC6_6A_24	15	/* Philips RC6-6A-24 protocol */
+#define	RC_TYPE_RC6_6A_32	16	/* Philips RC6-6A-32 protocol */
+#define	RC_TYPE_RC6_MCE		17	/* MCE (Philips RC6-6A-32 subtype) protocol */
+
+#define RC_TYPE_ALL (RC_TYPE_OTHER | RC_TYPE_LIRC | RC_TYPE_RC5 | RC_TYPE_RC5X | \
+		     RC_TYPE_RC5_SZ | RC_TYPE_JVC | RC_TYPE_SONY12 | RC_TYPE_SONY15 | RC_TYPE_SONY20 | \
+		     RC_TYPE_NEC | RC_TYPE_SANYO | RC_TYPE_MCE_KBD | RC_TYPE_RC6_0 | RC_TYPE_RC6_6A_20 | \
+             RC_TYPE_RC6_6A_24 | RC_TYPE_RC6_6A_32 | RC_TYPE_RC6_MCE )
+
+#else
+
+#define RC_TYPE_UNKNOWN	0
+#define RC_TYPE_RC5	(1  << 0)	/* Philips RC5 protocol */
+#define RC_TYPE_NEC	(1  << 1)
+#define RC_TYPE_RC6	(1  << 2)	/* Philips RC6 protocol */
+#define RC_TYPE_JVC	(1  << 3)	/* JVC protocol */
+#define RC_TYPE_SONY	(1  << 4)	/* Sony12/15/20 protocol */
+#define RC_TYPE_RC5_SZ	(1  << 5)	/* RC5 variant used by Streamzap */
+#define RC_TYPE_MCE_KBD	(1  << 29)	/* RC6-ish MCE keyboard/mouse */
+#define RC_TYPE_LIRC	(1  << 30)	/* Pass raw IR to lirc userspace */
+#define RC_TYPE_OTHER	(1u << 31)
+
+#define RC_TYPE_ALL (RC_TYPE_RC5 | RC_TYPE_NEC  | RC_TYPE_RC6  | \
+		     RC_TYPE_JVC | RC_TYPE_SONY | RC_TYPE_LIRC | \
+		     RC_TYPE_RC5_SZ | RC_TYPE_MCE_KBD | RC_TYPE_OTHER)
+#endif
 
 #define RC_BIT_NONE		0
 #define RC_BIT_UNKNOWN		(1 << RC_TYPE_UNKNOWN)
@@ -70,7 +113,8 @@ struct rc_map {
 	unsigned int		size;	/* Max number of entries */
 	unsigned int		len;	/* Used number of entries */
 	unsigned int		alloc;	/* Size of *scan in bytes */
-	enum rc_type		rc_type;
+        //enum rc_type		rc_type;
+        u64         rc_type;
 	const char		*name;
 	spinlock_t		lock;
 };
@@ -192,6 +236,7 @@ void rc_map_init(void);
 #define RC_MAP_VIDEOMATE_TV_PVR          "rc-videomate-tv-pvr"
 #define RC_MAP_WINFAST                   "rc-winfast"
 #define RC_MAP_WINFAST_USBII_DELUXE      "rc-winfast-usbii-deluxe"
+
 
 /*
  * Please, do not just append newer Remote Controller names at the end.

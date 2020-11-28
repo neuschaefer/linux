@@ -205,6 +205,11 @@ int copy_thread(unsigned long clone_flags, unsigned long stack_start,
 		if (is_compat_thread(task_thread_info(p))) {
 			if (stack_start)
 				childregs->compat_sp = stack_start;
+#if (MP_DEBUG_TOOL_KDEBUG == 1)
+#ifdef CONFIG_SHOW_FAULT_TRACE_INFO
+				p->user_ssp = childregs->ARM_sp;
+#endif /*CONFIG_SHOW_FAULT_TRACE_INFO*/
+#endif/*MP_DEBUG_TOOL_KDEBUG*/
 		} else {
 			/*
 			 * Read the current TLS pointer from tpidr_el0 as it may be

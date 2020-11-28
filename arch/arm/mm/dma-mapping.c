@@ -298,7 +298,11 @@ static void __dma_free_remap(void *cpu_addr, size_t size)
 	vunmap(cpu_addr);
 }
 
-#define DEFAULT_DMA_COHERENT_POOL_SIZE	SZ_256K
+#ifdef CONFIG_MP_WIFI_INC_DEFAULT_DMA_COHERENT_POOL_SIZE
+#define DEFAULT_DMA_COHERENT_POOL_SIZE	(SZ_1M + SZ_256K)
+#else  //CONFIG_MP_WIFI_INC_DEFAULT_DMA_COHERENT_POOL_SIZE
+#define DEFAULT_DMA_COHERENT_POOL_SIZE	SZ_1M
+#endif //CONFIG_MP_WIFI_INC_DEFAULT_DMA_COHERENT_POOL_SIZE
 
 struct dma_pool {
 	size_t size;
@@ -564,6 +568,8 @@ static void *__alloc_from_contiguous(struct device *dev, size_t size,
 	struct page *page;
 	void *ptr;
 
+
+
 	page = dma_alloc_from_contiguous(dev, count, order);
 	if (!page)
 		return NULL;
@@ -710,6 +716,41 @@ static void *arm_coherent_dma_alloc(struct device *dev, size_t size,
 	return __dma_alloc(dev, size, handle, gfp, prot, true,
 			   __builtin_return_address(0));
 }
+
+#ifdef CONFIG_MP_ION_PATCH_MSTAR
+void *alloc_from_contiguous_addr(struct device *dev, unsigned long start,
+																int size, unsigned int align,
+																dma_addr_t *handle)
+{
+	unsigned long order = get_order(size);
+	size_t count = size >> PAGE_SHIFT;
+	struct page *page;
+	void *ptr;
+	pgprot_t prot = __get_dma_pgprot(NULL, pgprot_kernel);
+
+	page = dma_alloc_from_contiguous_addr(dev, start,count,align);
+	if (!page)
+		return NULL;
+
+	__dma_clear_buffer(page, size);
+
+	if (PageHighMem(page)) {
+		ptr = __dma_alloc_remap(page, size, GFP_KERNEL, prot, NULL);
+		if (!ptr) {
+			dma_release_from_contiguous(dev, page, count);
+			return NULL;
+		}
+	} else {
+		__dma_remap(page, size, prot);
+		ptr = page_address(page);
+	}
+	if(ptr)
+		*handle = pfn_to_dma(dev, page_to_pfn(page));
+
+	return ptr;
+	
+}
+#endif
 
 /*
  * Create userspace mapping for the DMA-coherent memory.

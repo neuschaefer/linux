@@ -95,6 +95,9 @@ static void __uart_start(struct tty_struct *tty)
 	struct uart_state *state = tty->driver_data;
 	struct uart_port *port = state->uart_port;
 
+	if (port->ops->wake_peer)
+		port->ops->wake_peer(port);
+
 	if (!uart_circ_empty(&state->xmit) && state->xmit.buf &&
 	    !tty->stopped && !tty->hw_stopped)
 		port->ops->start_tx(port);
@@ -127,6 +130,7 @@ uart_update_mctrl(struct uart_port *port, unsigned int set, unsigned int clear)
 
 #define uart_set_mctrl(port, set)	uart_update_mctrl(port, set, 0)
 #define uart_clear_mctrl(port, clear)	uart_update_mctrl(port, 0, clear)
+#define RTSCTS_core 0
 
 /*
  * Startup the port.  This will be called once per open.  All calls
@@ -173,8 +177,13 @@ static int uart_port_startup(struct tty_struct *tty, struct uart_state *state,
 			 * Setup the RTS and DTR signals once the
 			 * port is open and ready to respond.
 			 */
+		#if RTSCTS_core
+			if (tty->termios.c_cflag & CBAUD)
+				uart_set_mctrl(uport, TIOCM_RTS);
+		#else			 
 			if (tty->termios.c_cflag & CBAUD)
 				uart_set_mctrl(uport, TIOCM_RTS | TIOCM_DTR);
+        #endif
 		}
 
 		if (tty_port_cts_enabled(port)) {
@@ -1874,7 +1883,11 @@ uart_set_options(struct uart_port *port, struct console *co,
 	 * some uarts on other side don't support no flow control.
 	 * So we set * DTR in host uart to make them happy
 	 */
+#if RTSCTS_core
+	port->mctrl |= TIOCM_RTS;
+#else
 	port->mctrl |= TIOCM_DTR;
+#endif
 
 	port->ops->set_termios(port, &termios, &dummy);
 	/*

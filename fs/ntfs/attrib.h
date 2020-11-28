@@ -31,6 +31,10 @@
 #include "runlist.h"
 #include "volume.h"
 
+#if (MP_NTFS_VOLUME_LABEL==1)
+extern ntfschar AT_UNNAMED[];
+#endif
+
 /**
  * ntfs_attr_search_ctx - used in attribute search functions
  * @mrec:	buffer containing mft record to search

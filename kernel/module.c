@@ -66,6 +66,7 @@
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/module.h>
+#include <mstar/mpatch_macro.h>
 
 #ifndef ARCH_SHF_SMALL
 #define ARCH_SHF_SMALL 0
@@ -93,6 +94,13 @@
 
 /* If this is set, the section belongs in the init part of the module */
 #define INIT_OFFSET_MASK (1UL << (BITS_PER_LONG-1))
+
+#if (MP_DEBUG_TOOL_OPROFILE == 1)
+#ifdef CONFIG_ADVANCE_OPROFILE
+/* Protects module list */
+static DEFINE_SPINLOCK(modlist_lock);
+#endif
+#endif /*MP_DEBUG_TOOL_OPROFILE*/
 
 /*
  * Mutex protects:
@@ -890,6 +898,12 @@ SYSCALL_DEFINE2(delete_module, const char __user *, name_user,
 
 	/* Store the name of the last unloaded module for diagnostic purposes */
 	strlcpy(last_unloaded_module, mod->name, sizeof(last_unloaded_module));
+
+#if (MP_DEBUG_TOOL_OPROFILE == 1)
+#ifdef CONFIG_PRINT_MODULE_ADDR
+	printk(KERN_EMERG"%s mod uld\n", mod->name);
+#endif
+#endif /*MP_DEBUG_TOOL_OPROFILE*/
 
 	free_module(mod);
 	return 0;
@@ -3135,6 +3149,13 @@ static int may_init_module(void)
 	return 0;
 }
 
+#if (MP_DEBUG_TOOL_COREDUMP == 1)
+/* VDLP.4.2.x patch, ultimate coredump check usb modules, 2009-10-07 */
+struct module *ultimate_module_check(const char * name)
+{
+	return find_module(name);
+}
+#endif /*MP_DEBUG_TOOL_COREDUMP*/
 /*
  * We try to place it in the list now to make sure it's unique before
  * we dedicate too many resources.  In particular, temporary percpu
@@ -3812,6 +3833,31 @@ struct module *__module_text_address(unsigned long addr)
 	return mod;
 }
 EXPORT_SYMBOL_GPL(__module_text_address);
+
+#if (MP_DEBUG_TOOL_OPROFILE == 1)
+#ifdef CONFIG_ADVANCE_OPROFILE
+/* Check Is this a valid module address? and return module if available */
+struct module *aop_get_module_struct(unsigned long addr)
+{
+	unsigned long flags;
+	struct module *mod;
+
+	spin_lock_irqsave(&modlist_lock, flags);
+
+	list_for_each_entry(mod, &modules, list) {
+		if (within(addr, mod->module_init, mod->init_text_size)
+				|| within(addr, mod->module_core, mod->core_text_size)) {
+			spin_unlock_irqrestore(&modlist_lock, flags);
+			return mod;
+		}
+	}
+
+	spin_unlock_irqrestore(&modlist_lock, flags);
+
+	return NULL;
+}
+#endif /* CONFIG_ADVANCE_OPROFILE */
+#endif /*MP_DEBUG_TOOL_OPROFILE*/
 
 /* Don't grab lock, we're oopsing. */
 void print_modules(void)

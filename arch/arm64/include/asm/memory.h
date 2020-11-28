@@ -26,6 +26,19 @@
 #include <linux/types.h>
 #include <asm/sizes.h>
 
+#if defined(CONFIG_MP_CMA_PATCH_CMA_64_BIT_TEMP_MODIFICATION)
+/* if include <mach/memory.h>, some macro will be multiple-defined, so I just move wantted macros to here */
+#if 0
+#include <mach/memory.h>
+#else
+/* bank page offsets */
+#define PAGE_OFFSET1    (PAGE_OFFSET + lx_mem_size)
+/* page offset of LX_MEM3*/
+#define PAGE_OFFSET2    (PAGE_OFFSET1 + lx_mem2_size)
+#define INVALID_PHY_ADDR 0xFFFFFFFFULL
+#endif
+#endif
+
 /*
  * Allow for constants defined here to be used from assembly code
  * by prepending the UL suffix only with actual C code compilation.
@@ -94,7 +107,8 @@
 
 extern phys_addr_t		memstart_addr;
 /* PHYS_OFFSET - the physical address of the start of memory. */
-#define PHYS_OFFSET		({ memstart_addr; })
+#define PHYS_OFFSET	        UL(CONFIG_MEMORY_START_ADDRESS)
+	
 
 /*
  * PFNs are used to describe any physical page; this means

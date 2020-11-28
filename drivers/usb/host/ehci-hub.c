@@ -16,6 +16,8 @@
  * Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+#include <mstar/mpatch_macro.h>
+
 /* this file is part of ehci-hcd.c */
 
 /*-------------------------------------------------------------------------*/
@@ -341,6 +343,9 @@ static int ehci_bus_suspend (struct usb_hcd *hcd)
 
  done:
 	ehci->next_statechange = jiffies + msecs_to_jiffies(10);
+#if (MP_USB_MSTAR==1)
+	disable_irq(hcd->irq); //20120301, for system suspend-resume
+#endif
 	ehci->enabled_hrtimer_events = 0;
 	ehci->next_hrtimer_event = EHCI_HRTIMER_NO_EVENT;
 	spin_unlock_irq (&ehci->lock);
@@ -893,6 +898,7 @@ static int ehci_hub_control (
 		if ((temp & PORT_RESET)
 				&& time_after_eq(jiffies,
 					ehci->reset_done[wIndex])) {
+
 			status |= USB_PORT_STAT_C_RESET << 16;
 			ehci->reset_done [wIndex] = 0;
 			clear_bit(wIndex, &ehci->resuming_ports);
@@ -900,6 +906,7 @@ static int ehci_hub_control (
 			/* force reset to complete */
 			ehci_writel(ehci, temp & ~(PORT_RWC_BITS | PORT_RESET),
 					status_reg);
+									 
 			/* REVISIT:  some hardware needs 550+ usec to clear
 			 * this bit; seems too long to spin routinely...
 			 */
@@ -1047,6 +1054,17 @@ static int ehci_hub_control (
 			 * which can be fine if this root hub has a
 			 * transaction translator built in.
 			 */
+#if (MP_USB_MSTAR==1)
+			if (!(temp & PORT_CONNECT))
+			{
+				/* fail reset process, if device has gone */
+				printk("[USB] device has gone before bus reset\n");
+				retval = -ENODEV;
+				goto error_exit;
+			}
+
+			{
+#else
 			if ((temp & (PORT_PE|PORT_CONNECT)) == PORT_CONNECT
 					&& !ehci_is_TDI(ehci)
 					&& PORT_USB11 (temp)) {
@@ -1055,6 +1073,7 @@ static int ehci_hub_control (
 					wIndex + 1);
 				temp |= PORT_OWNER;
 			} else {
+#endif
 				ehci_vdbg (ehci, "port %d reset\n", wIndex + 1);
 				temp |= PORT_RESET;
 				temp &= ~PORT_PE;

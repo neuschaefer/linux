@@ -174,6 +174,16 @@ struct timeval;
 extern void swsusp_show_speed(struct timeval *, struct timeval *,
 				unsigned int, char *);
 
+#if defined(CONFIG_MP_MSTAR_STR_BASE)
+#define STENT_RESUME_FROM_SUSPEND   3
+extern void set_state_value(int value);
+extern int get_state_value(void);
+extern void set_state_entering(void);
+extern void clear_state_entering(void);
+extern int is_mstar_str(void);
+extern int get_str_max_cnt(void);
+#endif
+
 #ifdef CONFIG_SUSPEND
 /* kernel/power/suspend.c */
 extern const char *const pm_states[];

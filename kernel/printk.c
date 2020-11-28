@@ -50,6 +50,14 @@
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/printk.h>
+#include <mstar/mpatch_macro.h>
+#if (MP_DEBUG_TOOL_COREDUMP == 1)
+#include <linux/vt_kern.h>
+#endif /*MP_DEBUG_TOOL_CODEDUMP*/
+
+#ifdef CONFIG_EARLY_PRINTK_DIRECT
+extern void printascii(char *);
+#endif
 
 /* printk's without a loglevel use this.. */
 #define DEFAULT_MESSAGE_LOGLEVEL CONFIG_DEFAULT_MESSAGE_LOGLEVEL
@@ -1261,6 +1269,69 @@ SYSCALL_DEFINE3(syslog, int, type, char __user *, buf, int, len)
 	return do_syslog(type, buf, len, SYSLOG_FROM_READER);
 }
 
+#if (MP_DEBUG_TOOL_COREDUMP == 1)
+#ifdef CONFIG_SEPARATE_PRINTK_FROM_USER
+void _sep_printk_start(void)
+{
+	struct console *con;
+	struct tty_driver *tty_drv, *tty_driver;
+	int index;
+	struct tty_struct *tty = NULL;
+
+	for_each_console(con) {
+		if ((con->flags & CON_ENABLED) && con->write &&
+		    (cpu_online(raw_smp_processor_id()) ||
+		    (con->flags & CON_ANYTIME))) {
+			tty_drv = con->device(con, &index);
+			tty_driver =  tty_driver_kref_get(tty_drv);
+			if (tty_driver) {
+				if (strcmp(con->name, "tty") == 0) {
+					index = fg_console;
+					tty = tty_init_dev(tty_driver, index);
+				}
+				else {
+					if (tty_drv->ttys[index])
+						tty = tty_drv->ttys[index];
+					else
+						tty = tty_init_dev(tty_driver, index);
+				}
+				tty_driver_kref_put(tty_driver);
+			}
+			if (tty) {
+				tty->hw_stopped = 1;
+				/* tty_drv->stop(tty_drv->ttys[index]); */
+			}
+		}
+	}
+}
+
+void _sep_printk_end(void)
+{
+	struct console *con;
+	struct tty_driver *tty_drv, *tty_driver;
+	int index;
+	struct tty_struct *tty = NULL;
+
+	for_each_console(con) {
+		if ((con->flags & CON_ENABLED) && con->write &&
+		    (cpu_online(raw_smp_processor_id()) ||
+		    (con->flags & CON_ANYTIME))) {
+			tty_drv = con->device(con, &index);
+			tty_driver = tty_driver_kref_get(tty_drv);
+			if (tty_driver) {
+				if (strcmp(con->name, "tty") == 0)
+					index = fg_console;
+					tty = tty_drv->ttys[index];
+					tty->hw_stopped = 0;
+					/* tty_drv->start(tty_drv->ttys[index]); */
+					tty_driver_kref_put(tty_driver);
+			}
+		}
+	}
+}
+#endif /*CONFIG_SEPARATE_PRINTK_FROM_USER*/
+#endif /*MP_DEBUG_TOOL_COREDUMP*/
+
 /*
  * Call the console drivers, asking them to write out
  * log_buf[start] to log_buf[end - 1].
@@ -1577,6 +1648,10 @@ asmlinkage int vprintk_emit(int facility, int level,
 			text = (char *)end_of_header;
 		}
 	}
+
+#ifdef CONFIG_EARLY_PRINTK_DIRECT
+	printascii(text);
+#endif
 
 	if (level == -1)
 		level = default_message_loglevel;

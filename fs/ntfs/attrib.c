@@ -34,6 +34,9 @@
 #include "mft.h"
 #include "ntfs.h"
 #include "types.h"
+#if (MP_NTFS_VOLUME_LABEL==1)
+ntfschar AT_UNNAMED[] = { cpu_to_le16('\0') };
+#endif
 
 /**
  * ntfs_map_runlist_nolock - map (a part of) a runlist of an ntfs inode

@@ -27,6 +27,7 @@
 #include <linux/path.h>
 #include <linux/compat.h>
 #include <asm/uaccess.h>
+#include <mstar/mpatch_macro.h>
 
 /* The dcookies are allocated from a kmem_cache and
  * hashed onto a small number of lists. None of the
@@ -213,6 +214,109 @@ COMPAT_SYSCALL_DEFINE4(lookup_dcookie, u32, w0, u32, w1, char __user *, buf, siz
 #endif
 }
 #endif
+
+#if (MP_DEBUG_TOOL_OPROFILE == 1)
+#ifdef CONFIG_ADVANCE_OPROFILE
+/* And here is where the userspace process can look up the cookie value
+ * to retrieve the path.
+ */
+asmlinkage long aop_sys_lookup_dcookie(u64 cookie64, char *buf, size_t len)
+{
+	unsigned long cookie = (unsigned long)cookie64;
+	int err = -EINVAL;
+	char *kbuf;
+	char *path;
+	size_t pathlen;
+	struct dcookie_struct *dcs;
+
+	/* we could leak path information to users
+	 * without dir read permission without this
+	 */
+	if (!capable(CAP_SYS_ADMIN))
+		return -EPERM;
+
+	mutex_lock(&dcookie_mutex);
+
+	if (!is_live()) {
+		err = -EINVAL;
+		goto out;
+	}
+
+	dcs = find_dcookie(cookie);
+	if (!dcs)
+		goto out;
+
+	err = -ENOMEM;
+	kbuf = kmalloc(PAGE_SIZE, GFP_KERNEL);
+	if (!kbuf)
+		goto out;
+
+	/* FIXME: (deleted) ? */
+	path = d_path(&dcs->path, kbuf, PAGE_SIZE);
+
+	if (IS_ERR(path)) {
+		err = PTR_ERR(path);
+		goto out_free;
+	}
+
+	err = -ERANGE;
+
+	pathlen = kbuf + PAGE_SIZE - path;
+	if (pathlen <= len) {
+		err = pathlen;
+		memcpy(buf, path, pathlen);
+	}
+
+out_free:
+	kfree(kbuf);
+out:
+	mutex_unlock(&dcookie_mutex);
+	return err;
+}
+
+/* lookup the dcookies and get the binary name without path */
+asmlinkage long aop_lookup_dcookie(u64 cookie64, char *buf, size_t len)
+{
+	unsigned long cookie = (unsigned long)cookie64;
+	int err = -EINVAL;
+	size_t pathlen;
+	struct dcookie_struct *dcs;
+
+	if (!buf)
+		goto out;
+
+	/* we could leak path information to users
+	 * without dir read permission without this
+	 */
+	if (!capable(CAP_SYS_ADMIN))
+		return -EPERM;
+
+	mutex_lock(&dcookie_mutex);
+
+	if (!is_live()) {
+		err = -EINVAL;
+		goto out;
+	}
+
+	dcs = find_dcookie(cookie);
+	if (!dcs)
+		goto out;
+
+	pathlen = strlen (dcs->path.dentry->d_iname);
+	if (pathlen > len)
+		pathlen = len;
+
+	err = pathlen;
+
+	/* copy the image name */
+	memcpy(buf, dcs->path.dentry->d_iname, pathlen);
+
+out:
+	mutex_unlock(&dcookie_mutex);
+	return err;
+}
+#endif /* CONFIG_ADVANCE_OPROFILE */
+#endif /*MP_DEBUG_TOOL_OPROFILE*/
 
 static int dcookie_init(void)
 {

@@ -538,6 +538,10 @@ extern struct ratelimit_state dm_ratelimit_state;
 
 #define SECTOR_SHIFT 9
 
+#if (MP_security_dm_verity == 1)
+#define SECTOR_SIZE 512
+#endif/*MP_security_dm_verity*/
+
 /*
  * Definitions of return values from target end_io function.
  */

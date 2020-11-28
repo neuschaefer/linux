@@ -183,7 +183,7 @@ void __init early_init_dt_add_memory_arch(u64 base, u64 size)
 	}
 	if (base < PHYS_OFFSET) {
 		pr_warning("Ignoring memory range 0x%llx - 0x%llx\n",
-			   base, PHYS_OFFSET);
+			   base, (u64)PHYS_OFFSET);
 		size -= PHYS_OFFSET - base;
 		base = PHYS_OFFSET;
 	}
@@ -244,10 +244,13 @@ static void __init request_standard_resources(void)
 
 u64 __cpu_logical_map[NR_CPUS] = { [0 ... NR_CPUS-1] = INVALID_HWID };
 
+extern void early_putstr(const char *fmt, ...);
+extern void __init prom_meminit(void);
 void __init setup_arch(char **cmdline_p)
 {
 	setup_processor();
 
+    early_putstr("__fdt_pointer=0x%x\n",__fdt_pointer );
 	setup_machine_fdt(__fdt_pointer);
 
 	init_mm.start_code = (unsigned long) _text;
@@ -259,8 +262,12 @@ void __init setup_arch(char **cmdline_p)
 
 	parse_early_param();
 
-	arm64_memblock_init();
+#if (MP_PLATFORM_ARM == 1)
+	prom_meminit();
+#endif/*MP_PLATFORM_ARM*/
 
+	arm64_memblock_init();
+        
 	paging_init();
 	request_standard_resources();
 

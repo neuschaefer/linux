@@ -41,6 +41,7 @@
 #include <asm/mach/arch.h>
 #include <asm/mach/irq.h>
 #include <asm/mach/time.h>
+#include <mstar/mpatch_macro.h>
 
 unsigned long irq_err_count;
 
@@ -117,8 +118,9 @@ void __init init_IRQ(void)
 {
 	if (IS_ENABLED(CONFIG_OF) && !machine_desc->init_irq)
 		irqchip_init();
-	else
+	else{
 		machine_desc->init_irq();
+	}
 }
 
 #ifdef CONFIG_MULTI_IRQ_HANDLER
@@ -177,6 +179,34 @@ static bool migrate_one_irq(struct irq_desc *desc)
  * Note: we must iterate over all IRQs, whether they have an attached
  * action structure or not, as we need to get chained interrupts too.
  */
+#if (MP_PLATFORM_ARM == 1)
+void migrate_irqs(void)
+{
+        unsigned int i, cpu = smp_processor_id();
+        struct irq_desc *desc;
+        unsigned long flags;
+
+        local_irq_save(flags);
+
+        for_each_irq_desc(i, desc) {
+                struct irq_data *d = &desc->irq_data;
+                bool affinity_broken = false;
+                raw_spin_lock(&desc->lock);
+                do {
+                        if (desc->action == NULL)
+                                break;
+                        if (d->node != cpu)
+                               break;
+                        affinity_broken = migrate_one_irq((struct irq_desc *)d);
+                } while (0);
+                raw_spin_unlock(&desc->lock);
+                if (affinity_broken && printk_ratelimit())
+                        pr_warning("IRQ%u no longer affine to CPU%u\n", i, cpu);
+        }
+
+        local_irq_restore(flags);
+}
+#else/*MP_PLATFORM_ARM*/
 void migrate_irqs(void)
 {
 	unsigned int i;
@@ -199,4 +229,5 @@ void migrate_irqs(void)
 
 	local_irq_restore(flags);
 }
+#endif/*MP_PLATFORM_ARM*/
 #endif /* CONFIG_HOTPLUG_CPU */

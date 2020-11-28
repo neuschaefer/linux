@@ -68,6 +68,11 @@
 #include <linux/slab.h>
 #include "xhci.h"
 
+#if (MP_USB_MSTAR==1) && (XHCI_FLUSHPIPE_PATCH)
+extern void Chip_Flush_Memory(void);
+extern void Chip_Read_Memory(void);
+#endif
+
 static int handle_cmd_in_cmd_wait_list(struct xhci_hcd *xhci,
 		struct xhci_virt_device *virt_dev,
 		struct xhci_event_cmd *event);
@@ -290,6 +295,10 @@ static inline int room_on_ring(struct xhci_hcd *xhci, struct xhci_ring *ring,
 /* Ring the host controller doorbell after placing a command on the ring */
 void xhci_ring_cmd_db(struct xhci_hcd *xhci)
 {
+#if (MP_USB_MSTAR==1) && (XHCI_FLUSHPIPE_PATCH)
+	Chip_Flush_Memory();
+#endif
+
 	if (!(xhci->cmd_ring_state & CMD_RING_STATE_RUNNING))
 		return;
 
@@ -439,6 +448,10 @@ static void ring_doorbell_for_active_rings(struct xhci_hcd *xhci,
 {
 	unsigned int stream_id;
 	struct xhci_virt_ep *ep;
+
+#if (MP_USB_MSTAR==1) && (XHCI_FLUSHPIPE_PATCH)
+	Chip_Flush_Memory();
+#endif
 
 	ep = &xhci->devs[slot_id]->eps[ep_index];
 
@@ -2075,8 +2088,19 @@ static int process_ctrl_td(struct xhci_hcd *xhci, struct xhci_td *td,
 					 * stage? */
 					*status = -EREMOTEIO;
 			} else {
+#if (MP_USB_MSTAR==1)
+				/* Don't change the actual length if short transfer event
+				 * with zero byte transmission happened.
+				 */
+				if (td->ctrl_td_zero_trans_flag == 0)
+				{
+					td->urb->actual_length =
+						td->urb->transfer_buffer_length;
+				}
+#else
 				td->urb->actual_length =
 					td->urb->transfer_buffer_length;
+#endif
 			}
 		} else {
 		/* Maybe the event was for the data stage? */
@@ -2085,6 +2109,11 @@ static int process_ctrl_td(struct xhci_hcd *xhci, struct xhci_td *td,
 				EVENT_TRB_LEN(le32_to_cpu(event->transfer_len));
 			xhci_dbg(xhci, "Waiting for status "
 					"stage event\n");
+#if (MP_USB_MSTAR==1)
+			/* Set the flag when short transfer with actual transfer length is zero. */
+			if ( (trb_comp_code == COMP_SHORT_TX) && (td->urb->actual_length == 0) )
+				td->ctrl_td_zero_trans_flag = 1;
+#endif
 			return 0;
 		}
 	}
@@ -2554,12 +2583,29 @@ static int handle_tx_event(struct xhci_hcd *xhci,
 				xhci_err(xhci,
 					"ERROR Transfer event TRB DMA ptr not "
 					"part of current TD\n");
+
+				#if (MP_USB_MSTAR==1) && defined(XHCI_TX_ERR_EVENT_PATCH)
+				if (trb_comp_code == COMP_TX_ERR) {
+					printk("Patch TRB ptr\n");
+					event_dma = xhci_trb_virt_to_dma(ep_ring->deq_seg, ep_ring->dequeue);
+					event_seg = trb_in_td(ep_ring->deq_seg, ep_ring->dequeue,
+							td->last_trb, event_dma);
+					if (event_seg)
+						goto GO_TX_EVENT;
+				}
+				#endif
+				
 				return -ESHUTDOWN;
 			}
 
 			ret = skip_isoc_td(xhci, td, event, ep, &status);
 			goto cleanup;
 		}
+
+#if (MP_USB_MSTAR==1) && defined(XHCI_TX_ERR_EVENT_PATCH)
+GO_TX_EVENT:
+#endif
+		
 		if (trb_comp_code == COMP_SHORT_TX)
 			ep_ring->last_td_was_short = true;
 		else
@@ -2742,6 +2788,10 @@ irqreturn_t xhci_irq(struct usb_hcd *hcd)
 	dma_addr_t deq;
 
 	spin_lock(&xhci->lock);
+
+#if (MP_USB_MSTAR==1) && (XHCI_FLUSHPIPE_PATCH)
+	Chip_Read_Memory(); //Flush Read buffer when H/W finished
+#endif
 	/* Check if the xHC generated the interrupt, or the irq is shared */
 	status = xhci_readl(xhci, &xhci->op_regs->status);
 	if (status == 0xffffffff)
@@ -3049,6 +3099,12 @@ static void giveback_first_trb(struct xhci_hcd *xhci, int slot_id,
 		start_trb->field[3] |= cpu_to_le32(start_cycle);
 	else
 		start_trb->field[3] &= cpu_to_le32(~TRB_CYCLE);
+
+#if (MP_USB_MSTAR==1) && (XHCI_FLUSHPIPE_PATCH)	
+	wmb();
+	Chip_Flush_Memory();
+#endif
+
 	xhci_ring_ep_doorbell(xhci, slot_id, ep_index, stream_id);
 }
 
@@ -3326,9 +3382,13 @@ int xhci_queue_bulk_tx(struct xhci_hcd *xhci, gfp_t mem_flags,
 
 	num_trbs = 0;
 	/* How much data is (potentially) left before the 64KB boundary? */
+#if (MP_USB_MSTAR==1)  //XHCI_CROSS64K_PATCH
+	running_total = 0;
+#else
 	running_total = TRB_MAX_BUFF_SIZE -
 		(urb->transfer_dma & (TRB_MAX_BUFF_SIZE - 1));
 	running_total &= TRB_MAX_BUFF_SIZE - 1;
+#endif
 
 	/* If there's some data on this 64KB chunk, or we have to send a
 	 * zero-length transfer, we need at least one TRB
@@ -3364,8 +3424,13 @@ int xhci_queue_bulk_tx(struct xhci_hcd *xhci, gfp_t mem_flags,
 			usb_endpoint_maxp(&urb->ep->desc));
 	/* How much data is in the first TRB? */
 	addr = (u64) urb->transfer_dma;
+#if (MP_USB_MSTAR==1)  //XHCI_CROSS64K_PATCH
+	trb_buff_len = TRB_MAX_BUFF_SIZE;
+#else
 	trb_buff_len = TRB_MAX_BUFF_SIZE -
 		(urb->transfer_dma & (TRB_MAX_BUFF_SIZE - 1));
+#endif
+
 	if (trb_buff_len > urb->transfer_buffer_length)
 		trb_buff_len = urb->transfer_buffer_length;
 
@@ -3933,6 +3998,17 @@ int xhci_queue_address_device(struct xhci_hcd *xhci, dma_addr_t in_ctx_ptr,
 			TRB_TYPE(TRB_ADDR_DEV) | SLOT_ID_FOR_TRB(slot_id),
 			false);
 }
+
+#if (MP_USB_MSTAR==1)
+int xhci_queue_address_device_BSR (struct xhci_hcd *xhci, dma_addr_t in_ctx_ptr,
+		u32 slot_id)
+{
+	return queue_command(xhci, lower_32_bits(in_ctx_ptr),
+			upper_32_bits(in_ctx_ptr), 0,
+			TRB_TYPE(TRB_ADDR_DEV) | SLOT_ID_FOR_TRB(slot_id) | (0x1 << 9) ,
+			false);
+}
+#endif
 
 int xhci_queue_vendor_command(struct xhci_hcd *xhci,
 		u32 field1, u32 field2, u32 field3, u32 field4)

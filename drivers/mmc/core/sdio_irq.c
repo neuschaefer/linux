@@ -86,7 +86,7 @@ static int sdio_irq_thread(void *_host)
 	unsigned long period, idle_period;
 	int ret;
 
-	sched_setscheduler(current, SCHED_FIFO, &param);
+	sched_setscheduler(current, SCHED_NORMAL, &param);
 
 	/*
 	 * We want to allow for SDIO cards to work even on non SDIO

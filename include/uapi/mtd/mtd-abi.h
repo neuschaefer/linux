@@ -103,12 +103,18 @@ struct mtd_write_req {
 #define MTD_BIT_WRITEABLE	0x800	/* Single bits can be flipped */
 #define MTD_NO_ERASE		0x1000	/* No erase necessary */
 #define MTD_POWERUP_LOCK	0x2000	/* Always locked after reset */
+#if defined(CONFIG_MTD_SLC_WRITE) && (MP_NAND_MTD == 1)
+#define MTD_MLC			0x4000	/* MLC NAND*/
+#endif
 
 /* Some common devices / combinations of capabilities */
 #define MTD_CAP_ROM		0
 #define MTD_CAP_RAM		(MTD_WRITEABLE | MTD_BIT_WRITEABLE | MTD_NO_ERASE)
 #define MTD_CAP_NORFLASH	(MTD_WRITEABLE | MTD_BIT_WRITEABLE)
 #define MTD_CAP_NANDFLASH	(MTD_WRITEABLE)
+#if defined(CONFIG_MTD_SLC_WRITE) && (MP_NAND_MTD == 1)
+#define MTD_CAP_MLC		(MTD_WRITEABLE | MTD_MLC)
+#endif
 
 /* Obsolete ECC byte placement modes (used with obsolete MEMGETOOBSEL) */
 #define MTD_NANDECC_OFF		0	// Switch off ECC (Not recommended)
@@ -210,8 +216,14 @@ struct otp_info {
 struct nand_oobinfo {
 	__u32 useecc;
 	__u32 eccbytes;
+#if (defined(CONFIG_MSTAR_NAND) || defined(CONFIG_MSTAR_SPI_NAND)) && (MP_NAND_MTD == 1)
+	__u32 oobfree[16][2];
+	__u32 eccpos[1280];
+#else
 	__u32 oobfree[8][2];
 	__u32 eccpos[32];
+#endif
+
 };
 
 struct nand_oobfree {
@@ -219,8 +231,14 @@ struct nand_oobfree {
 	__u32 length;
 };
 
+#if (defined(CONFIG_MSTAR_NAND) || defined(CONFIG_MSTAR_SPI_NAND)) && (MP_NAND_MTD == 1)
+#define MTD_MAX_OOBFREE_ENTRIES	16
+#define MTD_MAX_ECCPOS_ENTRIES	1280
+#else
 #define MTD_MAX_OOBFREE_ENTRIES	8
 #define MTD_MAX_ECCPOS_ENTRIES	64
+#endif
+
 /*
  * OBSOLETE: ECC layout control structure. Exported to user-space via ioctl
  * ECCGETLAYOUT for backwards compatbility and should not be mistaken as a
@@ -273,6 +291,9 @@ enum mtd_file_modes {
 	MTD_FILE_MODE_OTP_FACTORY = MTD_OTP_FACTORY,
 	MTD_FILE_MODE_OTP_USER = MTD_OTP_USER,
 	MTD_FILE_MODE_RAW,
+#if defined(CONFIG_MTD_SLC_WRITE) && (MP_NAND_MTD == 1)
+	MTD_MODE_SLC,
+#endif	
 };
 
 #endif /* __MTD_ABI_H__ */

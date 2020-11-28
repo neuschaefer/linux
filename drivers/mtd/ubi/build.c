@@ -16,7 +16,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  *
- * Author: Artem Bityutskiy (Битюцкий Артём),
+ * Author: Artem Bityutskiy (?и???кий ????м),
  *         Frank Haverkamp
  */
 
@@ -42,7 +42,10 @@
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include "ubi.h"
-
+#include <mstar/mpatch_macro.h>
+#if defined(CONFIG_MTD_UBI_ENHANCE_INIT) && (MP_NAND_UBI == 1)
+#include "./mstar/ubi_en_init.h"
+#endif
 /* Maximum length of the 'mtd=' parameter */
 #define MTD_PARAM_LEN_MAX 64
 
@@ -960,6 +963,18 @@ int ubi_attach_mtd_dev(struct mtd_info *mtd, int ubi_num,
 	ubi_msg("default fastmap WL pool size: %d", ubi->fm_wl_pool.max_size);
 #else
 	ubi->fm_disabled = 1;
+
+	#if (MP_NAND_UBI == 1)
+	//initial for ec array 
+	{
+		int idx;
+		for(idx = 0; idx < 10; idx++)
+		{
+			ubi->top_ec[idx] = 0;
+			ubi->last_ec[idx] = 2147483647;
+		}
+	}
+	#endif
 #endif
 	mutex_init(&ubi->buf_mutex);
 	mutex_init(&ubi->ckvol_mutex);
@@ -985,6 +1000,25 @@ int ubi_attach_mtd_dev(struct mtd_info *mtd, int ubi_num,
 	if (!ubi->fm_buf)
 		goto out_free;
 #endif
+
+#if defined(CONFIG_MTD_UBI_ENHANCE_INIT) && (MP_NAND_UBI == 1)
+	ubi->ebr = kzalloc (sizeof(struct ubi_en_bitmap_record), GFP_KERNEL);
+	if(!ubi->ebr)
+		goto out_free;
+	ubi->trn = kzalloc(sizeof(struct ubi_tbl_rcd_node) * ubi->peb_count, GFP_KERNEL);
+	if(!ubi->trn)
+		goto out_free_en;
+	ubi->tsm = kzalloc(sizeof(struct tbl_storage_manager),GFP_KERNEL);
+	if(!ubi->tsm)
+		goto out_free_en;
+	
+	memset(ubi->ebr, 0, sizeof(struct ubi_en_bitmap_record));
+	memset(ubi->trn, 0, sizeof(struct ubi_tbl_rcd_node) * ubi->peb_count);
+	memset(ubi->tsm, 0, sizeof(struct tbl_storage_manager));
+	mutex_init(&ubi->tsm->tbl_work_sem);
+	spin_lock_init(&ubi->tsm->ctrl_lock);
+#endif
+
 	err = ubi_attach(ubi, 0);
 	if (err) {
 		ubi_err("failed to attach mtd%d, error %d", mtd->index, err);
@@ -1012,6 +1046,18 @@ int ubi_attach_mtd_dev(struct mtd_info *mtd, int ubi_num,
 			err);
 		goto out_debugfs;
 	}
+
+#if defined(CONFIG_MTD_UBI_WRITE_CALLBACK) && (MP_NAND_UBI == 1)
+	spin_lock_init(&ubi->wcb_lock);
+	INIT_LIST_HEAD(&ubi->wcb_works);
+	ubi->wcb_thread = kthread_create(ubi_wcb_thread, ubi, UBI_WCB_NAME);
+	if (IS_ERR(ubi->wcb_thread)) {
+		err = PTR_ERR(ubi->wcb_thread);
+		ubi_err("cannot spawn \"%s\", error %d", UBI_WCB_NAME,
+			err);
+		goto out_debugfs;
+	}
+#endif
 
 	ubi_msg("attached mtd%d (name \"%s\", size %llu MiB) to ubi%d",
 		mtd->index, mtd->name, ubi->flash_size >> 20, ubi_num);
@@ -1041,6 +1087,13 @@ int ubi_attach_mtd_dev(struct mtd_info *mtd, int ubi_num,
 	wake_up_process(ubi->bgt_thread);
 	spin_unlock(&ubi->wl_lock);
 
+#if defined(CONFIG_MTD_UBI_WRITE_CALLBACK) && (MP_NAND_UBI == 1)
+	spin_lock(&ubi->wcb_lock);
+	ubi->wcb_thread_enabled = 1;
+	wake_up_process(ubi->wcb_thread);
+	spin_unlock(&ubi->wcb_lock);
+#endif
+
 	ubi_devices[ubi_num] = ubi;
 	ubi_notify_all(ubi, UBI_VOLUME_ADDED, NULL);
 	return ubi_num;
@@ -1055,6 +1108,15 @@ out_detach:
 	ubi_wl_close(ubi);
 	ubi_free_internal_volumes(ubi);
 	vfree(ubi->vtbl);
+#if defined(CONFIG_MTD_UBI_ENHANCE_INIT) && (MP_NAND_UBI == 1)
+out_free_en:
+	if(ubi->ebr)
+		kfree(ubi->ebr);
+	if(ubi->trn)
+		kfree(ubi->trn);
+	if(ubi->tsm)
+		kfree(ubi->tsm);
+#endif
 out_free:
 	vfree(ubi->peb_buf);
 	vfree(ubi->fm_buf);
@@ -1088,6 +1150,16 @@ int ubi_detach_mtd_dev(int ubi_num, int anyway)
 	ubi = ubi_get_device(ubi_num);
 	if (!ubi)
 		return -EINVAL;
+#if defined(CONFIG_MTD_UBI_ENHANCE_INIT) && (MP_NAND_UBI == 1)
+	if(!ubi->tsm->disable_flag)
+	{
+		mutex_lock(&ubi->tsm->tbl_work_sem);
+		eninit_msg("Sync dirty tbl and bitmap");
+		sync_dirty_tbl_storage(ubi, 0);
+		sync_bitmap_storage(ubi);
+		mutex_unlock(&ubi->tsm->tbl_work_sem);
+	}
+#endif
 
 	spin_lock(&ubi_devices_lock);
 	put_device(&ubi->dev);
@@ -1119,6 +1191,11 @@ int ubi_detach_mtd_dev(int ubi_num, int anyway)
 	if (ubi->bgt_thread)
 		kthread_stop(ubi->bgt_thread);
 
+#if defined(CONFIG_MTD_UBI_WRITE_CALLBACK) && (MP_NAND_UBI == 1)
+	if (ubi->wcb_thread)
+		kthread_stop(ubi->wcb_thread);
+#endif
+
 	/*
 	 * Get a reference to the device in order to prevent 'dev_release()'
 	 * from freeing the @ubi object.
@@ -1129,9 +1206,31 @@ int ubi_detach_mtd_dev(int ubi_num, int anyway)
 	uif_close(ubi);
 
 	ubi_wl_close(ubi);
+#if defined(CONFIG_MTD_UBI_WRITE_CALLBACK) && (MP_NAND_UBI == 1)
+	ubi_wcb_close(ubi);
+#endif
 	ubi_free_internal_volumes(ubi);
 	vfree(ubi->vtbl);
 	put_mtd_device(ubi->mtd);
+#if defined(CONFIG_MTD_UBI_BACKUP_LSB) && (MP_NAND_UBI == 1)
+	kfree(ubi->databuf);
+	kfree(ubi->oobbuf);
+#endif
+
+#if defined(CONFIG_MTD_UBI_ENHANCE_INIT) && (MP_NAND_UBI == 1)
+	en_exit();
+	vfree(ubi->tsm->val_tbl_blk);
+	vfree(ubi->tsm->valid_groups);
+	vfree(ubi->tsm->dirty_pages);
+	kfree(ubi->ebr->bh);
+	
+	if(ubi->ebr)
+		kfree(ubi->ebr);
+	if(ubi->trn)
+		kfree(ubi->trn);
+	if(ubi->tsm)
+		kfree(ubi->tsm);
+#endif
 	vfree(ubi->peb_buf);
 	vfree(ubi->fm_buf);
 	ubi_msg("mtd%d is detached from ubi%d", ubi->mtd->index, ubi->ubi_num);
@@ -1185,7 +1284,11 @@ static struct mtd_info * __init open_mtd_by_chdev(const char *mtd_dev)
  * as MTD character device node path. Returns MTD device description object in
  * case of success and a negative error code in case of failure.
  */
+#if defined(CONFIG_MTD_UBI_ENHANCE_INIT) && (MP_NAND_UBI == 1)
+struct mtd_info * __init open_mtd_device(const char *mtd_dev)
+#else
 static struct mtd_info * __init open_mtd_device(const char *mtd_dev)
+#endif
 {
 	struct mtd_info *mtd;
 	int mtd_num;
@@ -1312,7 +1415,11 @@ out:
 	ubi_err("UBI error: cannot initialize UBI, error %d", err);
 	return err;
 }
+#if defined(CONFIG_MTD_UBI_DELAY_INIT) && (MP_NAND_UBI == 1)
 late_initcall(ubi_init);
+#else
+module_init(ubi_init);
+#endif
 
 static void __exit ubi_exit(void)
 {

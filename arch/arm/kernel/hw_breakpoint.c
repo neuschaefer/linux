@@ -37,6 +37,7 @@
 #include <asm/kdebug.h>
 #include <asm/traps.h>
 #include <asm/hardware/coresight.h>
+#include <mstar/mpatch_macro.h>
 
 /* Breakpoint currently in use for each BRP. */
 static DEFINE_PER_CPU(struct perf_event *, bp_on_reg[ARM_MAX_BRP]);
@@ -873,6 +874,11 @@ static int hw_breakpoint_pending(unsigned long addr, unsigned int fsr,
 	case ARM_ENTRY_ASYNC_WATCHPOINT:
 		WARN(1, "Asynchronous watchpoint exception taken. Debugging results may be unreliable\n");
 	case ARM_ENTRY_SYNC_WATCHPOINT:
+		#if (MP_DEBUG_TOOL_COREDUMP == 1)
+		#ifdef	CONFIG_SHOW_FAULT_TRACE_INFO
+		show_usr_info(current,regs,addr);/*for watchpoint*/
+		#endif/*CONFIG_SHOW_FAULT_TRACE_INFO*/		
+		#endif /*MP_DEBUG_TOOL_COREDUMP*/
 		watchpoint_handler(addr, fsr, regs);
 		break;
 	default:

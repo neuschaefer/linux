@@ -16,7 +16,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  *
- * Author: Artem Bityutskiy (Битюцкий Артём)
+ * Author: Artem Bityutskiy (?и???кий ????м)
  */
 
 #ifndef __UBI_UBI_H__
@@ -43,6 +43,11 @@
 #include <asm/pgtable.h>
 
 #include "ubi-media.h"
+
+#include <mstar/mpatch_macro.h>
+#if defined(CONFIG_MTD_UBI_ENHANCE_INIT) && (MP_NAND_UBI == 1)
+#include "./mstar/ubi_en_init.h"
+#endif
 
 /* Maximum number of supported UBI devices */
 #define UBI_MAX_DEVICES 32
@@ -114,6 +119,10 @@ enum {
 	UBI_IO_BAD_HDR,
 	UBI_IO_BAD_HDR_EBADMSG,
 	UBI_IO_BITFLIPS,
+#if defined(CONFIG_MTD_UBI_BITFLIPS) && (MP_NAND_UBI == 1)
+	UBI_IO_BITFLIPS_BAD,
+	UBI_IO_BITFLIPS_TORTURE
+#endif
 };
 
 /*
@@ -516,6 +525,11 @@ struct ubi_device {
 	/* Note, mean_ec is not updated run-time - should be fixed */
 	int mean_ec;
 
+#if (MP_NAND_UBI == 1)
+	int top_ec[10];
+	int last_ec[10];
+#endif
+
 	/* EBA sub-system's stuff */
 	unsigned long long global_sqnum;
 	spinlock_t ltree_lock;
@@ -539,6 +553,10 @@ struct ubi_device {
 	struct rb_root free;
 	int free_count;
 	struct rb_root scrub;
+#if defined(CONFIG_MTD_UBI_BITFLIPS) && (MP_NAND_UBI == 1)
+	struct rb_root scrubbad;
+	struct rb_root scrubtorture;
+#endif
 	struct list_head pq[UBI_PROT_QUEUE_LEN];
 	int pq_head;
 	spinlock_t wl_lock;
@@ -567,6 +585,9 @@ struct ubi_device {
 	int min_io_size;
 	int hdrs_min_io_size;
 	int ro_mode;
+#if (MP_NAND_UBI == 1)
+	int is_mlc;
+#endif
 	int leb_size;
 	int leb_start;
 	int ec_hdr_alsize;
@@ -584,7 +605,44 @@ struct ubi_device {
 	struct mutex ckvol_mutex;
 
 	struct ubi_debug_info dbg;
+
+#if defined(CONFIG_MTD_UBI_BACKUP_LSB) && (MP_NAND_UBI == 1)
+	int backup_next_offset;
+	int backup_leb_scrub;
+	void *databuf;
+	void *oobbuf;
+#endif
+
+#if defined(CONFIG_MTD_UBI_ENHANCE_INIT) && (MP_NAND_UBI == 1)
+	int group_page_count;
+	struct tbl_storage_manager *tsm;
+	struct ubi_tbl_rcd_node *trn;
+	struct ubi_en_bitmap_record *ebr;
+#endif
+
+#if defined(CONFIG_MTD_UBI_WRITE_CALLBACK) && (MP_NAND_UBI == 1)
+	struct list_head wcb_works;
+	int wcb_works_count;
+	struct task_struct *wcb_thread;
+	int wcb_thread_enabled;
+	spinlock_t wcb_lock;
+#endif
 };
+
+#if defined(CONFIG_MTD_UBI_BACKUP_LSB) && (MP_NAND_UBI == 1)
+struct ubi_paired_page_map {
+	unsigned short lsb;
+	unsigned short paired_page;
+};
+
+extern struct ubi_paired_page_map ga_tUbiPairedPageMap[];
+#endif
+
+#if defined(CONFIG_MTD_UBI_WRITE_CALLBACK) && (MP_NAND_UBI == 1)
+#define UBI_WCB_NAME "ubi_wcb"
+#endif
+
+#define UBI_SCAN_UNKNOWN_EC (-1)
 
 /**
  * struct ubi_ainf_peb - attach information about a physical eraseblock.
@@ -785,14 +843,26 @@ void ubi_calculate_reserved(struct ubi_device *ubi);
 int ubi_check_pattern(const void *buf, uint8_t patt, int size);
 
 /* eba.c */
+#if defined(CONFIG_MTD_UBI_BACKUP_LSB) && (MP_NAND_UBI == 1)
+int ubi_get_compat(const struct ubi_device *ubi, int vol_id);
+#endif
 int ubi_eba_unmap_leb(struct ubi_device *ubi, struct ubi_volume *vol,
 		      int lnum);
 int ubi_eba_read_leb(struct ubi_device *ubi, struct ubi_volume *vol, int lnum,
 		     void *buf, int offset, int len, int check);
+#if (MP_NAND_UBI == 1)
+int ubi_eba_is_mlc_lsbpage(struct ubi_device *ubi, int offset);
+int ubi_eba_mlc_pairedpage(struct ubi_device *ubi, int offset);
+#endif
+
 int ubi_eba_write_leb(struct ubi_device *ubi, struct ubi_volume *vol, int lnum,
 		      const void *buf, int offset, int len);
 int ubi_eba_write_leb_st(struct ubi_device *ubi, struct ubi_volume *vol,
 			 int lnum, const void *buf, int len, int used_ebs);
+#if defined(CONFIG_MTD_UBI_WRITE_CALLBACK) && (MP_NAND_UBI == 1)
+int ubi_eba_write_leb_cb(struct ubi_device *ubi, struct ubi_volume *vol, int lnum,
+		      const void *buf, int offset, int len, int dtype, struct write_info *write);
+#endif
 int ubi_eba_atomic_leb_change(struct ubi_device *ubi, struct ubi_volume *vol,
 			      int lnum, const void *buf, int len);
 int ubi_eba_copy_leb(struct ubi_device *ubi, int from, int to,
@@ -807,7 +877,11 @@ int ubi_wl_get_peb(struct ubi_device *ubi);
 int ubi_wl_put_peb(struct ubi_device *ubi, int vol_id, int lnum,
 		   int pnum, int torture);
 int ubi_wl_flush(struct ubi_device *ubi, int vol_id, int lnum);
+#if defined(CONFIG_MTD_UBI_BITFLIPS) && (MP_NAND_UBI == 1)
+int ubi_wl_scrub_peb(struct ubi_device *ubi, int pnum, int scrubtree);
+#else
 int ubi_wl_scrub_peb(struct ubi_device *ubi, int pnum);
+#endif
 int ubi_wl_init(struct ubi_device *ubi, struct ubi_attach_info *ai);
 void ubi_wl_close(struct ubi_device *ubi);
 int ubi_thread(void *u);
@@ -818,11 +892,21 @@ int ubi_is_erase_work(struct ubi_work *wrk);
 void ubi_refill_pools(struct ubi_device *ubi);
 int ubi_ensure_anchor_pebs(struct ubi_device *ubi);
 
+/* wcb.c */
+#if defined(CONFIG_MTD_UBI_WRITE_CALLBACK) && (MP_NAND_UBI == 1)
+int ubi_wcb_thread(void *u);
+void ubi_wcb_close(struct ubi_device *ubi);
+#endif
+
 /* io.c */
 int ubi_io_read(const struct ubi_device *ubi, void *buf, int pnum, int offset,
 		int len);
 int ubi_io_write(struct ubi_device *ubi, const void *buf, int pnum, int offset,
 		 int len);
+#if defined(CONFIG_MTD_UBI_WRITE_CALLBACK) && (MP_NAND_UBI == 1)
+int ubi_io_write_cb(struct ubi_device *ubi, const void *buf, int pnum, int offset,
+		 int len, struct write_info *write);
+#endif
 int ubi_io_sync_erase(struct ubi_device *ubi, int pnum, int torture);
 int ubi_io_is_bad(const struct ubi_device *ubi, int pnum);
 int ubi_io_mark_bad(const struct ubi_device *ubi, int pnum);
@@ -834,6 +918,14 @@ int ubi_io_read_vid_hdr(struct ubi_device *ubi, int pnum,
 			struct ubi_vid_hdr *vid_hdr, int verbose);
 int ubi_io_write_vid_hdr(struct ubi_device *ubi, int pnum,
 			 struct ubi_vid_hdr *vid_hdr);
+#if defined(CONFIG_MTD_UBI_BACKUP_LSB) && (MP_NAND_UBI == 1)
+int ubi_backup_init_scan(struct ubi_device *ubi, struct ubi_attach_info *si);
+
+int ubi_io_read_oob(const struct ubi_device *ubi, void *databuf, void *oobbuf,
+		int pnum, int offset);
+int ubi_io_write_oob(const struct ubi_device *ubi, void *databuf, void *oobbuf,
+		int pnum, int offset);
+#endif
 
 /* build.c */
 int ubi_attach_mtd_dev(struct mtd_info *mtd, int ubi_num,
@@ -854,6 +946,24 @@ void ubi_free_internal_volumes(struct ubi_device *ubi);
 void ubi_do_get_device_info(struct ubi_device *ubi, struct ubi_device_info *di);
 void ubi_do_get_volume_info(struct ubi_device *ubi, struct ubi_volume *vol,
 			    struct ubi_volume_info *vi);
+#if defined(CONFIG_MTD_UBI_ENHANCE_INIT) && (MP_NAND_UBI == 1)
+int sync_dirty_tbl_storage(struct ubi_device * ubi, int all_sync);
+int sync_bitmap_storage(struct ubi_device *ubi);
+int ubi_en_init_scan(struct ubi_device *ubi, struct ubi_attach_info* ai);
+int process_tbl_page(struct ubi_device *ubi, struct ubi_attach_info *si, 	__u8 *pu8_DataBuf, __u32 page_idx);
+int process_valid_tbl_record(struct ubi_device *ubi, struct ubi_attach_info *si, struct ubi_en_bitmap_record *ebr);
+int process_ctrl_record(struct ubi_device *ubi, __u8 * pu8_DataBuf);
+int write_invalid_marker(struct ubi_device *ubi);
+int check_set_dirty_group(struct ubi_device * ubi, int pnum);
+int check_dirty_group(struct ubi_device * ubi, int pnum);
+int set_dirty_group(struct ubi_device * ubi, int pnum);
+int ubi_dirty_write_back(struct ubi_device *ubi);
+int erase_all_blocks(void);
+int en_init(void);
+int en_exit(void);
+
+#endif
+
 /* scan.c */
 int ubi_compare_lebs(struct ubi_device *ubi, const struct ubi_ainf_peb *aeb,
 		      int pnum, const struct ubi_vid_hdr *vid_hdr);
@@ -957,6 +1067,15 @@ static inline int ubi_io_write_data(struct ubi_device *ubi, const void *buf,
 	ubi_assert(offset >= 0);
 	return ubi_io_write(ubi, buf, pnum, offset + ubi->leb_start, len);
 }
+
+#if defined(CONFIG_MTD_UBI_WRITE_CALLBACK) && (MP_NAND_UBI == 1)
+static inline int ubi_io_write_data_cb(struct ubi_device *ubi, const void *buf,
+				    int pnum, int offset, int len, struct write_info *write)
+{
+	ubi_assert(offset >= 0);
+	return ubi_io_write_cb(ubi, buf, pnum, offset + ubi->leb_start, len, write);
+}
+#endif
 
 /**
  * ubi_ro_mode - switch to read-only mode.

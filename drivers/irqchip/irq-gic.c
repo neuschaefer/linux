@@ -45,8 +45,18 @@
 #include <asm/irq.h>
 #include <asm/exception.h>
 #include <asm/smp_plat.h>
+#include <mstar/mpatch_macro.h>
+#if (MP_PLATFORM_ARM == 1)
+#include "chip_int.h"
+#endif/*MP_PLATFORM_ARM*/
 
 #include "irqchip.h"
+
+#if (MP_PLATFORM_INT_1_to_1_SPI == 1)
+#define SECOND_LEVEL_BOUNDARY 256
+#else
+#define SECOND_LEVEL_BOUNDARY 128
+#endif/*MP_PLATFORM_INT_1_to_1_SPI*/
 
 union gic_base {
 	void __iomem *common_base;
@@ -383,11 +393,18 @@ static void __init gic_dist_init(struct gic_chip_data *gic)
 
 	writel_relaxed(0, base + GIC_DIST_CTRL);
 
+
+#if (MP_PLATFORM_INT_1_to_1_SPI == 1)
+	init_chip_spi_config();
+	for (i = MSTAR_IRQ_BASE; i < MSTAR_CHIP_INT_END; i += 16)
+		writel_relaxed(interrupt_configs[i/16], base + GIC_DIST_CONFIG + i * 4 / 16); // for level
+#else
 	/*
 	 * Set all global interrupts to be level triggered, active low.
 	 */
 	for (i = 32; i < gic_irqs; i += 16)
 		writel_relaxed(0, base + GIC_DIST_CONFIG + i * 4 / 16);
+#endif/*MP_PLATFORM_INT_1_to_1_SPI*/
 
 	/*
 	 * Set all global interrupts to this CPU only.
@@ -442,6 +459,13 @@ static void __cpuinit gic_cpu_init(struct gic_chip_data *gic)
 	 */
 	writel_relaxed(0xffff0000, dist_base + GIC_DIST_ENABLE_CLEAR);
 	writel_relaxed(0x0000ffff, dist_base + GIC_DIST_ENABLE_SET);
+#if (MP_PLATFORM_INT_1_to_1_SPI == 1)
+	{
+		unsigned int gic_irqs = 256;
+		for (i = 4; i < gic_irqs/8; i += 4)
+			writel_relaxed(0xFFFFFFFF, dist_base + GIC_DIST_ENABLE_SET + i);
+	}
+#endif/*MP_PLATFORM_INT_1_to_1_SPI*/
 
 	/*
 	 * Set priority on PPI and SGI interrupts
@@ -453,7 +477,7 @@ static void __cpuinit gic_cpu_init(struct gic_chip_data *gic)
 	writel_relaxed(1, base + GIC_CPU_CTRL);
 }
 
-#ifdef CONFIG_CPU_PM
+#if defined CONFIG_CPU_PM && (MP_PLATFORM_ARM != 1)
 /*
  * Saves the GIC distributor registers during suspend or idle.  Must be called
  * with interrupts disabled but before powering down the GIC.  After calling
@@ -830,6 +854,7 @@ int __init gic_of_init(struct device_node *node, struct device_node *parent)
 	void __iomem *dist_base;
 	u32 percpu_offset;
 	int irq;
+	u32 val;
 
 	if (WARN_ON(!node))
 		return -ENODEV;
@@ -843,7 +868,18 @@ int __init gic_of_init(struct device_node *node, struct device_node *parent)
 	if (of_property_read_u32(node, "cpu-offset", &percpu_offset))
 		percpu_offset = 0;
 
-	gic_init_bases(gic_cnt, -1, dist_base, cpu_base, percpu_offset, node);
+	gic_init_bases(gic_cnt, 27, dist_base, cpu_base, percpu_offset, node);
+
+#if defined(CONFIG_MP_PLATFORM_INT_1_to_1_SPI)
+#elif defined(CONFIG_MP_PLATFORM_MSTAR_LEGANCY_INTR)
+        extern void arm_interrupt_chain_setup(int chain_num);
+        arm_interrupt_chain_setup(INT_PPI_IRQ);
+#else
+        //GIC Interrupt Set Enable Register for MSTAR controller
+        val = readl_relaxed(dist_base + GIC_DIST_SET_EANBLE + (INT_PPI_IRQ / 32) * 4);
+        val= val | (0x01 << INT_PPI_IRQ );
+	writel_relaxed(val, dist_base + GIC_DIST_SET_EANBLE + (INT_PPI_IRQ / 32) * 4);
+#endif /* CONFIG_MP_PLATFORM_MSTAR_LEGANCY_INTR */
 
 	if (parent) {
 		irq = irq_of_parse_and_map(node, 0);
@@ -852,9 +888,5 @@ int __init gic_of_init(struct device_node *node, struct device_node *parent)
 	gic_cnt++;
 	return 0;
 }
-IRQCHIP_DECLARE(cortex_a15_gic, "arm,cortex-a15-gic", gic_of_init);
-IRQCHIP_DECLARE(cortex_a9_gic, "arm,cortex-a9-gic", gic_of_init);
-IRQCHIP_DECLARE(msm_8660_qgic, "qcom,msm-8660-qgic", gic_of_init);
-IRQCHIP_DECLARE(msm_qgic2, "qcom,msm-qgic2", gic_of_init);
 
 #endif

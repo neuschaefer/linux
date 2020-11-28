@@ -276,12 +276,19 @@ static void end_free_itds(struct ehci_hcd *ehci)
 
 	list_for_each_entry_safe(itd, n, &ehci->cached_itd_list, itd_list) {
 		list_del(&itd->itd_list);
+/* tony.yu map between PHY addr & BUS addr */
+#if (MP_USB_MSTAR==1) && defined(BUS_PA_PATCH)
+		itd->itd_dma = PA2BUS(itd->itd_dma);
+#endif
 		dma_pool_free(ehci->itd_pool, itd, itd->itd_dma);
 		if (itd == ehci->last_itd_to_free)
 			break;
 	}
 	list_for_each_entry_safe(sitd, sn, &ehci->cached_sitd_list, sitd_list) {
 		list_del(&sitd->sitd_list);
+#if (MP_USB_MSTAR==1) && defined(BUS_PA_PATCH)
+		sitd->sitd_dma = PA2BUS(sitd->sitd_dma);
+#endif
 		dma_pool_free(ehci->sitd_pool, sitd, sitd->sitd_dma);
 		if (sitd == ehci->last_sitd_to_free)
 			break;

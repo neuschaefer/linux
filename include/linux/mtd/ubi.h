@@ -15,7 +15,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  *
- * Author: Artem Bityutskiy (Битюцкий Артём)
+ * Author: Artem Bityutskiy (?и???кий ????м)
  */
 
 #ifndef __LINUX_UBI_H__
@@ -24,6 +24,7 @@
 #include <linux/ioctl.h>
 #include <linux/types.h>
 #include <mtd/ubi-user.h>
+#include <mstar/mpatch_macro.h>
 
 /* All voumes/LEBs */
 #define UBI_ALL -1
@@ -154,6 +155,9 @@ struct ubi_device_info {
 	int min_io_size;
 	int max_write_size;
 	int ro_mode;
+#if (MP_NAND_UBI == 1)
+	int is_mlc;
+#endif
 	dev_t cdev;
 };
 
@@ -210,8 +214,16 @@ int ubi_unregister_volume_notifier(struct notifier_block *nb);
 void ubi_close_volume(struct ubi_volume_desc *desc);
 int ubi_leb_read(struct ubi_volume_desc *desc, int lnum, char *buf, int offset,
 		 int len, int check);
+#if (MP_NAND_UBI == 1)
+int ubi_is_mlc_lsbpage(struct ubi_volume_desc *desc, int offset);
+int ubi_mlc_pairedpage(struct ubi_volume_desc *desc, int offset);
+#endif
 int ubi_leb_write(struct ubi_volume_desc *desc, int lnum, const void *buf,
 		  int offset, int len);
+#if defined(CONFIG_MTD_UBI_WRITE_CALLBACK) && (MP_NAND_UBI == 1)
+int ubi_leb_write_cb(struct ubi_volume_desc *desc, int lnum, const void *buf,
+		  int offset, int len, int dtype);
+#endif
 int ubi_leb_change(struct ubi_volume_desc *desc, int lnum, const void *buf,
 		   int len);
 int ubi_leb_erase(struct ubi_volume_desc *desc, int lnum);

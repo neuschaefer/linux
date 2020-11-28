@@ -176,6 +176,12 @@ static inline pmd_t *pmd_offset(pud_t *pud, unsigned long addr)
 		clean_pmd_entry(pmdp);	\
 	} while (0)
 
+#define pmd_clear_upper(pmdp)			\
+	do {				\
+		pmdp[0] = __pmd(0);	\
+		clean_pmd_entry(pmdp);	\
+	} while (0)
+
 /* we don't need complex calculations here as the pmd is folded into the pgd */
 #define pmd_addr_end(addr,end) (end)
 

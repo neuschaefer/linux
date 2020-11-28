@@ -22,6 +22,7 @@
 #include <linux/memblock.h>
 #include <linux/dma-contiguous.h>
 #include <linux/sizes.h>
+#include <linux/proc_fs.h>
 
 #include <asm/mach-types.h>
 #include <asm/memblock.h>
@@ -35,9 +36,13 @@
 #include <asm/mach/map.h>
 
 #include "mm.h"
+#include <mstar/mpatch_macro.h>
 
 static unsigned long phys_initrd_start __initdata = 0;
 static unsigned long phys_initrd_size __initdata = 0;
+
+extern unsigned long lx_mem_addr;
+extern unsigned long lx_mem_size;
 
 static int __init early_initrd(char *p)
 {
@@ -204,6 +209,40 @@ static void __init arm_bootmem_init(unsigned long start_pfn,
 	}
 }
 
+#if defined(CONFIG_MEMORY_HOTPLUG) && (MP_PLATFORM_ARM_MEMORY_HOTPLUG == 1) 
+static char *msg;
+extern volatile unsigned int flag;
+extern void create_mapping(struct map_desc *md);
+int arch_add_memory(int nid, u64 start, u64 size){
+	pg_data_t *pgdat;
+        unsigned long start_pfn = start >> PAGE_SHIFT;
+        unsigned long nr_pages = size >> PAGE_SHIFT;
+	struct membank *bank = &meminfo.bank[meminfo.nr_banks];
+	struct memblock_region *reg;
+        int ret;
+
+        pgdat = NODE_DATA(nid);
+	flag ++;
+
+        /* We only have ZONE_NORMAL, so this is easy.. */
+        ret = __add_pages(nid, pgdat->node_zones + ZONE_HIGHMEM,
+                                start_pfn, nr_pages);
+	size -= start & ~PAGE_MASK;
+        bank->start = PAGE_ALIGN(start);
+	bank->size = size & ~(phys_addr_t)(PAGE_SIZE - 1);
+	bank->highmem = 1;
+	meminfo.nr_banks++;
+	memblock_add(meminfo.bank[meminfo.nr_banks-1].start, meminfo.bank[meminfo.nr_banks-1].size);
+
+        if (unlikely(ret))
+                printk("%s: Failed, __add_pages() == %d\n", __func__, ret);
+
+        return ret;
+}
+EXPORT_SYMBOL_GPL(arch_add_memory);
+
+#endif
+
 #ifdef CONFIG_ZONE_DMA
 
 unsigned long arm_dma_zone_size __read_mostly;
@@ -334,6 +373,10 @@ phys_addr_t __init arm_memblock_steal(phys_addr_t size, phys_addr_t align)
 	return phys;
 }
 
+
+#ifdef CONFIG_MP_ION_PATCH_MSTAR_CUSTOMER_IOCTL
+extern void ion_cust_reserve(void);
+#endif
 void __init arm_memblock_init(struct meminfo *mi, struct machine_desc *mdesc)
 {
 	int i;
@@ -378,10 +421,17 @@ void __init arm_memblock_init(struct meminfo *mi, struct machine_desc *mdesc)
 
 	/*
 	 * reserve memory for DMA contigouos allocations,
-	 * must come from DMA area inside low memory
+	 * must come from DMA area inside low memory,
+	 * arm_lowmem_limit is the limit of bus addr for reserve memory
 	 */
-	dma_contiguous_reserve(min(arm_dma_limit, arm_lowmem_limit));
+   
+	//dma_contiguous_reserve(min(arm_dma_limit, arm_lowmem_limit));
+	// to limit cma default buffer at LX_MEM, but if LX_MEM acrosses sections(1GB), mi->bank[0] will be splited to mi->bank[0] and mi->bank[1], --> this is for clippers
+	dma_contiguous_reserve(min((lx_mem_addr+lx_mem_size), min(arm_dma_limit, arm_lowmem_limit)));
 
+#ifdef CONFIG_MP_ION_PATCH_MSTAR_CUSTOMER_IOCTL
+    ion_cust_reserve();
+#endif
 	arm_memblock_steal_permitted = false;
 	memblock_allow_resize();
 	memblock_dump_all();
@@ -413,6 +463,7 @@ void __init bootmem_init(void)
 	 * the sparse mem_map arrays initialized by sparse_init()
 	 * for memmap_init_zone(), otherwise all PFNs are invalid.
 	 */
+	/**********now max_high = max_low*********/
 	arm_bootmem_free(min, max_low, max_high);
 
 	/*
@@ -575,6 +626,9 @@ static void __init free_highpages(void)
 #endif
 }
 
+#ifdef CONFIG_CMA
+extern void __init lowMemInfo();
+#endif
 /*
  * mem_init() marks the free areas in the mem_map and tells us how much
  * memory is free.  This is done after various parts of the system have
@@ -659,7 +713,9 @@ void __init mem_init(void)
 #endif
 			"    fixmap  : 0x%08lx - 0x%08lx   (%4ld kB)\n"
 			"    vmalloc : 0x%08lx - 0x%08lx   (%4ld MB)\n"
+#ifndef CONFIG_CMA
 			"    lowmem  : 0x%08lx - 0x%08lx   (%4ld MB)\n"
+#endif		
 #ifdef CONFIG_HIGHMEM
 			"    pkmap   : 0x%08lx - 0x%08lx   (%4ld MB)\n"
 #endif
@@ -679,7 +735,9 @@ void __init mem_init(void)
 #endif
 			MLK(FIXADDR_START, FIXADDR_TOP),
 			MLM(VMALLOC_START, VMALLOC_END),
+#ifndef CONFIG_CMA			
 			MLM(PAGE_OFFSET, (unsigned long)high_memory),
+#endif			
 #ifdef CONFIG_HIGHMEM
 			MLM(PKMAP_BASE, (PKMAP_BASE) + (LAST_PKMAP) *
 				(PAGE_SIZE)),
@@ -692,6 +750,10 @@ void __init mem_init(void)
 			MLK_ROUNDUP(__init_begin, __init_end),
 			MLK_ROUNDUP(_sdata, _edata),
 			MLK_ROUNDUP(__bss_start, __bss_stop));
+
+#ifdef CONFIG_CMA
+	lowMemInfo();
+#endif
 
 #undef MLK
 #undef MLM

@@ -1,6 +1,7 @@
 #
 # linux/drivers/nand/Makefile
 #
+CONFIG_MSTAR_CHIP_NAME := $(subst ",,$(CONFIG_MSTAR_CHIP_NAME))
 
 obj-$(CONFIG_MTD_NAND)			+= nand.o
 obj-$(CONFIG_MTD_NAND_ECC)		+= nand_ecc.o
@@ -50,5 +51,27 @@ obj-$(CONFIG_MTD_NAND_JZ4740)		+= jz4740_nand.o
 obj-$(CONFIG_MTD_NAND_GPMI_NAND)	+= gpmi-nand/
 obj-$(CONFIG_MTD_NAND_XWAY)		+= xway_nand.o
 obj-$(CONFIG_MTD_NAND_BCM47XXNFLASH)	+= bcm47xxnflash/
+
+ifeq ($(CONFIG_MSTAR_NAND),y)
+
+# compatiblity with mstar
+EXTRA_CFLAGS    += -Idrivers/mstar/nand/fcie3/inc/api
+EXTRA_CFLAGS    += -Idrivers/mstar/nand/fcie3/inc/common
+EXTRA_CFLAGS    += -Idrivers/mstar/nand/fcie3/inc/config
+
+# compatiblity with mstar2
+EXTRA_CFLAGS    += -Idrivers/mstar2/drv/nand/inc/api
+EXTRA_CFLAGS    += -Idrivers/mstar2/drv/nand/inc/common
+EXTRA_CFLAGS    += -Idrivers/mstar2/drv/nand/inc/config
+EXTRA_CFLAGS    += -Idrivers/mstar2/hal/$(CONFIG_MSTAR_CHIP_NAME)/nand
+
+endif
+
+ifeq ($(CONFIG_MSTAR_SPI_NAND),y)
+CONFIG_MSTAR_CHIP_NAME := $(subst ",,$(CONFIG_MSTAR_CHIP_NAME))
+EXTRA_CFLAGS      +=  -Idrivers/mstar/spinand/inc/common
+EXTRA_CFLAGS      +=  -Idrivers/mstar/spinand/inc/config
+EXTRA_CFLAGS      +=  -Idrivers/mstar/spinand/inc/config/$(CONFIG_MSTAR_CHIP_NAME)
+endif
 
 nand-objs := nand_base.o nand_bbt.o

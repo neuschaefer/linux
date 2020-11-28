@@ -2120,6 +2120,7 @@ void tcp_push_one(struct sock *sk, unsigned int mss_now)
  */
 u32 __tcp_select_window(struct sock *sk)
 {
+	isb();
 	struct inet_connection_sock *icsk = inet_csk(sk);
 	struct tcp_sock *tp = tcp_sk(sk);
 	/* MSS for the peer's data.  Previous versions used mss_clamp

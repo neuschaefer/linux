@@ -143,6 +143,12 @@ static inline void *dma_alloc_attrs(struct device *dev, size_t size,
 	return cpu_addr;
 }
 
+#ifdef CONFIG_MP_ION_PATCH_MSTAR
+void *alloc_from_contiguous_addr(struct device *dev, unsigned long start,
+																int size, unsigned int align,
+																dma_addr_t *handle);
+#endif
+
 /**
  * arm_dma_free - free memory allocated by arm_dma_alloc
  * @dev: valid struct device pointer, or NULL for ISA and EISA-like devices

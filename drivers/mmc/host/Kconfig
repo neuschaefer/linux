@@ -4,6 +4,22 @@
 
 comment "MMC/SD/SDIO Host Controller Drivers"
 
+config MMC_MSTAR_MMC_EMMC
+        tristate "MStar eMMC driver"
+        help
+          MStar eMMC driver.
+
+config MMC_MSTAR_MMC_EMMC_CHK_VERSION
+        tristate "MStar eMMC driver - check version"
+        depends on MMC_MSTAR_MMC_EMMC
+        help
+          MStar eMMC driver - check version.
+          
+config MMC_MSTAR_tSD
+        tristate "Mstar tSD Interface support"
+        help
+          Mstar FCIE SD/SDIO Host Controller Driver.
+          
 config MMC_ARMMMCI
 	tristate "ARM AMBA Multimedia Card Interface support"
 	depends on ARM_AMBA

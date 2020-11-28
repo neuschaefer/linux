@@ -31,11 +31,19 @@
 #include <linux/oprofile.h>
 #include <linux/sched.h>
 #include <linux/gfp.h>
+#include <mstar/mpatch_macro.h>
 
 #include "oprofile_stats.h"
 #include "event_buffer.h"
 #include "cpu_buffer.h"
 #include "buffer_sync.h"
+
+#if (MP_DEBUG_TOOL_OPROFILE == 1)
+#ifdef CONFIG_ADVANCE_OPROFILE
+#include "oprof.h"
+#include <kdebugd/kdebugd.h>
+#endif /* CONFIG_ADVANCE_OPROFILE */
+#endif /*MP_DEBUG_TOOL_OPROFILE*/
 
 static LIST_HEAD(dying_tasks);
 static LIST_HEAD(dead_tasks);
@@ -443,6 +451,20 @@ static void process_task_mortuary(void)
 	spin_unlock_irqrestore(&task_mortuary, flags);
 
 	list_for_each_entry_safe(task, ttask, &local_dead_tasks, tasks) {
+
+#if (MP_DEBUG_TOOL_OPROFILE == 1)
+#ifdef CONFIG_ADVANCE_OPROFILE
+	if (oprofile_started) {
+			/*Create the linked list while the task are getting killed.
+			This creation is done at the time when the task is about to
+			die and not at the processing time of raw data. This is
+			because at the processing time, some threads/processes
+			might be cleaned up and doesn't have any task_struct for them.*/
+
+			aop_create_dead_list(task);
+	}
+#endif /* CONFIG_ADVANCE_OPROFILE */
+#endif /*MP_DEBUG_TOOL_OPROFILE*/
 		list_del(&task->tasks);
 		free_task(task);
 	}

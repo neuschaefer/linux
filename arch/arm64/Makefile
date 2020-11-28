@@ -19,6 +19,34 @@ LIBGCC 		:= $(shell $(CC) $(KBUILD_CFLAGS) -print-libgcc-file-name)
 
 KBUILD_DEFCONFIG := defconfig
 
+machine-$(CONFIG_MSTAR_NAPOLI)      += ../../../../mstar2/hal/napoli/cpu
+machine-$(CONFIG_MSTAR_MADISON)     += ../../../../mstar2/hal/madison/cpu
+machine-$(CONFIG_MSTAR_CLIPPERS)    += ../../../../mstar2/hal/clippers/cpu
+machine-$(CONFIG_MSTAR_MIAMI)       += ../../../../mstar2/hal/miami/cpu
+machine-$(CONFIG_MSTAR_MONACO)      += ../../../../mstar2/hal/monaco/cpu
+machine-$(CONFIG_MSTAR_KAISER)      += ../../../../mstar2/hal/kaiser/cpu
+machine-$(CONFIG_MSTAR_MUJI)        += ../../../../mstar2/hal/muji/cpu/arm64
+
+KBUILD_CPPFLAGS += -Iarch/arm64/include
+KBUILD_CPPFLAGS += -Idrivers/mstar2
+
+ifneq ($(CONFIG_MSTAR_CHIP),)
+MACHINE  := arch/arm64/arm-boards/$(word 1,$(machine-y))/
+machdirs := $(patsubst %,arch/arm64/arm-boards/%/,$(machine-y))
+platdirs := $(patsubst %,arch/arm64/arm-boards/plat-%/,$(plat-y))
+core-y += arch/arm64/arm-boards/generic/
+core-y += ../mstar2/hal/$(subst ",,$(CONFIG_MSTAR_CHIP_NAME))/cpu/arm64/
+
+ifeq ($(KBUILD_SRC),)
+KBUILD_CPPFLAGS += $(patsubst %,-I%/include,$(machdirs) $(platdirs))
+KBUILD_CPPFLAGS += $(patsubst %,-I%,$(machdirs) $(platdirs))
+else
+KBUILD_CPPFLAGS += $(patsubst %,-I$(srctree)/%/include,$(machdirs) $(platdirs))
+KBUILD_CPPFLAGS += $(patsubst %,-I$(srctree)/%,$(machdirs) $(platdirs))
+endif
+endif
+
+
 KBUILD_CFLAGS	+= -mgeneral-regs-only
 KBUILD_CPPFLAGS	+= -mlittle-endian
 AS		+= -EL
@@ -48,11 +76,11 @@ all:	$(KBUILD_IMAGE) $(KBUILD_DTBS)
 
 boot := arch/arm64/boot
 
-Image Image.gz: vmlinux
-	$(Q)$(MAKE) $(build)=$(boot) $(boot)/$@
+Image Image.gz uImage: vmlinux
+	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $(boot)/$@
 
-zinstall install: vmlinux
-	$(Q)$(MAKE) $(build)=$(boot) $@
+zinstall install uinstall: vmlinux
+	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $@
 
 %.dtb: scripts
 	$(Q)$(MAKE) $(build)=$(boot)/dts $(boot)/dts/$@
@@ -64,12 +92,17 @@ dtbs: scripts
 archclean:
 	$(Q)$(MAKE) $(clean)=$(boot)
 
+
+
+
 define archhelp
   echo  '* Image.gz      - Compressed kernel image (arch/$(ARCH)/boot/Image.gz)'
   echo  '  Image         - Uncompressed kernel image (arch/$(ARCH)/boot/Image)'
+  echo  '  uImage        - U-Boot wrapped Image'
   echo  '* dtbs          - Build device tree blobs for enabled boards'
   echo  '  install       - Install uncompressed kernel'
   echo  '  zinstall      - Install compressed kernel'
+  echo  '  uinstall      - Install U-Boot wrapped uncompressed kernel'
   echo  '                  Install using (your) ~/bin/installkernel or'
   echo  '                  (distribution) /sbin/installkernel or'
   echo  '                  install to $$(INSTALL_PATH) and run lilo'

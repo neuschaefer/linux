@@ -184,8 +184,8 @@ machine-$(CONFIG_ARCH_SHMOBILE) 	+= shmobile
 machine-$(CONFIG_ARCH_TEGRA)		+= tegra
 machine-$(CONFIG_ARCH_U300)		+= u300
 machine-$(CONFIG_ARCH_U8500)		+= ux500
-machine-$(CONFIG_ARCH_VERSATILE)	+= versatile
-machine-$(CONFIG_ARCH_VEXPRESS)		+= vexpress
+#machine-$(CONFIG_ARCH_VERSATILE)	+= versatile
+#machine-$(CONFIG_ARCH_VEXPRESS)		+= vexpress
 machine-$(CONFIG_ARCH_VT8500)		+= vt8500
 machine-$(CONFIG_ARCH_W90X900)		+= w90x900
 machine-$(CONFIG_FOOTBRIDGE)		+= footbridge
@@ -194,6 +194,19 @@ machine-$(CONFIG_PLAT_SPEAR)		+= spear
 machine-$(CONFIG_ARCH_VIRT)		+= virt
 machine-$(CONFIG_ARCH_ZYNQ)		+= zynq
 machine-$(CONFIG_ARCH_SUNXI)		+= sunxi
+#temporalily
+machine-$(CONFIG_MSTAR_NAPOLI)      += ../../../../mstar2/hal/napoli/cpu
+machine-$(CONFIG_MSTAR_MADISON)     += ../../../../mstar2/hal/madison/cpu
+machine-$(CONFIG_MSTAR_CLIPPERS)    += ../../../../mstar2/hal/clippers/cpu
+machine-$(CONFIG_MSTAR_MIAMI)       += ../../../../mstar2/hal/miami/cpu
+machine-$(CONFIG_MSTAR_MONACO)      += ../../../../mstar2/hal/monaco/cpu
+machine-$(CONFIG_MSTAR_MUNICH)      += ../../../../mstar2/hal/munich/cpu
+machine-$(CONFIG_MSTAR_KAISER)      += ../../../../mstar2/hal/kaiser/cpu
+machine-$(CONFIG_MSTAR_MUJI)     += ../../../../mstar2/hal/muji/cpu/arm
+
+KBUILD_CPPFLAGS += -Iarch/arm/include
+KBUILD_CPPFLAGS += -Idrivers/mstar2
+
 
 # Platform directory name.  This list is sorted alphanumerically
 # by CONFIG_* macro name.
@@ -204,7 +217,8 @@ plat-$(CONFIG_PLAT_ORION)	+= orion
 plat-$(CONFIG_PLAT_PXA)		+= pxa
 plat-$(CONFIG_PLAT_S3C24XX)	+= samsung
 plat-$(CONFIG_PLAT_S5P)		+= samsung
-plat-$(CONFIG_PLAT_VERSATILE)	+= versatile
+#plat-$(CONFIG_PLAT_VERSATILE)	+= versatile
+plat-$(CONFIG_PLAT_MSTAR)    += mstar
 
 ifeq ($(CONFIG_ARCH_EBSA110),y)
 # This is what happens if you forget the IOCS16 line.
@@ -216,6 +230,21 @@ endif
 # The byte offset of the kernel image in RAM from the start of RAM.
 TEXT_OFFSET := $(textofs-y)
 
+ifneq ($(CONFIG_MSTAR_CHIP),)
+MACHINE  := arch/arm/arm-boards/$(word 1,$(machine-y))/
+machdirs := $(patsubst %,arch/arm/arm-boards/%/,$(machine-y))
+platdirs := $(patsubst %,arch/arm/arm-boards/plat-%/,$(plat-y))
+core-y += arch/arm/arm-boards/generic/
+KBUILD_CPPFLAGS += -Iarch/arm/arm-boards/generic/include/
+ifeq ($(KBUILD_SRC),)
+KBUILD_CPPFLAGS += $(patsubst %,-I%/include,$(machdirs) $(platdirs))
+KBUILD_CPPFLAGS += $(patsubst %,-I%,$(machdirs) $(platdirs))
+else
+KBUILD_CPPFLAGS += $(patsubst %,-I$(srctree)/%/include,$(machdirs) $(platdirs))
+KBUILD_CPPFLAGS += $(patsubst %,-I$(srctree)/%,$(machdirs) $(platdirs))
+endif
+
+else
 # The first directory contains additional information for the boot setup code
 ifneq ($(machine-y),)
 MACHINE  := arch/arm/mach-$(word 1,$(machine-y))/
@@ -236,6 +265,17 @@ else
 KBUILD_CPPFLAGS += $(patsubst %,-I$(srctree)/%include,$(machdirs) $(platdirs))
 endif
 endif
+
+
+endif
+
+ifeq ($(CONFIG_MP_MSTAR_STR_BASE),y)
+ifneq ($(wildcard $(MACHINE)/mstar_strmisc_chip.h),)
+KBUILD_CPPFLAGS += -DMSTAR_STRMISC_CHIP
+endif
+endif
+
+KBUILD_CPPFLAGS += -I drivers/mstar
 
 export	TEXT_OFFSET GZFLAGS MMUEXT
 
@@ -264,6 +304,8 @@ libs-y				:= arch/arm/lib/ $(libs-y)
 # Default target when executing plain make
 ifeq ($(CONFIG_XIP_KERNEL),y)
 KBUILD_IMAGE := xipImage
+else ifeq ($(CONFIG_BUILD_ARM_APPENDED_DTB_IMAGE),y)
+KBUILD_IMAGE := zImage-dtb
 else
 KBUILD_IMAGE := zImage
 endif
@@ -276,6 +318,7 @@ endif
 all:	$(KBUILD_IMAGE) $(KBUILD_DTBS)
 
 boot := arch/arm/boot
+generic := arch/arm/arm-boards/generic
 
 archprepare:
 	$(Q)$(MAKE) $(build)=arch/arm/tools include/generated/mach-types.h
@@ -294,6 +337,9 @@ zinstall uinstall install: vmlinux
 
 dtbs: scripts
 	$(Q)$(MAKE) $(build)=$(boot)/dts MACHINE=$(MACHINE) dtbs
+
+zImage-dtb: vmlinux scripts dtbs
+	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $(boot)/$@
 
 # We use MRPROPER_FILES and CLEAN_FILES now
 archclean:

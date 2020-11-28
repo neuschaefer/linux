@@ -66,6 +66,14 @@
 #include <asm/futex.h>
 
 #include "rtmutex_common.h"
+#include <mstar/mpatch_macro.h>
+
+#if (MP_DEBUG_TOOL_KDEBUG == 1)
+#ifdef CONFIG_KDEBUGD_FUTEX
+#include <linux/jiffies.h>
+#include <kdebugd/kdebugd.h>
+#endif
+#endif/*MP_DEBUG_TOOL_KDEBUG*/
 
 int __read_mostly futex_cmpxchg_enabled;
 
@@ -132,6 +140,13 @@ struct futex_q {
 	struct rt_mutex_waiter *rt_waiter;
 	union futex_key *requeue_pi_key;
 	u32 bitset;
+#if (MP_DEBUG_TOOL_KDEBUG == 1)
+#ifdef CONFIG_KDEBUGD_FUTEX
+	/* timestamp to be filled at time of futex_wait.
+	 * this shall be used to calculate the wait time */
+	u32 timestamp;
+#endif
+#endif /**/
 };
 
 static const struct futex_q futex_q_init = {
@@ -162,6 +177,73 @@ static struct futex_hash_bucket *hash_futex(union futex_key *key)
 			  key->both.offset);
 	return &futex_queues[hash & ((1 << FUTEX_HASHBITS)-1)];
 }
+
+#if (MP_DEBUG_TOOL_KDEBUG == 1)
+#ifdef CONFIG_KDEBUGD_FUTEX
+#ifdef DBG_FUTEX_LIST
+#define dprintk printk
+#else
+#define dprintk(...) do {} while (0)
+#endif
+
+/* fill the waiter_array with thread info of threads waiting
+ * - for time more than wait_msec
+ * - with max limit as max_waiters
+ */
+int read_hash_queue(struct futex_waiter *waiter_array, const int max_waiters, int wait_msec)
+{
+	int i = 0;
+	struct futex_hash_bucket *hb = NULL;
+	struct futex_q *this = NULL, *next = NULL;
+	struct plist_head *head = NULL;
+	unsigned int current_time;
+	unsigned int wait_time = 0;
+	int index = 0;
+
+	if ((wait_msec < 0) || (max_waiters <= 0) || !(waiter_array)) {
+		printk(KERN_ERR "Incorrect arguments to read_hash_queue\n");
+		dprintk("wait time: %d, max_waiters: %d, waiter_array: %p\n",
+				wait_msec, max_waiters, waiter_array);
+		return 0;
+	}
+
+	for (i = 0; i < ((1 << FUTEX_HASHBITS)); i++) {
+		hb = &futex_queues[i];
+		spin_lock(&hb->lock);
+		head = &hb->chain;
+
+		plist_for_each_entry_safe(this, next, head, list) {
+			current_time = (u32)jiffies;
+			if (this->task) {
+				dprintk("curr: %x, ts: %x\n",
+						current_time, this->timestamp);
+				wait_time = jiffies_to_msecs(current_time - this->timestamp);
+				if (wait_time >= wait_msec) {
+					dprintk("[HASH INDEX: %d], tid: %x [%s],wait_time: %x\n",
+							i, this->task->pid, this->task->comm, wait_time);
+					waiter_array[index].hash_key = i;
+					waiter_array[index].wait_msec = wait_time;
+					waiter_array[index].task = this->task;
+					index++;
+
+					if (index >= max_waiters) {
+						printk(KERN_NOTICE "#### Futex List:: More waiters present. Increase the size!!!!!\n");
+						break;
+					}
+				}
+			} else {
+				printk(KERN_ERR "#### NULL (%3d)\n", i);
+			}
+		}
+		spin_unlock(&hb->lock);
+		if (index >= max_waiters)
+			break;
+
+	}
+	return index;
+}
+#endif /* CONFIG_KDEBUGD_FUTEX */
+#endif /*MP_DEBUG_TOOL_KDEBUG*/
 
 /*
  * Return 1 if two futex_keys are equal, 0 otherwise.
@@ -838,6 +920,40 @@ static void __unqueue_futex(struct futex_q *q)
 	plist_del(&q->list, &hb->chain);
 }
 
+#if (MP_DEBUG_TOOL_KDEBUG == 1)
+#ifdef CONFIG_KDEBUGD_FUTEX
+extern int kdbg_futex_dbg_pid;
+extern int kdbg_futex_dbg_start;
+extern int kdbg_futex_config_min_wait_msec;
+extern void show_user_backtrace_pid(pid_t pid, int use_ptrace, int load_elf);
+
+void kdbg_futex_check_task(struct futex_q *q)
+{
+	struct task_struct *p = q->task;
+	unsigned int wait_jiffies;
+	unsigned int wait_time_msec;
+
+	if (!kdbg_futex_dbg_start ||
+			(kdbg_futex_dbg_pid != p->pid))
+		return;
+
+	wait_jiffies = jiffies - q->timestamp;
+	wait_time_msec = jiffies_to_msecs(wait_jiffies);
+
+	dprintk("Target pid: %d, current pid: %d\n",
+			kdbg_futex_dbg_pid, p->pid);
+	dprintk("waited for %u msec\n", wait_time_msec);
+
+	/* if condition is met */
+	if (wait_time_msec > kdbg_futex_config_min_wait_msec) {
+		printk(KERN_NOTICE "Lock latency: %u msec\n", wait_time_msec);
+		show_user_backtrace_pid(p->pid, 0, 1);
+	}
+
+	dprintk("####### Waking task: %s(%d)\n", p->comm, p->pid);
+}
+#endif/*CONFIG_KDEBUGD_FUTEX*/
+#endif /*MP_DEBUG_TOOL_KDEBUG*/
 /*
  * The hash bucket lock must be held when this is called.
  * Afterwards, the futex_q must not be accessed.
@@ -1528,6 +1644,11 @@ static inline void queue_me(struct futex_q *q, struct futex_hash_bucket *hb)
 	plist_node_init(&q->list, prio);
 	plist_add(&q->list, &hb->chain);
 	q->task = current;
+#if (MP_DEBUG_TOOL_KDEBUG == 1)
+#ifdef CONFIG_KDEBUGD_FUTEX
+	q->timestamp = (u32)jiffies;
+#endif/*CONFIG_KDEBUGD_FUTEX*/
+#endif/*MP_DEBUG_TOOL_KDEBUG*/
 	spin_unlock(&hb->lock);
 }
 
@@ -1927,6 +2048,13 @@ retry:
 
 	/* If we were woken (and unqueued), we succeeded, whatever. */
 	ret = 0;
+
+#if (MP_DEBUG_TOOL_KDEBUG == 1)
+#ifdef CONFIG_KDEBUGD_FUTEX
+	/* the futex is woken here... */
+	kdbg_futex_check_task(&q);
+#endif/*CONFIG_KDEBUGD_FUTEX*/
+#endif /*MP_DEBUG_TOOL_KDEBUG*/ 
 	/* unqueue_me() drops q.key ref */
 	if (!unqueue_me(&q))
 		goto out;
@@ -2045,8 +2173,17 @@ retry_private:
 	/*
 	 * Block on the PI mutex:
 	 */
-	if (!trylock)
+	if (!trylock){
 		ret = rt_mutex_timed_lock(&q.pi_state->pi_mutex, to, 1);
+#if (MP_DEBUG_TOOL_KDEBUG == 1)
+#ifdef CONFIG_KDEBUGD_FUTEX
+		/* this is non-atomic,
+		 * if trylock, we anyway return immediately
+		 */
+		kdbg_futex_check_task(&q);
+#endif/*CONFIG_KDEBUGD_FUTEX*/
+#endif/*MP_DEBUG_TOOL_KDEBUG*/
+}
 	else {
 		ret = rt_mutex_trylock(&q.pi_state->pi_mutex);
 		/* Fixup the trylock return value: */

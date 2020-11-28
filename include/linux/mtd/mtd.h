@@ -28,6 +28,11 @@
 #include <mtd/mtd-abi.h>
 
 #include <asm/div64.h>
+#include <mstar/mpatch_macro.h>
+
+#if defined(CONFIG_MTD_UBI_WRITE_CALLBACK) && (MP_NAND_UBI == 1)
+#include <../drivers/mstar/nand/fcie3/inc/api/drv_unfd.h>
+#endif
 
 #define MTD_CHAR_MAJOR 90
 #define MTD_BLOCK_MAJOR 31
@@ -37,8 +42,16 @@
 #define MTD_ERASE_SUSPEND	0x04
 #define MTD_ERASE_DONE		0x08
 #define MTD_ERASE_FAILED	0x10
+#if (MP_NAND_BBT == 1)
+#define MTD_ERASE_HWFAILED        0x12
+#endif
 
 #define MTD_FAIL_ADDR_UNKNOWN -1LL
+
+#if (defined(CONFIG_MSTAR_NAND) || defined(CONFIG_MSTAR_SPI_NAND)) && (MP_NAND_MTD == 1)
+/* Initial CRC32 value used when calculating CRC checksums */
+#define BBT_CRC32_INIT 0xFFFFFFFFU
+#endif
 
 /*
  * If the erase fails, fail_addr might indicate exactly which block failed. If
@@ -98,7 +111,11 @@ struct mtd_oob_ops {
 };
 
 #define MTD_MAX_OOBFREE_ENTRIES_LARGE	32
+#if (defined(CONFIG_MSTAR_NAND) || defined(CONFIG_MSTAR_SPI_NAND)) && (MP_NAND_MTD == 1)
+#define MTD_MAX_ECCPOS_ENTRIES_LARGE	1280
+#else
 #define MTD_MAX_ECCPOS_ENTRIES_LARGE	640
+#endif
 /*
  * Internal ECC layout control structure. For historical reasons, there is a
  * similar, smaller struct nand_ecclayout_user (in mtd-abi.h) that is retained
@@ -198,6 +215,10 @@ struct mtd_info {
 		      size_t *retlen, u_char *buf);
 	int (*_write) (struct mtd_info *mtd, loff_t to, size_t len,
 		       size_t *retlen, const u_char *buf);
+	#if defined(CONFIG_MTD_UBI_WRITE_CALLBACK) && (MP_NAND_UBI == 1)
+	int (*_write_cb)(struct mtd_info *mtd, loff_t to, size_t len, size_t *retlen, const u_char *buf,
+					struct write_info *write);
+	#endif
 	int (*_panic_write) (struct mtd_info *mtd, loff_t to, size_t len,
 			     size_t *retlen, const u_char *buf);
 	int (*_read_oob) (struct mtd_info *mtd, loff_t from,

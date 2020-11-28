@@ -31,6 +31,7 @@
 #include <asm/mach/arch.h>
 #include <asm/mach/time.h>
 
+
 #if defined(CONFIG_RTC_DRV_CMOS) || defined(CONFIG_RTC_DRV_CMOS_MODULE) || \
     defined(CONFIG_NVRAM) || defined(CONFIG_NVRAM_MODULE)
 /* this needs a better home */
@@ -120,6 +121,5 @@ void __init time_init(void)
 		machine_desc->init_time();
 	else
 		clocksource_of_init();
-
 	sched_clock_postinit();
 }

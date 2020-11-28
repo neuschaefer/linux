@@ -31,6 +31,18 @@
 
 #include "inode.h"
 
+#if (MP_NTFS_READ_PAGES==1)
+#define MAX_SUBMIT_PAGE 32
+struct submit_rw_io_data
+{
+    int       b_read;
+    unsigned int bh_page_count;
+    struct buffer_head* bh[MAX_SUBMIT_PAGE];
+    unsigned int bh_count[MAX_SUBMIT_PAGE];
+};
+extern struct kmem_cache *ntfs_bio_data_cache;
+#endif
+
 /**
  * ntfs_unmap_page - release a page that was mapped using ntfs_map_page()
  * @page:	the page to release

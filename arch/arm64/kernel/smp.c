@@ -48,6 +48,7 @@
 #include <asm/tlbflush.h>
 #include <asm/ptrace.h>
 
+extern  struct smp_enable_ops mstar_smp_spin_table;
 /*
  * as from 2.5, kernels no longer have an init_tasks structure
  * so we need some other way of telling a new secondary core
@@ -166,7 +167,7 @@ asmlinkage void __cpuinit secondary_start_kernel(void)
 {
 	struct mm_struct *mm = &init_mm;
 	unsigned int cpu = smp_processor_id();
-
+        
 	printk("CPU%u: Booted secondary processor\n", cpu);
 
 	/*
@@ -198,6 +199,14 @@ asmlinkage void __cpuinit secondary_start_kernel(void)
 	 */
 	raw_spin_lock(&boot_lock);
 	raw_spin_unlock(&boot_lock);
+	
+        /*
+	 * OK, now it's safe to let the boot CPU continue.  Wait for
+	 * the CPU migration code to notice that the CPU is online
+	 * before we continue.
+	 */
+	set_cpu_online(cpu, true);
+	complete(&cpu_running);
 
 	/*
 	 * Enable local interrupts.
@@ -205,14 +214,6 @@ asmlinkage void __cpuinit secondary_start_kernel(void)
 	notify_cpu_starting(cpu);
 	local_irq_enable();
 	local_fiq_enable();
-
-	/*
-	 * OK, now it's safe to let the boot CPU continue.  Wait for
-	 * the CPU migration code to notice that the CPU is online
-	 * before we continue.
-	 */
-	set_cpu_online(cpu, true);
-	complete(&cpu_running);
 
 	/*
 	 * OK, it's off to the idle thread for us
@@ -236,6 +237,7 @@ void __init smp_prepare_boot_cpu(void)
 static void (*smp_cross_call)(const struct cpumask *, unsigned int);
 
 static const struct smp_enable_ops *enable_ops[] __initconst = {
+	&mstar_smp_spin_table,
 	&smp_spin_table_ops,
 	&smp_psci_ops,
 	NULL,

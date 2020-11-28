@@ -2829,3 +2829,10 @@ static __init int event_trace_self_tests_init(void)
 late_initcall(event_trace_self_tests_init);
 
 #endif
+
+#if (MP_DEBUG_TOOL_KDEBUG == 1)
+#ifdef CONFIG_KDEBUGD_FTRACE
+/* Let kdebugd have access to static functions in this file */
+#include "../kdebugd/trace/kdbg_ftrace_events_helper.c"
+#endif /* CONFIG_KDEBUGD_FTRACE */
+#endif/*MP_DEBUG_TOOL_KDEBUG*/

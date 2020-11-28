@@ -327,7 +327,22 @@ __v7_setup:
 1:
 #endif
 
-3:	mov	r10, #0
+	/* Cortex-A12 Errata */
+3:	ldr	r10, =0x00000c0d              @ Cortex-A12 primary part number
+	teq	r0, r10
+	bne	4f
+#if (MP_PLATFORM_ARM_ERRATA_832072 == 1)
+        mrc   p15, 0, r10, c15, c0, 1         @ read diagnostic register
+        orr   r10, r10, #1 << 1               @ set bit #1
+        mcr   p15, 0, r10, c15, c0, 1         @ write diagnostic register
+#endif
+#if (MP_PLATFORM_ARM_ERRATA_821420 == 1)
+	mrc p15, 0, r0, c15, c0, 2
+	orr r0, r0, #1 << 1
+	mcr p15, 0, r0, c15, c0, 2
+#endif
+
+4:	mov	r10, #0
 	mcr	p15, 0, r10, c7, c5, 0		@ I+BTB cache invalidate
 	dsb
 #ifdef CONFIG_MMU

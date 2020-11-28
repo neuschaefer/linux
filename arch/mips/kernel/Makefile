@@ -14,7 +14,8 @@ CFLAGS_REMOVE_early_printk.o = -pg
 CFLAGS_REMOVE_perf_event.o = -pg
 CFLAGS_REMOVE_perf_event_mipsxx.o = -pg
 endif
-
+EXTRA_CFLAGS      +=  -Idrivers/mstar2/hal/$(CONFIG_MSTAR_CHIP_NAME)/cpu
+EXTRA_CFLAGS      +=  -Iarch/mips/mips-boards/$(CONFIG_MSTAR_CHIP_NAME)
 obj-$(CONFIG_CEVT_BCM1480)	+= cevt-bcm1480.o
 obj-$(CONFIG_CEVT_R4K)		+= cevt-r4k.o
 obj-$(CONFIG_MIPS_MT_SMTC)	+= cevt-smtc.o

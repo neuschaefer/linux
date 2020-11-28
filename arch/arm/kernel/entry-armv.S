@@ -957,10 +957,19 @@ __kuser_helper_end:
  * SP points to a minimal amount of processor-private memory, the address
  * of which is copied into r0 for the mode specific abort handler.
  */
+#if (MP_PLATFORM_ARM_ERRATA_775420 == 1)
+	.macro	vector_stub, name, mode, correction=0, abort=0
+#else
 	.macro	vector_stub, name, mode, correction=0
+#endif/*MP_PLATFORM_ARM_ERRATA_775420*/
 	.align	5
 
 vector_\name:
+#if (MP_PLATFORM_ARM_ERRATA_775420 == 1)
+	.if \abort
+	dsb
+	.endif
+#endif/*MP_PLATFORM_ARM_ERRATA_775420*/
 	.if \correction
 	sub	lr, lr, #\correction
 	.endif
@@ -1033,7 +1042,11 @@ vector_rst:
  * Data abort dispatcher
  * Enter in ABT mode, spsr = USR CPSR, lr = USR PC
  */
+#if (MP_PLATFORM_ARM_ERRATA_775420 == 1)
+	vector_stub	dabt, ABT_MODE, 8, 1
+#else
 	vector_stub	dabt, ABT_MODE, 8
+#endif/*MP_PLATFORM_ARM_ERRATA_775420*/
 
 	.long	__dabt_usr			@  0  (USR_26 / USR_32)
 	.long	__dabt_invalid			@  1  (FIQ_26 / FIQ_32)
@@ -1056,7 +1069,11 @@ vector_rst:
  * Prefetch abort dispatcher
  * Enter in ABT mode, spsr = USR CPSR, lr = USR PC
  */
+#if (MP_PLATFORM_ARM_ERRATA_775420 == 1)
+	vector_stub	pabt, ABT_MODE, 4, 1
+#else
 	vector_stub	pabt, ABT_MODE, 4
+#endif/*MP_PLATFORM_ARM_ERRATA_775420*/
 
 	.long	__pabt_usr			@  0 (USR_26 / USR_32)
 	.long	__pabt_invalid			@  1 (FIQ_26 / FIQ_32)

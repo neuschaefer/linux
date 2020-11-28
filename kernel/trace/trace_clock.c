@@ -20,6 +20,17 @@
 #include <linux/sched.h>
 #include <linux/ktime.h>
 #include <linux/trace_clock.h>
+#include <mstar/mpatch_macro.h>
+#if (MP_DEBUG_TOOL_KDEBUG == 1)
+#ifdef CONFIG_KDEBUGD_FTRACE
+#include "kdbg_util.h"
+#include <trace/kdbg_ftrace_helper.h>
+#include <trace/kdbg-ftrace.h>
+#endif /* CONFIG_KDEBUGD_FTRACE */
+#endif/*MP_DEBUG_TOOL_KDEBUG*/
+
+
+#include "trace.h"
 
 /*
  * trace_clock_local(): the simplest and least coherent tracing clock.
@@ -38,6 +49,11 @@ u64 notrace trace_clock_local(void)
 	 */
 	preempt_disable_notrace();
 	clock = sched_clock();
+#if (MP_DEBUG_TOOL_KDEBUG == 1)
+#ifdef CONFIG_KDEBUGD_FTRACE_HR_CLOCK
+	clock += kdbg_ftrace_timekeeping_get_ns_raw();
+#endif /* CONFIG_KDEBUGD_FTRACE_HR_CLOCK */
+#endif /*MP_DEBUG_TOOL_KDEBUG*/
 	preempt_enable_notrace();
 
 	return clock;

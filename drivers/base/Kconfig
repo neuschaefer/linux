@@ -207,6 +207,7 @@ config CMA
 	depends on HAVE_DMA_CONTIGUOUS && HAVE_MEMBLOCK
 	select MIGRATION
 	select MEMORY_ISOLATION
+        select ARM_HAS_SG_CHAIN
 	help
 	  This enables the Contiguous Memory Allocator which allows drivers
 	  to allocate big physically-contiguous blocks of memory for use with

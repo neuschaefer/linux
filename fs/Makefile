@@ -76,7 +76,11 @@ obj-y				+= ramfs/
 obj-$(CONFIG_HUGETLBFS)		+= hugetlbfs/
 obj-$(CONFIG_CODA_FS)		+= coda/
 obj-$(CONFIG_MINIX_FS)		+= minix/
+ifeq ($(CONFIG_FAT_PVR_OPT_FS),y)
+obj-$(CONFIG_FAT_FS)		+= fat_pvr/
+else
 obj-$(CONFIG_FAT_FS)		+= fat/
+endif
 obj-$(CONFIG_BFS_FS)		+= bfs/
 obj-$(CONFIG_ISO9660_FS)	+= isofs/
 obj-$(CONFIG_HFSPLUS_FS)	+= hfsplus/ # Before hfs to find wrapped HFS+

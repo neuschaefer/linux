@@ -32,7 +32,9 @@
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/blktrans.h>
 #include <linux/mutex.h>
-
+#if defined(CONFIG_MSTAR_NAND) && (MP_NAND_MTD == 1)
+#include <linux/mtd/nand.h>
+#endif
 
 struct mtdblk_dev {
 	struct mtd_blktrans_dev mbd;
@@ -42,6 +44,9 @@ struct mtdblk_dev {
 	unsigned long cache_offset;
 	unsigned int cache_size;
 	enum { STATE_EMPTY, STATE_CLEAN, STATE_DIRTY } cache_state;
+	#if (defined(CONFIG_MSTAR_NAND) || defined(CONFIG_MSTAR_SPI_NAND)) && (MP_NAND_MTD == 1)
+	unsigned char	au8_BadBlkTbl[512];
+	#endif	
 };
 
 static DEFINE_MUTEX(mtdblks_lock);
@@ -209,6 +214,329 @@ static int do_cached_write (struct mtdblk_dev *mtdblk, unsigned long pos,
 	return 0;
 }
 
+#if defined(CONFIG_MSTAR_NAND) && (MP_NAND_MTD == 1)
+static int mtdblock_erase(struct mtd_info *mtd, unsigned long pos, int len)
+{
+	struct erase_info erase;
+	DECLARE_WAITQUEUE(wait, current);
+	wait_queue_head_t wait_q;
+	int ret;
+
+	/*
+	 * First, let's erase the flash block.
+	 */
+
+	init_waitqueue_head(&wait_q);
+	erase.mtd = mtd;
+	erase.callback = erase_callback;
+	erase.addr = pos;
+	erase.len = len;
+	erase.priv = (u_long)&wait_q;
+
+	set_current_state(TASK_INTERRUPTIBLE);
+	add_wait_queue(&wait_q, &wait);
+
+	ret = mtd_erase(mtd, &erase);
+	if (ret) {
+		set_current_state(TASK_RUNNING);
+		remove_wait_queue(&wait_q, &wait);
+		printk (KERN_WARNING "mtdblock: erase of region [0x%lx, 0x%x] "
+				     "on \"%s\" failed\n",
+			pos, len, mtd->name);
+		return ret;
+	}
+
+	schedule();  /* Wait for erase to finish. */
+	remove_wait_queue(&wait_q, &wait);
+
+	return 0;
+}
+
+static int nand_ReadDisturbance_BigImg(struct mtd_info *mtd, uint32_t u32_from)
+{
+	struct mtd_oob_ops ops;
+
+	u_int32_t u32_Err, u32_Row ,u32_phys_erase_shift , u32_page_shift;
+	u_int16_t u16_BlkPageCnt ,u16_Mtd_Block_cnt, u16_BakupBlock_cnt, u16_i, u16_GoodBlock_Idx,u16_BlkIdx;
+	uint8_t *pu8_PageDataBuf = (uint8_t*)kmalloc(mtd->writesize * sizeof(uint8_t), GFP_KERNEL);
+	uint8_t *pu8_PageSpareBuf = (uint8_t*)kmalloc(mtd->oobsize * sizeof(uint8_t), GFP_KERNEL);
+
+
+	u32_phys_erase_shift = ffs(mtd->erasesize) - 1;
+	u32_page_shift       = ffs(mtd->writesize) - 1;
+	u16_Mtd_Block_cnt    = mtd->size >> u32_phys_erase_shift;
+	u16_BakupBlock_cnt   = ((u16_Mtd_Block_cnt*3)/100)+2;
+	u16_BlkPageCnt       = mtd->erasesize/mtd->writesize;
+
+	for(u16_GoodBlock_Idx = u16_Mtd_Block_cnt-1 ; u16_GoodBlock_Idx > (u16_Mtd_Block_cnt - u16_BakupBlock_cnt); u16_GoodBlock_Idx--) 
+	{
+		u32_Err = mtd_block_isbad(mtd,u16_GoodBlock_Idx<<u32_phys_erase_shift);
+		if(u32_Err != 0)//bad block 
+			continue;
+
+		u32_Err = mtdblock_erase(mtd, u16_GoodBlock_Idx<<u32_phys_erase_shift ,mtd->erasesize);
+		if(u32_Err == 0)
+		{
+			break;
+		}
+		else
+			mtd_block_markbad(mtd,u16_GoodBlock_Idx<<u32_phys_erase_shift);
+	}
+
+	if(u16_GoodBlock_Idx <= (u16_Mtd_Block_cnt - u16_BakupBlock_cnt))
+	{
+		printk("No Good Block to do ReadDisturbance\n");
+		kfree(pu8_PageDataBuf);
+		kfree(pu8_PageSpareBuf);		
+		return 0;
+	}
+
+	ops.mode = MTD_OPS_PLACE_OOB;
+	ops.ooboffs = 0;
+	ops.ooblen = mtd->oobsize;
+	ops.oobbuf = pu8_PageSpareBuf;
+	ops.datbuf = pu8_PageDataBuf;
+	ops.len = mtd->writesize; 
+
+	memset(pu8_PageSpareBuf, 0xFF, mtd->oobsize);
+	u16_BlkIdx = u32_from / mtd->erasesize;
+
+	//Write Src Block to Free Good Block
+	for(u16_i = 0; u16_i < u16_BlkPageCnt; u16_i ++)
+	{
+		u32_Row = (u16_BlkIdx*u16_BlkPageCnt + u16_i)<<u32_page_shift;
+		u32_Err = mtd_read_oob(mtd, u32_Row, &ops);
+
+		if (u32_Err!= 0)
+		{
+			kfree(pu8_PageDataBuf);
+			kfree(pu8_PageSpareBuf);		
+			return u32_Err;
+		}
+
+		ops.oobbuf[1] = 0x36;
+		ops.oobbuf[2] = u16_BlkIdx & 0xFF;
+		ops.oobbuf[3] = u16_BlkIdx >>8;			
+
+		u32_Row = (u16_GoodBlock_Idx*u16_BlkPageCnt + u16_i)<<u32_page_shift;
+		u32_Err = mtd_write_oob(mtd, u32_Row, &ops);
+		if (u32_Err!= 0)
+		{
+			kfree(pu8_PageDataBuf);
+			kfree(pu8_PageSpareBuf);
+			return u32_Err;
+		}
+	}
+
+	u32_Err = mtdblock_erase(mtd,u16_BlkIdx<<u32_phys_erase_shift,mtd->erasesize);
+	if(u32_Err != 0)
+	{
+		//complicated need to do
+		//mark bad and do shifting block
+		kfree(pu8_PageDataBuf);
+		kfree(pu8_PageSpareBuf);	
+		return u32_Err;		
+	}
+	//Write  back to Src Block
+	for(u16_i = 0; u16_i < u16_BlkPageCnt; u16_i ++)
+	{
+		u32_Row = (u16_GoodBlock_Idx*u16_BlkPageCnt + u16_i)<<u32_page_shift;
+		u32_Err = mtd_read_oob(mtd, u32_Row, &ops);
+		if (u32_Err!= 0)
+		{
+			kfree(pu8_PageDataBuf);
+			kfree(pu8_PageSpareBuf);		
+			return u32_Err;
+		}
+
+		u32_Row = (u16_BlkIdx*u16_BlkPageCnt + u16_i)<<u32_page_shift;
+		u32_Err = mtd_write_oob(mtd, u32_Row, &ops);
+		if (u32_Err!= 0)
+		{
+			kfree(pu8_PageDataBuf);
+			kfree(pu8_PageSpareBuf);		
+			return u32_Err;
+		}
+	}
+
+	u32_Err = mtdblock_erase(mtd,u16_GoodBlock_Idx<<u32_phys_erase_shift,mtd->erasesize);
+	if(u32_Err != 0)
+	{
+	    mtd_block_markbad(mtd,u16_GoodBlock_Idx<<u32_phys_erase_shift);
+	}
+
+	kfree(pu8_PageDataBuf);
+	kfree(pu8_PageSpareBuf);   
+	return 0;
+}
+
+static int nand_ReadDisturbance_BigImgRestore(struct mtd_info *mtd)
+{
+	struct mtd_oob_ops ops;
+	u_int32_t u32_Err, u32_Row ,u32_phys_erase_shift , u32_page_shift;
+	u_int16_t u16_BlkPageCnt, u16_Mtd_Block_cnt, u16_BakupBlock_cnt, u16_i, u16_GoodBlock_Idx, u16_BlkIdx;
+	uint8_t *pu8_PageDataBuf  = (uint8_t*)kmalloc(mtd->writesize * sizeof(uint8_t), GFP_KERNEL);
+	uint8_t *pu8_PageSpareBuf = (uint8_t*)kmalloc(mtd->oobsize * sizeof(uint8_t), GFP_KERNEL);
+
+	u32_phys_erase_shift = ffs(mtd->erasesize) - 1;
+	u32_page_shift       = ffs(mtd->writesize) - 1;
+	u16_Mtd_Block_cnt    = mtd->size >> u32_phys_erase_shift;
+	u16_BakupBlock_cnt   = ((u16_Mtd_Block_cnt*3)/100)+2;
+	u16_BlkPageCnt       = mtd->erasesize / mtd->writesize;
+		
+	ops.mode = MTD_OPS_PLACE_OOB;
+	ops.ooboffs = 0;
+	ops.ooblen = mtd->oobsize;
+	ops.oobbuf = pu8_PageSpareBuf;
+	ops.datbuf = pu8_PageDataBuf;
+	ops.len = mtd->writesize; 
+	memset(pu8_PageSpareBuf, 0xFF, mtd->oobsize);
+
+	//search last good block of read only partition
+	for(u16_GoodBlock_Idx = u16_Mtd_Block_cnt-1 ; u16_GoodBlock_Idx > (u16_Mtd_Block_cnt - u16_BakupBlock_cnt); u16_GoodBlock_Idx--) 
+	{
+		u32_Row = u16_GoodBlock_Idx << u32_phys_erase_shift;
+		u32_Err = mtd_read_oob(mtd, u32_Row, &ops);
+
+		if(ops.oobbuf[0] == 0xFF)//good block 
+			break;
+	}
+
+	if(u16_GoodBlock_Idx <= (u16_Mtd_Block_cnt - u16_BakupBlock_cnt))
+	{
+		printk("No Good Block to do ReadDisturbance\n");
+		kfree(pu8_PageDataBuf);
+		kfree(pu8_PageSpareBuf);		
+		return 0;
+	}
+
+	//check block content
+	// read first and last lsb page for checking ecc and empty
+	if(u32_Err != 0)
+	{
+		printk("Read last good readonly block 0x%x first page fail\n", u16_GoodBlock_Idx);
+		//erase block and skip process
+		u32_Err =  mtdblock_erase(mtd,u16_GoodBlock_Idx<<u32_phys_erase_shift,mtd->erasesize);
+		if(u32_Err != 0)
+		{
+		    printk("Erase last good readonly block 0x%x fail\n", u16_GoodBlock_Idx); 
+			mtd_block_markbad(mtd,u16_GoodBlock_Idx<<u32_phys_erase_shift);
+		}
+		kfree(pu8_PageDataBuf);
+		kfree(pu8_PageSpareBuf);		
+		return 0;
+	}
+
+	if(pu8_PageSpareBuf[1] == 0xFF && pu8_PageSpareBuf[2] == 0xFF && pu8_PageSpareBuf[3] == 0xFF)
+	{
+		printk("First page is empty\n");
+		//done for the resetore
+		kfree(pu8_PageDataBuf);
+		kfree(pu8_PageSpareBuf);		
+		return 0;
+	}
+
+	if(!(pu8_PageSpareBuf[1] == 0x36))
+	{
+		printk("Dummy data find at last good readonly block 0x%x first page, spare[2]=0x%x spare[3]=0x%x\n", 
+			u16_GoodBlock_Idx, pu8_PageSpareBuf[2],pu8_PageSpareBuf[3]);
+
+		u32_Err =  mtdblock_erase(mtd,u16_GoodBlock_Idx<<u32_phys_erase_shift,mtd->erasesize);
+		if(u32_Err != 0)
+		{
+			printk("Erase last good readonly block 0x%x fail\n", u16_GoodBlock_Idx); 
+			mtd_block_markbad(mtd,u16_GoodBlock_Idx<<u32_phys_erase_shift);
+		}	
+		kfree(pu8_PageDataBuf);
+		kfree(pu8_PageSpareBuf);		
+		return 0;
+	}
+
+
+	//Read last page of last good read only block
+	u32_Row = ((u16_GoodBlock_Idx+1)*u16_BlkPageCnt -1)<<u32_page_shift;
+	u32_Err = mtd_read_oob(mtd, u32_Row, &ops);
+
+	if((u32_Err != 0) || (pu8_PageSpareBuf[1] == 0xFF && pu8_PageSpareBuf[2] == 0xFF && pu8_PageSpareBuf[3] == 0xFF) 
+			 || (pu8_PageSpareBuf[1] != 0x36))
+	{
+		printk("last page is empty or dummy data or Read fail\n");
+		u32_Err =  mtdblock_erase(mtd,u16_GoodBlock_Idx<<u32_phys_erase_shift,mtd->erasesize);
+		if(u32_Err != 0)
+		{
+			printk("Erase last good readonly block 0x%x fail\n", u16_GoodBlock_Idx); 
+			mtd_block_markbad(mtd,u16_GoodBlock_Idx<<u32_phys_erase_shift);
+		}
+		kfree(pu8_PageDataBuf);
+		kfree(pu8_PageSpareBuf);		
+		return 0;
+	}
+
+	//source block idx read from last good block last page
+	u16_BlkIdx = (pu8_PageSpareBuf[3]<<8) + pu8_PageSpareBuf[2];
+    
+	//erase source block
+	u32_Err = mtdblock_erase(mtd,u16_BlkIdx<<u32_phys_erase_shift,mtd->erasesize);
+	if(u32_Err != 0)
+	{
+		//mark bad and do shifting...
+		printk("Erase source readonly block 0x%x fail\n", u16_BlkIdx); 		
+		kfree(pu8_PageDataBuf);
+		kfree(pu8_PageSpareBuf);		
+		return 0;
+	}
+
+	//restore data to source block
+	for(u16_i = 0; u16_i < u16_BlkPageCnt ; u16_i ++)
+	{
+		u32_Row = (u16_GoodBlock_Idx*u16_BlkPageCnt + u16_i)<<u32_page_shift;
+		u32_Err = mtd_read_oob(mtd, u32_Row, &ops);
+		if(u32_Err != 0)
+		{
+			//fatal error
+			printk("Read last good block fail, nand blobk 0x%x page 0x%x\n", u16_BlkIdx, u16_i);
+			kfree(pu8_PageDataBuf);
+			kfree(pu8_PageSpareBuf);
+			return u32_Err;
+		}
+		else
+		{
+			if(pu8_PageSpareBuf[1] == 0x36)
+			{
+				u32_Row = (u16_BlkIdx*u16_BlkPageCnt + u16_i)<<u32_page_shift;
+				u32_Err = mtd_write_oob(mtd, u32_Row, &ops);
+
+				if(u32_Err != 0)
+				{
+					printk("restoring data to readonly block 0x%x page 0x%x fail\n", u16_BlkIdx, u16_i); 
+					mtd_block_markbad(mtd,u16_BlkIdx<<u32_phys_erase_shift);
+					kfree(pu8_PageDataBuf);
+					kfree(pu8_PageSpareBuf);
+					return u32_Err;
+				}
+			}
+			else
+			{
+				printk("Dummy data find at last good readonly block 0x%x page 0x%x\n", u16_BlkIdx, u16_i);
+				kfree(pu8_PageDataBuf);
+				kfree(pu8_PageSpareBuf);				
+				return 1;
+			}
+		}
+	}
+
+	//Erase Backup block
+	u32_Err = mtdblock_erase(mtd,u16_GoodBlock_Idx<<u32_phys_erase_shift,mtd->erasesize);
+	if(u32_Err != 0)
+	{
+		printk("Erase last good readonly block 0x%x fail\n", u16_GoodBlock_Idx);
+		mtd_block_markbad(mtd,u16_GoodBlock_Idx<<u32_phys_erase_shift);
+	}
+	kfree(pu8_PageDataBuf);
+	kfree(pu8_PageSpareBuf);
+	return 0;
+}
+#endif
 
 static int do_cached_read (struct mtdblk_dev *mtdblk, unsigned long pos,
 			   int len, char *buf)
@@ -217,6 +545,9 @@ static int do_cached_read (struct mtdblk_dev *mtdblk, unsigned long pos,
 	unsigned int sect_size = mtdblk->cache_size;
 	size_t retlen;
 	int ret;
+	#if defined(CONFIG_MSTAR_NAND) && (MP_NAND_MTD == 1)
+	struct nand_chip *chip = mtd->priv;
+	#endif
 
 	pr_debug("mtdblock: read on \"%s\" at 0x%lx, size 0x%x\n",
 			mtd->name, pos, len);
@@ -242,8 +573,31 @@ static int do_cached_read (struct mtdblk_dev *mtdblk, unsigned long pos,
 			memcpy (buf, mtdblk->cache_data + offset, size);
 		} else {
 			ret = mtd_read(mtd, pos, size, &retlen, buf);
+			#if defined(CONFIG_MSTAR_NAND) && (MP_NAND_MTD == 1)
+			if(mtd->type == MTD_NANDFLASH)
+			{
+				if (ret == -EUCLEAN)//ecc correct
+			        {
+					if(!(chip->options & NAND_IS_SPI))
+					{
+						ret = nand_ReadDisturbance_BigImg(mtd, pos);
+						if(ret != 0)
+							return ret;
+					}
+					else if(ret == -EBADMSG)//ecc fail
+					{
+						return ret;
+					}
+				}
+			}
+			else {
+				if(ret)
+					return ret;
+			}			
+			#else
 			if (ret)
 				return ret;
+			#endif
 			if (retlen != size)
 				return -EIO;
 		}
@@ -260,7 +614,55 @@ static int mtdblock_readsect(struct mtd_blktrans_dev *dev,
 			      unsigned long block, char *buf)
 {
 	struct mtdblk_dev *mtdblk = container_of(dev, struct mtdblk_dev, mbd);
+	
+	#if (defined(CONFIG_MSTAR_NAND) || defined(CONFIG_MSTAR_SPI_NAND)) && (MP_NAND_MTD == 1)
+	struct mtd_info *mtd = mtdblk->mbd.mtd;
+	u_int16_t u16_blkidx, u16_bad_blk_cnt , u16_blk_cnt; 
+	u_int16_t u16_blk_sec_cnt_shift, u16_blk_sec_cnt_mask;
+	u_int16_t u16_check_blk_idx,u16_check_blk_cnt;
+	u_int32_t u32_real_block,u32_phys_erase_shift;
+		
+	u32_phys_erase_shift = ffs(mtd->erasesize) -1;
+	u16_blk_cnt = mtd->size >> u32_phys_erase_shift;
+	u16_blk_sec_cnt_shift = ffs(mtd->erasesize >>9) - 1;
+	u16_blk_sec_cnt_mask = (mtd->erasesize >>9) - 1;
+	u16_blkidx = block >>u16_blk_sec_cnt_shift;
+	u16_bad_blk_cnt = 0;
+	u16_check_blk_cnt = 0;
+	u16_check_blk_idx =0;
+	if(mtd->type == MTD_NANDFLASH)
+	{
+		u32_phys_erase_shift = ffs(mtd->erasesize) - 1;
+		while(u16_check_blk_cnt < (u16_blkidx+1))
+		{
+			 if (!(mtdblk->au8_BadBlkTbl[u16_check_blk_idx>> 3] & (1 << (u16_check_blk_idx & 0x7))))
+			 {
+		         u16_bad_blk_cnt++;
+			 }
+		     else
+		     {
+			     u16_check_blk_cnt++;
+		     }
+			 u16_check_blk_idx++;
+		};
+		
+		if((u16_blkidx+u16_bad_blk_cnt) > u16_blk_cnt)
+		{
+		    printk("MTD Err: Too Many Bad Block!\n");
+			return 1;
+		}
+		
+		u32_real_block = ((u16_blkidx+u16_bad_blk_cnt) << u16_blk_sec_cnt_shift)+(block & u16_blk_sec_cnt_mask);
+		
+		return do_cached_read(mtdblk, u32_real_block<<9, 512, buf);
+	}
+	else
+	{
 	return do_cached_read(mtdblk, block<<9, 512, buf);
+}
+	#else
+	return do_cached_read(mtdblk, block<<9, 512, buf);
+	#endif
 }
 
 static int mtdblock_writesect(struct mtd_blktrans_dev *dev,
@@ -282,6 +684,13 @@ static int mtdblock_writesect(struct mtd_blktrans_dev *dev,
 static int mtdblock_open(struct mtd_blktrans_dev *mbd)
 {
 	struct mtdblk_dev *mtdblk = container_of(mbd, struct mtdblk_dev, mbd);
+	struct mtd_info *mtd = mtdblk->mbd.mtd;
+	#if (defined(CONFIG_MSTAR_NAND) || defined(CONFIG_MSTAR_SPI_NAND)) && (MP_NAND_MTD == 1)
+	u_int16_t u16_blkidx;
+	int ret;
+	u_int32_t u32_phys_erase_shift;
+	struct nand_chip *chip = mtd->priv;
+	#endif
 
 	pr_debug("mtdblock_open\n");
 
@@ -300,6 +709,31 @@ static int mtdblock_open(struct mtd_blktrans_dev *mbd)
 		mtdblk->cache_size = mbd->mtd->erasesize;
 		mtdblk->cache_data = NULL;
 	}
+
+	#if (defined(CONFIG_MSTAR_NAND) || defined(CONFIG_MSTAR_SPI_NAND)) && (MP_NAND_MTD == 1)
+	if(mtd->type == MTD_NANDFLASH)
+	{
+		u32_phys_erase_shift = ffs(mtd->erasesize) - 1;
+		memset(mtdblk->au8_BadBlkTbl,0xff,512);
+		for(u16_blkidx=0;u16_blkidx< (mtd->size >> u32_phys_erase_shift);u16_blkidx++)
+		{
+		    ret = mtd_block_isbad(mtd,u16_blkidx<<u32_phys_erase_shift);
+			if(ret != 0)//bad block
+			{
+	           mtdblk->au8_BadBlkTbl[u16_blkidx>> 3] &= ~(1 << (u16_blkidx & 0x7));
+			}
+		}
+	}
+	#if defined(CONFIG_MSTAR_NAND)
+	if(mtd->type == MTD_NANDFLASH && !(chip->options & NAND_IS_SPI))
+	{
+		ret = nand_ReadDisturbance_BigImgRestore(mtd);
+		if(ret != 0)
+		    printk("nand_ReadDisturbance_BigImgRestore Fail\n"); 
+	}
+ 	#endif
+
+    #endif
 
 	mutex_unlock(&mtdblks_lock);
 

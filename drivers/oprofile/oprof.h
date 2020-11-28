@@ -6,7 +6,7 @@
  *
  * @author John Levon <levon@movementarian.org>
  */
-
+#include <mstar/mpatch_macro.h>
 #ifndef OPROF_H
 #define OPROF_H
 
@@ -44,6 +44,11 @@ static inline int op_nmi_timer_init(struct oprofile_operations *ops)
 }
 #endif
 
+#if (MP_DEBUG_TOOL_OPROFILE == 1)
+#ifdef CONFIG_ADVANCE_OPROFILE
+void oprofile_set_backtrace(unsigned long val);
+#endif
+#endif /*MP_DEBUG_TOOL_OPROFILE*/
 
 int oprofile_set_ulong(unsigned long *addr, unsigned long val);
 int oprofile_set_timeout(unsigned long time);

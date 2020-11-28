@@ -245,3 +245,53 @@ void tracing_sched_switch_assign_trace(struct trace_array *tr)
 	ctx_trace = tr;
 }
 
+#if (MP_DEBUG_TOOL_KDEBUG == 1)
+#ifdef CONFIG_KDEBUGD_FTRACE
+static void stop_sched_trace(struct trace_array *tr)
+{
+	tracing_stop_sched_switch_record();
+}
+
+static int sched_switch_trace_init(struct trace_array *tr)
+{
+	ctx_trace = tr;
+	tracing_reset_online_cpus(tr);
+	tracing_start_sched_switch_record();
+	return 0;
+}
+
+static void sched_switch_trace_reset(struct trace_array *tr)
+{
+	if (sched_ref)
+		stop_sched_trace(tr);
+}
+
+static void sched_switch_trace_start(struct trace_array *tr)
+{
+	sched_stopped = 0;
+}
+
+static void sched_switch_trace_stop(struct trace_array *tr)
+{
+	sched_stopped = 1;
+}
+
+static struct tracer sched_switch_trace __read_mostly = {
+	.name           = "sched_switch",
+	.init           = sched_switch_trace_init,
+	.reset          = sched_switch_trace_reset,
+	.start          = sched_switch_trace_start,
+	.stop           = sched_switch_trace_stop,
+	.wait_pipe      = poll_wait_pipe,
+#ifdef CONFIG_FTRACE_SELFTEST
+	.selftest    = trace_selftest_startup_sched_switch,
+#endif
+};
+
+static __init int init_sched_switch_trace(void)
+{
+	return register_tracer(&sched_switch_trace);
+}
+device_initcall(init_sched_switch_trace);
+#endif /* CONFIG_KDEBUGD_FTRACE */
+#endif /*MP_DEBUG_TOOL_KDEBUG*/

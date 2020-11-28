@@ -30,6 +30,7 @@
 #include <linux/nfs_fs.h>
 #include <linux/nfs_fs_sb.h>
 #include <linux/nfs_mount.h>
+#include <mstar/mpatch_macro.h>
 
 #include "do_mounts.h"
 
@@ -551,13 +552,23 @@ void __init prepare_namespace(void)
 	wait_for_device_probe();
 
 	md_run_setup();
+#if (MP_security_dm_verity == 1)
+	dm_run_setup();
+#endif/*MP_security_dm_verity*/
 
 	if (saved_root_name[0]) {
 		root_device_name = saved_root_name;
 		if (!strncmp(root_device_name, "mtd", 3) ||
 		    !strncmp(root_device_name, "ubi", 3)) {
+#if defined(CONFIG_DM_NFSB) && (MP_security_dm_verity == 1)
+
+			panic("MTD and UBI devices not supported when NFSB is required.");
+#else
+
 			mount_block_root(root_device_name, root_mountflags);
 			goto out;
+
+#endif/*MP_security_dm_verity*/
 		}
 		ROOT_DEV = name_to_dev_t(root_device_name);
 		if (strncmp(root_device_name, "/dev/", 5) == 0)
@@ -581,7 +592,10 @@ void __init prepare_namespace(void)
 
 	if (is_floppy && rd_doload && rd_load_disk(0))
 		ROOT_DEV = Root_RAM0;
-
+#if defined(CONFIG_DM_NFSB) && (MP_security_dm_verity == 1)
+	/* If this succeeds, the ROOT_DEV will have changed. */
+	ROOT_DEV = dm_mount_nfsb(ROOT_DEV);
+#endif/*MP_security_dm_verity*/
 	mount_root();
 out:
 	devtmpfs_mount("dev");

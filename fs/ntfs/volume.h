@@ -130,6 +130,9 @@ typedef struct {
 	struct inode *usnjrnl_j_ino;	/* Attribute inode for $UsnJrnl/$J. */
 #endif /* NTFS_RW */
 	struct nls_table *nls_map;
+#if (MP_NTFS_VOLUME_LABEL==1)    
+    char *vol_name;		/* Name of the volume. */
+#endif
 } ntfs_volume;
 
 /*

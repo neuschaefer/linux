@@ -1,12 +1,27 @@
+config MSTAR_CHIP
+	bool
+	default y
+
+source "drivers/mstar2/Kconfig"
+source "mpatch_Kconfig"
+
+
 config MIPS
 	bool
 	default y
+	select HAVE_CONTEXT_TRACKING
 	select HAVE_GENERIC_DMA_COHERENT
 	select HAVE_IDE
 	select HAVE_OPROFILE
 	select HAVE_PERF_EVENTS
 	select PERF_USE_VMALLOC
 	select HAVE_ARCH_KGDB
+# Patch COMPRESSION KERNEL
+    select HAVE_KERNEL_GZIP
+    select HAVE_KERNEL_BZIP2
+    select HAVE_KERNEL_LZMA
+    select HAVE_KERNEL_LZO
+#    select KERNEL_LZMA	
 	select ARCH_HAVE_CUSTOM_GPIO_H
 	select HAVE_FUNCTION_TRACER
 	select HAVE_FUNCTION_TRACE_MCOUNT_TEST
@@ -52,6 +67,9 @@ config ZONE_DMA
 choice
 	prompt "System type"
 	default SGI_IP22
+config MSTAR_CHIP
+	bool "Mstar Chip Family"
+	select SYS_SUPPORTS_ZBOOT
 
 config MIPS_ALCHEMY
 	bool "Alchemy processor based machines"
@@ -420,7 +438,6 @@ config POWERTV
 	select CSRC_POWERTV
 	select DMA_NONCOHERENT
 	select HW_HAS_PCI
-	select SYS_HAS_EARLY_PRINTK
 	select SYS_HAS_CPU_MIPS32_R2
 	select SYS_SUPPORTS_32BIT_KERNEL
 	select SYS_SUPPORTS_BIG_ENDIAN
@@ -838,6 +855,7 @@ config NLM_XLP_BOARD
 
 endchoice
 
+
 source "arch/mips/alchemy/Kconfig"
 source "arch/mips/ath79/Kconfig"
 source "arch/mips/bcm47xx/Kconfig"
@@ -1031,7 +1049,6 @@ config CPU_BIG_ENDIAN
 config CPU_LITTLE_ENDIAN
 	bool "Little endian"
 	depends on SYS_SUPPORTS_LITTLE_ENDIAN
-	help
 
 endchoice
 
@@ -1737,6 +1754,7 @@ endchoice
 
 config KVM_GUEST
 	bool "KVM Guest Kernel"
+	depends on BROKEN_ON_SMP
 	help
 	  Select this option if building a guest kernel for KVM (Trap & Emulate) mode
 
@@ -2014,6 +2032,7 @@ config MIPS_VPE_APSP_API
 config MIPS_CMP
 	bool "MIPS CMP framework support"
 	depends on SYS_SUPPORTS_MIPS_CMP
+	select SMP
 	select SYNC_R4K
 	select SYS_SUPPORTS_SMP
 	select SYS_SUPPORTS_SCHED_SMT if SMP
@@ -2547,6 +2566,7 @@ config MIPS32_N32
 config BINFMT_ELF32
 	bool
 	default y if MIPS32_O32 || MIPS32_N32
+	select ELFCORE
 
 endmenu
 
@@ -2586,6 +2606,10 @@ source "arch/mips/Kconfig.debug"
 source "security/Kconfig"
 
 source "crypto/Kconfig"
+
+source "arch/mips/Kconfig.kdebug"
+
+source "arch/mips/Kconfig.codedump"
 
 source "lib/Kconfig"
 

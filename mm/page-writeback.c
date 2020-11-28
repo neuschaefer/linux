@@ -2250,6 +2250,15 @@ int test_clear_page_writeback(struct page *page)
 	return ret;
 }
 
+#if (MP_NTFS3G_WRAP==1)
+int test_clear_page_writeback_wrap(struct page *page)
+{
+    return test_clear_page_writeback(page);
+}
+
+EXPORT_SYMBOL(test_clear_page_writeback_wrap);
+#endif
+
 int test_set_page_writeback(struct page *page)
 {
 	struct address_space *mapping = page_mapping(page);

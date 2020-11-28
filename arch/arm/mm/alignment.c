@@ -27,6 +27,7 @@
 #include <asm/unaligned.h>
 
 #include "fault.h"
+#include <mstar/mpatch_macro.h>
 
 /*
  * 32-bit misaligned trap handler (c) 1998 San Mehat (CCC) -July 1998
@@ -123,6 +124,12 @@ static const char *usermode_action[] = {
 	"signal",
 	"signal+warn"
 };
+
+#if (MP_DEBUG_TOOL_KDEBUG == 1)
+#ifdef CONFIG_SHOW_FAULT_TRACE_INFO
+extern void show_info(struct task_struct *task, struct pt_regs *regs, unsigned long addr);
+#endif
+#endif /*MP_DEBUG_TOOL_KDEBUG*/
 
 static int alignment_proc_show(struct seq_file *m, void *v)
 {
@@ -917,6 +924,15 @@ do_alignment(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
 	if (ai_usermode & UM_SIGNAL) {
 		siginfo_t si;
 
+#if (MP_DEBUG_TOOL_KDEBUG == 1)
+#ifdef CONFIG_SHOW_FAULT_TRACE_INFO
+		/* add unaligned access bus error msg, VDLP 2011-08-18 */
+		printk(KERN_ALERT "##### Unaligned access bus error: Pid [%d], comm: %s, PC=0x%08lx Instr=0x%0*lx\n",
+		       task_pid_nr(current), current->comm, instrptr,
+		       isize << 1, isize == 2 ? tinstr : instr);
+		show_usr_info(current, regs, 0);
+#endif/*CONFIG_SHOW_FAULT_TRACE_INFO*/
+#endif /*MP_DEBUG_TOOL_KDEBUG*/
 		si.si_signo = SIGBUS;
 		si.si_errno = 0;
 		si.si_code = BUS_ADRALN;

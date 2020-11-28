@@ -2,6 +2,12 @@
 # Makefile for USB Host Controller Drivers
 #
 
+# compatiblity with mstar
+EXTRA_CFLAGS      += -Idrivers/mstar/usb
+
+# compatiblity with mstar2
+EXTRA_CFLAGS      += -Idrivers/mstar2/hal/$(CONFIG_MSTAR_CHIP_NAME)/usb
+
 ccflags-$(CONFIG_USB_DEBUG) := -DDEBUG
 
 isp1760-y := isp1760-hcd.o isp1760-if.o
@@ -17,6 +23,10 @@ xhci-hcd-$(CONFIG_PCI)	+= xhci-pci.o
 
 ifneq ($(CONFIG_USB_XHCI_PLATFORM), )
 	xhci-hcd-y		+= xhci-plat.o
+endif
+
+ifeq ($(CONFIG_MSTAR_CHIP),y)
+xhci-hcd-y += xhci-mstar.o
 endif
 
 obj-$(CONFIG_USB_WHCI_HCD)	+= whci/

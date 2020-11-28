@@ -37,6 +37,7 @@ static noinline void __down(struct semaphore *sem);
 static noinline int __down_interruptible(struct semaphore *sem);
 static noinline int __down_killable(struct semaphore *sem);
 static noinline int __down_timeout(struct semaphore *sem, long jiffies);
+static noinline int __down_timeout_interruptible(struct semaphore *sem, long jiffies);
 static noinline void __up(struct semaphore *sem);
 
 /**
@@ -169,6 +170,28 @@ int down_timeout(struct semaphore *sem, long jiffies)
 EXPORT_SYMBOL(down_timeout);
 
 /**
+ * down_timeout_interruptible - acquire the semaphore within a specified time unless interrupted
+ * @sem: the semaphore to be acquired
+ * @jiffies: how long to wait before failing
+ */
+int down_timeout_interruptible(struct semaphore *sem, long jiffies)
+{
+	unsigned long flags;
+	int result = 0;
+
+	raw_spin_lock_irqsave(&sem->lock, flags);
+	if (likely(sem->count > 0))
+		sem->count--;
+	else
+		result = __down_timeout_interruptible(sem, jiffies);
+	raw_spin_unlock_irqrestore(&sem->lock, flags);
+
+	return result;
+}
+EXPORT_SYMBOL(down_timeout_interruptible);
+
+
+/**
  * up - release the semaphore
  * @sem: the semaphore to release
  *
@@ -251,6 +274,11 @@ static noinline int __sched __down_killable(struct semaphore *sem)
 static noinline int __sched __down_timeout(struct semaphore *sem, long jiffies)
 {
 	return __down_common(sem, TASK_UNINTERRUPTIBLE, jiffies);
+}
+
+static noinline int __sched __down_timeout_interruptible(struct semaphore *sem, long jiffies)
+{
+	return __down_common(sem, TASK_INTERRUPTIBLE, jiffies);
 }
 
 static noinline void __sched __up(struct semaphore *sem)

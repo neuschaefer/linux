@@ -54,6 +54,7 @@ struct sched_param {
 #include <linux/gfp.h>
 
 #include <asm/processor.h>
+#include <mstar/mpatch_macro.h>
 
 struct exec_domain;
 struct futex_pi_state;
@@ -258,6 +259,18 @@ extern void show_regs(struct pt_regs *);
  * trace (or NULL if the entire call-chain of the task should be shown).
  */
 extern void show_stack(struct task_struct *task, unsigned long *sp);
+
+#if (MP_DEBUG_TOOL_KDEBUG == 1)
+#ifdef CONFIG_SHOW_FAULT_TRACE_INFO
+extern void dump_pid_maps(struct task_struct *task);
+extern void show_user_stack(struct task_struct *task, struct pt_regs * regs);
+#ifdef CONFIG_ARM
+extern void show_usr_info(struct task_struct *task, struct pt_regs *regs, unsigned long addr);
+#elif defined(CONFIG_MIPS)
+extern void show_info(struct task_struct *task, struct pt_regs * regs);
+#endif
+#endif
+#endif /* MP_DEBUG_TOOL_KDEBUG */
 
 void io_schedule(void);
 long io_schedule_timeout(long timeout);
@@ -1379,6 +1392,13 @@ struct task_struct {
 	 */
 	unsigned long timer_slack_ns;
 	unsigned long default_timer_slack_ns;
+#if (MP_DEBUG_TOOL_COREDUMP == 1) || (MP_DEBUG_TOOL_KDEBUG == 1)
+         /* VDLinux, based VDLP.Mstar default patch No.5,show fault user stack, 2010-01-29 */
+#ifdef CONFIG_SHOW_FAULT_TRACE_INFO
+         unsigned long user_ssp;  /* user mode start sp */
+#endif
+#endif /* MP_DEBUG_TOOL_COREDUMP */
+
 
 #ifdef CONFIG_FUNCTION_GRAPH_TRACER
 	/* Index of current stored address in ret_stack */
@@ -1609,6 +1629,9 @@ static inline cputime_t task_gtime(struct task_struct *t)
 #endif
 extern void task_cputime_adjusted(struct task_struct *p, cputime_t *ut, cputime_t *st);
 extern void thread_group_cputime_adjusted(struct task_struct *p, cputime_t *ut, cputime_t *st);
+
+extern int task_free_register(struct notifier_block *n);
+extern int task_free_unregister(struct notifier_block *n);
 
 /*
  * Per process flags

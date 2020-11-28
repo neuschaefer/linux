@@ -12,6 +12,14 @@ obj-y     = fork.o exec_domain.o panic.o printk.o \
 	    notifier.o ksysfs.o cred.o \
 	    async.o range.o groups.o lglock.o smpboot.o
 
+# compatiblity with mstar
+EXTRA_CFLAGS      +=  -Idrivers/mstar/mbx/drv
+EXTRA_CFLAGS      +=  -Idrivers/mstar/include
+
+# compatiblity with mstar2
+EXTRA_CFLAGS      +=  -Idrivers/mstar2/drv/mbx
+EXTRA_CFLAGS      +=  -Idrivers/mstar2/include
+
 ifdef CONFIG_FUNCTION_TRACER
 # Do not trace debug files and internal ftrace files
 CFLAGS_REMOVE_lockdep.o = -pg
@@ -92,10 +100,11 @@ obj-$(CONFIG_TASK_DELAY_ACCT) += delayacct.o
 obj-$(CONFIG_TASKSTATS) += taskstats.o tsacct.o
 obj-$(CONFIG_TRACEPOINTS) += tracepoint.o
 obj-$(CONFIG_LATENCYTOP) += latencytop.o
-obj-$(CONFIG_BINFMT_ELF) += elfcore.o
-obj-$(CONFIG_COMPAT_BINFMT_ELF) += elfcore.o
-obj-$(CONFIG_BINFMT_ELF_FDPIC) += elfcore.o
+obj-$(CONFIG_ELFCORE) += elfcore.o
 obj-$(CONFIG_FUNCTION_TRACER) += trace/
+#Add for KDEBUGD
+obj-$(CONFIG_KDEBUGD)   += kdebugd/
+###############
 obj-$(CONFIG_TRACING) += trace/
 obj-$(CONFIG_TRACE_CLOCK) += trace/
 obj-$(CONFIG_RING_BUFFER) += trace/

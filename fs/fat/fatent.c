@@ -108,8 +108,28 @@ static int fat_ent_bread(struct super_block *sb, struct fat_entry *fatent,
 	fatent->fat_inode = MSDOS_SB(sb)->fat_inode;
 	fatent->bhs[0] = sb_bread(sb, blocknr);
 	if (!fatent->bhs[0]) {
+#if (1 == MP_FAT_DEBUG_MESSAGE_CONTROL)
+		if (sb->s_bdev != NULL && sb->s_bdev->bd_disk != NULL) {
+			if ((sb->s_bdev->bd_disk->flags & GENHD_FL_UP) == 0) {
+				if(false == sb->not_msg_flag && sb->msg_count < 50)
+				{
+				   sb->msg_count++;
+				}
+				else if(50 == sb->msg_count  && false == sb->not_msg_flag)
+				{
+					sb->not_msg_flag = true;
+				}
+			}
+		}
+		if(false == sb->not_msg_flag)
+		{
+			fat_msg(sb, KERN_ERR, "FAT read failed (blocknr %llu)",
+			   (llu)blocknr);
+		}
+#else
 		fat_msg(sb, KERN_ERR, "FAT read failed (blocknr %llu)",
 		       (llu)blocknr);
+#endif
 		return -EIO;
 	}
 	fatent->nr_bhs = 1;

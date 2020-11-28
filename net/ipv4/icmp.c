@@ -212,6 +212,11 @@ static inline struct sock *icmp_xmit_lock(struct net *net)
 {
 	struct sock *sk;
 
+#ifdef CONFIG_MP_ETHERNET_MSTAR_ICMP_ENHANCE
+    local_bh_disable();
+    sk = icmp_sk(net);
+    spin_lock(&sk->sk_lock.slock);
+#else
 	local_bh_disable();
 
 	sk = icmp_sk(net);
@@ -223,6 +228,7 @@ static inline struct sock *icmp_xmit_lock(struct net *net)
 		local_bh_enable();
 		return NULL;
 	}
+#endif
 	return sk;
 }
 
@@ -939,7 +945,8 @@ error:
 void icmp_err(struct sk_buff *skb, u32 info)
 {
 	struct iphdr *iph = (struct iphdr *)skb->data;
-	struct icmphdr *icmph = (struct icmphdr *)(skb->data+(iph->ihl<<2));
+	int offset = iph->ihl<<2;
+	struct icmphdr *icmph = (struct icmphdr *)(skb->data + offset);
 	int type = icmp_hdr(skb)->type;
 	int code = icmp_hdr(skb)->code;
 	struct net *net = dev_net(skb->dev);
@@ -949,7 +956,7 @@ void icmp_err(struct sk_buff *skb, u32 info)
 	 * triggered by ICMP_ECHOREPLY which sent from kernel.
 	 */
 	if (icmph->type != ICMP_ECHOREPLY) {
-		ping_err(skb, info);
+		ping_err(skb, offset, info);
 		return;
 	}
 

@@ -1322,6 +1322,12 @@ struct super_block {
 
 	/* Being remounted read-only */
 	int s_readonly_remount;
+
+#if (1 == MP_FAT_DEBUG_MESSAGE_CONTROL)
+	/*debug message control */
+	int msg_count;
+	bool not_msg_flag;
+#endif
 };
 
 /* superblock cache pruning functions */
@@ -2347,6 +2353,9 @@ extern void unlock_new_inode(struct inode *);
 extern unsigned int get_next_ino(void);
 
 extern void __iget(struct inode * inode);
+#if (MP_NTFS3G_WRAP==1)
+extern void __iget_wrap(struct inode * inode);      //AlanYu 20111121 : wrap for __iget()
+#endif
 extern void iget_failed(struct inode *);
 extern void clear_inode(struct inode *);
 extern void __destroy_inode(struct inode *);

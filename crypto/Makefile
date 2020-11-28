@@ -94,6 +94,9 @@ obj-$(CONFIG_CRYPTO_GHASH) += ghash-generic.o
 obj-$(CONFIG_CRYPTO_USER_API) += af_alg.o
 obj-$(CONFIG_CRYPTO_USER_API_HASH) += algif_hash.o
 obj-$(CONFIG_CRYPTO_USER_API_SKCIPHER) += algif_skcipher.o
+obj-$(CONFIG_CRYPTO_MPUINT) += mpuint.o
+obj-$(CONFIG_CRYPTO_MPURSA) += mpursa.o
+obj-$(CONFIG_CRYPTO_MPUSHA) += mpusha.o
 
 #
 # generic algorithms and the async_tx api

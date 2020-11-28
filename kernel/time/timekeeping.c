@@ -22,9 +22,18 @@
 #include <linux/tick.h>
 #include <linux/stop_machine.h>
 #include <linux/pvclock_gtod.h>
+#include <mstar/mpatch_macro.h>
 
 #include "tick-internal.h"
 #include "ntp_internal.h"
+
+#if (MP_DEBUG_TOOL_KDEBUG == 1)
+#ifdef CONFIG_KDEBUGD_FTRACE
+#include "kdbg_util.h"
+#include <trace/kdbg_ftrace_helper.h>
+#include <trace/kdbg-ftrace.h>
+#endif /* CONFIG_KDEBUGD_FTRACE */
+#endif/*MP_DEBUG_TOOL_KDEBUG*/
 
 static struct timekeeper timekeeper;
 static DEFINE_RAW_SPINLOCK(timekeeper_lock);
@@ -83,6 +92,30 @@ static void tk_set_sleep_time(struct timekeeper *tk, struct timespec t)
 	tk->total_sleep_time	= t;
 	tk->offs_boot		= timespec_to_ktime(t);
 }
+#if (MP_PLATFORM_CPU_SETTING == 1)
+#if defined CONFIG_MSTAR_CPU_calibrating
+#if (!defined CONFIG_MP_STATIC_TIMER_CLOCK_SOURCE) && (!defined CONFIG_MP_GLOBAL_TIMER_12MHZ_PATCH)
+static void tk_setup_internals(struct timekeeper *tk, struct clocksource *clock);
+static void timekeeping_forward_now(struct timekeeper *tk);
+void change_interval(unsigned int old_freq, unsigned int new_freq)
+{
+	struct timekeeper *tk = &timekeeper;
+	struct clocksource *clock = tk->clock;
+	//mutex_lock(&change_interval_mutex);
+	printk("\n*** ori: timekeeper.cycle_interval = %llu\n", timekeeper.cycle_interval);
+
+	timekeeping_forward_now(tk);
+	clock->mult = clocksource_khz2mult(new_freq/2, clock->shift);
+	//timekeeper_setup_internals(clock);
+	tk_setup_internals(&timekeeper,clock);
+	
+	printk("\n*** after: timekeeper.cycle_interval = %llu\n", timekeeper.cycle_interval);
+
+	//mutex_unlock(&change_interval_mutex);
+}
+#endif // CONFIG_MP_STATIC_TIMER_CLOCK_SOURCE && CONFIG_MP_GLOBAL_TIMER_12MHZ_PATCH
+#endif // defined CONFIG_MSTAR_CPU_calibrating
+#endif /*MP_PLATFORM_CPU_SETTING*/
 
 /**
  * timekeeper_setup_internals - Set up internals to use clocksource clock.
@@ -177,6 +210,40 @@ static inline s64 timekeeping_get_ns(struct timekeeper *tk)
 	/* If arch requires, add in get_arch_timeoffset() */
 	return nsec + get_arch_timeoffset();
 }
+
+#if (MP_DEBUG_TOOL_KDEBUG == 1)
+#ifdef CONFIG_KDEBUGD_FTRACE
+/* kdbg_ftrace_timekeeping_get_ns_raw
+ * function to get the raw nanoseconds value.
+ */
+s64 notrace kdbg_ftrace_timekeeping_get_ns_raw(void)
+{
+	cycle_t cycle_now, cycle_delta;
+	struct clocksource *clock;
+	s64 nsec;
+
+	if (fconf.trace_timestamp_nsec_status) {
+		/* read clocksource: */
+		clock = timekeeper.clock;
+		cycle_now = clock->read(clock);
+
+		/* calculate the delta since the last update_wall_time: */
+		cycle_delta = (cycle_now - clock->cycle_last) & clock->mask;
+
+		/* convert delta to nanoseconds. */
+		nsec = clocksource_cyc2ns(cycle_delta, clock->mult, clock->shift);
+
+		/* If arch requires, add in gettimeoffset() */
+#ifdef CONFIG_ARCH_USES_GETTIMEOFFSET
+		return nsec + arch_gettimeoffset();
+#else
+		return nsec + get_arch_timeoffset();
+#endif
+	} else
+		return 0;
+}
+#endif /* CONFIG_KDEBUGD_FTRACE */
+#endif /*MP_DEBUG_TOOL_KDEBUG*/
 
 static inline s64 timekeeping_get_ns_raw(struct timekeeper *tk)
 {

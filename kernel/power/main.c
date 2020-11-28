@@ -278,6 +278,38 @@ static inline void pm_print_times_init(void) {}
 
 struct kobject *power_kobj;
 
+#if defined(CONFIG_MP_MSTAR_STR_BASE)
+static int pm_is_state_entering=0;
+static int pm_state_value=0;
+void set_state_value(int value)
+{
+    pm_state_value=value;
+}
+int get_state_value(void)
+{
+    return pm_state_value;
+}
+void set_state_entering(void)
+{
+    pm_is_state_entering=1;
+}
+void clear_state_entering(void)
+{
+    set_state_value(0);
+    pm_is_state_entering=0;
+}
+static int pm_is_mstar_str=0;
+int is_mstar_str(void)
+{
+    return pm_is_mstar_str;
+}
+static int pm_str_max_cnt=0;
+int get_str_max_cnt(void)
+{
+    return pm_str_max_cnt;
+}
+#endif
+
 /**
  *	state - control system power state.
  *
@@ -349,7 +381,23 @@ static ssize_t state_store(struct kobject *kobj, struct kobj_attribute *attr,
 		error = -EBUSY;
 		goto out;
 	}
-
+#if defined(CONFIG_MP_MSTAR_STR_BASE)
+    // for mstar str, we skip wakelock
+    // and earlysuspend/lateresume to speedup suspend
+    {
+        char *p;
+    	int len;
+        p = memchr(buf, '\n', n);
+    	len = p ? p - buf : n;
+        if (len == 4 && !strncmp(buf, "mstr", len)) {
+            state = PM_SUSPEND_MEM;
+            pm_is_mstar_str = 1;
+            error = pm_suspend(state);
+            pm_is_mstar_str = 0;
+            goto out;
+        }
+    }
+#endif
 	state = decode_state(buf, n);
 	if (state < PM_SUSPEND_MAX)
 		error = pm_suspend(state);
@@ -364,6 +412,64 @@ static ssize_t state_store(struct kobject *kobj, struct kobj_attribute *attr,
 }
 
 power_attr(state);
+
+#if defined(CONFIG_MP_MSTAR_STR_BASE)
+/**
+ *	suspending - indicate whether is suspending.
+ *
+ *	show() returns whether is suspending, which is hard-coded to
+ *	'0' (suspending completed and resumed), '1' (is suspending)
+ *
+ */
+static ssize_t state_entering_show(struct kobject *kobj, struct kobj_attribute *attr,
+			  char *buf)
+{
+	char *s = buf;
+    s +=sprintf(s,"%d\n",pm_is_state_entering);
+	return (s - buf);
+}
+static ssize_t state_entering_store(struct kobject *kobj, struct kobj_attribute *attr,
+			   const char *buf, size_t n)
+{
+    int num=0;
+    int ncontent=0;
+    num=sscanf(buf,"%d",&ncontent);
+    if(num && (ncontent==1 || ncontent==2))
+    {
+        pm_is_state_entering=ncontent;
+        return n;
+    }
+    return -EINVAL;
+}
+
+power_attr(state_entering);
+
+/**
+ *	str_max_cnt - indicate the max continuously str cnt .
+ */
+static ssize_t str_max_cnt_show(struct kobject *kobj, struct kobj_attribute *attr,
+			  char *buf)
+{
+	char *s = buf;
+    s +=sprintf(s,"%d\n",pm_str_max_cnt);
+	return (s - buf);
+}
+static ssize_t str_max_cnt_store(struct kobject *kobj, struct kobj_attribute *attr,
+			   const char *buf, size_t n)
+{
+    int num=0;
+    int ncontent=0;
+    num=sscanf(buf,"%d",&ncontent);
+    if(num)
+    {
+        pm_str_max_cnt=ncontent;
+        return n;
+    }
+    return -EINVAL;
+}
+
+power_attr(str_max_cnt);
+#endif
 
 #ifdef CONFIG_PM_SLEEP
 /*
@@ -579,6 +685,10 @@ power_attr(pm_freeze_timeout);
 
 static struct attribute * g[] = {
 	&state_attr.attr,
+#if defined(CONFIG_MP_MSTAR_STR_BASE)
+    &state_entering_attr.attr,
+    &str_max_cnt_attr.attr,
+#endif
 #ifdef CONFIG_PM_TRACE
 	&pm_trace_attr.attr,
 	&pm_trace_dev_match_attr.attr,

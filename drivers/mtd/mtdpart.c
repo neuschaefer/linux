@@ -180,6 +180,22 @@ static int part_write(struct mtd_info *mtd, loff_t to, size_t len,
 				    retlen, buf);
 }
 
+#if defined(CONFIG_MTD_UBI_WRITE_CALLBACK) && (MP_NAND_UBI == 1)
+static int part_write_cb(struct mtd_info *mtd, loff_t to, size_t len,
+		size_t *retlen, const u_char *buf, struct write_info *write)
+{
+	struct mtd_part *part = PART(mtd);
+	if (!(mtd->flags & MTD_WRITEABLE))
+		return -EROFS;
+	if (to >= mtd->size)
+		len = 0;
+	else if (to + len > mtd->size)
+		len = mtd->size - to;
+	return part->master->_write_cb(part->master, to + part->offset,
+				    len, retlen, buf, write);
+}
+#endif
+
 static int part_panic_write(struct mtd_info *mtd, loff_t to, size_t len,
 		size_t *retlen, const u_char *buf)
 {
@@ -375,9 +391,17 @@ static struct mtd_part *allocate_partition(struct mtd_info *master,
 	 * to have the same data be in two different partitions.
 	 */
 	slave->mtd.dev.parent = master->dev.parent;
+	
+#if (MP_NAND_MTD == 1)
+	slave->mtd.priv = master->priv;
+#endif
 
 	slave->mtd._read = part_read;
 	slave->mtd._write = part_write;
+	
+#if defined(CONFIG_MTD_UBI_WRITE_CALLBACK) && (MP_NAND_UBI == 1)
+	slave->mtd._write_cb = part_write_cb;
+#endif
 
 	if (master->_panic_write)
 		slave->mtd._panic_write = part_panic_write;

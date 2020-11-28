@@ -73,6 +73,8 @@
 #include "sierra_ms.h"
 #include "option_ms.h"
 
+#include <mstar/mpatch_macro.h>
+
 /* Some informational data */
 MODULE_AUTHOR("Matthew Dharm <mdharm-usb@one-eyed-alien.net>");
 MODULE_DESCRIPTION("USB Mass Storage driver for Linux");
@@ -1005,6 +1007,9 @@ int usb_stor_probe2(struct us_data *us)
 
 	if (delay_use > 0)
 		dev_dbg(dev, "waiting for device to settle before scanning\n");
+#if (MP_USB_MSTAR==1)
+	delay_use = 0;	//tony add for reducing usb device connect time
+#endif
 	queue_delayed_work(system_freezable_wq, &us->scan_dwork,
 			delay_use * HZ);
 	return 0;
@@ -1082,7 +1087,11 @@ static struct usb_driver usb_storage_driver = {
 	.post_reset =	usb_stor_post_reset,
 	.id_table =	usb_storage_usb_ids,
 	.supports_autosuspend = 1,
+#if (MP_USB_MSTAR==1)
+	.soft_unbind =	0,
+#else
 	.soft_unbind =	1,
+#endif
 };
 
 module_usb_driver(usb_storage_driver);

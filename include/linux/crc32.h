@@ -7,6 +7,13 @@
 
 #include <linux/types.h>
 #include <linux/bitrev.h>
+#include <mstar/mpatch_macro.h>
+
+#if (MP_DEBUG_TOOL_COREDUMP == 1)
+/* VDLinux, based VDLP (Mstar) default patch No.10,
+   ultimate coredump v0.3, SP Team 2009-06-08 */
+extern unsigned long  gzip_crc32_le(unsigned char const *p, unsigned long len);
+#endif
 
 extern u32  crc32_le(u32 crc, unsigned char const *p, size_t len);
 extern u32  crc32_be(u32 crc, unsigned char const *p, size_t len);

@@ -39,6 +39,7 @@
 
 #include "trace_output.h"
 #include "trace_stat.h"
+#include <mstar/mpatch_macro.h>
 
 #define FTRACE_WARN_ON(cond)			\
 	({					\
@@ -4998,3 +4999,10 @@ void ftrace_graph_stop(void)
 	ftrace_stop();
 }
 #endif
+
+#if (MP_DEBUG_TOOL_KDEBUG == 1)
+#ifdef CONFIG_KDEBUGD_FTRACE
+/* Let kdebugd have access to static functions in this file */
+#include "../kdebugd/trace/kdbg_ftrace_dyn_helper.c"
+#endif /* CONFIG_KDEBUGD_FTRACE */
+#endif /*MP_DEBUG_TOOL_KDEBUG*/

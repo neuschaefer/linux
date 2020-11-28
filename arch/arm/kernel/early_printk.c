@@ -11,15 +11,25 @@
 #include <linux/kernel.h>
 #include <linux/console.h>
 #include <linux/init.h>
+#include <mstar/mpatch_macro.h>
 
 extern void printch(int);
+#if (MP_PLATFORM_ARM == 1)
+extern void prom_putchar(int);
+#endif/*MP_PLATFORM_ARM*/
 
 static void early_write(const char *s, unsigned n)
 {
 	while (n-- > 0) {
+#if (MP_PLATFORM_ARM == 1)
+		if (*s == '\n')
+			prom_putchar('\r');
+		prom_putchar(*s);
+#else
 		if (*s == '\n')
 			printch('\r');
 		printch(*s);
+#endif/*MP_PLATFORM_ARM*/
 		s++;
 	}
 }

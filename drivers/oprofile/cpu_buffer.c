@@ -22,6 +22,7 @@
 #include <linux/sched.h>
 #include <linux/oprofile.h>
 #include <linux/errno.h>
+#include <mstar/mpatch_macro.h>
 
 #include "event_buffer.h"
 #include "cpu_buffer.h"
@@ -461,3 +462,31 @@ static void wq_sync_buffer(struct work_struct *work)
 	if (work_enabled)
 		schedule_delayed_work(&b->work, DEFAULT_TIMER_EXPIRE);
 }
+#if (MP_DEBUG_TOOL_OPROFILE == 1) 
+#ifdef CONFIG_ADVANCE_OPROFILE
+/* clear the cpu buffer after stop the oprofile,
+as we don't shutdown the oprofile while stop, we must clear the cpu buffer */
+
+int aop_clear_cpu_buffers(void)
+{
+	int i;
+
+	unsigned long buffer_size = oprofile_cpu_buffer_size;
+
+	for_each_possible_cpu(i) {
+		struct oprofile_cpu_buffer *b = &per_cpu(op_cpu_buffer, i);
+
+		b->last_task = NULL;
+		b->last_is_kernel = -1;
+		b->tracing = 0;
+		b->buffer_size = buffer_size;
+		b->sample_received = 0;
+		b->sample_lost_overflow = 0;
+		b->backtrace_aborted = 0;
+		b->sample_invalid_eip = 0;
+		b->cpu = i;
+	}
+	return 0;
+}
+#endif /* CONFIG_ADVANCE_OPROFILE */
+#endif /*MP_DEBUG_TOOL_OPROFILE*/

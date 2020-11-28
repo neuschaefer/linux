@@ -12,8 +12,17 @@
 #include <linux/seq_file.h>
 #include <linux/interrupt.h>
 #include <linux/kernel_stat.h>
+#include <mstar/mpatch_macro.h>
+
+#if (MP_PLATFORM_ARCH_GENERAL == 1)
+#include <linux/poll.h>
+#include <linux/sched.h>
+#include "chip_int.h"
+#include <linux/slab.h>
+#endif/*MP_PLATFORM_ARCH_GENERAL*/
 
 #include "internals.h"
+#include <internal.h>
 
 static struct proc_dir_entry *root_irq_dir;
 
@@ -266,6 +275,425 @@ static const struct file_operations irq_spurious_proc_fops = {
 	.release	= single_release,
 };
 
+struct irq_proc {
+	int irq;
+	wait_queue_head_t q;
+	atomic_t count;
+	char devname[TASK_COMM_LEN];
+	int debug_mode;
+#ifdef CONFIG_MP_PLATFORM_UTOPIA2_INTERRUPT
+	unsigned int mask;
+	unsigned int completion;
+	pid_t pid;
+	struct list_head list;
+#endif
+};
+
+static DEFINE_MUTEX(irq_proc_mutex);
+
+#ifdef CONFIG_MP_PLATFORM_ARCH_GENERAL
+
+#ifdef CONFIG_MP_PLATFORM_UTOPIA2_INTERRUPT
+#define UTOPIA_DEBUG 0
+
+#define  PRINT_KD(fmt , args ...)  	 printk(PRINT_KD_STR fmt, ##args)
+/*#define DEBUG */
+# if UTOPIA_DEBUG
+# define dprintk(x...) PRINT_KD(x)
+# else
+# define dprintk(x...)
+# endif
+
+#define E_IRQ_DISABLE			(0)
+#define E_IRQ_ENABLE			(1)
+#define E_IRQ_ACK				(2)
+#define E_IRQ_COMPLETE			(3)
+#define E_IRQ_DEBUG_STATUS_FLOW	(4)
+#define E_IRQ_DEBUG_DISABLE		(1 << 31)
+
+struct irq_proc_head {
+	atomic_t num;
+	int irq;
+	unsigned int mask;
+	spinlock_t mask_lock;
+	struct list_head list;
+};
+
+static struct irq_proc_head irq_proc_head[NR_IRQS];
+
+/*
+ * update head->mask by ANDing all irq_proc->mask with same irq
+ * and return it
+ */
+static unsigned int all_threads_mask(struct irq_proc_head *head)
+{
+	unsigned long flags;
+	struct irq_proc *ip;
+
+	spin_lock_irqsave(&head->mask_lock, flags);
+	head->mask = true;
+	list_for_each_entry(ip, &head->list, list)
+		head->mask &= ip->mask;
+	spin_unlock_irqrestore(&head->mask_lock, flags);
+
+	return head->mask;		
+}
+
+/*
+ * ANDing all irq_proc->completion and return it
+ */
+static unsigned int all_threads_complete(struct irq_proc_head *head)
+{
+	unsigned long flags;
+	struct irq_proc *ip;
+	unsigned int completion = true;
+
+	spin_lock_irqsave(&head->mask_lock, flags);
+	list_for_each_entry(ip, &head->list, list)
+		completion &= ip->completion;
+	spin_unlock_irqrestore(&head->mask_lock, flags);
+
+	return completion;
+}
+
+static void show_irq_list(struct irq_proc_head *cur_top)
+{
+	struct irq_proc *ip;
+	unsigned long flags;
+
+	spin_lock_irqsave(&cur_top->mask_lock, flags);
+	dprintk("---------------------------------------------------------------------------------------\n");
+	dprintk("show list\n");
+	dprintk("cur_top->mask=%d, cur_top->irq=%d, cur_top->num=%d\n", cur_top->mask,cur_top->irq, cur_top->num);
+	
+	list_for_each_entry(ip, &cur_top->list, list) {
+		dprintk("ip->irq=%d, ip->devname=%s, ip->pid=%d, ip->mask=%d, ip->completion=%d, ip->count=%d\n",
+			ip->irq, ip->devname, ip->pid, ip->mask, ip->completion, ip->count);
+	}
+	dprintk("\n\n");
+	spin_unlock_irqrestore(&cur_top->mask_lock, flags);
+}
+#endif
+
+/*
+ * increment count & wake up unmasked threads
+ */
+static irqreturn_t irq_proc_irq_handler(int irq, void *desc)
+{
+#ifdef CONFIG_MP_PLATFORM_UTOPIA2_INTERRUPT
+	struct irq_proc_head *head = (struct irq_proc_head *)desc;
+	struct irq_proc *ip;
+	unsigned long flags;
+
+	BUG_ON(head->irq != irq);
+
+	dprintk("irq_proc_irq_handler:\n");
+	disable_irq_nosync(irq);
+
+	spin_lock_irqsave(&head->mask_lock, flags);
+	list_for_each_entry(ip, &head->list, list) {
+		if(ip->mask == false) {
+			ip->mask = true;
+			ip->completion = false;
+			atomic_inc(&ip->count);
+			wake_up(&ip->q);
+		}
+	}
+	spin_unlock_irqrestore(&head->mask_lock, flags);
+
+	return IRQ_HANDLED;
+#else
+	struct irq_proc *idp = (struct irq_proc *)desc;
+
+	BUG_ON(idp->irq != irq);
+
+    if(idp->debug_mode & E_IRQ_DEBUG_STATUS_FLOW)
+		printk("\ncpu = %X, status = DISABLE, irq = %d\n"
+				, task_cpu(current), irq);
+
+	disable_irq_nosync(irq);
+	atomic_inc(&idp->count);
+	wake_up(&idp->q);
+
+	return IRQ_HANDLED;
+#endif
+}
+
+/*
+ * Signal to userspace an interrupt has occured.
+ * Note: no data is ever transferred to/from user space!
+ */
+ssize_t irq_proc_read(struct file *fp, char *bufp, size_t len, loff_t *where)
+{
+	struct irq_proc *ip = (struct irq_proc *)fp->private_data;
+	irq_desc_t *idp = irq_to_desc(ip->irq);
+	int i;
+	int err;
+
+	DEFINE_WAIT(wait);
+
+	if (len < sizeof(int))
+		return -EINVAL;
+
+	if ((i = atomic_read(&ip->count)) == 0) {
+		if (idp->status_use_accessors & IRQD_IRQ_DISABLED)
+			enable_irq(ip->irq);
+		if (fp->f_flags & O_NONBLOCK)
+			return -EWOULDBLOCK;
+	}
+
+	while (i == 0) {
+		prepare_to_wait(&ip->q, &wait, TASK_INTERRUPTIBLE);
+		if ((i = atomic_read(&ip->count)) == 0)
+			schedule();
+		finish_wait(&ip->q, &wait);
+		if (signal_pending(current))
+		{
+			return -ERESTARTSYS;
+		}
+	}
+
+	if ((err = copy_to_user(bufp, &i, sizeof i)))
+		return err;
+	*where += sizeof i;
+
+	atomic_sub(i, &ip->count);
+	return sizeof i;
+}
+
+/*
+ * according to write option
+ * enable/disable/complete/debug irq
+ */
+static ssize_t irq_proc_write(struct file *fp,
+		const char *bufp, size_t len, loff_t *where)
+{
+	struct irq_proc *ip = (struct irq_proc *)fp->private_data;
+	int option;
+	int err;
+#ifdef CONFIG_MP_PLATFORM_UTOPIA2_INTERRUPT
+	struct irq_proc_head *head = &irq_proc_head[ip->irq];
+	unsigned long flags;
+#endif
+
+	if (len < sizeof(int))
+		return -EINVAL;
+
+	if ((err = copy_from_user(&option, bufp, sizeof(option))))
+		return err;
+
+	switch (option) {
+#ifdef CONFIG_MP_PLATFORM_UTOPIA2_INTERRUPT
+		case E_IRQ_ENABLE:
+			ip->mask = false;
+			spin_lock_irqsave(&head->mask_lock, flags);
+			head->mask = false;
+			spin_unlock_irqrestore(&head->mask_lock, flags);
+
+			/* 
+			 * if num == 1, we help users "complete" for compatibility
+			 * else, they have to explicitly notify kernel of the completion
+			 */
+			if (atomic_read(&head->num) == 1)
+				goto complete;
+			break;
+
+complete:
+		case E_IRQ_COMPLETE:
+			ip->completion = true;
+			if(all_threads_complete(head) == true && 
+					all_threads_mask(head) == false)
+				/* do not enable irq if already enableld */
+				if ((irq_to_desc(ip->irq)->irq_data.state_use_accessors & 
+							IRQD_IRQ_DISABLED)) 
+					enable_irq(ip->irq);
+			break;
+
+		case E_IRQ_DISABLE:
+			ip->mask = true;
+			if(all_threads_mask(head) == true)
+				disable_irq_nosync(ip->irq);
+			break;
+#else
+	case E_IRQ_ENABLE:
+		if(ip->debug_mode & E_IRQ_DEBUG_STATUS_FLOW)
+			printk("\ncpu = %d, status = ENABLE, irq = %d\n"
+					, task_cpu(current), ip->irq);
+		/* do not enable irq if already enableld */
+		if((irq_to_desc(ip->irq)->irq_data.state_use_accessors & 
+					IRQD_IRQ_DISABLED))
+			enable_irq(ip->irq);
+
+		break;
+
+	case E_IRQ_DISABLE:
+		disable_irq_nosync(ip->irq);
+		break;
+#endif
+
+	case E_IRQ_ACK:
+		if(ip->debug_mode & E_IRQ_DEBUG_STATUS_FLOW)
+			printk("\ncpu = %d, status = ACK, irq = %d\n"
+					, task_cpu(current), ip->irq);
+		break;
+
+	case E_IRQ_DEBUG_DISABLE:
+		ip->debug_mode = 0;
+		break;
+
+	default:
+		ip->debug_mode = option;
+		break;
+	}
+
+	*where += sizeof(option);
+	return sizeof(option);
+}
+
+/* 
+ * initialize irq_proc and, if necessary, irq_proc_head
+ */
+static int irq_proc_open(struct inode *inop, struct file *fp)
+{
+	struct irq_proc *ip;
+	struct proc_dir_entry *ent = PDE(inop);
+	int error;
+	unsigned long  irqflags;
+#ifdef CONFIG_MP_PLATFORM_UTOPIA2_INTERRUPT
+	struct irq_proc_head *head;
+#endif
+
+	mutex_lock(&irq_proc_mutex);
+
+	ip = kzalloc(sizeof *ip, GFP_KERNEL);
+	if (!ip) {
+		mutex_unlock(&irq_proc_mutex);
+		return -ENOMEM;
+	}
+
+	strcpy(ip->devname, current->comm);
+	init_waitqueue_head(&ip->q);
+	atomic_set(&ip->count, 0);
+	ip->irq = (int)ent->data;
+	irqflags = (ip->irq == E_IRQ_DISP) ? IRQF_SHARED : SA_INTERRUPT;
+#ifdef CONFIG_MP_PLATFORM_UTOPIA2_INTERRUPT
+	ip->mask = true;
+	ip->completion = true;
+	ip->debug_mode = 0;
+	ip->pid = current->pid;
+	head = &irq_proc_head[ip->irq];
+	
+	/* if head doesn't exist yet, initialize it here */
+	if (!atomic_read(&head->num)) {
+		INIT_LIST_HEAD(&head->list);
+		head->irq = ip->irq;
+		head->mask = true;
+		atomic_set(&head->num, 0);
+		spin_lock_init (&head->mask_lock);
+		if ((error = request_irq(ip->irq, irq_proc_irq_handler,
+				irqflags, ip->devname, head)) < 0) {
+#else
+		if ((error = request_irq(ip->irq, irq_proc_irq_handler,
+				irqflags, ip->devname, ip)) < 0) {
+#endif
+			kfree(ip);
+			mutex_unlock(&irq_proc_mutex);
+			return error;
+		}
+
+	if(!(irq_to_desc(ip->irq)->irq_data.state_use_accessors & 
+				IRQD_IRQ_DISABLED))
+		disable_irq_nosync(ip->irq);
+#ifdef CONFIG_MP_PLATFORM_UTOPIA2_INTERRUPT
+	}
+	list_add_tail(&ip->list, &head->list);
+	atomic_inc(&head->num);
+#endif
+	fp->private_data = (void *)ip;
+
+	mutex_unlock(&irq_proc_mutex);
+
+	return 0;
+}
+
+/*
+ * i don't see anyone call this function...
+ */
+static int irq_proc_release(struct inode *inop, struct file *fp)
+{
+#ifdef CONFIG_MP_PLATFORM_UTOPIA2_INTERRUPT
+	/* protect fp->private_data & ip->list */
+	mutex_lock(&irq_proc_mutex); 
+
+	if (fp->private_data != NULL) {
+		struct irq_proc *ip = (struct irq_proc *)fp->private_data;
+		int irq = ip->irq;
+		struct irq_proc_head *head = &irq_proc_head[irq];
+
+		list_del(&ip->list);
+		atomic_dec(&head->num);
+		kfree(ip);
+		fp->private_data = NULL;
+
+		if (!atomic_read(&head->num))
+			free_irq(irq, head); /* note: head won't be freed */
+	}
+
+	mutex_unlock(&irq_proc_mutex);
+
+	return 0;
+#else
+	if(fp->private_data != NULL) {
+		struct irq_proc *ip = (struct irq_proc *)fp->private_data;
+
+		free_irq(ip->irq, ip);
+		kfree(ip);
+		fp->private_data = NULL;
+	}
+
+	return 0;
+#endif
+}
+
+/*
+ * let userspace thread sleep until irq_proc_irq_handler wakes it up
+ */
+unsigned int irq_proc_poll(struct file *fp, struct poll_table_struct *wait)
+{
+    struct irq_proc *ip = (struct irq_proc *)fp->private_data;
+
+    poll_wait(fp, &ip->q, wait);
+    if (atomic_read(&ip->count) > 0) {
+        atomic_dec(&ip->count);
+        return POLLIN | POLLRDNORM;
+    }
+    return 0;
+}
+
+/*
+ * from CHIP_DetachISR, but do the same job as irq_proc_release
+ */
+static long irq_proc_ioctl(struct file *fp, unsigned int cmd, unsigned long arg)
+{
+	switch (cmd) {
+	case 137: /* special command to free_irq immediately */
+		return irq_proc_release(NULL, fp);
+	default:
+		return -1;
+	}
+}
+
+struct file_operations irq_proc_file_operations = {
+        .read = irq_proc_read,
+        .write = irq_proc_write,
+        .open = irq_proc_open,
+        .release = irq_proc_release,
+        .poll = irq_proc_poll,
+        .unlocked_ioctl= irq_proc_ioctl,  //Procfs ioctl handlers must use unlocked_ioctl.
+};
+
+#endif/*CONFIG_MP_PLATFORM_ARCH_GENERAL*/
+
 #define MAX_NAMELEN 128
 
 static int name_unique(unsigned int irq, struct irqaction *new_action)
@@ -311,6 +739,9 @@ void register_irq_proc(unsigned int irq, struct irq_desc *desc)
 {
 	char name [MAX_NAMELEN];
 
+#if (MP_PLATFORM_ARCH_GENERAL == 1)
+	struct proc_dir_entry *entry;
+#endif/*MP_PLATFORM_ARCH_GENERAL*/
 	if (!root_irq_dir || (desc->irq_data.chip == &no_irq_chip) || desc->dir)
 		return;
 
@@ -341,6 +772,12 @@ void register_irq_proc(unsigned int irq, struct irq_desc *desc)
 
 	proc_create_data("spurious", 0444, desc->dir,
 			 &irq_spurious_proc_fops, (void *)(long)irq);
+
+#if (MP_PLATFORM_ARCH_GENERAL == 1)
+	entry = proc_create("irq", 0600, desc->dir, &irq_proc_file_operations);
+        if (entry) 
+                entry->data = (void *)(long)irq;
+#endif  /* MP_PLATFORM_ARCH_GENERAL */
 }
 
 void unregister_irq_proc(unsigned int irq, struct irq_desc *desc)

@@ -19,6 +19,7 @@
 #include <linux/dcookies.h>
 #include <linux/fs.h>
 #include <asm/uaccess.h>
+#include <mstar/mpatch_macro.h>
 
 #include "oprof.h"
 #include "event_buffer.h"
@@ -200,6 +201,87 @@ out:
 	mutex_unlock(&buffer_mutex);
 	return retval;
 }
+
+#if (MP_DEBUG_TOOL_OPROFILE == 1)
+#ifdef CONFIG_ADVANCE_OPROFILE
+/* Copy event buffer data to aop buffer */
+ssize_t aop_read_event_buffer(unsigned long *buf, unsigned long *size)
+{
+	int retval = -EINVAL;
+
+	wait_event_interruptible(buffer_wait, atomic_read(&buffer_ready));
+
+	if (signal_pending(current))
+		return -EINTR;
+
+	/* can't currently happen */
+	if (!atomic_read(&buffer_ready))
+		return -EAGAIN;
+
+	mutex_lock(&buffer_mutex);
+
+	atomic_set(&buffer_ready, 0);
+
+	retval = buffer_pos * sizeof(unsigned long);
+
+	/* find the data size to be copied */
+	*size = (retval >= *size) ? *size : retval;
+
+	if (*size) {
+		/* copy data to given buffer */
+		if (buf)
+			memcpy(buf, event_buffer, *size);
+
+		buffer_pos = 0;
+	}
+
+	mutex_unlock(&buffer_mutex);
+
+	return *size;
+}
+
+/* Open event & cpu buffer to setup oprofile */
+int aop_event_buffer_open(void **dcookie_user_data)
+{
+	int err = -EPERM;
+
+	if (!capable(CAP_SYS_ADMIN))
+		return -EPERM;
+
+	if (test_and_set_bit(0, &buffer_opened))
+		return -EBUSY;
+
+	/* Register as a user of dcookies
+	 * to ensure they persist for the lifetime of
+	 * the open event file
+	 */
+	err = -EINVAL;
+	*dcookie_user_data = dcookie_register();
+	if (!*dcookie_user_data)
+		goto out;
+
+	err = oprofile_setup();
+	if (err)
+		goto fail;
+
+	return 0;
+
+fail:
+	dcookie_unregister(*dcookie_user_data);
+out:
+	clear_bit(0, &buffer_opened);
+
+	return err;
+}
+
+/* Clear the even buffer and set the writing position to zero */
+void aop_event_buffer_clear(void)
+{
+	memset(event_buffer, 0, sizeof(unsigned long) * buffer_size);
+	buffer_pos = 0;
+}
+#endif /* CONFIG_ADVANCE_OPROFILE */
+#endif /*MP_DEBUG_TOOL_OPROFILE*/
 
 const struct file_operations event_buffer_fops = {
 	.open		= event_buffer_open,

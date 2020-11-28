@@ -319,6 +319,10 @@ extern void cancel_dirty_page(struct page *page, unsigned int account_size);
 int test_clear_page_writeback(struct page *page);
 int test_set_page_writeback(struct page *page);
 
+#if (MP_NTFS3G_WRAP==1)
+int test_clear_page_writeback_wrap(struct page *page);  //AlanYu 20111121 : wrap for test_clear_page_writeback
+#endif
+
 static inline void set_page_writeback(struct page *page)
 {
 	test_set_page_writeback(page);

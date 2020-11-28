@@ -24,6 +24,7 @@
 #include <asm/irq.h>
 #include <asm/ptrace.h>
 #include <asm/irq_regs.h>
+#include <mstar/mpatch_macro.h>
 
 struct seq_file;
 struct module;
@@ -33,6 +34,16 @@ typedef	void (*irq_flow_handler_t)(unsigned int irq,
 					    struct irq_desc *desc);
 typedef	void (*irq_preflow_handler_t)(struct irq_data *data);
 
+#if (MP_PLATFORM_ARCH_GENERAL == 1)
+typedef enum
+{
+    E_IRQ_DISABLE = 0 << 0, // reserve for MsOS_DisableInterrupt
+    E_IRQ_ENABLE = 1 << 0, // reserve for MsOS_EnableInterrupt
+    E_IRQ_ACK = 1 << 1,
+    E_IRQ_DEBUG_STATUS_FLOW = 1 << 2,
+    E_IRQ_DEBUG_DISABLE = 1 << 31,
+} IrqDebugOpt;
+#endif/*MP_PLATFORM_ARCH_GENERAL*/
 /*
  * IRQ line status.
  *
@@ -352,6 +363,16 @@ enum {
 /* This include will go away once we isolated irq_desc usage to core code */
 #include <linux/irqdesc.h>
 
+#if (MP_PLATFORM_ARCH_GENERAL == 1)
+/*
+ * Migration helpers for obsolete names, they will go away:
+ */
+#define hw_interrupt_type       irq_chip
+#define no_irq_type             no_irq_chip
+typedef struct irq_desc         irq_desc_t;
+
+extern struct irq_desc *irq_to_desc_alloc_node(unsigned int irq, int node);
+#endif/*MP_PLATFORM_ARCH_GENERAL*/
 /*
  * Pick up the arch-dependent methods:
  */

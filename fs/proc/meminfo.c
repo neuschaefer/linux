@@ -16,6 +16,11 @@
 #include <asm/pgtable.h>
 #include "internal.h"
 
+#ifdef CONFIG_MP_ION_PATCH_MSTAR
+char cma_info[512];
+extern void get_cma_status(char *info); 
+#endif
+
 void __attribute__((weak)) arch_report_meminfo(struct seq_file *m)
 {
 }
@@ -167,6 +172,17 @@ static int meminfo_proc_show(struct seq_file *m, void *v)
 #endif
 		);
 
+#ifdef CONFIG_MP_ION_PATCH_MSTAR
+	memset(cma_info,0,sizeof(cma_info));
+	get_cma_status(cma_info);
+
+	seq_printf(m,
+		"CMA Free: %lu kB \n"	
+		"CMA heap info(name,alloc,in cache,fail,total free):%s \n"
+		,K(global_page_state(NR_FREE_CMA_PAGES))
+		,cma_info
+		);
+#endif
 	hugetlb_report_meminfo(m);
 
 	arch_report_meminfo(m);

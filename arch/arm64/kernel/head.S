@@ -83,8 +83,10 @@
 
 #ifdef CONFIG_ARM64_64K_PAGES
 #define MM_MMUFLAGS	PTE_ATTRINDX(MT_NORMAL) | PTE_FLAGS
+#define DEV_MMUFLAGS	PTE_ATTRINDX(MT_DEVICE_nGnRnE) | PTE_FLAGS
 #else
 #define MM_MMUFLAGS	PMD_ATTRINDX(MT_NORMAL) | PMD_FLAGS
+#define DEV_MMUFLAGS	PTE_ATTRINDX(MT_DEVICE_nGnRnE) | PMD_FLAGS
 #endif
 
 /*
@@ -114,6 +116,7 @@
 	.quad	0				// reserved
 
 ENTRY(stext)
+	mov	x0, 0x23000000			// tempary patch assume FDT is at 0x23000000
 	mov	x21, x0				// x21=FDT
 	bl	__calc_phys_offset		// x24=PHYS_OFFSET, x28=PHYS_OFFSET-PAGE_OFFSET
 	bl	el2_setup			// Drop to EL1
@@ -384,6 +387,16 @@ __create_page_tables:
 	stp	xzr, xzr, [x0], #16
 	cmp	x0, x6
 	b.lo	1b
+
+        /*
+         * Map the Periphel register mmap.
+         * VA=0x000000_1f200000 PA=0x000000_1f200000
+         */
+        ldr     x7, =DEV_MMUFLAGS
+	add	x0, x25, #PAGE_SIZE		// section table address
+        ldr	x3, =0x0000001f200000
+	create_pgd_entry x25, x0, x3, x5, x6
+	create_block_map x0, x7, x3, x5, x5, idmap=1
 
 	ldr	x7, =MM_MMUFLAGS
 

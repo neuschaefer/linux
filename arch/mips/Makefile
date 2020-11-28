@@ -164,8 +164,12 @@ cflags-$(CONFIG_CPU_DADDI_WORKAROUNDS)	+= $(call cc-option,-mno-daddi,)
 
 ifdef CONFIG_CPU_SB1
 ifdef CONFIG_SB1_PASS_1_WORKAROUNDS
-KBUILD_AFLAGS_MODULE += -msb1-pass1-workarounds
-KBUILD_CFLAGS_MODULE += -msb1-pass1-workarounds
+#
+# -msb1-pass1-workarounds is only supported by Broadcom's Montavista toolchain
+# but not FSF gcc.
+#
+KBUILD_AFLAGS_MODULE += $(call cc-option,-msb1-pass1-workarounds)
+KBUILD_CFLAGS_MODULE += $(call cc-option,-msb1-pass1-workarounds)
 endif
 endif
 
@@ -194,6 +198,22 @@ include $(srctree)/arch/mips/Kbuild.platforms
 ifdef CONFIG_PHYSICAL_START
 load-y					= $(CONFIG_PHYSICAL_START)
 endif
+
+#
+# MStar Keres project
+#
+core-y += arch/mips/mips-boards/generic
+ifdef CONFIG_MSTAR_KRIS
+core-y	+= arch/mips/mips-boards/generic
+endif
+core-$(CONFIG_MSTAR_KRIS)	+= arch/mips/mips-boards/generic
+cflags-$(CONFIG_MSTAR_KRIS) += -I$ arch/mips/mips-boards/generic/include
+cflags-$(CONFIG_MSTAR_KRIS) += -I$ drivers/mstar2/hal/kris/cpu/
+cflags-$(CONFIG_MSTAR_KRIS)+= -I$(srctree)/arch/mips/include/asm/mach-malta
+##cflags-$(CONFIG_MSTAR_KRIS)+= -I$(srctree)/arch/mips/mips-boards/keres
+##cflags-$(CONFIG_MSTAR_KRIS)+= -I$(srctree)/arch/mips/mips-boards/keres/include
+##load-$(CONFIG_MSTAR_KRIS)	+= 0xffffffff80000000
+all-$(CONFIG_MSTAR_KRIS)	:= vmlinux.bin
 
 cflags-y			+= -I$(srctree)/arch/mips/include/asm/mach-generic
 drivers-$(CONFIG_PCI)		+= arch/mips/pci/

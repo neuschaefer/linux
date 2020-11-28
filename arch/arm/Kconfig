@@ -1,3 +1,14 @@
+#defined by mstar
+config MSTAR_CHIP
+	bool
+	default y
+
+#defined by mstar for arm-boards
+config HAVE_SCHED_CLOCK
+	bool
+
+source "drivers/mstar2/Kconfig"	
+source "mpatch_Kconfig"
 config ARM
 	bool
 	default y
@@ -109,6 +120,13 @@ config MIGHT_HAVE_PCI
 config SYS_SUPPORTS_APM_EMULATION
 	bool
 
+config ARCH_SCHED_CLOCK
+        bool
+        help
+          Allow the default sched_clock() to be overloaded at runtime.
+          Use this option if you build a kernel for a platform with
+          multiplee sched_clock sources, one of which will be selected
+          at runtime.
 config HAVE_TCM
 	bool
 	select GENERIC_ALLOCATOR
@@ -284,8 +302,9 @@ config MMU
 #
 choice
 	prompt "ARM system type"
-	default ARCH_VERSATILE if !MMU
-	default ARCH_MULTIPLATFORM if MMU
+	default ARCH_MSTAR
+#	default ARCH_VERSATILE if !MMU
+#	default ARCH_MULTIPLATFORM if MMU
 
 config ARCH_MULTIPLATFORM
 	bool "Allow multiple platforms to be selected"
@@ -346,6 +365,23 @@ config ARCH_VERSATILE
 	select VERSATILE_FPGA_IRQ
 	help
 	  This enables support for ARM Ltd Versatile board.
+
+config ARCH_MSTAR
+	bool "Mstar ARM-based"
+	select ARM_AMBA
+	select ARCH_HAS_CPUFREQ	
+	select CLKDEV_LOOKUP
+	select GENERIC_CLOCKEVENTS
+	select ARCH_SCHED_CLOCK
+	select HAVE_CLK
+	select HAVE_SMP
+	select PLAT_MSTAR
+	select MSTAR_CHIP
+	select ARCH_HAS_HOLES_MEMORYMODEL
+	select COMMON_CLK
+	select ARCH_SPARSEMEM_ENABLE
+	help
+	  Support mstar chip porting
 
 config ARCH_AT91
 	bool "Atmel AT91"
@@ -1021,6 +1057,8 @@ source "arch/arm/mach-vexpress/Kconfig"
 source "arch/arm/plat-versatile/Kconfig"
 
 source "arch/arm/mach-virt/Kconfig"
+source "arch/arm/arm-boards/Kconfig"
+source "arch/arm/arm-boards/plat-mstar/Kconfig"
 
 source "arch/arm/mach-vt8500/Kconfig"
 
@@ -1053,6 +1091,8 @@ config PLAT_PXA
 config PLAT_VERSATILE
 	bool
 
+config PLAT_MSTAR
+	bool
 config ARM_TIMER_SP804
 	bool
 	select CLKSRC_MMIO
@@ -1437,7 +1477,7 @@ config SMP
 	bool "Symmetric Multi-Processing"
 	depends on CPU_V6K || CPU_V7
 	depends on GENERIC_CLOCKEVENTS
-	depends on HAVE_SMP
+	depends on HAVE_SMP || ARCH_MSTAR_CA9X4
 	depends on MMU
 	select USE_GENERIC_SMP_HELPERS
 	help
@@ -1538,6 +1578,12 @@ choice
 		bool "1G/3G user/kernel split"
 endchoice
 
+config VMALLOC_END_RESERVE_FOR_UTOPIA2K_MODULE
+	hex
+	prompt "Reserved for utopia2k kernel module memory"
+	default 0x0A000000 if MSTAR_MONACO
+	default 0x0
+
 config PAGE_OFFSET
 	hex
 	default 0x40000000 if VMSPLIT_1G
@@ -1597,7 +1643,7 @@ config ARCH_NR_GPIO
 source kernel/Kconfig.preempt
 
 config HZ
-	int
+	int "Timer Frequency(HZ)"
 	default 200 if ARCH_EBSA110 || ARCH_S3C24XX || ARCH_S5P64X0 || \
 		ARCH_S5PV210 || ARCH_EXYNOS4
 	default AT91_TIMER_HZ if ARCH_AT91
@@ -1697,6 +1743,9 @@ config ARCH_SPARSEMEM_DEFAULT
 	def_bool ARCH_SPARSEMEM_ENABLE
 
 config ARCH_SELECT_MEMORY_MODEL
+	def_bool ARCH_SPARSEMEM_ENABLE
+
+config HOLES_IN_ZONE
 	def_bool ARCH_SPARSEMEM_ENABLE
 
 config HAVE_ARCH_PFN_VALID
@@ -1819,6 +1868,15 @@ config XEN
 	help
 	  Say Y if you want to run Linux in a Virtual Machine on Xen on ARM.
 
+config ARM_FLUSH_CONSOLE_ON_RESTART
+	bool "Force flush the console on restart"
+	help
+	  If the console is locked while the system is rebooted, the messages
+	  in the temporary logbuffer would not have propogated to all the
+	  console drivers. This option forces the console lock to be
+	  released if it failed to be acquired, which will cause all the
+	  pending messages to be flushed.
+
 endmenu
 
 menu "Boot options"
@@ -1847,6 +1905,21 @@ config DEPRECATED_PARAM_STRUCT
 	help
 	  This was deprecated in 2001 and announced to live on for 5 years.
 	  Some old boot loaders still use this way.
+
+config BUILD_ARM_APPENDED_DTB_IMAGE
+	bool "Build a concatenated zImage/dtb by default"
+	depends on OF
+	help
+	  Enabling this option will cause a concatenated zImage and list of
+	  DTBs to be built by default (instead of a standalone zImage.)
+	  The image will built in arch/arm/boot/zImage-dtb
+
+config BUILD_ARM_APPENDED_DTB_IMAGE_NAMES
+	string "Default dtb names"
+	depends on BUILD_ARM_APPENDED_DTB_IMAGE
+	help
+	  Space separated list of names of dtbs to append when
+	  building a concatenated zImage-dtb.
 
 # Compressed boot loader in ROM.  Yes, we really want to ask about
 # TEXT and BSS so we preserve their values in the config files.
@@ -2071,6 +2144,10 @@ config AUTO_ZRELADDR
 	  will be determined at run-time by masking the current IP with
 	  0xf8000000. This assumes the zImage being placed in the first 128MB
 	  from start of memory.
+config MEMORY_START_ADDRESS
+	hex "Physical address of the memory starting"
+	default 0x40000000 if ((MSTAR_EIFFEL || MSTAR_EDISON || MSTAR_EINSTEIN) && ANDROID)
+	default 0x40400000 if ((MSTAR_EIFFEL || MSTAR_EDISON || MSTAR_EINSTEIN) && !ANDROID)
 
 endmenu
 
@@ -2237,6 +2314,10 @@ source "drivers/Kconfig"
 source "fs/Kconfig"
 
 source "arch/arm/Kconfig.debug"
+
+source "arch/Kconfig.kdebug"
+
+source "arch/arm/Kconfig.coredump"
 
 source "security/Kconfig"
 

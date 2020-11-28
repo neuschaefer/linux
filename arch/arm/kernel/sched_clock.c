@@ -15,17 +15,7 @@
 #include <linux/timer.h>
 
 #include <asm/sched_clock.h>
-
-struct clock_data {
-	u64 epoch_ns;
-	u32 epoch_cyc;
-	u32 epoch_cyc_copy;
-	unsigned long rate;
-	u32 mult;
-	u32 shift;
-	bool suspended;
-	bool needs_suspend;
-};
+#include <mstar/mpatch_macro.h>
 
 static void sched_clock_poll(unsigned long wrap_ticks);
 static DEFINE_TIMER(sched_clock_timer, sched_clock_poll, 0, 0);
@@ -79,13 +69,16 @@ static unsigned long long notrace cyc_to_sched_clock(u32 cyc, u32 mask)
 /*
  * Atomically update the sched_clock epoch.
  */
-static void notrace update_sched_clock(void)
+void notrace update_sched_clock(void)
 {
 	unsigned long flags;
 	u32 cyc;
 	u64 ns;
-
+#if (MP_CA7_QUAD_CORE_PATCH == 1)
+	cyc = arch_counter_read(); 
+#else
 	cyc = read_sched_clock();
+#endif
 	ns = cd.epoch_ns +
 		cyc_to_ns((cyc - cd.epoch_cyc) & sched_clock_mask,
 			  cd.mult, cd.shift);
@@ -104,7 +97,11 @@ static void notrace update_sched_clock(void)
 
 static void sched_clock_poll(unsigned long wrap_ticks)
 {
+#if (defined (CONFIG_MSTAR_CPU_calibrating)&&!defined(CONFIG_MP_STATIC_TIMER_CLOCK_SOURCE)&&!defined(CONFIG_MP_GLOBAL_TIMER_12MHZ_PATCH)) 
+	mod_timer(&sched_clock_timer, round_jiffies(jiffies + wrap_ticks/2));
+#else
 	mod_timer(&sched_clock_timer, round_jiffies(jiffies + wrap_ticks));
+#endif // defined CONFIG_MSTAR_CPU_calibrating
 	update_sched_clock();
 }
 

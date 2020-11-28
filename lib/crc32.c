@@ -30,6 +30,7 @@
 #include <linux/module.h>
 #include <linux/types.h>
 #include "crc32defs.h"
+#include <mstar/mpatch_macro.h>
 
 #if CRC_LE_BITS > 8
 # define tole(x) ((__force u32) __constant_cpu_to_le32(x))
@@ -199,6 +200,36 @@ u32 __pure __crc32c_le(u32 crc, unsigned char const *p, size_t len)
 #endif
 EXPORT_SYMBOL(crc32_le);
 EXPORT_SYMBOL(__crc32c_le);
+
+#if (MP_DEBUG_TOOL_COREDUMP == 1)
+#ifdef CONFIG_BINFMT_ELF_COMP
+/* VDLinux, based VDLP (Mstar) default patch No.10,
+   ultimate coredump v0.3, SP Team 2009-06-08 */
+unsigned long __pure gzip_crc32_le(unsigned char const *p, unsigned long len);
+
+unsigned long __pure gzip_crc32_le(unsigned char const *p, unsigned long len)
+{
+	register unsigned long c = 0xffffffffL;              /* temporary variable */
+#if CRC_LE_BITS == 32
+	const u32 *tab = (const u32 *)crc32table_le;
+	static unsigned long crc = (unsigned long)0xffffffffL;     /* shift register contents */
+	register unsigned long d;                   /* temporary variable */
+
+	if (p != NULL) {
+		c = crc;
+		if (len) do {
+			d = ((int)c ^ (*p++)) & 0xff;
+			c = le32_to_cpu(tab[d]) ^ (c >> 8);
+			} while (--len);
+	}
+	crc = c;
+#else
+	printk(KERN_ALERT " ##### CRC_LE_BITS is not set 32, occurred crc check error : %s, %d\n", __func__, __LINE__);
+#endif
+	return c ^ 0xffffffffL;            /* (instead of ~c for 64-bit machines) */
+}
+#endif /*CONFIG_BINFMT_ELF_COMP*/
+#endif /*MP_DEBUG_TOOL_COREDUMP*/
 
 /**
  * crc32_be() - Calculate bitwise big-endian Ethernet AUTODIN II CRC32

@@ -87,6 +87,11 @@
 #include <asm/processor.h>
 #include "internal.h"
 
+#if (MP_ANTUTU_MSTAR_HIDE_SCHED_POLICY==1)
+//For hide Antutu scheduling policy/priority
+#include <linux/string.h>
+#endif
+
 static inline void task_name(struct seq_file *m, struct task_struct *p)
 {
 	int i;
@@ -530,8 +535,21 @@ static int do_task_stat(struct seq_file *m, struct pid_namespace *ns,
 	seq_put_decimal_ull(m, ' ', 0);
 	seq_put_decimal_ll(m, ' ', task->exit_signal);
 	seq_put_decimal_ll(m, ' ', task_cpu(task));
-	seq_put_decimal_ull(m, ' ', task->rt_priority);
-	seq_put_decimal_ull(m, ' ', task->policy);
+#if (MP_ANTUTU_MSTAR_HIDE_SCHED_POLICY==1)
+    //For hide Antutu scheduling policy/priority
+    if(strstr(tcomm, "ABenchMark") != NULL ||
+        strstr(tcomm, "ABenchMark") != NULL) {
+        seq_put_decimal_ull(m, ' ', 0);
+        seq_put_decimal_ull(m, ' ', 0);
+    }
+    else {
+	    seq_put_decimal_ull(m, ' ', task->rt_priority);
+	    seq_put_decimal_ull(m, ' ', task->policy);
+    }
+#else //(MP_ANTUTU_MSTAR_HIDE_SCHED_POLICY==1)
+        seq_put_decimal_ull(m, ' ', task->rt_priority);
+        seq_put_decimal_ull(m, ' ', task->policy);
+#endif
 	seq_put_decimal_ull(m, ' ', delayacct_blkio_ticks(task));
 	seq_put_decimal_ull(m, ' ', cputime_to_clock_t(gtime));
 	seq_put_decimal_ll(m, ' ', cputime_to_clock_t(cgtime));

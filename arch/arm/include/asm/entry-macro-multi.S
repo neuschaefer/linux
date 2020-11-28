@@ -1,4 +1,7 @@
 #include <asm/assembler.h>
+#include <mstar/mpatch_macro.h>
+
+#if (MP_PLATFORM_MSTAR_LEGANCY_INTR == 1)
 
 /*
  * Interrupt handling.  Preserves r7, r8, r9
@@ -37,3 +40,9 @@
 	arch_irq_handler_default
 	mov     pc, r8
 	.endm
+
+#else
+
+#include <asm/entry-macro-multi-old.S>
+
+#endif /* CONFIG_MP_PLATFORM_MSTAR_LEGANCY_INTR */

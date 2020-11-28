@@ -19,6 +19,11 @@
 
 #include "usb.h"
 
+#include <mstar/mpatch_macro.h>
+#if (MP_USB_MSTAR==1)
+#include "../host/ehci-mstar.h"
+#endif
+
 static void cancel_async_set_config(struct usb_device *udev);
 
 struct api_context {
@@ -145,6 +150,15 @@ int usb_control_msg(struct usb_device *dev, unsigned int pipe, __u8 request,
 	dr->wValue = cpu_to_le16(value);
 	dr->wIndex = cpu_to_le16(index);
 	dr->wLength = cpu_to_le16(size);
+
+#if (MP_USB_MSTAR==1) //20121029, for logitech webcam, it needs 1.2 secs but timeout value is 1 sec
+	if ( (le16_to_cpu(dev->descriptor.idVendor) == 0x046d) &&
+		(le16_to_cpu(dev->descriptor.idProduct) == 0x0825) &&
+		usb_pipeout(pipe) )
+	{
+		timeout = USB_CTRL_SET_TIMEOUT + 5000;
+	}
+#endif
 
 	ret = usb_internal_control_msg(dev, pipe, dr, data, size, timeout);
 
@@ -557,8 +571,25 @@ void usb_sg_wait(struct usb_sg_request *io)
 	 * So could the submit loop above ... but it's easier to
 	 * solve neither problem than to solve both!
 	 */
+#if defined(CONFIG_SUSPEND) && (MP_USB_STR_PATCH==1)
+	while(1)
+	{
+		long timeleft = wait_for_completion_interruptible_timeout(
+				&io->complete, 0.1*HZ);
+		if(timeleft <= 0)
+		{
+			if(is_suspending())
+			{
+				usb_sg_cancel(io);
+				break;
+			}
+		}
+		else
+			break;
+	}
+#else
 	wait_for_completion(&io->complete);
-
+#endif
 	sg_clean(io);
 }
 EXPORT_SYMBOL_GPL(usb_sg_wait);
@@ -825,6 +856,11 @@ int usb_string(struct usb_device *dev, int index, char *buf, size_t size)
 	if (err < 0)
 		goto errout;
 
+#if (MP_USB_MSTAR==1) && _USB_FRIENDLY_CUSTOMER_PATCH
+	// timeout occur when requested string descriptor with Yepp-U4.(MP3)	
+	if(le16_to_cpu(dev->descriptor.idVendor) == 0x04E8 && le16_to_cpu(dev->descriptor.idProduct) == 0x5092)
+	 	goto errout;
+#endif
 	err = usb_string_sub(dev, dev->string_langid, index, tbuf);
 	if (err < 0)
 		goto errout;
@@ -1894,7 +1930,9 @@ free_interfaces:
 			"adding %s (config #%d, interface %d)\n",
 			dev_name(&intf->dev), configuration,
 			intf->cur_altsetting->desc.bInterfaceNumber);
+#if (MP_USB_MSTAR==0)
 		device_enable_async_suspend(&intf->dev);
+#endif
 		ret = device_add(&intf->dev);
 		if (ret != 0) {
 			dev_err(&dev->dev, "device_add(%s) --> %d\n",

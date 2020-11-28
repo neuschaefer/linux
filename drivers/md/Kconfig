@@ -191,6 +191,33 @@ config BLK_DEV_DM
 
 	  If unsure, say N.
 
+config DM_BOOT
+	tristate "Device mapper support"
+	depends on BLK_DEV_DM=y
+	# Not ideal, but if you want to boot from a device-mapper device,
+	# it reuses the call interface that MD uses so they mustn't both
+	# be compiled in
+	depends on !BLK_DEV_MD=y
+	---help---
+	  Enable this to support booting with a root device on device-mapper.
+	  It adds the additional kernel parameter 'dm' which takes the format
+	  of a table entry as per the command-line tool, dmsetup.
+
+	  If unsure, say N.
+
+config DM_NFSB
+	tristate "Netflix Secure Boot device mapper support"
+	depends on BLK_DEV_DM
+	select CRYPTO_MD5
+	select CRYPTO_SHA256
+	select CRYPTO_MPURSA
+	select DM_VERITY
+	---help---
+	  Enable this to support booting with a Netflix Secure Boot root device
+	  on device-mapper.
+
+	  If unsure, say N.
+
 config DM_DEBUG
 	boolean "Device mapper debugging support"
 	depends on BLK_DEV_DM

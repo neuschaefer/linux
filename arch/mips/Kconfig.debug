@@ -4,7 +4,11 @@ config TRACE_IRQFLAGS_SUPPORT
 	bool
 	default y
 
-source "lib/Kconfig.debug"
+config KCONFIG_DEBUG_PATH
+	string
+	option env="KCONFIG_DEBUG_PATH"
+
+source "$KCONFIG_DEBUG_PATH"
 
 config EARLY_PRINTK
 	bool "Early printk" if EXPERT

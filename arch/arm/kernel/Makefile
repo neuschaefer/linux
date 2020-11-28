@@ -12,6 +12,8 @@ CFLAGS_REMOVE_patch.o = -pg
 endif
 
 CFLAGS_REMOVE_return_address.o = -pg
+EXTRA_CFLAGS      +=  -Idrivers/mstar2/hal/$(CONFIG_MSTAR_CHIP_NAME)/cpu
+EXTRA_CFLAGS      +=  -Iarch/arm/arm-boards/$(CONFIG_MSTAR_CHIP_NAME)
 
 # Object file lists.
 
@@ -85,3 +87,9 @@ obj-$(CONFIG_ARM_VIRT_EXT)	+= hyp-stub.o
 obj-$(CONFIG_ARM_PSCI)		+= psci.o
 
 extra-y := $(head-y) vmlinux.lds
+
+ifeq ($(KERNELVERSION),3.8.13)
+EXTRA_CFLAGS      +=  -Iarch/arm/arm-boards/$(CONFIG_MSTAR_CHIP_NAME)_3.8/include
+else
+EXTRA_CFLAGS      +=  -Iarch/arm/arm-boards/$(CONFIG_MSTAR_CHIP_NAME)/include
+endif

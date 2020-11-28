@@ -32,6 +32,14 @@ config FAT_FS
 	  cannot compile any of the FAT-based file systems into the kernel
 	  -- they will have to be modules as well.
 
+config FAT_PVR_OPT_FS
+	bool "Optimized PVR FAT"
+	default n
+	depends on FAT_FS
+	help
+	  FAT PVR optimized version
+
+
 config MSDOS_FS
 	tristate "MSDOS fs support"
 	select FAT_FS

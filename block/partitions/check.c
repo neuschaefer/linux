@@ -34,6 +34,7 @@
 #include "efi.h"
 #include "karma.h"
 #include "sysv68.h"
+#include "emmc.h"
 
 int warn_no_part = 1; /*This is ugly: should make genhd removable media aware*/
 
@@ -42,6 +43,10 @@ static int (*check_part[])(struct parsed_partitions *) = {
 	 * Probe partition formats with tables at disk address 0
 	 * that also have an ADFS boot block at 0xdc0.
 	 */
+//#if defined (CONFIG_EMMC_PARTITION) && (MP_EMMC_PARTITION == 1)
+#if defined (CONFIG_EMMC_PARTITION)
+	emmc_partition,
+#endif	 	 	 
 #ifdef CONFIG_ACORN_PARTITION_ICS
 	adfspart_check_ICS,
 #endif

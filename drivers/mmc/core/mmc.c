@@ -262,6 +262,12 @@ static void mmc_select_card_type(struct mmc_card *card)
 			card_type & EXT_CSD_CARD_TYPE_SDR_1_2V))
 		hs_max_dtr = MMC_HS200_MAX_DTR;
 
+	if ((caps2 & MMC_CAP2_HS400_1_8V_DDR &&
+			card_type & EXT_CSD_CARD_TYPE_HS400_1_8V) ||
+	    (caps2 & MMC_CAP2_HS400_1_2V_DDR &&
+			card_type & EXT_CSD_CARD_TYPE_HS400_1_2V))
+		hs_max_dtr = MMC_HS400_MAX_DTR;
+
 	card->ext_csd.hs_max_dtr = hs_max_dtr;
 	card->ext_csd.card_type = card_type;
 }
@@ -293,7 +299,7 @@ static int mmc_read_ext_csd(struct mmc_card *card, u8 *ext_csd)
 	}
 
 	card->ext_csd.rev = ext_csd[EXT_CSD_REV];
-	if (card->ext_csd.rev > 6) {
+	if (card->ext_csd.rev > 7) {
 		pr_err("%s: unrecognised EXT_CSD revision %d\n",
 			mmc_hostname(card->host), card->ext_csd.rev);
 		err = -EINVAL;
@@ -829,6 +835,73 @@ err:
 	return err;
 }
 
+static int mmc_select_hs400(struct mmc_card *card)
+{
+	int idx, err = -EINVAL;
+	struct mmc_host *host;
+	static unsigned ext_csd_bits[] = {
+		EXT_CSD_DDR_BUS_WIDTH_4,
+		EXT_CSD_DDR_BUS_WIDTH_8,
+	};
+	static unsigned bus_widths[] = {
+		MMC_BUS_WIDTH_4,
+		MMC_BUS_WIDTH_8,
+	};
+
+	BUG_ON(!card);
+
+	host = card->host;
+
+	if (card->ext_csd.card_type & EXT_CSD_CARD_TYPE_HS400_1_2V &&
+			host->caps2 & MMC_CAP2_HS400_1_2V_DDR)
+		err = __mmc_set_signal_voltage(host, MMC_SIGNAL_VOLTAGE_120);
+
+	if (err && card->ext_csd.card_type & EXT_CSD_CARD_TYPE_HS400_1_8V &&
+			host->caps2 & MMC_CAP2_HS400_1_8V_DDR)
+		err = __mmc_set_signal_voltage(host, MMC_SIGNAL_VOLTAGE_180);
+
+	/* If fails try again during next card power cycle */
+	if (err)
+		goto err;
+
+	idx = (host->caps & MMC_CAP_8_BIT_DATA) ? 1 : 0;
+
+	/*
+	 * Unlike SD, MMC cards dont have a configuration register to notify
+	 * supported bus width. So bus test command should be run to identify
+	 * the supported bus width or compare the ext csd values of current
+	 * bus width and ext csd values of 1 bit mode read earlier.
+	 */
+	for (; idx >= 0; idx--) {
+
+		/*
+		 * Host is capable of 8bit transfer, then switch
+		 * the device to work in 8bit transfer mode. If the
+		 * mmc switch command returns error then switch to
+		 * 4bit transfer mode. On success set the corresponding
+		 * bus width on the host.
+		 */
+		err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+				 EXT_CSD_BUS_WIDTH,
+				 ext_csd_bits[idx],
+				 card->ext_csd.generic_cmd6_time);
+		if (err)
+			continue;
+
+		mmc_set_bus_width(card->host, bus_widths[idx]);
+
+		if (!err)
+			break;
+	}
+
+	/* switch to HS400 mode if bus width set successfully */
+	if (!err)
+		err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+				 EXT_CSD_HS_TIMING, 3, 0);
+err:
+	return err;
+}
+
 /*
  * Handle the detection and initialisation of a card.
  *
@@ -943,14 +1016,15 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 			goto free_card;
 	}
 
-	if (!oldcard) {
+	    err = mmc_get_ext_csd(card, &ext_csd);
+    if (err)
+        goto free_card;
+
+	if (!oldcard) 
+	{
 		/*
 		 * Fetch and process extended CSD.
 		 */
-
-		err = mmc_get_ext_csd(card, &ext_csd);
-		if (err)
-			goto free_card;
 		err = mmc_read_ext_csd(card, ext_csd);
 		if (err)
 			goto free_card;
@@ -1038,10 +1112,16 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 	 */
 	if (card->ext_csd.hs_max_dtr != 0) {
 		err = 0;
+        #if 0
 		if (card->ext_csd.hs_max_dtr > 52000000 &&
+		    host->caps2 & MMC_CAP2_HS400)
+			err = mmc_select_hs400(card);
+		else if (card->ext_csd.hs_max_dtr > 52000000 &&
 		    host->caps2 & MMC_CAP2_HS200)
 			err = mmc_select_hs200(card);
-		else if	(host->caps & MMC_CAP_MMC_HIGHSPEED)
+		else  
+        #endif
+        if  (host->caps & MMC_CAP_MMC_HIGHSPEED)
 			err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
 					 EXT_CSD_HS_TIMING, 1,
 					 card->ext_csd.generic_cmd6_time);
@@ -1054,12 +1134,24 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 			       mmc_hostname(card->host));
 			err = 0;
 		} else {
-			if (card->ext_csd.hs_max_dtr > 52000000 &&
-			    host->caps2 & MMC_CAP2_HS200) {
+			mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+					 EXT_CSD_BUS_WIDTH,
+					 EXT_CSD_BUS_WIDTH_8,
+					 card->ext_csd.generic_cmd6_time);
+
+			mmc_set_bus_width(card->host, MMC_BUS_WIDTH_8);
+			if(card->ext_csd.hs_max_dtr > 52000000 && host->caps2 & MMC_CAP2_HS400)
+			{
+				mmc_card_set_hs400(card);
+				mmc_set_timing(card->host, MMC_TIMING_MMC_HS400);
+			}
+			else if (card->ext_csd.hs_max_dtr > 52000000 && host->caps2 & MMC_CAP2_HS200)
+			{
 				mmc_card_set_hs200(card);
-				mmc_set_timing(card->host,
-					       MMC_TIMING_MMC_HS200);
-			} else {
+				mmc_set_timing(card->host, MMC_TIMING_MMC_HS200);
+			}
+			else
+			{
 				mmc_card_set_highspeed(card);
 				mmc_set_timing(card->host, MMC_TIMING_MMC_HS);
 			}
@@ -1071,7 +1163,7 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 	 */
 	max_dtr = (unsigned int)-1;
 
-	if (mmc_card_highspeed(card) || mmc_card_hs200(card)) {
+	if (mmc_card_highspeed(card) || mmc_card_hs200(card) || mmc_card_hs400(card)) {
 		if (max_dtr > card->ext_csd.hs_max_dtr)
 			max_dtr = card->ext_csd.hs_max_dtr;
 		if (mmc_card_highspeed(card) && (max_dtr > 52000000))
@@ -1101,7 +1193,7 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 	/*
 	 * Indicate HS200 SDR mode (if supported).
 	 */
-	if (mmc_card_hs200(card)) {
+	if (mmc_card_hs200(card)||mmc_card_hs400(card)) {
 		u32 ext_csd_bits;
 		u32 bus_width = card->host->ios.bus_width;
 
@@ -1141,7 +1233,7 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 	/*
 	 * Activate wide bus and DDR (if supported).
 	 */
-	if (!mmc_card_hs200(card) &&
+	if (!mmc_card_hs200(card) && !mmc_card_hs400(card) &&
 	    (card->csd.mmca_vsn >= CSD_SPEC_VER_4) &&
 	    (host->caps & (MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA))) {
 		static unsigned ext_csd_bits[][2] = {

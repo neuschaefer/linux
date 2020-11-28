@@ -19,6 +19,7 @@
 #include <linux/seq_file.h>
 #include <linux/uaccess.h>
 #include <linux/ratelimit.h>
+#include <mstar/mpatch_macro.h>
 
 #undef LDISC_DEBUG_HANGUP
 
@@ -36,6 +37,14 @@
  *	must be taken with irqs off because there are hangup path
  *	callers who will do ldisc lookups and cannot sleep.
  */
+
+#if (MP_DEBUG_TOOL_KDEBUG == 1)
+/* VDLinux, based SELP.Mstar default patch No.15,
+   n_tty serial input disable, SP Team 2010-01-29 */
+#ifdef CONFIG_SERIAL_INPUT_MANIPULATION
+extern struct tty_struct *INPUT_tty;
+#endif/*CONFIG_SERIAL_INPUT_MANIPULATION*/
+#endif /*MP_DEBUG_TOOL_KDEBUG*/
 
 static DEFINE_RAW_SPINLOCK(tty_ldisc_lock);
 static DECLARE_WAIT_QUEUE_HEAD(tty_ldisc_wait);
@@ -879,9 +888,39 @@ int tty_ldisc_setup(struct tty_struct *tty, struct tty_struct *o_tty)
 	struct tty_ldisc *ld = tty->ldisc;
 	int retval;
 
+#if (MP_DEBUG_TOOL_KDEBUG == 1)
+#ifdef CONFIG_SERIAL_INPUT_MANIPULATION
+#if CONFIG_SERIAL_INPUT_MANIPULATION_PORTNUM >= 10
+#error  "Serial port number is over one digit, check CONFIG_SERIAL_INPUT_MANIPULATION_PORTNUM"
+#endif/*CONFIG_SERIAL_INPUT_MANIPULATION_PORTNUM*/
+	char buf[6];    /* console name of one digit port number */
+	snprintf(buf, 6, "ttyS%d", CONFIG_SERIAL_INPUT_MANIPULATION_PORTNUM);
+
+	if ((ld->ops->open) && (!strncmp(buf, tty->name, strlen(buf)))) {
+#ifdef CONFIG_SERIAL_INPUT_ENABLE_HELP_MSG
+		printk(KERN_CONT "[SERIAL INPUT MANAGE]"
+			" Managed tty_struct(.name:%s) Setup!!!\n", tty->name);
+#endif/*CONFIG_SERIAL_INPUT_ENABLE_HELP_MSG*/
+		INPUT_tty = tty;
+	}
+#endif/*CONFIG_SERIAL_INPUT_MANIPULATION */
+#endif /*MP_DEBUG_TOOL_KDEBUG*/
+
 	retval = tty_ldisc_open(tty, ld);
-	if (retval)
+	if (retval){
+#if (MP_DEBUG_TOOL_KDEBUG == 1)
+#ifdef CONFIG_SERIAL_INPUT_MANIPULATION
+		if((INPUT_tty != NULL) && (!strncmp(tty->name, buf, strlen(buf)))) {
+			INPUT_tty = NULL;
+#ifdef CONFIG_SERIAL_INPUT_ENABLE_HELP_MSG
+			printk(KERN_CONT "[SERIAL INPUT MANAGE]"
+				" Managed tty_struct(.name:%s) failed!!!\n", tty->name);
+#endif
+		}
+#endif
+#endif /*MP_DEBUG_TOOL_KDEBUG*/
 		return retval;
+	}
 
 	if (o_tty) {
 		retval = tty_ldisc_open(o_tty, o_tty->ldisc);

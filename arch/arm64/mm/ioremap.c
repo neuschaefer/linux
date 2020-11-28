@@ -24,6 +24,7 @@
 #include <linux/mm.h>
 #include <linux/vmalloc.h>
 #include <linux/io.h>
+#include <asm/tlb.h>
 
 static void __iomem *__ioremap_caller(phys_addr_t phys_addr, size_t size,
 				      pgprot_t prot, void *caller)
@@ -64,6 +65,13 @@ static void __iomem *__ioremap_caller(phys_addr_t phys_addr, size_t size,
 		vunmap((void *)addr);
 		return NULL;
 	}
+
+	/*
+	 * Flush the caches and tlb to ensure that we're in a
+	 * consistent state.
+	 */
+	flush_cache_all();
+	flush_tlb_all();
 
 	return (void __iomem *)(offset + addr);
 }

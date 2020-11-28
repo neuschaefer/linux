@@ -41,6 +41,7 @@
 #include <asm/unistd.h>
 #include <asm/siginfo.h>
 #include <asm/cacheflush.h>
+#include <mstar/mpatch_macro.h>
 #include "audit.h"	/* audit_signal_info() */
 
 /*
@@ -2361,6 +2362,16 @@ relock:
 			 * first and our do_group_exit call below will use
 			 * that value and ignore the one we pass it.
 			 */
+#if (MP_DEBUG_TOOL_COREDUMP == 1)
+#ifdef CONFIG_SHOW_FAULT_TRACE_INFO
+#if defined(CONFIG_ARM64)
+			extern void show_usr_info(struct task_struct *task, struct pt_regs *regs, unsigned long addr);
+			show_usr_info(current, regs, regs->pc);
+#endif //CONFIG_ARM64
+
+			printk(KERN_ALERT "[Mstar COREDUMP] SIGNR:%d\n\n", signr);
+#endif 
+#endif /*MP_DEBUG_TOOL_COREDUMP*/
 			do_coredump(info);
 		}
 
@@ -2848,7 +2859,7 @@ int do_sigtimedwait(const sigset_t *which, siginfo_t *info,
 		recalc_sigpending();
 		spin_unlock_irq(&tsk->sighand->siglock);
 
-		timeout = schedule_timeout_interruptible(timeout);
+		timeout = freezable_schedule_timeout_interruptible(timeout);
 
 		spin_lock_irq(&tsk->sighand->siglock);
 		__set_task_blocked(tsk, &tsk->real_blocked);

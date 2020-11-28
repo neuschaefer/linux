@@ -21,7 +21,11 @@
 # machine_is_xxx	CONFIG_xxxx		MACH_TYPE_xxx		number
 #
 ebsa110			ARCH_EBSA110		EBSA110			0
-riscpc			ARCH_RPC		RISCPC			1
+#riscpc			ARCH_RPC		RISCPC			1
+#Mstar chip types
+#einstein                 MSTAR_EINSTEIN          EINSTEIN                1
+napoli                  MSTAR_NAPOLI            NAPOLI                  1
+mstar			MSTAR_CHIP		MSTAR			1
 ebsa285			ARCH_EBSA285		EBSA285			4
 netwinder		ARCH_NETWINDER		NETWINDER		5
 cats			ARCH_CATS		CATS			6

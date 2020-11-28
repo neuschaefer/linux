@@ -55,6 +55,7 @@
 #include <linux/module.h>
 #include <linux/err.h>
 
+#include <mstar/mpatch_macro.h>
 /* error message prefix */
 #define ERRP "mtd: "
 
@@ -305,9 +306,16 @@ static int mtdpart_setup_real(char *s)
  * information. It returns partitions for the requested mtd device, or
  * the first one in the chain if a NULL mtd_id is passed in.
  */
+#if (defined(CONFIG_MSTAR_NAND) || defined(CONFIG_MSTAR_SPI_NAND)) && (MP_NAND_MTD == 1)
+int parse_cmdline_partitions(struct mtd_info *master,
+				    struct mtd_partition **pparts,
+				    struct mtd_part_parser_data *data)
+
+#else
 static int parse_cmdline_partitions(struct mtd_info *master,
 				    struct mtd_partition **pparts,
 				    struct mtd_part_parser_data *data)
+#endif
 {
 	unsigned long long offset;
 	int i, err;
@@ -369,6 +377,9 @@ static int parse_cmdline_partitions(struct mtd_info *master,
 	return part->num_parts;
 }
 
+#if (defined(CONFIG_MSTAR_NAND) || defined(CONFIG_MSTAR_SPI_NAND)) && (MP_NAND_MTD == 1)
+EXPORT_SYMBOL(parse_cmdline_partitions);
+#endif
 
 /*
  * This is the handler for our kernel parameter, called from

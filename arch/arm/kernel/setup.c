@@ -55,6 +55,7 @@
 #include <asm/unwind.h>
 #include <asm/memblock.h>
 #include <asm/virt.h>
+#include <mstar/mpatch_macro.h>
 
 #include "atags.h"
 
@@ -75,6 +76,10 @@ extern void paging_init(struct machine_desc *desc);
 extern void sanity_check_meminfo(void);
 extern void reboot_setup(char *str);
 extern void setup_dma_zone(struct machine_desc *desc);
+
+#if (MP_PLATFORM_ARM == 1)
+extern void setup_early_printk(void);
+#endif/*MP_PLATFORM_ARM*/
 
 unsigned int processor_id;
 EXPORT_SYMBOL(processor_id);
@@ -570,6 +575,10 @@ int __init arm_add_memory(phys_addr_t start, phys_addr_t size)
 	return 0;
 }
 
+#if (MP_PLATFORM_ARM == 1)
+EXPORT_SYMBOL(arm_add_memory);
+#endif/*MP_PLATFORM_ARM*/
+
 /*
  * Pick out the memory size.  We look for mem=size@start,
  * where start and size are "size[KkMm]"
@@ -685,6 +694,10 @@ static int __init init_machine_late(void)
 }
 late_initcall(init_machine_late);
 
+#if (MP_PLATFORM_ARM == 1)
+extern void __init prom_meminit(void);
+#endif/*MP_PLATFORM_ARM*/
+
 #ifdef CONFIG_KEXEC
 static inline unsigned long long get_total_mem(void)
 {
@@ -756,6 +769,9 @@ void __init hyp_mode_check(void)
 #endif
 }
 
+#if (MP_PLATFORM_ARM == 1)
+extern void __init prom_meminit(void);
+#endif/*MP_PLATFORM_ARM*/
 void __init setup_arch(char **cmdline_p)
 {
 	struct machine_desc *mdesc;
@@ -783,6 +799,9 @@ void __init setup_arch(char **cmdline_p)
 
 	parse_early_param();
 
+#if (MP_PLATFORM_ARM == 1)
+	prom_meminit();
+#endif/*MP_PLATFORM_ARM*/	
 	sort(&meminfo.bank, meminfo.nr_banks, sizeof(meminfo.bank[0]), meminfo_cmp, NULL);
 	sanity_check_meminfo();
 	arm_memblock_init(&meminfo, mdesc);

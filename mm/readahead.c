@@ -237,6 +237,25 @@ int force_page_cache_readahead(struct address_space *mapping, struct file *filp,
 	return ret;
 }
 
+#if (MP_NTFS3G_WRAP==1)
+/*
+ * This version skips the IO if the queue is read-congested, and will tell the
+ * block layer to abandon the readahead if request allocation would block.
+ *
+ * force_page_cache_readahead() will ignore queue congestion and will block on
+ * request queues.
+ */
+int do_page_cache_readahead(struct address_space *mapping, struct file *filp,
+			pgoff_t offset, unsigned long nr_to_read)
+{
+	if (bdi_read_congested(mapping->backing_dev_info))
+		return -1;
+
+	return __do_page_cache_readahead(mapping, filp, offset, nr_to_read, 0);
+}
+EXPORT_SYMBOL(do_page_cache_readahead);
+#endif
+
 /*
  * Given a desired number of PAGE_CACHE_SIZE readahead pages, return a
  * sensible upper limit.

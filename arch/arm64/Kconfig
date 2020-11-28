@@ -1,3 +1,15 @@
+#defined by mstar
+config MSTAR_CHIP
+	bool
+	default y
+
+#defined by mstar for arm-boards
+config HAVE_SCHED_CLOCK
+	bool
+
+source "drivers/mstar2/Kconfig"	
+source "mpatch_Kconfig"
+
 config ARM64
 	def_bool y
 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
@@ -21,6 +33,7 @@ config ARM64
 	select HAVE_DEBUG_KMEMLEAK
 	select HAVE_DMA_API_DEBUG
 	select HAVE_DMA_ATTRS
+	select HAVE_DMA_CONTIGUOUS if MMU
 	select HAVE_GENERIC_DMA_COHERENT
 	select HAVE_GENERIC_HARDIRQS
 	select HAVE_HW_BREAKPOINT if PERF_EVENTS
@@ -99,6 +112,12 @@ source "init/Kconfig"
 
 source "kernel/Kconfig.freezer"
 
+choice
+	prompt "ARM system type"
+	default ARCH_MSTAR
+
+endchoice
+
 menu "Platform selection"
 
 config ARCH_VEXPRESS
@@ -111,7 +130,29 @@ config ARCH_VEXPRESS
 	  This enables support for the ARMv8 software model (Versatile
 	  Express).
 
+
+config ARCH_MSTAR
+	bool "Mstar ARM-based"
+	select ARM_AMBA
+	select ARCH_HAS_CPUFREQ	
+	select CLKDEV_LOOKUP
+	select GENERIC_CLOCKEVENTS
+	select ARCH_SCHED_CLOCK
+	select HAVE_CLK
+	select HAVE_SMP
+	select PLAT_MSTAR
+	select MSTAR_CHIP
+	select ARCH_HAS_HOLES_MEMORYMODEL
+	select COMMON_CLK
+	select ARCH_SPARSEMEM_ENABLE
+	help
+	  Support mstar chip porting
+
+
+config PLAT_MSTAR
+	bool
 endmenu
+
 
 menu "Bus support"
 
@@ -202,6 +243,14 @@ config CMDLINE_FORCE
 	  This is useful if you cannot or don't want to change the
 	  command-line options your boot loader passes to the kernel.
 
+config MEMORY_START_ADDRESS
+        hex "Physical address of the memory starting"
+        default 0x40000000 if ((MSTAR_EDISON || MSTAR_EINSTEIN || MSTAR_NAPOLI || MSTAR_KAISER || MSTAR_EAGLE || MSTAR_KAISERS) && ANDROID)
+        default 0x40400000 if ((MSTAR_EDISON || MSTAR_EINSTEIN || MSTAR_NAPOLI || MSTAR_KAISER || MSTAR_EAGLE || MSTAR_KAISERS) && !ANDROID)
+        default 0x20000000 if ((MSTAR_EIFFEL || MSTAR_NIKE || MSTAR_MADISON || MSTAR_CLIPPERS || MSTAR_MIAMI) && ANDROID)
+        default 0x20200000 if ((MSTAR_EIFFEL || MSTAR_NIKE || MSTAR_MADISON || MSTAR_CLIPPERS || MSTAR_MIAMI || MSTAR_MUJI ) && !ANDROID)
+        default 0x20200000ULL if (( MSTAR_MUJI ) && !ANDROID)
+
 endmenu
 
 menu "Userspace binary formats"
@@ -229,6 +278,9 @@ config SYSVIPC_COMPAT
 
 endmenu
 
+source "arch/arm64/arm-boards/Kconfig"
+source "arch/arm64/arm-boards/plat-mstar/Kconfig"
+
 source "net/Kconfig"
 
 source "drivers/Kconfig"
@@ -236,6 +288,8 @@ source "drivers/Kconfig"
 source "fs/Kconfig"
 
 source "arch/arm64/Kconfig.debug"
+
+source "arch/arm/Kconfig.coredump"
 
 source "security/Kconfig"
 

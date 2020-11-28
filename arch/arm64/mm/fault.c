@@ -77,6 +77,12 @@ void show_pte(struct mm_struct *mm, unsigned long addr)
 	printk("\n");
 }
 
+#if (MP_DEBUG_TOOL_KDEBUG)
+#ifdef CONFIG_SHOW_FAULT_TRACE_INFO
+extern void show_info(struct task_struct *task, struct pt_regs *regs, unsigned long addr);
+#endif /*CONFIG_SHOW_FAULT_TRACE_INFO*/
+#endif /*MP_DEBUG_TOOL_KDEBUG*/
+
 /*
  * The kernel tried to access some page that wasn't present.
  */
@@ -121,6 +127,24 @@ static void __do_user_fault(struct task_struct *tsk, unsigned long addr,
 		show_pte(tsk->mm, addr);
 		show_regs(regs);
 	}
+
+#ifdef CONFIG_DEBUG_USER
+	if (((user_debug & UDBG_SEGV) && (sig == SIGSEGV)) ||
+	    ((user_debug & UDBG_BUS)  && (sig == SIGBUS))) {
+		printk(KERN_DEBUG "%s: unhandled page fault (%d) at 0x%08lx, code 0x%03x\n",
+		       tsk->comm, sig, addr, fsr);
+		show_pte(tsk->mm, addr);
+		show_regs(regs);
+
+#if (MP_DEBUG_TOOL_KDEBUG == 1)
+#ifdef CONFIG_SHOW_FAULT_TRACE_INFO
+	printk(KERN_ALERT "%s: unhandled page fault (%d) at 0x%08lx, code 0x%03x\n",
+							tsk->comm, sig, addr, fsr);
+	show_usr_info(tsk, regs, addr);
+#endif
+#endif /*MP_DEBUG_TOOL_KDEBUG*/
+	}
+#endif
 
 	tsk->thread.fault_address = addr;
 	si.si_signo = sig;

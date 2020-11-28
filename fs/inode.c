@@ -388,6 +388,14 @@ void __iget(struct inode *inode)
 	atomic_inc(&inode->i_count);
 }
 
+#if (MP_NTFS3G_WRAP==1)
+void __iget_wrap(struct inode * inode)
+{
+    __iget(inode);
+}
+EXPORT_SYMBOL(__iget_wrap);
+#endif
+
 /*
  * get additional reference to inode; caller must already hold one.
  */

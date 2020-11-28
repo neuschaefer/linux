@@ -10,6 +10,7 @@
 #include <linux/timex.h>
 #include <linux/smp.h>
 #include <linux/percpu.h>
+#include <mstar/mpatch_macro.h>
 
 unsigned long lpj_fine;
 unsigned long preset_lpj;
@@ -180,6 +181,9 @@ static unsigned long __cpuinit calibrate_delay_direct(void) {return 0;}
  */
 #define LPS_PREC 8
 
+#if (MP_Android_MSTAR_HARDCODE_LPJ == 1)
+        extern unsigned int query_frequency(void);
+#else //CONFIG_MP_Android_MSTAR_HARDCODE_LPJ
 static unsigned long __cpuinit calibrate_delay_converge(void)
 {
 	/* First stage - slowly accelerate to find initial bounds */
@@ -243,6 +247,7 @@ recalibrate:
 
 	return lpj;
 }
+#endif
 
 static DEFINE_PER_CPU(unsigned long, cpu_loops_per_jiffy) = { 0 };
 
@@ -264,6 +269,7 @@ void __cpuinit calibrate_delay(void)
 	unsigned long lpj;
 	static bool printed;
 	int this_cpu = smp_processor_id();
+	int cpu_clock;
 
 	if (per_cpu(cpu_loops_per_jiffy, this_cpu)) {
 		lpj = per_cpu(cpu_loops_per_jiffy, this_cpu);
@@ -288,7 +294,25 @@ void __cpuinit calibrate_delay(void)
 	} else {
 		if (!printed)
 			pr_info("Calibrating delay loop... ");
+#if (MP_Android_MSTAR_HARDCODE_LPJ == 1)
+		cpu_clock = query_frequency();
+		lpj = ((cpu_clock*10/110 )*1092912)/10;  // lpj =( cpu_clock / 1100 MHZ) * 4378620
+		/*temporalily not used*/
+		//lpj = CONFIG_LPJ_VALUE;
+#else
+#ifdef CONFIG_MSTAR_MONACO
+if(smp_processor_id() == 0)
+	{
 		lpj = calibrate_delay_converge();
+	}
+else
+	{
+		lpj = loops_per_jiffy;
+	}
+#else
+lpj = calibrate_delay_converge();
+#endif
+#endif /*MP_Android_MSTAR_HARDCODE_LPJ*/
 	}
 	per_cpu(cpu_loops_per_jiffy, this_cpu) = lpj;
 	if (!printed)

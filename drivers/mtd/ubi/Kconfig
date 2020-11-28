@@ -87,4 +87,42 @@ config MTD_UBI_GLUEBI
 	   work on top of UBI. Do not enable this unless you use legacy
 	   software.
 
+config MTD_UBI_DELAY_INIT
+    bool "UBI delayed init"
+    default y
+
+config MTD_UBI_BACKUP_LSB
+    bool "ENABLE UBI BACKUP LSB PAGE"
+    default y
+    depends on MSTAR_NAND && MP_NAND_UBI
+    help
+       This option enables backup LSB pages while writing MSB pages on MLC NAND
+
+#Mstar Config
+config MTD_UBI_ENHANCE_INIT
+    bool "Enhance UBI Initialization"
+    default n
+    depends on (MSTAR_NAND || MSTAR_SPI_NAND) && MP_NAND_UBI
+
+config MTD_UBI_WRITE_CALLBACK
+    bool "Enable UBI write callback"
+   	depends on UBIFS_PING_PONG_BUF && MP_NAND_UBI
+    default n
+
+config MTD_UBI_BITFLIPS
+    bool "ENABLE UBI BITFLIPS"
+    default y
+    depends on (MSTAR_NAND || MSTAR_SPI_NAND) && MP_NAND_UBI
+    help
+       This option enables backup LSB pages while writing MSB pages on MLC NAND
+
+
+config MTD_UBI_DEBUG
+	bool "UBI debugging"
+	depends on SYSFS
+	select DEBUG_FS
+	select KALLSYMS
+	help
+	  This option enables UBI debugging.
+
 endif # MTD_UBI

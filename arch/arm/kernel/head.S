@@ -22,6 +22,7 @@
 #include <asm/memory.h>
 #include <asm/thread_info.h>
 #include <asm/pgtable.h>
+#include <mstar/mpatch_macro.h>
 
 #if defined(CONFIG_DEBUG_LL) && !defined(CONFIG_DEBUG_SEMIHOSTING)
 #include CONFIG_DEBUG_LL_INCLUDE
@@ -77,6 +78,9 @@
 
 	__HEAD
 ENTRY(stext)
+#if (MP_PLATFORM_ARM == 1)
+	mov r1, #0x1
+#endif/*MP_PLATFORM_ARM*/
 
  THUMB(	adr	r9, BSYM(1f)	)	@ Kernel is always entered in ARM.
  THUMB(	bx	r9		)	@ If this is a Thumb-2 kernel,
@@ -88,6 +92,12 @@ ENTRY(stext)
 #endif
 	@ ensure svc mode and all interrupts masked
 	safe_svcmode_maskall r9
+
+#ifdef CONFIG_MSTAR_MONACO
+        mrc    p15, 0, r9, c15, c0, 1
+        orr    r9, r9, #0x1000
+        mcr    p15, 0, r9, c15, c0, 1
+#endif /*CONFIG_MSTAR_MONACO this is un-doc errata*/
 
 	mrc	p15, 0, r9, c0, c0		@ get processor id
 	bl	__lookup_processor_type		@ r5=procinfo r9=cpuid
@@ -356,6 +366,12 @@ ENTRY(secondary_startup)
 #endif
 	safe_svcmode_maskall r9
 
+#ifdef CONFIG_MSTAR_MONACO
+        mrc    p15, 0, r9, c15, c0, 1
+        orr    r9, r9, #0x1000
+        mcr    p15, 0, r9, c15, c0, 1
+#endif /*CONFIG_MSTAR_MONACO this is un-doc errata*/
+
 	mrc	p15, 0, r9, c0, c0		@ get processor id
 	bl	__lookup_processor_type
 	movs	r10, r5				@ invalid processor?
@@ -386,6 +402,12 @@ ENDPROC(secondary_startup)
 ENTRY(__secondary_switched)
 	ldr	sp, [r7, #4]			@ get secondary_data.stack
 	mov	fp, #0
+#if defined(CONFIG_MP_MSTAR_STR_BASE)
+	mrc   p15,0,r0,c1,c0,2
+    orr   r0, r0, #0x00F00000
+    bic   r0, r0, #0xC0000000
+    mcr   p15,0,r0,c1,c0,2
+#endif
 	b	secondary_start_kernel
 ENDPROC(__secondary_switched)
 

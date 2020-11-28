@@ -16,6 +16,10 @@
 #ifndef __ASM_PGTABLE_3LEVEL_TYPES_H
 #define __ASM_PGTABLE_3LEVEL_TYPES_H
 
+#if defined(CONFIG_MP_CMA_PATCH_CMA_64_BIT_TEMP_MODIFICATION)
+#include <linux/types.h>
+#endif
+
 typedef u64 pteval_t;
 typedef u64 pmdval_t;
 typedef u64 pgdval_t;

@@ -249,3 +249,12 @@ config SYSV68_PARTITION
 	  partition table format used by Motorola Delta machines (using
 	  sysv68).
 	  Otherwise, say N.
+	  
+config EMMC_PARTITION
+	bool "EMMC PARTITION table support" if PARTITION_ADVANCED
+	depends on PARTITION_ADVANCED
+	help
+	  Say Y here if you would like to be able to read the hard disk
+	  partition table format used by EMMC.
+	  Otherwise, say N.
+	  

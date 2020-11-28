@@ -15,6 +15,12 @@
 #include <linux/module.h>
 #include <linux/ftrace.h>
 #include <linux/fs.h>
+#include <mstar/mpatch_macro.h>
+#if (MP_DEBUG_TOOL_KDEBUG == 1)
+#ifdef CONFIG_KDEBUGD_FTRACE
+#include <linux/irqflags.h>
+#endif /* CONFIG_KDEBUGD_FTRACE */
+#endif/*MP_DEBUG_TOOL_KDEBUG*/
 
 #include "trace.h"
 
@@ -25,12 +31,17 @@ static DEFINE_PER_CPU(int, tracing_cpu);
 
 static DEFINE_RAW_SPINLOCK(max_trace_lock);
 
+#if (MP_DEBUG_TOOL_KDEBUG == 0) || !defined(CONFIG_KDEBUGD_FTRACE)
 enum {
 	TRACER_IRQS_OFF		= (1 << 1),
 	TRACER_PREEMPT_OFF	= (1 << 2),
 };
 
 static int trace_type __read_mostly;
+#else
+int kdbg_ftrace_trace_type __read_mostly;
+EXPORT_SYMBOL(kdbg_ftrace_trace_type);
+#endif /*MP_DEBUG_TOOL_KDEBUG &&  CONFIG_KDEBUGD_FTRACE */
 
 static int save_flags;
 static bool function_enabled;
@@ -42,7 +53,11 @@ static int start_irqsoff_tracer(struct trace_array *tr, int graph);
 static inline int
 preempt_trace(void)
 {
+#if (MP_DEBUG_TOOL_KDEBUG == 0) || !defined(CONFIG_KDEBUGD_FTRACE)
 	return ((trace_type & TRACER_PREEMPT_OFF) && preempt_count());
+#else
+	return preempt_count();
+#endif /*MP_DEBUG_TOOL_KDEBUG &&  CONFIG_KDEBUGD_FTRACE */
 }
 #else
 # define preempt_trace() (0)
@@ -52,8 +67,12 @@ preempt_trace(void)
 static inline int
 irq_trace(void)
 {
+#if (MP_DEBUG_TOOL_KDEBUG == 0) || !defined(CONFIG_KDEBUGD_FTRACE)
 	return ((trace_type & TRACER_IRQS_OFF) &&
 		irqs_disabled());
+#else
+	return irqs_disabled();
+#endif /* MP_DEBUG_TOOL_KDEBUG && CONFIG_KDEBUGD_FTRACE */
 }
 #else
 # define irq_trace() (0)
@@ -641,7 +660,11 @@ static void irqsoff_tracer_stop(struct trace_array *tr)
 #ifdef CONFIG_IRQSOFF_TRACER
 static int irqsoff_tracer_init(struct trace_array *tr)
 {
+#if (MP_DEBUG_TOOL_KDEBUG == 0) || !defined(CONFIG_KDEBUGD_FTRACE)
 	trace_type = TRACER_IRQS_OFF;
+#else
+	kdbg_ftrace_trace_type = TRACER_IRQS_OFF;
+#endif /*MP_DEBUG_TOOL_KDEBUG &&  CONFIG_KDEBUGD_FTRACE */
 
 	__irqsoff_tracer_init(tr);
 	return 0;
@@ -674,7 +697,11 @@ static struct tracer irqsoff_tracer __read_mostly =
 #ifdef CONFIG_PREEMPT_TRACER
 static int preemptoff_tracer_init(struct trace_array *tr)
 {
+#if (MP_DEBUG_TOOL_KDEBUG == 0) || !defined(CONFIG_KDEBUGD_FTRACE)
 	trace_type = TRACER_PREEMPT_OFF;
+#else
+	kdbg_ftrace_trace_type = TRACER_PREEMPT_OFF;
+#endif /* MP_DEBUG_TOOL_KDEBUG && CONFIG_KDEBUGD_FTRACE */
 
 	__irqsoff_tracer_init(tr);
 	return 0;
@@ -710,7 +737,11 @@ static struct tracer preemptoff_tracer __read_mostly =
 
 static int preemptirqsoff_tracer_init(struct trace_array *tr)
 {
+#if (MP_DEBUG_TOOL_KDEBUG == 0) || !defined(CONFIG_KDEBUGD_FTRACE)
 	trace_type = TRACER_IRQS_OFF | TRACER_PREEMPT_OFF;
+#else
+	kdbg_ftrace_trace_type = TRACER_IRQS_OFF | TRACER_PREEMPT_OFF;
+#endif /*MP_DEBUG_TOOL_KDEBUG &&  CONFIG_KDEBUGD_FTRACE */
 
 	__irqsoff_tracer_init(tr);
 	return 0;

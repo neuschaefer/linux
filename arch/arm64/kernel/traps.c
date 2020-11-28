@@ -46,6 +46,507 @@ static const char *handler[]= {
 
 int show_unhandled_signals = 1;
 
+#ifdef CONFIG_DEBUG_USER
+#if (MP_DEBUG_TOOL_COREDUMP == 1) && defined(CONFIG_SHOW_FAULT_TRACE_INFO)
+unsigned int user_debug = 0xff;
+#else
+unsigned int user_debug;
+#endif
+
+static int __init user_debug_setup(char *str)
+{
+	get_option(&str, &user_debug);
+	return 1;
+}
+__setup("user_debug=", user_debug_setup);
+#endif
+
+#if (MP_DEBUG_TOOL_KDEBUG == 1 ) || (MP_DEBUG_TOOL_COREDUMP == 1)
+#ifdef CONFIG_SHOW_FAULT_TRACE_INFO
+void show_pid_maps(struct task_struct *task)
+{
+	struct task_struct *t;
+	struct mm_struct *mm;
+	struct vm_area_struct *vma, *gate_vma;
+	struct file *file;
+	unsigned long long pgoff = 0;
+	unsigned long ino = 0;
+	dev_t dev = 0;
+	int tpid = 0;
+	char path_buf[256];
+
+	printk(KERN_ALERT "-----------------------------------------------------------\n");
+	printk(KERN_ALERT "* dump maps on pid (%d)\n", task->pid);
+	printk(KERN_ALERT "-----------------------------------------------------------\n");
+
+	if (!down_read_trylock(&task->mm->mmap_sem)) {
+		printk(KERN_ALERT "down_read_trylock() failed... do not dump pid maps info\n");
+		return;
+	}
+
+	gate_vma = get_gate_vma(task->mm);
+
+	vma = task->mm->mmap;
+	if (!vma)
+		vma = gate_vma;
+
+	while (vma) {
+		file = vma->vm_file;
+		if (file) {
+			struct inode *inode = file->f_dentry->d_inode;
+
+			dev = inode->i_sb->s_dev;
+			ino = inode->i_ino;
+			pgoff = ((loff_t)vma->vm_pgoff) << PAGE_SHIFT;
+		} else {
+			dev = 0;
+			ino = 0;
+			pgoff = 0;
+		}
+
+		printk(KERN_ALERT "%08lx-%08lx %c%c%c%c %08llx %02x:%02x %-10lu ",
+				vma->vm_start,
+				vma->vm_end,
+				vma->vm_flags & VM_READ ? 'r' : '-',
+				vma->vm_flags & VM_WRITE ? 'w' : '-',
+				vma->vm_flags & VM_EXEC ? 'x' : '-',
+				vma->vm_flags & VM_MAYSHARE ? 's' : 'p',
+				pgoff,
+				MAJOR(dev), MINOR(dev), ino);
+
+		if (file) {
+			char* p = d_path(&(file->f_path),path_buf, 256);
+
+			if (!IS_ERR(p)) printk("%s", p);
+		} else {
+			const char *name = arch_vma_name(vma);
+
+			mm = vma->vm_mm;
+			tpid = 0;
+			if (!name) {
+				if (mm) {
+					if (vma->vm_start <= mm->brk &&
+					    vma->vm_end >= mm->start_brk) {
+						name = "[heap]";
+					} else if (vma->vm_start <= mm->start_stack &&
+					           vma->vm_end >= mm->start_stack) {
+						name = "[stack]";
+					} else {
+						t = task;
+						do{
+							if (vma->vm_start <= t->user_ssp &&
+							    vma->vm_end >= t->user_ssp){
+								tpid = t->pid;
+								name = t->comm;
+								break;
+							}
+						}while_each_thread(task, t);
+					}
+				} else {
+					name = "[vdso]";
+				}
+			}
+			if (name) {
+				if (tpid)
+					printk("[tstack: %s: %d]", name, tpid);
+				else
+					printk("%s", name);
+			}
+		}
+		printk( "\n");
+
+		if (vma->vm_next)
+			vma = vma->vm_next;
+		else if (vma == gate_vma)
+			vma = NULL;
+		else
+			vma = gate_vma;
+	}
+	up_read(&task->mm->mmap_sem);
+
+	printk(KERN_ALERT "-----------------------------------------------------------\n\n");
+}
+
+static void dump_mem(const char *lvl, const char *str, unsigned long bottom,
+		     unsigned long top);
+
+void __show_user_stack(struct task_struct *task, unsigned long sp)
+{
+	struct vm_area_struct *vma;
+
+	vma = find_vma(task->mm, task->user_ssp);
+	if (!vma) {
+		printk(KERN_CONT "pid(%d) : printing user stack failed.\n", (int)task->pid);
+		return;
+	}
+
+	if (sp < vma->vm_start) {
+		printk(KERN_CONT "pid(%d) : seems stack overflow.\n"
+				 "  sp(0x%08lx), stack vma (0x%08lx ~ 0x%08lx)\n",
+				 (int)task->pid, sp, vma->vm_start, vma->vm_end);
+		return;
+	}
+
+	printk(KERN_CONT "pid(%d) stack vma (0x%08lx ~ 0x%08lx)\n",
+			 (int)task->pid, vma->vm_start, vma->vm_end);
+	dump_mem(KERN_CONT, "User Stack: ", sp, task->user_ssp);
+}
+
+#ifdef CONFIG_SHOW_THREAD_GROUP_STACK
+void __show_user_stack_tg(struct task_struct *task)
+{
+	struct task_struct *g, *p;
+	struct pt_regs *regs;
+
+	printk(KERN_CONT "--------------------------------------------------------\n");
+	printk(KERN_CONT "* dump all user stack of pid(%d) thread group\n", (int)task->pid);
+	printk(KERN_CONT "--------------------------------------------------------\n");
+
+	read_lock(&tasklist_lock);
+	do_each_thread(g, p) {
+		if (task->mm != p->mm)
+			continue;
+		if (task->pid == p->pid)
+			continue;
+		regs = task_pt_regs(p);
+		__show_user_stack(p, regs->ARM_sp);
+		printk(KERN_CONT "\n");
+	} while_each_thread(g, p);
+	read_unlock(&tasklist_lock);
+	printk(KERN_CONT "--------------------------------------------------------\n\n");
+}
+#else
+#define __show_user_stack_tg(t)
+#endif /* CONFIG_SHOW_THREAD_GROUP_STACK */
+
+/*
+ *  Assumes that user program uses frame pointer
+ *  TODO : consider context safety
+ */
+void show_user_stack(struct task_struct *task, struct pt_regs *regs)
+{
+	struct vm_area_struct *vma;
+
+	vma = find_vma(task->mm, task->user_ssp);
+	if (vma) {
+		printk(KERN_CONT "task stack info : pid(%d) stack area (0x%08lx ~ 0x%08lx)\n",
+			         (int)task->pid, vma->vm_start, vma->vm_end);
+	}
+
+	printk(KERN_CONT "-----------------------------------------------------------\n");
+	printk(KERN_CONT "* dump user stack\n");
+	printk(KERN_CONT "-----------------------------------------------------------\n");
+	__show_user_stack(task, regs->sp);
+	printk(KERN_CONT "-----------------------------------------------------------\n\n");
+	__show_user_stack_tg(task);
+}
+
+#ifdef CONFIG_SHOW_PC_LR_INFO
+void dump_mem_kernel(const char *str, unsigned long bottom, unsigned long top)
+{
+        unsigned long p;
+        int i;
+
+        printk(KERN_CONT "%s(0x%08lx to 0x%08lx)\n", str, bottom, top);
+
+        for (p = bottom & ~31; p <= top;) {
+                printk(KERN_CONT "%04lx: ", p & 0xffff);
+                for (i = 0; i < 8; i++, p += 4) {
+                        if (p < bottom || p > top)
+                                printk(KERN_CONT "         ");
+                        else
+                                printk(KERN_CONT "%08lx ", *(unsigned long*)p);
+                }
+                printk(KERN_CONT "\n");
+        }
+}
+
+
+void show_pc_lr(struct task_struct *task, struct pt_regs *regs)
+{
+	unsigned long addr_pc_start, addr_lr_start;
+	unsigned long addr_pc_end, addr_lr_end;
+	struct vm_area_struct *vma;
+
+	printk(KERN_CONT "\n");
+	printk(KERN_CONT "--------------------------------------------------------------------------------------\n");
+	printk(KERN_CONT "PC, LR MEMINFO\n");
+	printk(KERN_CONT "--------------------------------------------------------------------------------------\n");
+	printk(KERN_CONT "PC:%lx, LR:%lx\n", regs->ARM_pc, regs->ARM_lr);
+
+	//Basic error handling
+	if(regs->ARM_pc > 0x400)
+		addr_pc_start = regs->ARM_pc - 0x400;   // pc - 1024 byte
+	else
+		addr_pc_start = 0;
+
+	if(regs->ARM_pc < 0xfffffC00)
+		addr_pc_end = regs->ARM_pc + 0x400;     // pc + 1024 byte
+	else
+		addr_pc_end = 0xffffffff;
+
+	if(regs->ARM_lr > 0x800)
+		addr_lr_start = regs->ARM_lr - 0x800;   // lr - 2048 byte
+	else
+		addr_lr_start = 0;
+
+	if(regs->ARM_lr < 0xfffffC00)
+		addr_lr_end = regs->ARM_lr + 0x400;     // lr + 1024 byte
+	else
+		addr_lr_end = 0xffffffff;
+
+	//Calculate vma print range according which contain PC, LR
+	if(((regs->ARM_pc & 0xfff) < 0x400) && !find_vma(task->mm, addr_pc_start))
+		addr_pc_start = regs->ARM_pc & (~0xfff);
+	if(((regs->ARM_pc & 0xfff) > 0xBFF) && !find_vma(task->mm, addr_pc_end))
+		addr_pc_end = (regs->ARM_pc & (~0xfff)) + 0xfff;
+	if(((regs->ARM_lr & 0xfff) < 0x800) && !find_vma(task->mm, addr_lr_start))
+		addr_lr_start = regs->ARM_lr & (~0xfff);
+	if(((regs->ARM_lr & 0xfff) > 0xBFF) && !find_vma(task->mm, addr_lr_end))
+		addr_lr_end = (regs->ARM_lr & (~0xfff)) + 0xfff;
+
+	//Find a duplicated address range
+	if((addr_lr_start < addr_pc_start) && (addr_lr_end > addr_pc_end))
+		addr_pc_start = addr_pc_end;
+	else if((addr_pc_start <= addr_lr_start) && (addr_pc_end >= addr_lr_end))
+		addr_lr_start = addr_lr_end;
+	else if((addr_lr_start <= addr_pc_end) && (addr_lr_end > addr_pc_end))
+		addr_lr_start = addr_pc_end + 0x4;
+	else if((addr_pc_start <= addr_lr_end) && (addr_pc_end > addr_lr_end))
+		addr_pc_start = addr_lr_end + 0x4;
+
+	printk(KERN_CONT "--------------------------------------------------------------------------------------\n");
+	if((vma=find_vma(task->mm, regs->ARM_pc)) && (regs->ARM_pc >= vma->vm_start))
+		dump_mem(KERN_CONT, "PC meminfo ", addr_pc_start, addr_pc_end);
+	else
+		printk(KERN_CONT "No VMA for ADDR PC\n");
+
+	printk(KERN_CONT "--------------------------------------------------------------------------------------\n");
+	if((vma=find_vma(task->mm, regs->ARM_lr)) && (regs->ARM_lr >= vma->vm_start))
+		dump_mem(KERN_CONT, "LR meminfo ", addr_lr_start, addr_lr_end);
+	else
+		printk(KERN_CONT "No VMA for ADDR LR\n");
+
+	printk(KERN_CONT "--------------------------------------------------------------------------------------\n");
+	printk(KERN_CONT "\n");
+}
+
+static void show_pc_lr_kernel(const struct pt_regs *regs)
+{
+	unsigned long addr_pc, addr_lr;
+	int valid_pc, valid_lr;
+	int valid_pc_mod, valid_lr_mod;
+	struct module *mod;
+
+	addr_pc = regs->ARM_pc - 0x400;   // for 1024 byte
+	addr_lr = regs->ARM_lr - 0x800;   // for 2048 byte
+
+	valid_pc_mod = ((regs->ARM_pc >= VMALLOC_START && regs->ARM_pc < VMALLOC_END) ||
+			(regs->ARM_pc >= MODULES_VADDR && regs->ARM_pc < MODULES_END));
+	valid_lr_mod = ((regs->ARM_lr >= VMALLOC_START && regs->ARM_lr < VMALLOC_END) ||
+			(regs->ARM_lr >= MODULES_VADDR && regs->ARM_lr < MODULES_END));
+
+	valid_pc = (TASK_SIZE <= regs->ARM_pc && regs->ARM_pc < (unsigned long)high_memory)
+			 || valid_pc_mod;
+	valid_lr = (TASK_SIZE <= regs->ARM_lr && regs->ARM_lr < (unsigned long)high_memory)
+			|| valid_lr_mod;
+
+	/* Adjust the addr_pc according to the correct module virtual memory range. */
+	if(valid_pc) {
+		if (addr_pc < TASK_SIZE)
+			addr_pc = TASK_SIZE;
+		else if (valid_pc_mod) {
+			mod = __module_address(regs->ARM_pc);
+
+			if (!within_module_init(addr_pc, mod) &&
+			    !within_module_core(addr_pc, mod))
+				addr_pc = regs->ARM_pc & PAGE_MASK;
+		}
+	}
+
+	/* Adjust the addr_lr according to the correct module virtual memory range. */
+	if(valid_lr) {
+		if (addr_lr < TASK_SIZE)
+			addr_lr = TASK_SIZE;
+		else if (valid_lr_mod) {
+			mod = __module_address(regs->ARM_lr);
+			if (!within_module_init(addr_lr, mod) &&
+			    !within_module_core(addr_lr, mod))
+				addr_lr = regs->ARM_lr & PAGE_MASK;
+		}
+	}
+
+	if(valid_pc && valid_lr){
+		// find a duplicated address range case1
+		if((addr_lr<=regs->ARM_pc) && (regs->ARM_pc<regs->ARM_lr)){
+			addr_lr = regs->ARM_pc + 0x4;
+		}
+		// find a duplicated address rage case2
+		else if((addr_pc<=regs->ARM_lr) && (regs->ARM_lr<regs->ARM_pc)){
+			addr_pc = regs->ARM_lr + 0x4;
+		}
+	}
+
+	printk("--------------------------------------------------------------------------------------\n");
+	printk("[VDLP] DISPLAY PC, LR in KERNEL Level\n");
+	printk("pc:%lx, ra:%lx\n", regs->ARM_pc, regs->ARM_lr);
+	printk("--------------------------------------------------------------------------------------\n");
+
+	if(valid_pc){
+		dump_mem_kernel("PC meminfo in kernel", addr_pc, regs->ARM_pc);
+		printk("--------------------------------------------------------------------------------------\n");
+		dump_mem_kernel("PC meminfo in kernel", regs->ARM_pc + 0x4, regs->ARM_pc + 0x20);
+	} else {
+		printk("[VDLP] Invalid pc addr\n");
+	}
+	printk("--------------------------------------------------------------------------------------\n");
+
+	if(valid_lr)
+		dump_mem_kernel("LR meminfo in kernel", addr_lr, regs->ARM_lr);
+	else
+		printk("[VDLP] Invalid lr addr\n");
+	printk("--------------------------------------------------------------------------------------\n");
+	printk("\n");
+}
+
+#ifdef CONFIG_DUMP_RANGE_BASED_ON_REGISTER
+int is_valid_kernel_addr(unsigned long register_value)
+{
+	if (register_value < PAGE_OFFSET ||
+	    !virt_addr_valid((void*)register_value)){
+		//includes checking NULL and user address
+		return 0;
+	} else {
+		return 1;
+	}
+}
+
+void show_register_memory_kernel(struct pt_regs * regs)
+{
+	unsigned long start_addr_for_printing = 0;
+	unsigned long end_addr_for_printing = 0;
+	int register_num;
+
+	printk("--------------------------------------------------------------------------------------\n");
+	printk("REGISTER MEMORY INFO\n");
+	printk("--------------------------------------------------------------------------------------\n");
+
+	for (register_num = 0; register_num < sizeof(regs->uregs)/sizeof(regs->uregs[0]); register_num++) {
+		printk("\n\n* REGISTER : r%d\n",register_num);
+
+		start_addr_for_printing = (regs->uregs[register_num] & PAGE_MASK) - 0x1000; //-4kbyte
+		if (regs->uregs[register_num] >= 0xfffff000){
+			// if virtual address is 0xffffffff, skip dump address to prevent overflow
+			end_addr_for_printing = 0xffffffff;
+		} else {
+			end_addr_for_printing = (regs->uregs[register_num] & PAGE_MASK) + PAGE_SIZE + 0xfff;
+		} //+about 8kbyte
+
+		if (!is_valid_kernel_addr(regs->uregs[register_num])) {
+			printk("# Register value 0x%lx is wrong address.\n", regs->uregs[register_num]);
+			printk("# We can't do anything.\n");
+			printk("# So, we search next register.\n");
+			continue;
+		}
+
+		if (!is_valid_kernel_addr(start_addr_for_printing)) {
+			printk("# 'start_addr_for_printing' is wrong address.\n");
+			printk("# So, we use just 'regs->uregs[register_num] & PAGE_MASK)'\n");
+			start_addr_for_printing = (regs->uregs[register_num] & PAGE_MASK);
+		}
+
+		if (!is_valid_kernel_addr(end_addr_for_printing)) {
+			printk("# 'end_addr_for_printing' is wrong address.\n");
+			printk("# So, we use 'PAGE_ALIGN(regs->uregs[register_num]) + PAGE_SIZE-1'\n");
+			end_addr_for_printing = (regs->uregs[register_num] & PAGE_MASK) + PAGE_SIZE-1;
+		}
+
+		// dump
+		printk("# r%d register :0x%lx, start_addr : 0x%lx, end_addr : 0x%lx\n",
+			register_num, regs->uregs[register_num], start_addr_for_printing, end_addr_for_printing);
+		printk("--------------------------------------------------------------------------------------\n");
+		dump_mem_kernel("meminfo ", start_addr_for_printing, end_addr_for_printing);
+		printk("--------------------------------------------------------------------------------------\n");
+		printk("\n");
+	}
+}
+#endif
+#endif /* #ifdef CONFIG_SHOW_PC_LR_INFO */
+
+#ifndef CONFIG_SEPARATE_PRINTK_FROM_USER
+#define sep_printk_start
+#define sep_printk_end
+#else
+extern void _sep_printk_start(void);
+extern void _sep_printk_end(void);
+#define sep_printk_start _sep_printk_start
+#define sep_printk_end _sep_printk_end
+#endif
+
+#ifdef CONFIG_RUN_TIMER_DEBUG
+extern void show_timer_list(void);
+#endif
+
+void show_usr_info(struct task_struct *task, struct pt_regs *regs, unsigned long addr)
+{
+	static atomic_t prn_once = ATOMIC_INIT(0);
+
+	if(atomic_cmpxchg(&prn_once, 0, 1)) {
+		return;
+	}
+
+#ifdef CONFIG_SEPARATE_PRINTK_FROM_USER
+	sep_printk_start();
+#endif
+
+	console_verbose();      /* BSP patch : enable console while show_info */
+	preempt_disable();
+
+#ifdef CONFIG_VDLP_VERSION_INFO
+	printk(KERN_ALERT"================================================================================\n");
+	printk(KERN_ALERT" KERNEL Version : %s\n", DTV_KERNEL_VERSION);
+	printk(KERN_ALERT"================================================================================\n");
+#endif
+
+#ifdef CONFIG_SUPPORT_REBOOT
+	if( !print_permit() && reboot_permit() )
+	{
+		micom_reboot();
+		while(1);
+	}
+#endif
+
+#ifdef CONFIG_RUN_TIMER_DEBUG
+	show_timer_list();
+#endif
+
+#ifdef CONFIG_SHOW_PC_LR_INFO
+	show_pc_lr(task, regs);
+#endif
+	if(addr) {
+		show_pte(task->mm, addr);
+	}
+	show_regs(regs);
+	show_pid_maps(task);
+	show_user_stack(task, regs);
+	preempt_enable();
+
+#ifdef CONFIG_SUPPORT_REBOOT
+	if( reboot_permit() )
+	{
+		micom_reboot();
+		while(1);
+	}
+#endif
+
+#ifdef CONFIG_SEPARATE_PRINTK_FROM_USER
+	sep_printk_end();
+#endif
+}
+#endif /*CONFIG_SHOW_FAULT_TRACE_INFO*/
+#endif /*MP_DEBUG_TOOL_KDEBUG == 1 || MP_DEBUG_TOOL_COREDUMP == 1*/
+
+
 /*
  * Dump out the contents of some memory nicely...
  */
@@ -90,11 +591,33 @@ static void dump_mem(const char *lvl, const char *str, unsigned long bottom,
 
 static void dump_backtrace_entry(unsigned long where, unsigned long stack)
 {
+#ifdef CONFIG_KALLSYMS
+	printk("[<%08lx>] (%pS) \n", where, (void *)where);
+#else
+	printk("Function entered at [<%08lx>] \n", where);
+#endif
+
 	print_ip_sym(where);
 	if (in_exception_text(where))
 		dump_mem("", "Exception stack", stack,
 			 stack + sizeof(struct pt_regs));
 }
+
+#ifndef CONFIG_ARM_UNWIND
+/*
+ * Stack pointers should always be within the kernels view of
+ * physical memory.  If it is not there, then we can't dump
+ * out any information relating to the stack.
+ */
+static int verify_stack(unsigned long sp)
+{
+	if (sp < PAGE_OFFSET ||
+	    (sp > (unsigned long)high_memory && high_memory != NULL))
+		return -EFAULT;
+
+	return 0;
+}
+#endif
 
 static void dump_instr(const char *lvl, struct pt_regs *regs)
 {
@@ -250,11 +773,35 @@ void die(const char *str, struct pt_regs *regs, int err)
 void arm64_notify_die(const char *str, struct pt_regs *regs,
 		      struct siginfo *info, int err)
 {
-	if (user_mode(regs))
+
+	printk("----------------------------------------------------------------------\n");
+	if (user_mode(regs)){
+#if (MP_DEBUG_TOOL_COREDUMP == 1)
+#ifdef CONFIG_SHOW_FAULT_TRACE_INFO
+		show_usr_info(current, regs, regs->pc);
+#endif /*CONFIG_SHOW_FAULT_TRACE_INFO */
+#endif /*MP_DEBUG_TOOL_COREDUMP*/
 		force_sig_info(info->si_signo, info, current);
+	}
 	else
 		die(str, regs, err);
 }
+
+#ifdef CONFIG_GENERIC_BUG
+int is_valid_bugaddr(unsigned long pc)
+{
+#ifdef CONFIG_THUMB2_KERNEL
+	unsigned short bkpt;
+#else
+	unsigned long bkpt;
+#endif
+
+	if (probe_kernel_address((unsigned *)pc, bkpt))
+		return 0;
+
+	return bkpt == BUG_INSTR_VALUE;
+}
+#endif //CONFIG_GENERIC_BUG
 
 asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
 {
@@ -273,6 +820,14 @@ asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
 			current->comm, task_pid_nr(current), pc);
 		dump_instr(KERN_INFO, regs);
 	}
+
+#ifdef CONFIG_DEBUG_USER
+	if (user_debug & UDBG_UNDEFINED) {
+		printk(KERN_INFO "%s (%d): undefined instruction: pc=%p\n",
+			current->comm, task_pid_nr(current), pc);
+		dump_instr(KERN_INFO, regs);
+	}
+#endif
 
 	info.si_signo = SIGILL;
 	info.si_errno = 0;
@@ -303,6 +858,22 @@ asmlinkage long do_ni_syscall(struct pt_regs *regs)
 			__show_regs(regs);
 	}
 
+#ifdef CONFIG_DEBUG_USER
+	/*
+	 * experience shows that these seem to indicate that
+	 * something catastrophic has happened
+	 */
+	if (user_debug & UDBG_SYSCALL) {
+		printk("[%d] %s: arm syscall %d\n",
+		       task_pid_nr(current), current->comm, no);
+		dump_instr("", regs);
+		if (user_mode(regs)) {
+			__show_regs(regs);
+			c_backtrace(regs->ARM_fp, processor_mode(regs));
+		}
+	}
+#endif
+
 	return sys_ni_syscall();
 }
 
@@ -318,6 +889,14 @@ asmlinkage void bad_mode(struct pt_regs *regs, int reason, unsigned int esr)
 	pr_crit("Bad mode in %s handler detected, code 0x%08x\n",
 		handler[reason], esr);
 	__show_regs(regs);
+
+#ifdef CONFIG_DEBUG_USER
+	if (user_debug & UDBG_UDBG_BADABORT) {
+		printk(KERN_INFO "%s (%d): bad mode: pc=%p\n",
+			current->comm, task_pid_nr(current), pc);
+		dump_instr(KERN_INFO, regs);
+	}
+#endif
 
 	info.si_signo = SIGILL;
 	info.si_errno = 0;
