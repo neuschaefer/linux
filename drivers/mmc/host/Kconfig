@@ -35,6 +35,35 @@ config MMC_SDHCI
 
 	  If unsure, say N.
 
+config MMC_WPCM450_SDHCI
+	tristate "Secure Digital Host Controller Interface support for WPCM450"
+	depends on ARCH_WPCM450
+	help
+	  This select the Secure Digital Host Controller Interface of WPCM450.
+	  If you have a controller with this interface, say Y or M here.
+
+	  If unsure, say N.
+
+config MMC_WINBOND_EVB
+	bool "SDHC Driver for Winbond Hermon SVB"
+	depends on MMC_BLOCK && MMC_WPCM450_SDHCI
+	default n
+	help
+	  This configures the driver for Winbond Hermon SVB.
+	  If you have the EVB, say Y here.
+
+	  If unsure, say N.
+
+config MMC_WHOVILLE
+	bool "SDHC Driver for WHOVILLE platforms"
+	depends on MMC_BLOCK && MMC_WPCM450_SDHCI
+	default n
+	help
+	  This configures the driver for Dell 11G platforms.
+	  If you have the platform, say Y here.
+
+	  If unsure, say N.
+
 config MMC_OMAP
 	tristate "TI OMAP Multimedia Card Interface support"
 	depends on ARCH_OMAP

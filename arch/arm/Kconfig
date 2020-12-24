@@ -406,6 +406,11 @@ config ARCH_OMAP
 	help
 	  Support for TI's OMAP platform (OMAP1 and OMAP2).
 
+config ARCH_WPCM450
+	bool "Winbond WPCM450 (Hermon)"
+	help
+	  Winbond WPCM450 CPU based systems (Hermon).
+
 endchoice
 
 source "arch/arm/mach-clps711x/Kconfig"
@@ -465,6 +470,8 @@ source "arch/arm/mach-realview/Kconfig"
 source "arch/arm/mach-at91/Kconfig"
 
 source "arch/arm/plat-mxc/Kconfig"
+
+source "arch/arm/mach-wpcm450/Kconfig"
 
 source "arch/arm/mach-netx/Kconfig"
 

@@ -504,6 +504,8 @@ MMC_ATTR_FN(manfid, "0x%06x\n", card->cid.manfid);
 MMC_ATTR_FN(name, "%s\n", card->cid.prod_name);
 MMC_ATTR_FN(oemid, "0x%04x\n", card->cid.oemid);
 MMC_ATTR_FN(serial, "0x%08x\n", card->cid.serial);
+MMC_ATTR_FN(state, "0b%1d%1d%1d%1d\n", (card->state>>3)&1, (card->state>>2)&1, 
+									   (card->state>>1)&1, (card->state)&1 );
 
 static struct device_attribute mmc_sd_dev_attrs[] = {
 	MMC_ATTR_RO(cid),
@@ -516,6 +518,7 @@ static struct device_attribute mmc_sd_dev_attrs[] = {
 	MMC_ATTR_RO(name),
 	MMC_ATTR_RO(oemid),
 	MMC_ATTR_RO(serial),
+	MMC_ATTR_RO(state),
 	__ATTR_NULL,
 };
 

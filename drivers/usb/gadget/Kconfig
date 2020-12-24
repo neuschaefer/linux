@@ -82,6 +82,70 @@ choice
 	   Many controller drivers are platform-specific; these
 	   often need board-specific hooks.
 
+config USB_GADGET_CI13410_FS
+        boolean "Chipidea ci13410 Full Speed Driver"
+        depends on USB_GADGET
+        select USB_GADGET_DUALSPEED
+        help
+           Chipidea ci13410 is a USB peripheral controller which
+           supports both full and high speed USB 2.0 data transfers.
+
+           It has six configurable endpoints, as well as endpoint zero
+           (for control transfers).
+
+           Say "y" to link the driver statically, or "m" to build a
+           dynamically linked module called "g_ci13410" and force all
+           gadget drivers to also be dynamically linked.
+
+config USB_CI13410_FS
+        tristate
+        depends on USB_GADGET_CI13410_FS
+        default USB_GADGET
+        select USB_GADGET_SELECTED
+
+config USB_GADGET_CI13410_HS
+        boolean "Chipidea ci13410 High Speed Driver"
+        depends on USB_GADGET
+        select USB_GADGET_DUALSPEED
+        help
+           Chipidea ci13410 is a USB peripheral controller which
+           supports both full and high speed USB 2.0 data transfers.
+
+           It has six configurable endpoints, as well as endpoint zero
+           (for control transfers).
+
+           Say "y" to link the driver statically, or "m" to build a
+           dynamically linked module called "g_ci13410" and force all
+           gadget drivers to also be dynamically linked.
+
+config USB_CI13410_HS
+        tristate
+        depends on USB_GADGET_CI13410_HS
+        default USB_GADGET
+        select USB_GADGET_SELECTED
+
+config USB_GADGET_CI13410_FS_AND_CI13410_HS
+        boolean "Chipidea ci13410 Full Speed and ci13410 High Speed"
+        depends on USB_GADGET
+        select USB_GADGET_DUALSPEED
+        select USB_GADGET_DUAL_CONTROLLERS
+        help
+           Chipidea ci13410 is a USB peripheral controller which
+           supports both full and high speed USB 2.0 data transfers.
+
+           It has six configurable endpoints, as well as endpoint zero
+           (for control transfers).
+
+           Say "y" to link the driver statically, or "m" to build a
+           dynamically linked module called "g_ci13410-fs" "g_ci13410-hs"
+           and force all gadget drivers to also be dynamically linked.
+
+config USB_CI13410_FS_AND_CI13410_HS
+        tristate
+        depends on USB_GADGET_CI13410_FS_AND_CI13410_HS
+        default USB_GADGET
+        select USB_GADGET_SELECTED
+
 config USB_GADGET_AMD5536UDC
 	boolean "AMD5536 UDC"
 	depends on PCI
@@ -342,6 +406,14 @@ config USB_GADGET_DUALSPEED
 	  Means that gadget drivers should include extra descriptors
 	  and code to handle dual-speed controllers.
 
+config USB_GADGET_DUAL_CONTROLLERS
+        bool
+        depends on USB_GADGET
+        default n
+        help
+          Means that two peripheral controller drivers are being used
+          at the same time.
+
 #
 # USB Gadget Drivers
 #
@@ -366,6 +438,59 @@ choice
 	  a less common variant of a device class protocol.
 
 # this first set of drivers all depend on bulk-capable hardware.
+
+config USB_COMPOSITE
+        tristate "Composite Gadget"
+        depends on EXPERIMENTAL
+        help
+          Gadget Composite is a gadget driver between the peripheral
+          controller driver and one or more function drivers.  This is
+          used to attach multiple functions to one peripheral controller
+          driver.
+
+          Say "y" to link the driver statically, or "m" to build a
+          dynamically linked module called "g_composite".
+
+config USB_MASS_STORAGE
+        tristate "Mass Storage Function"
+        depends on USB_COMPOSITE
+        help
+          Mass Storage is a function driver that implements a CD/DVD
+          drive and/or a Floppy drive.
+
+          Say "y" to link the driver statically, or "m" to build a
+          dynamically linked module called "g_mass_storage".
+
+#config USB_MASS_STORAGE_CD
+#        bool "Configure Mass Storage CD/DVD device"
+#        depends on USB_MASS_STORAGE
+#        default n
+#        help
+#          Say "y" for CD/DVD functionality
+
+#config USB_MASS_STORAGE_FLOPPY
+#        bool "Configure Mass Storage Floppy device"
+#        depends on USB_MASS_STORAGE
+#        default n
+#        help
+#          Say "y" for Floppy functionality
+
+config USB_KBDMOUSE
+        tristate "Keyboard/Mouse Function"
+        depends on USB_COMPOSITE
+        help
+          Keyboard/Mouse is a function driver that implements two USB HID
+          devices (a keyboard and a mouse).
+
+          Say "y" to link the driver statically, or "m" to build a
+          dynamically linked module called "g_kbdmouse".
+
+config USB_MOUSE_RELATIVE
+        bool "Configure additional Relative Mouse"
+        depends on USB_KBDMOUSE
+        default y
+        help
+          Say "n" to remove Relative Mouse Functionality
 
 config USB_ZERO
 	tristate "Gadget Zero (DEVELOPMENT)"

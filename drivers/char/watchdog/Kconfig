@@ -850,4 +850,15 @@ config USBPCWATCHDOG
 
 	  Most people will say N.
 
+
+#AVOCENT
+config WDT_WPCM450
+	tristate "Winbond WPCM450 watchdog driver"
+	depends on ARM && ARCH_WPCM450
+	help 
+	 no	
+#AVOCENT
+
+
+
 endif # WATCHDOG

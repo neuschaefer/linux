@@ -39,6 +39,7 @@
 #define DRV_VERSION "1.8"
 
 /* Global VLAN variables */
+int g_vlan_enabled = 0;
 
 /* Our listing of VLAN group(s) */
 static struct hlist_head vlan_group_hash[VLAN_GRP_HASH_SIZE];
@@ -289,6 +290,8 @@ static int unregister_vlan_dev(struct net_device *real_dev,
 			}
 		}
 	}
+
+	g_vlan_enabled = 0;
 
 	return ret;
 }
@@ -565,6 +568,9 @@ static int register_vlan_device(struct net_device *real_dev,
 #ifdef VLAN_DEBUG
 	printk(VLAN_DBG "Allocated new device successfully, returning.\n");
 #endif
+
+	g_vlan_enabled = 1;
+
 	return 0;
 
 out_free_newdev:

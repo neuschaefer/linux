@@ -5,6 +5,15 @@ ifeq ($(CONFIG_USB_GADGET_DEBUG),y)
 	EXTRA_CFLAGS		+= -DDEBUG
 endif
 
+EXTRA_CFLAGS			+= -DCONFIG_USB_COMPOSITE
+
+g_ci13410-fs-objs                       := ci13410_fs.o
+g_ci13410-hs-objs                       := ci13410.o
+
+obj-$(CONFIG_USB_CI13410_FS)    += g_ci13410-fs.o
+obj-$(CONFIG_USB_CI13410_HS)    += g_ci13410-hs.o
+obj-$(CONFIG_USB_CI13410_FS_AND_CI13410_HS) += g_ci13410-fs.o
+obj-$(CONFIG_USB_CI13410_FS_AND_CI13410_HS) += g_ci13410-hs.o
 obj-$(CONFIG_USB_DUMMY_HCD)	+= dummy_hcd.o
 obj-$(CONFIG_USB_NET2280)	+= net2280.o
 obj-$(CONFIG_USB_AMD5536UDC)	+= amd5536udc.o
@@ -20,6 +29,10 @@ obj-$(CONFIG_USB_M66592)	+= m66592-udc.o
 #
 # USB gadget drivers
 #
+g_composite-objs                := composite.o usbstring.o config.o epautoconf.o
+g_mass_storage-objs             := mass_storage.o usbstring.o config.o \
+                                        epautoconf.o
+g_kbdmouse-objs                 := kbdmouse.o usbstring.o config.o epautoconf.o
 g_zero-objs			:= zero.o usbstring.o config.o epautoconf.o
 g_ether-objs			:= ether.o usbstring.o config.o epautoconf.o
 g_serial-objs			:= serial.o usbstring.o config.o epautoconf.o
@@ -31,7 +44,10 @@ g_file_storage-objs		:= file_storage.o usbstring.o config.o \
 ifeq ($(CONFIG_USB_ETH_RNDIS),y)
 	g_ether-objs		+= rndis.o
 endif
- 
+
+obj-$(CONFIG_USB_COMPOSITE)     += g_composite.o
+obj-$(CONFIG_USB_MASS_STORAGE)  += g_mass_storage.o
+obj-$(CONFIG_USB_KBDMOUSE)      += g_kbdmouse.o 
 obj-$(CONFIG_USB_ZERO)		+= g_zero.o
 obj-$(CONFIG_USB_ETH)		+= g_ether.o
 obj-$(CONFIG_USB_GADGETFS)	+= gadgetfs.o

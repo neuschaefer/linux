@@ -1,4 +1,4 @@
-# $Id: Kconfig,v 1.11 2005/11/07 11:14:19 gleixner Exp $
+# $Id$
 
 menuconfig MTD
 	tristate "Memory Technology Device (MTD) support"
@@ -277,6 +277,14 @@ config SSFDC
 	help
 	  This enables read only access to SmartMedia formatted NAND
 	  flash. You can mount it with FAT file system.
+
+#AVOCENT
+config MTD_WPCM450_SPI_NOR_FLASH
+	tristate "Winbond WPCM450 MTD NOR FLASH  driver"
+	depends on MTD && ARM && ARCH_WPCM450
+	help 
+	 no	
+#AVOCENT
 
 source "drivers/mtd/chips/Kconfig"
 

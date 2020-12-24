@@ -118,7 +118,7 @@ mmc_start_request(struct mmc_host *host, struct mmc_request *mrq)
 			"tsac %d ms nsac %d\n",
 			mmc_hostname(host), mrq->data->blksz,
 			mrq->data->blocks, mrq->data->flags,
-			mrq->data->timeout_ns / 10000000,
+			mrq->data->timeout_us / 1000,			/* (chtsai) */
 			mrq->data->timeout_clks);
 	}
 
@@ -242,7 +242,7 @@ void mmc_set_data_timeout(struct mmc_data *data, const struct mmc_card *card,
 	if (write)
 		mult <<= card->csd.r2w_factor;
 
-	data->timeout_ns = card->csd.tacc_ns * mult;
+	data->timeout_us = card->csd.tacc_ns / 1000 * mult;	/* (chtsai) */
 	data->timeout_clks = card->csd.tacc_clks * mult;
 
 	/*
@@ -251,7 +251,7 @@ void mmc_set_data_timeout(struct mmc_data *data, const struct mmc_card *card,
 	if (mmc_card_sd(card)) {
 		unsigned int timeout_us, limit_us;
 
-		timeout_us = data->timeout_ns / 1000;
+		timeout_us = data->timeout_us;					/* (chtsai) */
 		timeout_us += data->timeout_clks * 1000 /
 			(card->host->ios.clock / 1000);
 
@@ -264,7 +264,7 @@ void mmc_set_data_timeout(struct mmc_data *data, const struct mmc_card *card,
 		 * SDHC cards always use these fixed values.
 		 */
 		if (timeout_us > limit_us || mmc_card_blockaddr(card)) {
-			data->timeout_ns = limit_us * 1000;
+			data->timeout_us = limit_us;				/* (chtsai) */
 			data->timeout_clks = 0;
 		}
 	}
