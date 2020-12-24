@@ -40,10 +40,24 @@ static int mmc_prep_request(struct request_queue *q, struct request *req)
 	return BLKPREP_OK;
 }
 
+#ifdef CONFIG_MMC_WHOVILLE
+/* semaphore for access SDHC (chtsai) */
+DECLARE_MUTEX(sdhc_sem);
+
+#define WAIT_JIFFIES_COUNT			500
+#define POLL_CARD_DETECT_DELAY		4000
+
+#include <linux/delay.h>
+#endif
+
 static int mmc_queue_thread(void *d)
 {
 	struct mmc_queue *mq = d;
 	struct request_queue *q = mq->queue;
+#ifdef CONFIG_MMC_WHOVILLE
+	u32 u32tmpJiffies= (jiffies+POLL_CARD_DETECT_DELAY)&0xffffffff;
+	int retval=0;
+#endif
 
 	current->flags |= PF_MEMALLOC;
 
@@ -58,19 +72,68 @@ static int mmc_queue_thread(void *d)
 		mq->req = req;
 		spin_unlock_irq(q->queue_lock);
 
+#ifdef CONFIG_MMC_WHOVILLE
+		/* Send a dummy request to ask for card change status. (chtsai) */
+		if (jiffies >= (u32tmpJiffies+WAIT_JIFFIES_COUNT))
+		{
+			if(down_interruptible(&sdhc_sem))
+			{
+				printk(KERN_ERR "%s: down_interruptible error!\n", __FUNCTION__);
+				break;
+			}
+			else
+			{
+				if (mq->issue_fn)
+				{
+					retval = mq->issue_fn(mq, NULL);
+				}
+				else
+					retval = 0;
+					
+				up(&sdhc_sem);
+				if (retval == 2)		/* Insertion */
+				{
+					msleep(5000);
+				}
+				else if (retval == 3)	/* Removal */
+				{
+					msleep(2000);
+				}
+			}
+			u32tmpJiffies = jiffies;
+		}
+#endif
 		if (!req) {
 			if (kthread_should_stop()) {
 				set_current_state(TASK_RUNNING);
 				break;
 			}
 			up(&mq->thread_sem);
+#ifndef CONFIG_MMC_WHOVILLE
 			schedule();
+#else
+			schedule_timeout_interruptible(WAIT_JIFFIES_COUNT);
+#endif
 			down(&mq->thread_sem);
 			continue;
 		}
 		set_current_state(TASK_RUNNING);
 
+#ifndef CONFIG_MMC_WHOVILLE
 		mq->issue_fn(mq, req);
+#else
+		/* Use the semaphore to make sure the set of command(s)for the issue
+			sent to SDHC successively, since there is only one SDHC. (chtsai) */
+		if (down_interruptible(&sdhc_sem))
+		{
+			break;
+		}
+		else
+		{
+			mq->issue_fn(mq, req);
+			up(&sdhc_sem);
+		}
+#endif
 	} while (1);
 	up(&mq->thread_sem);
 

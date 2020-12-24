@@ -146,6 +146,10 @@
 /* Broadcom SB1250, etc. SOC */
 #define PORT_SB1250_DUART	77
 
+/* AVOCENT */
+/* Winbond WPCM450 SoC and derivatives thereof */
+#define PORT_WPCM450    74
+/* AVOCENT */
 
 #ifdef __KERNEL__
 

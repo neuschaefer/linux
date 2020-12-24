@@ -36,6 +36,7 @@
 
 #include <asm/irq.h>
 #include <asm/uaccess.h>
+#include <asm/arch/regs-serial.h>
 
 /*
  * This is used to lock changes in serial line configuration.
@@ -61,7 +62,7 @@ static struct lock_class_key port_lock_key;
 static void uart_change_speed(struct uart_state *state, struct ktermios *old_termios);
 static void uart_wait_until_sent(struct tty_struct *tty, int timeout);
 static void uart_change_pm(struct uart_state *state, int pm_state);
-
+extern void wpcm450_setfilp(struct uart_port *port, struct file *filp);
 /*
  * This routine is used by the interrupt handler to schedule processing in
  * the software interrupt portion of the driver.
@@ -142,9 +143,19 @@ static int uart_startup(struct uart_state *state, int init_hw)
 	struct uart_port *port = state->port;
 	unsigned long page;
 	int retval = 0;
+	
 
 	if (info->flags & UIF_INITIALIZED)
+	{
+
+		#ifdef __iDRAC__
+		if(DEBUG_SERIAL_PORT!=port->line) 
+		{
+			return -EAGAIN;
+		}
+		#endif
 		return 0;
+	}	
 
 	/*
 	 * Set the TTY IO error marker - we will only clear this
@@ -156,10 +167,12 @@ static int uart_startup(struct uart_state *state, int init_hw)
 	if (port->type == PORT_UNKNOWN)
 		return 0;
 
+
 	/*
 	 * Initialise and allocate the transmit and temporary
 	 * buffer.
 	 */
+
 	if (!info->xmit.buf) {
 		page = get_zeroed_page(GFP_KERNEL);
 		if (!page)
@@ -168,8 +181,14 @@ static int uart_startup(struct uart_state *state, int init_hw)
 		info->xmit.buf = (unsigned char *) page;
 		uart_circ_clear(&info->xmit);
 	}
-
+ 
 	retval = port->ops->startup(port);
+	#ifdef __iDRAC__
+	if(retval != 0)
+	    return retval;
+	#endif
+	
+
 	if (retval == 0) {
 		if (init_hw) {
 			/*
@@ -319,7 +338,7 @@ EXPORT_SYMBOL(uart_update_timeout);
  *	@old: old termios (or NULL)
  *	@min: minimum acceptable baud rate
  *	@max: maximum acceptable baud rate
- *
+ *  
  *	Decode the termios structure into a numeric baud rate,
  *	taking account of the magic 38400 baud rate (with spd_*
  *	flags), and mapping the %B0 rate to 9600 baud.
@@ -333,10 +352,10 @@ EXPORT_SYMBOL(uart_update_timeout);
 unsigned int
 uart_get_baud_rate(struct uart_port *port, struct ktermios *termios,
 		   struct ktermios *old, unsigned int min, unsigned int max)
-{
+{ 
 	unsigned int try, baud, altbaud = 38400;
 	upf_t flags = port->flags & UPF_SPD_MASK;
-
+ 
 	if (flags == UPF_SPD_HI)
 		altbaud = 57600;
 	if (flags == UPF_SPD_VHI)
@@ -424,8 +443,10 @@ uart_change_speed(struct uart_state *state, struct ktermios *old_termios)
 	 * If we have no tty, termios, or the port does not exist,
 	 * then we can't set the parameters for this port.
 	 */
+	 
 	if (!tty || !tty->termios || port->type == PORT_UNKNOWN)
 		return;
+
 
 	termios = tty->termios;
 
@@ -442,13 +463,16 @@ uart_change_speed(struct uart_state *state, struct ktermios *old_termios)
 	else
 		state->info->flags |= UIF_CHECK_CD;
 
+
 	port->ops->set_termios(port, termios, old_termios);
+
 }
 
 static inline void
 __uart_put_char(struct uart_port *port, struct circ_buf *circ, unsigned char c)
 {
 	unsigned long flags;
+   
 
 	if (!circ->buf)
 		return;
@@ -470,6 +494,8 @@ static void uart_put_char(struct tty_struct *tty, unsigned char ch)
 
 static void uart_flush_chars(struct tty_struct *tty)
 {
+
+      
 	uart_start(tty);
 }
 
@@ -1436,7 +1462,6 @@ uart_block_til_ready(struct file *filp, struct uart_state *state)
 	add_wait_queue(&info->open_wait, &wait);
 	while (1) {
 		set_current_state(TASK_INTERRUPTIBLE);
-
 		/*
 		 * If we have been hung up, tell userspace/restart open.
 		 */
@@ -1476,19 +1501,22 @@ uart_block_til_ready(struct file *filp, struct uart_state *state)
 		 * and wait for the carrier to indicate that the
 		 * modem is ready for us.
 		 */
+
 		spin_lock_irq(&port->lock);
 		port->ops->enable_ms(port);
 		mctrl = port->ops->get_mctrl(port);
 		spin_unlock_irq(&port->lock);
 		if (mctrl & TIOCM_CAR)
 			break;
-
 		mutex_unlock(&state->mutex);
+		 
 		schedule();
 		mutex_lock(&state->mutex);
 
 		if (signal_pending(current))
 			break;
+        
+
 	}
 	set_current_state(TASK_RUNNING);
 	remove_wait_queue(&info->open_wait, &wait);
@@ -1616,6 +1644,15 @@ static int uart_open(struct tty_struct *tty, struct file *filp)
 	if (state->count == 1)
 		uart_change_pm(state, 0);
 
+    #ifdef __iDRAC__
+    //080410
+    if(RAC_VIRTUAL_SERIAL_PORT== state->port->line || IPMI_VIRTUAL_SERIAL_PORT == state->port->line||
+       SOL_VIRTUAL_SERIAL_PORT== state->port->line)
+    {
+       wpcm450_setfilp(state->port, filp);
+    }
+    #endif 
+
 	/*
 	 * Start up the serial port.
 	 */
@@ -1631,12 +1668,12 @@ static int uart_open(struct tty_struct *tty, struct file *filp)
 	/*
 	 * If this is the first open to succeed, adjust things to suit.
 	 */
-	if (retval == 0 && !(state->info->flags & UIF_NORMAL_ACTIVE)) {
+	if (retval == 0 && !(state->info->flags & UIF_NORMAL_ACTIVE)) 
+	{
 		state->info->flags |= UIF_NORMAL_ACTIVE;
 
 		uart_update_termios(state);
 	}
-
  fail:
 	return retval;
 }

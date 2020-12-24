@@ -66,7 +66,7 @@ struct mmc_command {
 };
 
 struct mmc_data {
-	unsigned int		timeout_ns;	/* data timeout (in ns, max 80ms) */
+	unsigned int		timeout_us;	/* data timeout (in us) (chtsai) */
 	unsigned int		timeout_clks;	/* data timeout (in clocks) */
 	unsigned int		blksz;		/* data block size */
 	unsigned int		blocks;		/* number of blocks */

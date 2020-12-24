@@ -147,6 +147,17 @@
 #define	gadget_is_m66592(g)	0
 #endif
 
+#if defined(CONFIG_USB_GADGET_CI13410_FS) || defined(CONFIG_USB_GADGET_CI13410_FS_AND_CI13410_HS)
+#define gadget_is_ci13410_fs(g) !strcmp("g_ci13410_fs", (g)->name)
+#else
+#define gadget_is_ci13410_fs(g) 0
+#endif
+
+#if defined(CONFIG_USB_GADGET_CI13410_HS) || defined(CONFIG_USB_GADGET_CI13410_FS_AND_CI13410_HS)
+#define gadget_is_ci13410_hs(g) !strcmp("g_ci13410_hs", (g)->name)
+#else
+#define gadget_is_ci13410_hs(g) 0
+#endif
 
 // CONFIG_USB_GADGET_SX2
 // CONFIG_USB_GADGET_AU1X00
@@ -212,5 +223,9 @@ static inline int usb_gadget_controller_number(struct usb_gadget *gadget)
 		return 0x20;
 	else if (gadget_is_m66592(gadget))
 		return 0x21;
+        else if (gadget_is_ci13410_fs(gadget))
+                return 0x22;
+        else if (gadget_is_ci13410_hs(gadget))
+                return 0x23;
 	return -ENOENT;
 }

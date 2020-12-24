@@ -663,6 +663,7 @@ static void ndisc_recv_ns(struct sk_buff *skb)
 	int dad = ipv6_addr_any(saddr);
 	int inc;
 	int is_router;
+	const unsigned char *tmp_ns_sadr;
 
 	if (ipv6_addr_is_multicast(&msg->target)) {
 		ND_PRINTK2(KERN_WARNING
@@ -717,6 +718,7 @@ static void ndisc_recv_ns(struct sk_buff *skb)
 		if (ifp->flags & (IFA_F_TENTATIVE|IFA_F_OPTIMISTIC)) {
 			if (dad) {
 				if (dev->type == ARPHRD_IEEE802_TR) {
+				
 					const unsigned char *sadr;
 					sadr = skb_mac_header(skb);
 					if (((sadr[8] ^ dev->dev_addr[0]) & 0x7f) == 0 &&
@@ -729,6 +731,21 @@ static void ndisc_recv_ns(struct sk_buff *skb)
 						goto out;
 					}
 				}
+
+                                // AVCT - NS loopback on NCSI workaround.
+                                // check incoming NS, drop it if it has
+                                // the same MAC as host 
+                                tmp_ns_sadr = skb_mac_header(skb);
+                                if ((tmp_ns_sadr[6] == dev->dev_addr[0]) &&
+                                (tmp_ns_sadr[7] == dev->dev_addr[1]) &&
+                                (tmp_ns_sadr[8] == dev->dev_addr[2]) &&
+                                (tmp_ns_sadr[9] == dev->dev_addr[3]) &&
+                                (tmp_ns_sadr[10] == dev->dev_addr[4]) &&
+                                (tmp_ns_sadr[11] == dev->dev_addr[5]))
+                                {
+                                    goto out;
+                                }
+                                //
 
 				/*
 				 * We are colliding with another node

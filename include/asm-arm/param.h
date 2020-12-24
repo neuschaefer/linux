@@ -20,6 +20,10 @@
 
 #define EXEC_PAGESIZE	4096
 
+/* AVOCENT */
+#define sysclk	24000000
+/* AVOCENT */
+
 #ifndef NOGROUP
 #define NOGROUP         (-1)
 #endif

@@ -51,6 +51,9 @@ struct mmc_host_ops {
 	void	(*request)(struct mmc_host *host, struct mmc_request *req);
 	void	(*set_ios)(struct mmc_host *host, struct mmc_ios *ios);
 	int	(*get_ro)(struct mmc_host *host);
+#ifdef CONFIG_MMC_WHOVILLE
+	int		(*card_detect)(struct mmc_host *host);	/* chtsai */
+#endif
 };
 
 struct mmc_card;

@@ -14,6 +14,7 @@
 obj-$(CONFIG_PCWATCHDOG) += pcwd.o
 obj-$(CONFIG_MIXCOMWD) += mixcomwd.o
 obj-$(CONFIG_WDT) += wdt.o
+obj-$(CONFIG_WDT_WPCM450) += aess_wdtdrv.o
 
 # PCI-based Watchdog Cards
 obj-$(CONFIG_PCIPCWATCHDOG) += pcwd_pci.o

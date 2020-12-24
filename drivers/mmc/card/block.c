@@ -165,15 +165,15 @@ static u32 mmc_sd_num_wr_blocks(struct mmc_card *card)
 
 	memset(&data, 0, sizeof(struct mmc_data));
 
-	data.timeout_ns = card->csd.tacc_ns * 100;
+	data.timeout_us = card->csd.tacc_ns / 10;	/* (chtsai) */
 	data.timeout_clks = card->csd.tacc_clks * 100;
 
-	timeout_us = data.timeout_ns / 1000;
+	timeout_us = data.timeout_us;				/* (chtsai) */
 	timeout_us += data.timeout_clks * 1000 /
 		(card->host->ios.clock / 1000);
 
 	if (timeout_us > 100000) {
-		data.timeout_ns = 100000000;
+		data.timeout_us = 100000;				/* (chtsai) */
 		data.timeout_clks = 0;
 	}
 
@@ -200,6 +200,23 @@ static u32 mmc_sd_num_wr_blocks(struct mmc_card *card)
 	return blocks;
 }
 
+/* Define this to retry transaction on failure. */
+#define RETRY_TRANSACTION
+#define MAX_RETRY_COUNT	2
+
+#ifdef CONFIG_MMC_WHOVILLE
+
+/* To work around the MMC block write failure. */
+# define WORKAROUND_MMC_BLOCK_WRITE_FAILURE
+
+/* The maximum MMC write data sector number (in sector) */
+# define MAX_MMC_WRITE_DATA_SECTORS	(8<<1)
+
+/* To debug the workaround, including to fake MMC block write failures. */
+/* # define DEBUG_MMC_ERROR_WORKAROUND */
+
+#endif
+
 static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
 {
 	struct mmc_blk_data *md = mq->data;
@@ -207,7 +224,22 @@ static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
 	struct mmc_blk_request brq;
 	int ret = 1, sg_pos, data_size;
 
+#ifdef RETRY_TRANSACTION
+	int	retry_count=MAX_RETRY_COUNT;
+#endif
+
 	mmc_claim_host(card->host);
+	
+#ifdef CONFIG_MMC_WHOVILLE
+	/* Send a dummy request to inquire information for card detection. (chtsai) */
+	if (req == NULL)
+	{
+		if (card->host->ops->card_detect)
+			ret = card->host->ops->card_detect(card->host);
+		mmc_release_host(card->host);
+		return ret;
+	}
+#endif
 
 	do {
 		struct mmc_command cmd;
@@ -228,6 +260,22 @@ static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
 		brq.data.blocks = req->nr_sectors >> (md->block_bits - 9);
 		if (brq.data.blocks > card->host->max_blk_count)
 			brq.data.blocks = card->host->max_blk_count;
+
+#ifdef WORKAROUND_MMC_BLOCK_WRITE_FAILURE
+		/* 
+		 * Limit maximum data chunk to write at one time for MMC. (chtsai)
+		 */
+		if (mmc_card_mmc(card) && 
+			rq_data_dir(req) != READ &&
+			brq.data.blocks > MAX_MMC_WRITE_DATA_SECTORS)
+		{
+#if 0 //def DEBUG_MMC_ERROR_WORKAROUND	// for debugging, chtsai
+			printk("%s: Force blocks (%d) to be %d.\n",
+			       req->rq_disk->disk_name, brq.data.blocks, MAX_MMC_WRITE_DATA_SECTORS);
+#endif
+			brq.data.blocks = MAX_MMC_WRITE_DATA_SECTORS;
+		}
+#endif
 
 		mmc_set_data_timeout(&brq.data, card, rq_data_dir(req) != READ);
 
@@ -282,27 +330,45 @@ static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
 
 		mmc_wait_for_req(card->host, &brq.mrq);
 
+#ifdef DEBUG_MMC_ERROR_WORKAROUND	// for debugging (chtsai)
+		/* Any error from card status? */
+		if ((mmc_card_sd(card) && (brq.cmd.resp[0] & 0xfdff8008)) ||
+			(mmc_card_mmc(card) && (brq.cmd.resp[0] & 0xfdffa080)) ||
+			(mmc_card_mmc(card) && (brq.stop.resp[0] & 0xfdffa080)))
+		{
+			printk("%s: %s status for req : 0x%08x\n",
+			       __FUNCTION__, req->rq_disk->disk_name, brq.cmd.resp[0]);
+		}
+#endif
+
 		mmc_queue_bounce_post(mq);
 
+		/* Refer to the change in 2.6.27.8 (chtsai) */
+		/*
+		 * Check for errors here, but don't jump to cmd_err
+		 * until later as we need to wait for the card to leave
+		 * programming mode even when things go wrong.
+		 */
 		if (brq.cmd.error) {
 			printk(KERN_ERR "%s: error %d sending read/write command\n",
 			       req->rq_disk->disk_name, brq.cmd.error);
-			goto cmd_err;
 		}
 
 		if (brq.data.error) {
 			printk(KERN_ERR "%s: error %d transferring data\n",
 			       req->rq_disk->disk_name, brq.data.error);
-			goto cmd_err;
 		}
 
 		if (brq.stop.error) {
 			printk(KERN_ERR "%s: error %d sending stop command\n",
 			       req->rq_disk->disk_name, brq.stop.error);
-			goto cmd_err;
 		}
 
 		if (rq_data_dir(req) != READ) {
+#ifdef WORKAROUND_MMC_BLOCK_WRITE_FAILURE
+			u32 u32R1=0;
+#endif
+			
 			do {
 				int err;
 
@@ -315,7 +381,27 @@ static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
 					       req->rq_disk->disk_name, err);
 					goto cmd_err;
 				}
-			} while (!(cmd.resp[0] & R1_READY_FOR_DATA));
+				
+#ifdef WORKAROUND_MMC_BLOCK_WRITE_FAILURE
+				/* Keep the ERROR bit. (chtsai) */
+				if (cmd.resp[0] & R1_ERROR)
+				{
+					u32R1 = cmd.resp[0];
+#ifdef DEBUG_MMC_ERROR_WORKAROUND	// for debugging, chtsai
+					printk("%s: CMD13 ERROR bit set! cmd.resp[0] = %08x\n",
+				    	   __FUNCTION__, cmd.resp[0]);
+#endif
+				}
+#endif
+				
+				/* Refer to the change in 2.6.24.1 (chtsai) */
+				/*
+				 * Some cards mishandle the status bits,
+				 * so make sure to check both the busy
+				 * indication and the card state.
+				 */
+			} while (!(cmd.resp[0] & R1_READY_FOR_DATA) ||
+				(R1_CURRENT_STATE(cmd.resp[0]) == 7));
 
 #if 0
 			if (cmd.resp[0] & ~0x00000900)
@@ -324,6 +410,48 @@ static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
 			if (mmc_decode_status(cmd.resp))
 				goto cmd_err;
 #endif
+
+#ifdef WORKAROUND_MMC_BLOCK_WRITE_FAILURE
+			/* If ERROR bit set, retry the previous write command
+				by setting brq.cmd.error, for MMC. (chtsai) */
+			if (mmc_card_mmc(card) && 
+				((brq.stop.resp[0] & R1_ERROR) || 
+				 (u32R1 & R1_ERROR) || 
+				 (brq.cmd.resp[0] & R1_ERROR)))
+			{
+				printk(KERN_ERR "%s: MMC ERROR is set!\n",
+				       req->rq_disk->disk_name);
+				brq.cmd.error = 1;
+			}
+#endif
+
+#ifdef DEBUG_MMC_ERROR_WORKAROUND	// for testing, chtsai
+			if (!brq.cmd.error && (retry_count == MAX_RETRY_COUNT) &&
+				((req->sector & 0xff) == 04))
+			{
+				printk("Fake ERROR for testing... req->sector = 0x%x\n", 
+					   req->sector);
+				brq.cmd.error = 1;
+			}
+#endif
+		}
+		
+		if (brq.cmd.error || brq.data.error || brq.stop.error)
+		{
+#ifdef RETRY_TRANSACTION
+			/* Re-try transaction if error. (chtsai) */
+			if (retry_count)
+			{
+#ifdef DEBUG_MMC_ERROR_WORKAROUND	// for debugging, chtsai
+				printk(KERN_INFO "%s: Retry transaction (%d), %d blocks\n",
+				       req->rq_disk->disk_name, retry_count, brq.data.blocks);
+#endif
+				retry_count--;
+				
+				continue;
+			}
+#endif
+			goto cmd_err;
 		}
 
 		/*

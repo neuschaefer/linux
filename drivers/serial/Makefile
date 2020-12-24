@@ -1,7 +1,7 @@
 #
 # Makefile for the kernel serial device drivers.
 #
-#  $Id: Makefile,v 1.8 2002/07/21 21:32:30 rmk Exp $
+#  $Id$
 #
 
 obj-$(CONFIG_SERIAL_CORE) += serial_core.o
@@ -64,3 +64,6 @@ obj-$(CONFIG_SERIAL_UARTLITE) += uartlite.o
 obj-$(CONFIG_SERIAL_NETX) += netx-serial.o
 obj-$(CONFIG_SERIAL_OF_PLATFORM) += of_serial.o
 obj-$(CONFIG_SERIAL_KS8695) += serial_ks8695.o
+#AVOCENT
+obj-$(CONFIG_SERIAL_WPCM450) += wpcm450.o
+#AVOCENT

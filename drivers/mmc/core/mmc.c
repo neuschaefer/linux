@@ -129,6 +129,7 @@ static int mmc_decode_csd(struct mmc_card *card)
 	}
 
 	csd->mmca_vsn	 = UNSTUFF_BITS(resp, 122, 4);
+
 	m = UNSTUFF_BITS(resp, 115, 4);
 	e = UNSTUFF_BITS(resp, 112, 3);
 	csd->tacc_ns	 = (tacc_exp[e] * tacc_mant[m] + 9) / 10;
@@ -137,6 +138,7 @@ static int mmc_decode_csd(struct mmc_card *card)
 	m = UNSTUFF_BITS(resp, 99, 4);
 	e = UNSTUFF_BITS(resp, 96, 3);
 	csd->max_dtr	  = tran_exp[e] * tran_mant[m];
+
 	csd->cmdclass	  = UNSTUFF_BITS(resp, 84, 12);
 
 	e = UNSTUFF_BITS(resp, 47, 3);
@@ -247,7 +249,7 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 
 	BUG_ON(!host);
 	BUG_ON(!host->claimed);
-
+	
 	/*
 	 * Since we're changing the OCR value, we seem to
 	 * need to tell some cards to go back to the idle
@@ -318,6 +320,12 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 	if (err != MMC_ERR_NONE)
 		goto free_card;
 
+	/* Workaround: (chtsai)
+	 *  The SDHC of WPCM450 only supports up to MMC v3.31!
+	 *	Since it would be failed to read ext_csd for MMCv4, 
+	 *		skip it to save the time for timeout.
+	 */
+#if 0
 	if (!oldcard) {
 		/*
 		 * Fetch and process extened CSD.
@@ -326,7 +334,20 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 		if (err != MMC_ERR_NONE)
 			goto free_card;
 	}
+#endif
 
+	/* Workaround: (chtsai)
+	 *	Increase max_dtr to improve performance. 
+	 */
+#if 1
+	if (4 == card->csd.mmca_vsn && 00 == card->ext_csd.hs_max_dtr)
+	{
+		card->ext_csd.hs_max_dtr = 26000000;
+#ifdef CONFIG_MMC_DEBUG
+		printk(KERN_INFO "%s force card->ext_csd.hs_max_dtr = 26000000 Hz for MMC v4\n", __FUNCTION__);
+#endif
+	}
+#endif
 	/*
 	 * Activate high speed (if supported)
 	 */
@@ -353,7 +374,6 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 	} else if (max_dtr > card->csd.max_dtr) {
 		max_dtr = card->csd.max_dtr;
 	}
-
 	mmc_set_clock(host, max_dtr);
 
 	/*
