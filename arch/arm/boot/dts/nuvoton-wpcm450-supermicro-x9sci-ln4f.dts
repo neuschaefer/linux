@@ -49,6 +49,15 @@
 	};
 };
 
+&ethernet0 {
+	status = "okay";
+};
+
+&ethernet1 {
+	status = "okay";
+	use-ncsi;
+};
+
 &serial0 {
 	/*
 	 * Debug serial port. TX is exposed on the right pad of unpopulated
