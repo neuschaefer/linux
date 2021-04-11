@@ -76,6 +76,14 @@
 		enable-gpio = <&gpio4 12 GPIO_ACTIVE_LOW>;
 		startup-delay-us = <100000>;
 	};
+
+	bat: battery {
+		compatible = "simple-battery";
+		voltage-min-design-microvolt = <3400000>;
+		voltage-max-design-microvolt = <4100000>;
+		energy-full-design-microwatt-hours = <5550000>;
+		charge-full-design-microamp-hours = <1500000>;
+	};
 };
 
 &esdhc1 {
@@ -151,6 +159,7 @@
 		system-power-controller;
 		interrupts-extended = <&gpio4 11 IRQ_TYPE_EDGE_FALLING>;
 		#pwm-cells = <2>;
+		monitored-battery = <&bat>;
 	};
 };
 

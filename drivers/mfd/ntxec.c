@@ -107,6 +107,7 @@ static const struct regmap_config regmap_config = {
 static const struct mfd_cell ntxec_subdevices[] = {
 	{ .name = "ntxec-rtc" },
 	{ .name = "ntxec-pwm" },
+	{ .name = "ntxec-battery" },
 };
 
 static int ntxec_probe(struct i2c_client *client)
