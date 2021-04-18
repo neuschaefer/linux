@@ -42,6 +42,7 @@
 			label = "Power Button";
 			gpios = <&gpio4 10 GPIO_ACTIVE_LOW>;
 			linux,code = <KEY_POWER>;
+			wakeup-source;
 		};
 
 		hallsensor {
@@ -49,12 +50,14 @@
 			gpios = <&gpio5 15 GPIO_ACTIVE_LOW>;
 			linux,code = <KEY_RESERVED>;
 			linux,input-type = <EV_SW>;
+			wakeup-source;
 		};
 
 		frontlight {
 			label = "Frontlight";
 			gpios = <&gpio4 1 GPIO_ACTIVE_LOW>;
 			linux,code = <KEY_DISPLAYTOGGLE>;
+			wakeup-source;
 		};
 	};
 
