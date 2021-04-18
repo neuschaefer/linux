@@ -96,6 +96,12 @@ static const struct imx5_suspend_io_state imx53_suspend_io_config[] = {
 	{.offset = 0x720, .clear = MX53_DSE_HIGHZ_MASK, .set = 1 << 19}, /* CTLDS */
 };
 
+static const struct imx5_pm_data imx50_pm_data __initconst = {
+	.ccm_addr = 0x53fd4000,
+	.cortex_addr = 0x63fa0000,
+	.gpc_addr = 0x53fd8000,
+};
+
 static const struct imx5_pm_data imx51_pm_data __initconst = {
 	.ccm_addr = 0x73fd4000,
 	.cortex_addr = 0x83fa0000,
@@ -405,6 +411,12 @@ static int __init imx5_pm_common_init(const struct imx5_pm_data *data)
 	suspend_set_ops(&mx5_suspend_ops);
 
 	return 0;
+}
+
+void __init imx50_pm_init(void)
+{
+	if (IS_ENABLED(CONFIG_SOC_IMX50))
+		imx5_pm_common_init(&imx50_pm_data);
 }
 
 void __init imx51_pm_init(void)
