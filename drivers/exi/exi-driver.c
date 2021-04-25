@@ -161,7 +161,7 @@ static int exi_bus_match(struct device *dev, struct device_driver *drv)
  */
 static void exi_bus_device_release(struct device *dev)
 {
-	pr_warning("exi_bus_device_release called!\n");
+	pr_warn("exi_bus_device_release called!\n");
 }
 
 static void exi_device_release(struct device *dev);
@@ -472,7 +472,7 @@ static int exi_init(struct resource *mem, unsigned int irq)
 	init_waitqueue_head(&exi_bus_waitq);
 	exi_bus_task = kthread_run(exi_bus_thread, NULL, "kexid");
 	if (IS_ERR(exi_bus_task))
-		pr_warning("failed to start exi kernel thread\n");
+		pr_warn("failed to start exi kernel thread\n");
 
 	return 0;
 
