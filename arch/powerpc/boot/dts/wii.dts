@@ -235,6 +235,15 @@
 			gpios = <&GPIO 5 GPIO_ACTIVE_HIGH>;
 			panic-indicator;
 		};
+
+		/*
+		 * This is the "sensor bar", which provides positioning to the
+		 * Wii remote control
+		 */
+		sensor-bar {
+			label = "wii:infrared:sensor_bar";
+			gpios = <&GPIO 8 GPIO_ACTIVE_HIGH>;
+		};
 	};
 
 	gpio-keys {
