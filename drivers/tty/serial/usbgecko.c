@@ -14,6 +14,12 @@
 
 #define UG_DEBUG
 
+#define DRV_MODULE_NAME "usbgecko"
+#define DRV_DESCRIPTION "Console and TTY driver for the USB Gecko adapter"
+#define DRV_AUTHOR      "Albert Herranz"
+
+#define pr_fmt(fmt) DRV_MODULE_NAME ": " fmt
+
 #include <linux/kernel.h>
 #include <linux/device.h>
 #include <linux/module.h>
@@ -28,14 +34,7 @@
 
 #include <linux/exi.h>
 
-#define DRV_MODULE_NAME "usbgecko"
-#define DRV_DESCRIPTION "Console and TTY driver for the USB Gecko adapter"
-#define DRV_AUTHOR      "Albert Herranz"
-
 static char ug_driver_version[] = "0.1i";
-
-#define drv_printk(level, format, arg...) \
-	printk(level DRV_MODULE_NAME ": " format , ## arg)
 
 /*
  *
@@ -334,7 +333,7 @@ static int ug_tty_open(struct tty_struct *tty, struct file *filp)
 	if (!adapter->refcnt) {
 		adapter->poller = kthread_run(ug_tty_poller, tty, "kugtty");
 		if (IS_ERR(adapter->poller)) {
-			drv_printk(KERN_ERR, "error creating poller thread\n");
+			pr_err("error creating poller thread\n");
 			mutex_unlock(&adapter->mutex);
 			return -ENOMEM;
 		}
@@ -473,8 +472,7 @@ static int ug_probe(struct exi_device *exi_device)
 	console = &ug_consoles[slot];
 	adapter = console->data;
 
-	drv_printk(KERN_INFO, "USB Gecko detected in memcard slot-%c\n",
-		   'A'+slot);
+	pr_info("USB Gecko detected in memcard slot-%c\n", 'A'+slot);
 
 	adapter->poller = ERR_PTR(-EINVAL);
 	mutex_init(&adapter->mutex);
@@ -502,7 +500,7 @@ static void ug_remove(struct exi_device *exi_device)
 	adapter = console->data;
 
 	if (adapter->refcnt)
-		drv_printk(KERN_ERR, "adapter removed while in use!\n");
+		pr_err("adapter removed while in use!\n");
 
 	ug_tty_exit();
 
@@ -513,8 +511,7 @@ static void ug_remove(struct exi_device *exi_device)
 
 	mutex_destroy(&adapter->mutex);
 
-	drv_printk(KERN_INFO, "USB Gecko removed from memcard slot-%c\n",
-		   'A'+slot);
+	pr_info("USB Gecko removed from memcard slot-%c\n", 'A'+slot);
 }
 
 static struct exi_device_id ug_eid_table[] = {
@@ -547,8 +544,7 @@ static struct exi_driver ug_exi_driver = {
 
 static int __init ug_init_module(void)
 {
-	drv_printk(KERN_INFO, "%s - version %s\n", DRV_DESCRIPTION,
-		   ug_driver_version);
+	pr_info("%s - version %s\n", DRV_DESCRIPTION, ug_driver_version);
 
 	return exi_driver_register(&ug_exi_driver);
 }
