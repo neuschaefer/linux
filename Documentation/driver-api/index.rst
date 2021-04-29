@@ -44,6 +44,7 @@ available subsections can be seen below.
    interconnect
    devfreq
    hsi
+   exi
    edac
    scsi
    libata
