@@ -923,7 +923,6 @@ static const struct pinctrl_ops wpcm450_pinctrl_ops = {
 	.get_groups_count = wpcm450_get_groups_count,
 	.get_group_name = wpcm450_get_group_name,
 	.get_group_pins = wpcm450_get_group_pins,
-	//.pin_dbg_show = wpcm450_pin_dbg_show,
 	.dt_node_to_map = wpcm450_dt_node_to_map,
 	.dt_free_map = wpcm450_dt_free_map,
 };
@@ -1012,118 +1011,61 @@ static const struct pinmux_ops wpcm450_pinmux_ops = {
 static int wpcm450_config_get(struct pinctrl_dev *pctldev, unsigned int pin,
 			      unsigned long *config)
 {
-#if 0
+	struct wpcm450_pinctrl *pctrl = pinctrl_dev_get_drvdata(pctldev);
 	enum pin_config_param param = pinconf_to_config_param(*config);
-	struct wpcm450_pinctrl *npcm = pinctrl_dev_get_drvdata(pctldev);
-	struct wpcm450_gpio *bank =
-		&npcm->gpio_bank[pin / WPCM450_GPIO_PER_BANK];
-	int gpio = (pin % bank->gc.ngpio);
-	unsigned long pinmask = BIT(gpio);
-	u32 ie, oe, pu, pd;
-	int rc = 0;
+	unsigned long flags;
+	int mask;
+	u32 reg;
 
 	switch (param) {
-	case PIN_CONFIG_BIAS_DISABLE:
-	case PIN_CONFIG_BIAS_PULL_UP:
-	case PIN_CONFIG_BIAS_PULL_DOWN:
-		pu = ioread32(bank->base + WPCM450_GP_N_PU) & pinmask;
-		pd = ioread32(bank->base + WPCM450_GP_N_PD) & pinmask;
-		if (param == PIN_CONFIG_BIAS_DISABLE)
-			rc = (!pu && !pd);
-		else if (param == PIN_CONFIG_BIAS_PULL_UP)
-			rc = (pu && !pd);
-		else if (param == PIN_CONFIG_BIAS_PULL_DOWN)
-			rc = (!pu && pd);
-		break;
-	case PIN_CONFIG_OUTPUT:
-	case PIN_CONFIG_INPUT_ENABLE:
-		ie = ioread32(bank->base + WPCM450_GP_N_IEM) & pinmask;
-		oe = ioread32(bank->base + WPCM450_GP_N_OE) & pinmask;
-		if (param == PIN_CONFIG_INPUT_ENABLE)
-			rc = (ie && !oe);
-		else if (param == PIN_CONFIG_OUTPUT)
-			rc = (!ie && oe);
-		break;
-	case PIN_CONFIG_DRIVE_PUSH_PULL:
-		rc = !(ioread32(bank->base + WPCM450_GP_N_OTYP) & pinmask);
-		break;
-	case PIN_CONFIG_DRIVE_OPEN_DRAIN:
-		rc = ioread32(bank->base + WPCM450_GP_N_OTYP) & pinmask;
-		break;
 	case PIN_CONFIG_INPUT_DEBOUNCE:
-		rc = ioread32(bank->base + WPCM450_GP_N_DBNC) & pinmask;
-		break;
-	case PIN_CONFIG_DRIVE_STRENGTH:
-		rc = wpcm450_get_drive_strength(pctldev, pin);
-		if (rc)
-			*config = pinconf_to_config_packed(param, rc);
-		break;
-	case PIN_CONFIG_SLEW_RATE:
-		rc = wpcm450_get_slew_rate(bank, npcm->gcr_regmap, pin);
-		if (rc >= 0)
-			*config = pinconf_to_config_packed(param, rc);
+		mask = event_bitmask(pin);
+		if (mask < 0)
+			return mask;
+
+		spin_lock_irqsave(&pctrl->lock, flags);
+		reg = ioread32(pctrl->gpio_base + WPCM450_GPEVDBNC);
+		spin_unlock_irqrestore(&pctrl->lock, flags);
+
+		*config = pinconf_to_config_packed(param, !!(reg & mask));
 		break;
 	default:
 		return -ENOTSUPP;
 	}
 
-	if (!rc)
-		return -EINVAL;
-
-#endif
 	return 0;
 }
 
-static int wpcm450_config_set_one(struct wpcm450_pinctrl *npcm,
+static int wpcm450_config_set_one(struct wpcm450_pinctrl *pctrl,
 				  unsigned int pin, unsigned long config)
 {
-#if 0
 	enum pin_config_param param = pinconf_to_config_param(config);
-	u16 arg = pinconf_to_config_argument(config);
-	struct wpcm450_gpio *bank =
-		&npcm->gpio_bank[pin / WPCM450_GPIO_PER_BANK];
-	int gpio = BIT(pin % bank->gc.ngpio);
+	unsigned long flags;
+	int mask;
+	u32 reg;
+	int arg;
 
-	dev_dbg(bank->gc.parent, "param=%d %d[GPIO]\n", param, pin);
 	switch (param) {
-	case PIN_CONFIG_BIAS_DISABLE:
-		npcm_gpio_clr(&bank->gc, bank->base + WPCM450_GP_N_PU, gpio);
-		npcm_gpio_clr(&bank->gc, bank->base + WPCM450_GP_N_PD, gpio);
-		break;
-	case PIN_CONFIG_BIAS_PULL_DOWN:
-		npcm_gpio_clr(&bank->gc, bank->base + WPCM450_GP_N_PU, gpio);
-		npcm_gpio_set(&bank->gc, bank->base + WPCM450_GP_N_PD, gpio);
-		break;
-	case PIN_CONFIG_BIAS_PULL_UP:
-		npcm_gpio_clr(&bank->gc, bank->base + WPCM450_GP_N_PD, gpio);
-		npcm_gpio_set(&bank->gc, bank->base + WPCM450_GP_N_PU, gpio);
-		break;
-	case PIN_CONFIG_INPUT_ENABLE:
-		iowrite32(gpio, bank->base + WPCM450_GP_N_OEC);
-		bank->direction_input(&bank->gc, pin % bank->gc.ngpio);
-		break;
-	case PIN_CONFIG_OUTPUT:
-		iowrite32(gpio, bank->base + WPCM450_GP_N_OES);
-		bank->direction_output(&bank->gc, pin % bank->gc.ngpio, arg);
-		break;
-	case PIN_CONFIG_DRIVE_PUSH_PULL:
-		npcm_gpio_clr(&bank->gc, bank->base + WPCM450_GP_N_OTYP, gpio);
-		break;
-	case PIN_CONFIG_DRIVE_OPEN_DRAIN:
-		npcm_gpio_set(&bank->gc, bank->base + WPCM450_GP_N_OTYP, gpio);
-		break;
 	case PIN_CONFIG_INPUT_DEBOUNCE:
-		npcm_gpio_set(&bank->gc, bank->base + WPCM450_GP_N_DBNC, gpio);
+		mask = event_bitmask(pin);
+		if (mask < 0)
+			return mask;
+
+		arg = pinconf_to_config_argument(config);
+
+		spin_lock_irqsave(&pctrl->lock, flags);
+		reg = ioread32(pctrl->gpio_base + WPCM450_GPEVDBNC);
+		if (arg)
+			reg |= mask;
+		else
+			reg &= ~mask;
+		iowrite32(reg, pctrl->gpio_base + WPCM450_GPEVDBNC);
+		spin_unlock_irqrestore(&pctrl->lock, flags);
 		break;
-	case PIN_CONFIG_SLEW_RATE:
-		return wpcm450_set_slew_rate(bank, npcm->gcr_regmap, pin, arg);
-	case PIN_CONFIG_DRIVE_STRENGTH:
-		return wpcm450_set_drive_strength(npcm, pin, arg);
 	default:
 		return -ENOTSUPP;
 	}
 
-#endif
 	return 0;
 }
 
@@ -1131,11 +1073,11 @@ static int wpcm450_config_set_one(struct wpcm450_pinctrl *npcm,
 static int wpcm450_config_set(struct pinctrl_dev *pctldev, unsigned int pin,
 			      unsigned long *configs, unsigned int num_configs)
 {
-	struct wpcm450_pinctrl *npcm = pinctrl_dev_get_drvdata(pctldev);
+	struct wpcm450_pinctrl *pctrl = pinctrl_dev_get_drvdata(pctldev);
 	int rc;
 
 	while (num_configs--) {
-		rc = wpcm450_config_set_one(npcm, pin, *configs++);
+		rc = wpcm450_config_set_one(pctrl, pin, *configs++);
 		if (rc)
 			return rc;
 	}
@@ -1155,7 +1097,7 @@ static struct pinctrl_desc wpcm450_pinctrl_desc = {
 	.npins = ARRAY_SIZE(wpcm450_pins),
 	.pctlops = &wpcm450_pinctrl_ops,
 	.pmxops = &wpcm450_pinmux_ops,
-	//.confops = &wpcm450_pinconf_ops,
+	.confops = &wpcm450_pinconf_ops,
 	.owner = THIS_MODULE,
 };
 
