@@ -18,6 +18,7 @@
 #include <linux/netdevice.h>
 #include <linux/platform_device.h>
 #include <linux/skbuff.h>
+#include <linux/of_mdio.h>
 
 #define DRV_MODULE_NAME		"nuvoton-emc"
 #define DRV_MODULE_VERSION	"0.2"
@@ -120,8 +121,6 @@
 #define DELAY			1000
 #define CAM0			0x0
 
-static int nuvoton_emc_mdio_read(struct net_device *dev, int phy_id, int reg);
-
 struct nuvoton_emc_rxbd {
 	unsigned int sl;
 	unsigned int buffer;
@@ -156,11 +155,10 @@ struct nuvoton_emc {
 	struct sk_buff *skb;
 	struct clk *clk;
 	struct clk *rmiiclk;
-	struct mii_if_info mii;
-	struct timer_list check_timer;
 	void __iomem *reg;
 	int rxirq;
 	int txirq;
+	struct mii_bus *mdio;
 	unsigned int cur_tx;
 	unsigned int cur_rx;
 	unsigned int finish_tx;
@@ -168,9 +166,9 @@ struct nuvoton_emc {
 	unsigned int rx_bytes;
 	unsigned int start_tx_ptr;
 	unsigned int start_rx_ptr;
-	unsigned int linkflag;
 };
 
+// TODO: hook up to phylink
 static void update_linkspeed_register(struct net_device *dev,
 				unsigned int speed, unsigned int duplex)
 {
@@ -198,66 +196,6 @@ static void update_linkspeed_register(struct net_device *dev,
 	}
 
 	__raw_writel(val, emc->reg + REG_MCMDR);
-}
-
-static void update_linkspeed(struct net_device *dev)
-{
-	struct nuvoton_emc *emc = netdev_priv(dev);
-	struct platform_device *pdev;
-	unsigned int bmsr, bmcr, lpa, speed, duplex;
-
-	pdev = emc->pdev;
-
-	if (!mii_link_ok(&emc->mii)) {
-		emc->linkflag = 0x0;
-		netif_carrier_off(dev);
-		dev_warn(&pdev->dev, "%s: Link down.\n", dev->name);
-		return;
-	}
-
-	if (emc->linkflag == 1)
-		return;
-
-	bmsr = nuvoton_emc_mdio_read(dev, emc->mii.phy_id, MII_BMSR);
-	bmcr = nuvoton_emc_mdio_read(dev, emc->mii.phy_id, MII_BMCR);
-
-	if (bmcr & BMCR_ANENABLE) {
-		if (!(bmsr & BMSR_ANEGCOMPLETE))
-			return;
-
-		lpa = nuvoton_emc_mdio_read(dev, emc->mii.phy_id, MII_LPA);
-
-		if ((lpa & LPA_100FULL) || (lpa & LPA_100HALF))
-			speed = SPEED_100;
-		else
-			speed = SPEED_10;
-
-		if ((lpa & LPA_100FULL) || (lpa & LPA_10FULL))
-			duplex = DUPLEX_FULL;
-		else
-			duplex = DUPLEX_HALF;
-
-	} else {
-		speed = (bmcr & BMCR_SPEED100) ? SPEED_100 : SPEED_10;
-		duplex = (bmcr & BMCR_FULLDPLX) ? DUPLEX_FULL : DUPLEX_HALF;
-	}
-
-	update_linkspeed_register(dev, speed, duplex);
-
-	dev_info(&pdev->dev, "%s: Link now %i-%s\n", dev->name, speed,
-			(duplex == DUPLEX_FULL) ? "FullDuplex" : "HalfDuplex");
-	emc->linkflag = 0x01;
-
-	netif_carrier_on(dev);
-}
-
-static void nuvoton_emc_check_link(struct timer_list *t)
-{
-	struct nuvoton_emc *emc = from_timer(emc, t, check_timer);
-	struct net_device *dev = emc->mii.dev;
-
-	update_linkspeed(dev);
-	mod_timer(&emc->check_timer, jiffies + msecs_to_jiffies(1000));
 }
 
 static void nuvoton_emc_write_cam(struct net_device *dev,
@@ -494,57 +432,6 @@ static void nuvoton_emc_reset_mac(struct net_device *dev)
 		netif_wake_queue(dev);
 }
 
-static void nuvoton_emc_mdio_write(struct net_device *dev,
-					int phy_id, int reg, int data)
-{
-	struct nuvoton_emc *emc = netdev_priv(dev);
-	struct platform_device *pdev;
-	unsigned int val, i;
-
-	pdev = emc->pdev;
-
-	__raw_writel(data, emc->reg + REG_MIID);
-
-	val = (phy_id << 0x08) | reg;
-	val |= PHYBUSY | PHYWR | MDCCR_VAL;
-	__raw_writel(val, emc->reg + REG_MIIDA);
-
-	for (i = 0; i < DELAY; i++) {
-		if ((__raw_readl(emc->reg + REG_MIIDA) & PHYBUSY) == 0)
-			break;
-	}
-
-	if (i == DELAY)
-		dev_warn(&pdev->dev, "mdio write timed out\n");
-}
-
-static int nuvoton_emc_mdio_read(struct net_device *dev, int phy_id, int reg)
-{
-	struct nuvoton_emc *emc = netdev_priv(dev);
-	struct platform_device *pdev;
-	unsigned int val, i, data;
-
-	pdev = emc->pdev;
-
-	val = (phy_id << 0x08) | reg;
-	val |= PHYBUSY | MDCCR_VAL;
-	__raw_writel(val, emc->reg + REG_MIIDA);
-
-	for (i = 0; i < DELAY; i++) {
-		if ((__raw_readl(emc->reg + REG_MIIDA) & PHYBUSY) == 0)
-			break;
-	}
-
-	if (i == DELAY) {
-		dev_warn(&pdev->dev, "mdio read timed out\n");
-		data = 0xffff;
-	} else {
-		data = __raw_readl(emc->reg + REG_MIID);
-	}
-
-	return data;
-}
-
 static int nuvoton_emc_set_mac_address(struct net_device *dev, void *addr)
 {
 	struct sockaddr *address = addr;
@@ -572,7 +459,6 @@ static int nuvoton_emc_close(struct net_device *dev)
 
 	netif_stop_queue(dev);
 
-	del_timer_sync(&emc->check_timer);
 	clk_disable(emc->rmiiclk);
 	clk_disable(emc->clk);
 
@@ -822,7 +708,6 @@ static int nuvoton_emc_open(struct net_device *dev)
 		return -EAGAIN;
 	}
 
-	mod_timer(&emc->check_timer, jiffies + msecs_to_jiffies(1000));
 	netif_start_queue(dev);
 	nuvoton_emc_trigger_rx(dev);
 
@@ -847,15 +732,6 @@ static void nuvoton_emc_set_multicast_list(struct net_device *dev)
 	__raw_writel(rx_mode, emc->reg + REG_CAMCMR);
 }
 
-static int nuvoton_emc_ioctl(struct net_device *dev,
-						struct ifreq *ifr, int cmd)
-{
-	struct nuvoton_emc *emc = netdev_priv(dev);
-	struct mii_ioctl_data *data = if_mii(ifr);
-
-	return generic_mii_ioctl(&emc->mii, data, cmd, NULL);
-}
-
 static void nuvoton_emc_get_drvinfo(struct net_device *dev,
 					struct ethtool_drvinfo *info)
 {
@@ -863,41 +739,8 @@ static void nuvoton_emc_get_drvinfo(struct net_device *dev,
 	strlcpy(info->version, DRV_MODULE_VERSION, sizeof(info->version));
 }
 
-static int nuvoton_emc_get_link_ksettings(struct net_device *dev,
-				      struct ethtool_link_ksettings *cmd)
-{
-	struct nuvoton_emc *emc = netdev_priv(dev);
-
-	mii_ethtool_get_link_ksettings(&emc->mii, cmd);
-
-	return 0;
-}
-
-static int nuvoton_emc_set_link_ksettings(struct net_device *dev,
-				      const struct ethtool_link_ksettings *cmd)
-{
-	struct nuvoton_emc *emc = netdev_priv(dev);
-	return mii_ethtool_set_link_ksettings(&emc->mii, cmd);
-}
-
-static int nuvoton_emc_nway_reset(struct net_device *dev)
-{
-	struct nuvoton_emc *emc = netdev_priv(dev);
-	return mii_nway_restart(&emc->mii);
-}
-
-static u32 nuvoton_emc_get_link(struct net_device *dev)
-{
-	struct nuvoton_emc *emc = netdev_priv(dev);
-	return mii_link_ok(&emc->mii);
-}
-
 static const struct ethtool_ops nuvoton_emc_ethtool_ops = {
 	.get_drvinfo	= nuvoton_emc_get_drvinfo,
-	.nway_reset	= nuvoton_emc_nway_reset,
-	.get_link	= nuvoton_emc_get_link,
-	.get_link_ksettings = nuvoton_emc_get_link_ksettings,
-	.set_link_ksettings = nuvoton_emc_set_link_ksettings,
 };
 
 static const struct net_device_ops nuvoton_emc_netdev_ops = {
@@ -906,8 +749,6 @@ static const struct net_device_ops nuvoton_emc_netdev_ops = {
 	.ndo_start_xmit		= nuvoton_emc_start_xmit,
 	.ndo_set_rx_mode	= nuvoton_emc_set_multicast_list,
 	.ndo_set_mac_address	= nuvoton_emc_set_mac_address,
-	.ndo_do_ioctl		= nuvoton_emc_ioctl,
-	.ndo_validate_addr	= eth_validate_addr,
 };
 
 static void get_mac_address(struct net_device *dev)
@@ -931,6 +772,52 @@ static void get_mac_address(struct net_device *dev)
 		dev_err(&pdev->dev, "invalid mac address\n");
 }
 
+static int nuvoton_emc_mdio_write(struct mii_bus *mdio, int phy_id, int reg, u16 data)
+{
+	struct nuvoton_emc *emc = mdio->priv;
+	unsigned int val, i;
+
+	__raw_writel(data, emc->reg + REG_MIID);
+
+	val = (phy_id << 0x08) | reg;
+	val |= PHYBUSY | PHYWR | MDCCR_VAL;
+	__raw_writel(val, emc->reg + REG_MIIDA);
+
+	for (i = 0; i < DELAY; i++) {
+		if ((__raw_readl(emc->reg + REG_MIIDA) & PHYBUSY) == 0)
+			break;
+	}
+
+	if (i == DELAY)
+		dev_warn(&mdio->dev, "mdio write timed out\n");
+
+	return 0;
+}
+
+static int nuvoton_emc_mdio_read(struct mii_bus *mdio, int phy_id, int reg)
+{
+	struct nuvoton_emc *emc = mdio->priv;
+	unsigned int val, i, data;
+
+	val = (phy_id << 0x08) | reg;
+	val |= PHYBUSY | MDCCR_VAL;
+	__raw_writel(val, emc->reg + REG_MIIDA);
+
+	for (i = 0; i < DELAY; i++) {
+		if ((__raw_readl(emc->reg + REG_MIIDA) & PHYBUSY) == 0)
+			break;
+	}
+
+	if (i == DELAY) {
+		dev_warn(&mdio->dev, "mdio read timed out\n");
+		data = 0xffff;
+	} else {
+		data = __raw_readl(emc->reg + REG_MIID);
+	}
+
+	return data;
+}
+
 static int nuvoton_emc_setup(struct net_device *dev)
 {
 	struct nuvoton_emc *emc = netdev_priv(dev);
@@ -947,15 +834,37 @@ static int nuvoton_emc_setup(struct net_device *dev)
 	emc->cur_tx = 0x0;
 	emc->cur_rx = 0x0;
 	emc->finish_tx = 0x0;
-	emc->linkflag = 0x0;
-	emc->mii.phy_id = 0x01;
-	emc->mii.phy_id_mask = 0x1f;
-	emc->mii.reg_num_mask = 0x1f;
-	emc->mii.dev = dev;
-	emc->mii.mdio_read = nuvoton_emc_mdio_read;
-	emc->mii.mdio_write = nuvoton_emc_mdio_write;
 
-	timer_setup(&emc->check_timer, nuvoton_emc_check_link, 0);
+	return 0;
+}
+
+static int nuvoton_emc_init_mdio(struct nuvoton_emc *emc, struct device_node *np)
+{
+	struct mii_bus *mdio;
+	int res, i;
+
+	if (!np)
+		return 0;
+
+	mdio = devm_mdiobus_alloc(&emc->pdev->dev);
+	if (!mdio)
+		return -ENOMEM;
+	emc->mdio = mdio;
+
+	mdio->name = np->full_name;
+	snprintf(mdio->id, MII_BUS_ID_SIZE, "%pOF", np);
+	mdio->read = nuvoton_emc_mdio_read;
+	mdio->write = nuvoton_emc_mdio_write;
+	mdio->priv = emc;
+	mdio->parent = &emc->pdev->dev;
+	for (i = 0; i < PHY_MAX_ADDR; i++)
+		mdio->irq[i] = PHY_POLL;
+
+	res = of_mdiobus_register(mdio, np);
+	if (res) {
+		dev_info(&mdio->dev, "failed to register MDIO bus: %d\n", res);
+		return res;
+	}
 
 	return 0;
 }
@@ -971,6 +880,7 @@ static int nuvoton_emc_probe(struct platform_device *pdev)
 	dev = devm_alloc_etherdev(&pdev->dev, sizeof(struct nuvoton_emc));
 	if (!dev)
 		return -ENOMEM;
+	dev->dev.parent = &pdev->dev;
 
 	emc = netdev_priv(dev);
 
@@ -1014,23 +924,15 @@ static int nuvoton_emc_probe(struct platform_device *pdev)
 
 	nuvoton_emc_setup(dev);
 
-	error = register_netdev(dev);
+	dev_err(&pdev->dev, "Registering Nuvoton EMC: %px %px %px %px %px\n",
+			&pdev->dev, pdev->dev.parent, dev, &dev->dev, dev->dev.parent);
+	error = devm_register_netdev(&pdev->dev, dev);
 	if (error != 0) {
 		dev_err(&pdev->dev, "Registering Nuvoton EMC FAILED\n");
 		return -ENODEV;
 	}
 
-	return 0;
-}
-
-static int nuvoton_emc_remove(struct platform_device *pdev)
-{
-	struct net_device *dev = platform_get_drvdata(pdev);
-	struct nuvoton_emc *emc = netdev_priv(dev);
-
-	unregister_netdev(dev);
-
-	del_timer_sync(&emc->check_timer);
+	nuvoton_emc_init_mdio(emc, of_get_child_by_name(np, "mdio"));
 
 	return 0;
 }
@@ -1043,7 +945,6 @@ MODULE_DEVICE_TABLE(of, nuvoton_emc_of_match);
 
 static struct platform_driver nuvoton_emc_driver = {
 	.probe		= nuvoton_emc_probe,
-	.remove		= nuvoton_emc_remove,
 	.driver		= {
 		.name	= "nuvoton-emc",
 		.of_match_table = nuvoton_emc_of_match,
