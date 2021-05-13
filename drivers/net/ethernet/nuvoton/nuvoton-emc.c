@@ -176,24 +176,13 @@ static void update_linkspeed_register(struct net_device *dev,
 	unsigned int val;
 
 	val = __raw_readl(emc->reg + REG_MCMDR);
+	val &= ~(MCMDR_FDUP | MCMDR_OPMOD);
 
-	if (speed == SPEED_100) {
-		/* 100 full/half duplex */
-		if (duplex == DUPLEX_FULL) {
-			val |= (MCMDR_OPMOD | MCMDR_FDUP);
-		} else {
-			val |= MCMDR_OPMOD;
-			val &= ~MCMDR_FDUP;
-		}
-	} else {
-		/* 10 full/half duplex */
-		if (duplex == DUPLEX_FULL) {
-			val |= MCMDR_FDUP;
-			val &= ~MCMDR_OPMOD;
-		} else {
-			val &= ~(MCMDR_FDUP | MCMDR_OPMOD);
-		}
-	}
+	if (speed == SPEED_100)
+		val |= MCMDR_OPMOD;
+
+	if (duplex == DUPLEX_FULL)
+		val |= MCMDR_FDUP;
 
 	__raw_writel(val, emc->reg + REG_MCMDR);
 }
