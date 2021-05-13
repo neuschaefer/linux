@@ -383,24 +383,50 @@ static const int smb3_pins[]  = { 30, 31 };
 static const int smb4_pins[]  = { 28, 29 };
 static const int smb5_pins[]  = { 26, 27 };
 
-static const int kbcc_pins[] = { 94, 93 };
+static const int scs1_pins[] = { 32 };
+static const int scs2_pins[] = { 33 };
+static const int scs3_pins[] = { 34 };
 
-static const int fanin0_pins[] = { 64 };
-static const int fanin1_pins[] = { 65 };
-static const int fanin2_pins[] = { 66 };
-static const int fanin3_pins[] = { 67 };
-static const int fanin4_pins[] = { 68 };
-static const int fanin5_pins[] = { 69 };
-static const int fanin6_pins[] = { 70 };
-static const int fanin7_pins[] = { 71 };
-static const int fanin8_pins[] = { 72 };
-static const int fanin9_pins[] = { 73 };
-static const int fanin10_pins[] = { 74 };
-static const int fanin11_pins[] = { 75 };
-static const int fanin12_pins[] = { 76 };
-static const int fanin13_pins[] = { 77 };
-static const int fanin14_pins[] = { 78 };
-static const int fanin15_pins[] = { 79 };
+static const int bsp_pins[] = { 41, 42 };
+static const int hsp1_pins[] = { 43, 44, 45, 46, 47, 61, 62, 63 };
+static const int hsp2_pins[] = { 48, 49, 50, 51, 52, 53, 54, 55 };
+
+static const int r1err_pins[] = { 56 };
+static const int r1md_pins[] = { 57, 58 };
+static const int rmii2_pins[] = { 84, 85, 86, 87, 88, 89 };
+static const int r2err_pins[] = { 90 };
+static const int r2md_pins[] = { 91, 92 };
+
+static const int kbcc_pins[] = { 94, 93 };
+static const int clko_pins[] = { 96 };
+static const int smi_pins[] = { 97 };
+static const int uinc_pins[] = { 19 };
+static const int mben_pins[] = {};
+
+static const int gspi_pins[] = { 12, 13, 14, 15 };
+static const int sspi_pins[] = { 12, 13, 14, 15 };
+
+static const int xcs1_pins[] = { 35 };
+static const int xcs2_pins[] = { 36 };
+
+static const int sdio_pins[] = { 7, 22, 43, 44, 45, 46, 47, 60 };
+
+static const int fi0_pins[] = { 64 };
+static const int fi1_pins[] = { 65 };
+static const int fi2_pins[] = { 66 };
+static const int fi3_pins[] = { 67 };
+static const int fi4_pins[] = { 68 };
+static const int fi5_pins[] = { 69 };
+static const int fi6_pins[] = { 70 };
+static const int fi7_pins[] = { 71 };
+static const int fi8_pins[] = { 72 };
+static const int fi9_pins[] = { 73 };
+static const int fi10_pins[] = { 74 };
+static const int fi11_pins[] = { 75 };
+static const int fi12_pins[] = { 76 };
+static const int fi13_pins[] = { 77 };
+static const int fi14_pins[] = { 78 };
+static const int fi15_pins[] = { 79 };
 
 static const int pwm0_pins[] = { 80 };
 static const int pwm1_pins[] = { 81 };
@@ -420,39 +446,6 @@ static const int hg5_pins[] = { 25 };
 static const int hg6_pins[] = { 59 };
 static const int hg7_pins[] = { 60 };
 
-static const int uart1_pins[] = { 43, 44, 45, 46, 47, 61, 62, 63 };
-static const int uart2_pins[] = { 48, 49, 50, 51, 52, 53, 54, 55 };
-
-/* RMII 1 pin groups */
-static const int r1err_pins[] = { 56 };
-static const int r1md_pins[] = { 57, 58 };
-
-/* RMII 2 pin groups */
-static const int r2_pins[] = { 84, 85, 86, 87, 88, 89 };
-static const int r2err_pins[] = { 90 };
-static const int r2md_pins[] = { 91, 92 };
-
-static const int smi_pins[] = { 97 };
-
-/* BMC serial port */
-static const int bsp_pins[] = { 41, 42 };
-
-static const int clkout_pins[] = { 96 };
-
-static const int uinc_pins[] = { 19 };
-
-/* Graphics SPI Clock pin group */
-static const int gspi_pins[] = { 12, 13, 14, 15 };
-static const int sspi_pins[] = { 12, 13, 14, 15 };
-
-static const int sdio_pins[] = { 7, 22, 43, 44, 45, 46, 47, 60 };
-
-static const int spi0cs1_pins[] = { 32 };
-static const int spi0cs2_pins[] = { 33 };
-static const int spi0cs3_pins[] = { 34 };
-static const int xcs1_pins[] = { 35 };
-static const int xcs2_pins[] = { 36 };
-
 
 /*
  * pin:	     name, number
@@ -466,29 +459,49 @@ struct wpcm450_group {
 };
 
 #define WPCM450_GRPS \
-	WPCM450_GRP(smb0), \
-	WPCM450_GRP(smb1), \
-	WPCM450_GRP(smb2), \
 	WPCM450_GRP(smb3), \
 	WPCM450_GRP(smb4), \
 	WPCM450_GRP(smb5), \
+	WPCM450_GRP(scs1), \
+	WPCM450_GRP(scs2), \
+	WPCM450_GRP(scs3), \
+	WPCM450_GRP(smb0), \
+	WPCM450_GRP(smb1), \
+	WPCM450_GRP(smb2), \
+	WPCM450_GRP(bsp), \
+	WPCM450_GRP(hsp1), \
+	WPCM450_GRP(hsp2), \
+	WPCM450_GRP(r1err), \
+	WPCM450_GRP(r1md), \
+	WPCM450_GRP(rmii2), \
+	WPCM450_GRP(r2err), \
+	WPCM450_GRP(r2md), \
 	WPCM450_GRP(kbcc), \
-	WPCM450_GRP(fanin0), \
-	WPCM450_GRP(fanin1), \
-	WPCM450_GRP(fanin2), \
-	WPCM450_GRP(fanin3), \
-	WPCM450_GRP(fanin4), \
-	WPCM450_GRP(fanin5), \
-	WPCM450_GRP(fanin6), \
-	WPCM450_GRP(fanin7), \
-	WPCM450_GRP(fanin8), \
-	WPCM450_GRP(fanin9), \
-	WPCM450_GRP(fanin10), \
-	WPCM450_GRP(fanin11), \
-	WPCM450_GRP(fanin12), \
-	WPCM450_GRP(fanin13), \
-	WPCM450_GRP(fanin14), \
-	WPCM450_GRP(fanin15), \
+	WPCM450_GRP(clko), \
+	WPCM450_GRP(smi), \
+	WPCM450_GRP(uinc), \
+	WPCM450_GRP(gspi), \
+	WPCM450_GRP(mben), \
+	WPCM450_GRP(xcs2), \
+	WPCM450_GRP(xcs1), \
+	WPCM450_GRP(sdio), \
+	WPCM450_GRP(sspi), \
+	WPCM450_GRP(fi0), \
+	WPCM450_GRP(fi1), \
+	WPCM450_GRP(fi2), \
+	WPCM450_GRP(fi3), \
+	WPCM450_GRP(fi4), \
+	WPCM450_GRP(fi5), \
+	WPCM450_GRP(fi6), \
+	WPCM450_GRP(fi7), \
+	WPCM450_GRP(fi8), \
+	WPCM450_GRP(fi9), \
+	WPCM450_GRP(fi10), \
+	WPCM450_GRP(fi11), \
+	WPCM450_GRP(fi12), \
+	WPCM450_GRP(fi13), \
+	WPCM450_GRP(fi14), \
+	WPCM450_GRP(fi15), \
 	WPCM450_GRP(pwm0), \
 	WPCM450_GRP(pwm1), \
 	WPCM450_GRP(pwm2), \
@@ -505,25 +518,6 @@ struct wpcm450_group {
 	WPCM450_GRP(hg5), \
 	WPCM450_GRP(hg6), \
 	WPCM450_GRP(hg7), \
-	WPCM450_GRP(uart1), \
-	WPCM450_GRP(uart2), \
-	WPCM450_GRP(bsp), \
-	WPCM450_GRP(uinc), \
-	WPCM450_GRP(gspi), \
-	WPCM450_GRP(sdio), \
-	WPCM450_GRP(sspi), \
-	WPCM450_GRP(r1err), \
-	WPCM450_GRP(r1md), \
-	WPCM450_GRP(r2), \
-	WPCM450_GRP(r2err), \
-	WPCM450_GRP(r2md), \
-	WPCM450_GRP(smi), \
-	WPCM450_GRP(clkout), \
-	WPCM450_GRP(spi0cs1), \
-	WPCM450_GRP(spi0cs2), \
-	WPCM450_GRP(spi0cs3), \
-	WPCM450_GRP(xcs1), \
-	WPCM450_GRP(xcs2), \
 
 enum {
 #define WPCM450_GRP(x) fn_ ## x
@@ -551,29 +545,49 @@ struct wpcm450_func {
 	const char *const *groups;
 };
 
-WPCM450_SFUNC(smb0);
-WPCM450_SFUNC(smb1);
-WPCM450_SFUNC(smb2);
 WPCM450_SFUNC(smb3);
 WPCM450_SFUNC(smb4);
 WPCM450_SFUNC(smb5);
+WPCM450_SFUNC(scs1);
+WPCM450_SFUNC(scs2);
+WPCM450_SFUNC(scs3);
+WPCM450_SFUNC(smb0);
+WPCM450_SFUNC(smb1);
+WPCM450_SFUNC(smb2);
+WPCM450_SFUNC(bsp);
+WPCM450_SFUNC(hsp1);
+WPCM450_SFUNC(hsp2);
+WPCM450_SFUNC(r1err);
+WPCM450_SFUNC(r1md);
+WPCM450_SFUNC(rmii2);
+WPCM450_SFUNC(r2err);
+WPCM450_SFUNC(r2md);
 WPCM450_SFUNC(kbcc);
-WPCM450_SFUNC(fanin0);
-WPCM450_SFUNC(fanin1);
-WPCM450_SFUNC(fanin2);
-WPCM450_SFUNC(fanin3);
-WPCM450_SFUNC(fanin4);
-WPCM450_SFUNC(fanin5);
-WPCM450_SFUNC(fanin6);
-WPCM450_SFUNC(fanin7);
-WPCM450_SFUNC(fanin8);
-WPCM450_SFUNC(fanin9);
-WPCM450_SFUNC(fanin10);
-WPCM450_SFUNC(fanin11);
-WPCM450_SFUNC(fanin12);
-WPCM450_SFUNC(fanin13);
-WPCM450_SFUNC(fanin14);
-WPCM450_SFUNC(fanin15);
+WPCM450_SFUNC(clko);
+WPCM450_SFUNC(smi);
+WPCM450_SFUNC(uinc);
+WPCM450_SFUNC(gspi);
+WPCM450_SFUNC(mben);
+WPCM450_SFUNC(xcs2);
+WPCM450_SFUNC(xcs1);
+WPCM450_SFUNC(sdio);
+WPCM450_SFUNC(sspi);
+WPCM450_SFUNC(fi0);
+WPCM450_SFUNC(fi1);
+WPCM450_SFUNC(fi2);
+WPCM450_SFUNC(fi3);
+WPCM450_SFUNC(fi4);
+WPCM450_SFUNC(fi5);
+WPCM450_SFUNC(fi6);
+WPCM450_SFUNC(fi7);
+WPCM450_SFUNC(fi8);
+WPCM450_SFUNC(fi9);
+WPCM450_SFUNC(fi10);
+WPCM450_SFUNC(fi11);
+WPCM450_SFUNC(fi12);
+WPCM450_SFUNC(fi13);
+WPCM450_SFUNC(fi14);
+WPCM450_SFUNC(fi15);
 WPCM450_SFUNC(pwm0);
 WPCM450_SFUNC(pwm1);
 WPCM450_SFUNC(pwm2);
@@ -590,62 +604,52 @@ WPCM450_SFUNC(hg4);
 WPCM450_SFUNC(hg5);
 WPCM450_SFUNC(hg6);
 WPCM450_SFUNC(hg7);
-WPCM450_SFUNC(rg1);
-WPCM450_SFUNC(rg1mdio);
-WPCM450_SFUNC(rg2);
-WPCM450_SFUNC(rg2mdio);
-WPCM450_SFUNC(ddr);
-WPCM450_SFUNC(uart1);
-WPCM450_SFUNC(uart2);
-WPCM450_SFUNC(bsp);
-WPCM450_SFUNC(uinc);
-WPCM450_SFUNC(gspi);
-WPCM450_SFUNC(sdio);
-WPCM450_SFUNC(sspi);
-WPCM450_SFUNC(r1err);
-WPCM450_SFUNC(r1md);
-WPCM450_SFUNC(r2);
-WPCM450_SFUNC(r2err);
-WPCM450_SFUNC(r2md);
-WPCM450_SFUNC(sd1);
-WPCM450_SFUNC(sd1pwr);
-WPCM450_SFUNC(wdog1);
-WPCM450_SFUNC(wdog2);
-WPCM450_SFUNC(scipme);
-WPCM450_SFUNC(sci);
-WPCM450_SFUNC(serirq);
-WPCM450_SFUNC(clkout);
-WPCM450_SFUNC(spi0cs1);
-WPCM450_SFUNC(spi0cs2);
-WPCM450_SFUNC(spi0cs3);
-WPCM450_SFUNC(xcs1);
-WPCM450_SFUNC(xcs2);
 
 /* Function names */
 static struct wpcm450_func wpcm450_funcs[] = {
-	WPCM450_MKFUNC(smb0),
-	WPCM450_MKFUNC(smb1),
-	WPCM450_MKFUNC(smb2),
 	WPCM450_MKFUNC(smb3),
 	WPCM450_MKFUNC(smb4),
 	WPCM450_MKFUNC(smb5),
+	WPCM450_MKFUNC(scs1),
+	WPCM450_MKFUNC(scs2),
+	WPCM450_MKFUNC(scs3),
+	WPCM450_MKFUNC(smb0),
+	WPCM450_MKFUNC(smb1),
+	WPCM450_MKFUNC(smb2),
+	WPCM450_MKFUNC(bsp),
+	WPCM450_MKFUNC(hsp1),
+	WPCM450_MKFUNC(hsp2),
+	WPCM450_MKFUNC(r1err),
+	WPCM450_MKFUNC(r1md),
+	WPCM450_MKFUNC(rmii2),
+	WPCM450_MKFUNC(r2err),
+	WPCM450_MKFUNC(r2md),
 	WPCM450_MKFUNC(kbcc),
-	WPCM450_MKFUNC(fanin0),
-	WPCM450_MKFUNC(fanin1),
-	WPCM450_MKFUNC(fanin2),
-	WPCM450_MKFUNC(fanin3),
-	WPCM450_MKFUNC(fanin4),
-	WPCM450_MKFUNC(fanin5),
-	WPCM450_MKFUNC(fanin6),
-	WPCM450_MKFUNC(fanin7),
-	WPCM450_MKFUNC(fanin8),
-	WPCM450_MKFUNC(fanin9),
-	WPCM450_MKFUNC(fanin10),
-	WPCM450_MKFUNC(fanin11),
-	WPCM450_MKFUNC(fanin12),
-	WPCM450_MKFUNC(fanin13),
-	WPCM450_MKFUNC(fanin14),
-	WPCM450_MKFUNC(fanin15),
+	WPCM450_MKFUNC(clko),
+	WPCM450_MKFUNC(smi),
+	WPCM450_MKFUNC(uinc),
+	WPCM450_MKFUNC(gspi),
+	WPCM450_MKFUNC(mben),
+	WPCM450_MKFUNC(xcs2),
+	WPCM450_MKFUNC(xcs1),
+	WPCM450_MKFUNC(sdio),
+	WPCM450_MKFUNC(sspi),
+	WPCM450_MKFUNC(fi0),
+	WPCM450_MKFUNC(fi1),
+	WPCM450_MKFUNC(fi2),
+	WPCM450_MKFUNC(fi3),
+	WPCM450_MKFUNC(fi4),
+	WPCM450_MKFUNC(fi5),
+	WPCM450_MKFUNC(fi6),
+	WPCM450_MKFUNC(fi7),
+	WPCM450_MKFUNC(fi8),
+	WPCM450_MKFUNC(fi9),
+	WPCM450_MKFUNC(fi10),
+	WPCM450_MKFUNC(fi11),
+	WPCM450_MKFUNC(fi12),
+	WPCM450_MKFUNC(fi13),
+	WPCM450_MKFUNC(fi14),
+	WPCM450_MKFUNC(fi15),
 	WPCM450_MKFUNC(pwm0),
 	WPCM450_MKFUNC(pwm1),
 	WPCM450_MKFUNC(pwm2),
@@ -662,36 +666,6 @@ static struct wpcm450_func wpcm450_funcs[] = {
 	WPCM450_MKFUNC(hg5),
 	WPCM450_MKFUNC(hg6),
 	WPCM450_MKFUNC(hg7),
-	WPCM450_MKFUNC(rg1),
-	WPCM450_MKFUNC(rg1mdio),
-	WPCM450_MKFUNC(rg2),
-	WPCM450_MKFUNC(rg2mdio),
-	WPCM450_MKFUNC(ddr),
-	WPCM450_MKFUNC(uart1),
-	WPCM450_MKFUNC(uart2),
-	WPCM450_MKFUNC(bsp),
-	WPCM450_MKFUNC(uinc),
-	WPCM450_MKFUNC(gspi),
-	WPCM450_MKFUNC(sdio),
-	WPCM450_MKFUNC(sspi),
-	WPCM450_MKFUNC(r1err),
-	WPCM450_MKFUNC(r1md),
-	WPCM450_MKFUNC(r2),
-	WPCM450_MKFUNC(r2err),
-	WPCM450_MKFUNC(r2md),
-	WPCM450_MKFUNC(sd1),
-	WPCM450_MKFUNC(sd1pwr),
-	WPCM450_MKFUNC(wdog1),
-	WPCM450_MKFUNC(wdog2),
-	WPCM450_MKFUNC(scipme),
-	WPCM450_MKFUNC(sci),
-	WPCM450_MKFUNC(serirq),
-	WPCM450_MKFUNC(clkout),
-	WPCM450_MKFUNC(spi0cs1),
-	WPCM450_MKFUNC(spi0cs2),
-	WPCM450_MKFUNC(spi0cs3),
-	WPCM450_MKFUNC(xcs1),
-	WPCM450_MKFUNC(xcs2),
 };
 
 #define WPCM450_PINCFG(a, b, c, d, e, f, g) \
@@ -738,65 +712,65 @@ static const struct wpcm450_pincfg pincfg[] = {
 	WPCM450_PINCFG(30,	 smb3, MFSEL1, 0,	  none, NONE, 0),
 	WPCM450_PINCFG(31,	 smb3, MFSEL1, 0,	  none, NONE, 0),
 
-	WPCM450_PINCFG(32,    spi0cs1, MFSEL1, 3,	  none, NONE, 0),
-	WPCM450_PINCFG(33,    spi0cs2, MFSEL1, 4,	  none, NONE, 0),
-	WPCM450_PINCFG(34,    spi0cs3, MFSEL1, 5,	  none, NONE, 0),
+	WPCM450_PINCFG(32,	 scs1, MFSEL1, 3,	  none, NONE, 0),
+	WPCM450_PINCFG(33,	 scs2, MFSEL1, 4,	  none, NONE, 0),
+	WPCM450_PINCFG(34,	 scs3, MFSEL1, 5,	  none, NONE, 0),
 	WPCM450_PINCFG(35,	 xcs1, MFSEL1, 29,	  none, NONE, 0),
 	WPCM450_PINCFG(36,	 xcs2, MFSEL1, 28,	  none, NONE, 0),
 	WPCM450_PINCFG(37,	 none, NONE, 0,		  none, NONE, 0), /* DVO */
 	WPCM450_PINCFG(38,	 none, NONE, 0,		  none, NONE, 0), /* DVO */
 	WPCM450_PINCFG(39,	 none, NONE, 0,		  none, NONE, 0), /* DVO */
 	WPCM450_PINCFG(40,	 none, NONE, 0,		  none, NONE, 0), /* DVO */
-	WPCM450_PINCFG(41,        bsp, MFSEL1, 9,	  none, NONE, 0),
-	WPCM450_PINCFG(42,        bsp, MFSEL1, 9,	  none, NONE, 0),
-	WPCM450_PINCFG(43,	uart1, MFSEL1, 10,	  sdio, MFSEL1, 30),
-	WPCM450_PINCFG(44,	uart1, MFSEL1, 10,	  sdio, MFSEL1, 30),
-	WPCM450_PINCFG(45,	uart1, MFSEL1, 10,	  sdio, MFSEL1, 30),
-	WPCM450_PINCFG(46,	uart1, MFSEL1, 10,	  sdio, MFSEL1, 30),
-	WPCM450_PINCFG(47,	uart1, MFSEL1, 10,	  sdio, MFSEL1, 30),
-	WPCM450_PINCFG(48,	uart2, MFSEL1, 11,	  none, NONE, 0),
-	WPCM450_PINCFG(49,	uart2, MFSEL1, 11,	  none, NONE, 0),
-	WPCM450_PINCFG(50,	uart2, MFSEL1, 11,	  none, NONE, 0),
-	WPCM450_PINCFG(51,	uart2, MFSEL1, 11,	  none, NONE, 0),
-	WPCM450_PINCFG(52,	uart2, MFSEL1, 11,	  none, NONE, 0),
-	WPCM450_PINCFG(53,	uart2, MFSEL1, 11,	  none, NONE, 0),
-	WPCM450_PINCFG(54,	uart2, MFSEL1, 11,	  none, NONE, 0),
-	WPCM450_PINCFG(55,	uart2, MFSEL1, 11,	  none, NONE, 0),
+	WPCM450_PINCFG(41,	  bsp, MFSEL1, 9,	  none, NONE, 0),
+	WPCM450_PINCFG(42,	  bsp, MFSEL1, 9,	  none, NONE, 0),
+	WPCM450_PINCFG(43,	 hsp1, MFSEL1, 10,	  sdio, MFSEL1, 30),
+	WPCM450_PINCFG(44,	 hsp1, MFSEL1, 10,	  sdio, MFSEL1, 30),
+	WPCM450_PINCFG(45,	 hsp1, MFSEL1, 10,	  sdio, MFSEL1, 30),
+	WPCM450_PINCFG(46,	 hsp1, MFSEL1, 10,	  sdio, MFSEL1, 30),
+	WPCM450_PINCFG(47,	 hsp1, MFSEL1, 10,	  sdio, MFSEL1, 30),
+	WPCM450_PINCFG(48,	 hsp2, MFSEL1, 11,	  none, NONE, 0),
+	WPCM450_PINCFG(49,	 hsp2, MFSEL1, 11,	  none, NONE, 0),
+	WPCM450_PINCFG(50,	 hsp2, MFSEL1, 11,	  none, NONE, 0),
+	WPCM450_PINCFG(51,	 hsp2, MFSEL1, 11,	  none, NONE, 0),
+	WPCM450_PINCFG(52,	 hsp2, MFSEL1, 11,	  none, NONE, 0),
+	WPCM450_PINCFG(53,	 hsp2, MFSEL1, 11,	  none, NONE, 0),
+	WPCM450_PINCFG(54,	 hsp2, MFSEL1, 11,	  none, NONE, 0),
+	WPCM450_PINCFG(55,	 hsp2, MFSEL1, 11,	  none, NONE, 0),
 	WPCM450_PINCFG(56,	r1err, MFSEL1, 12,	  none, NONE, 0),
 	WPCM450_PINCFG(57,	 r1md, MFSEL1, 13,	  none, NONE, 0),
 	WPCM450_PINCFG(58,	 r1md, MFSEL1, 13,	  none, NONE, 0),
 	WPCM450_PINCFG(59,	  hg6, MFSEL2, 30,	  none, NONE, 0),
 	WPCM450_PINCFG(60,	  hg7, MFSEL2, 31,	  sdio, MFSEL1, 30),
-	WPCM450_PINCFG(61,	uart1, MFSEL1, 10,	  none, NONE, 0),
-	WPCM450_PINCFG(62,	uart1, MFSEL1, 10,	  none, NONE, 0),
-	WPCM450_PINCFG(63,	uart1, MFSEL1, 10,	  none, NONE, 0),
+	WPCM450_PINCFG(61,	 hsp1, MFSEL1, 10,	  none, NONE, 0),
+	WPCM450_PINCFG(62,	 hsp1, MFSEL1, 10,	  none, NONE, 0),
+	WPCM450_PINCFG(63,	 hsp1, MFSEL1, 10,	  none, NONE, 0),
 
-	WPCM450_PINCFG(64,     fanin0, MFSEL2, 0,	  none, NONE, 0),
-	WPCM450_PINCFG(65,     fanin1, MFSEL2, 1,	  none, NONE, 0),
-	WPCM450_PINCFG(66,     fanin2, MFSEL2, 2,	  none, NONE, 0),
-	WPCM450_PINCFG(67,     fanin3, MFSEL2, 3,	  none, NONE, 0),
-	WPCM450_PINCFG(68,     fanin4, MFSEL2, 4,	  none, NONE, 0),
-	WPCM450_PINCFG(69,     fanin5, MFSEL2, 5,	  none, NONE, 0),
-	WPCM450_PINCFG(70,     fanin6, MFSEL2, 6,	  none, NONE, 0),
-	WPCM450_PINCFG(71,     fanin7, MFSEL2, 7,	  none, NONE, 0),
-	WPCM450_PINCFG(72,     fanin8, MFSEL2, 8,	  none, NONE, 0),
-	WPCM450_PINCFG(73,     fanin9, MFSEL2, 9,	  none, NONE, 0),
-	WPCM450_PINCFG(74,    fanin10, MFSEL2, 10,	  none, NONE, 0),
-	WPCM450_PINCFG(75,    fanin11, MFSEL2, 11,	  none, NONE, 0),
-	WPCM450_PINCFG(76,    fanin12, MFSEL2, 12,	  none, NONE, 0),
-	WPCM450_PINCFG(77,    fanin13, MFSEL2, 13,	  none, NONE, 0),
-	WPCM450_PINCFG(78,    fanin14, MFSEL2, 14,	  none, NONE, 0),
-	WPCM450_PINCFG(79,    fanin15, MFSEL2, 15,	  none, NONE, 0),
+	WPCM450_PINCFG(64,	  fi0, MFSEL2, 0,	  none, NONE, 0),
+	WPCM450_PINCFG(65,	  fi1, MFSEL2, 1,	  none, NONE, 0),
+	WPCM450_PINCFG(66,	  fi2, MFSEL2, 2,	  none, NONE, 0),
+	WPCM450_PINCFG(67,	  fi3, MFSEL2, 3,	  none, NONE, 0),
+	WPCM450_PINCFG(68,	  fi4, MFSEL2, 4,	  none, NONE, 0),
+	WPCM450_PINCFG(69,	  fi5, MFSEL2, 5,	  none, NONE, 0),
+	WPCM450_PINCFG(70,	  fi6, MFSEL2, 6,	  none, NONE, 0),
+	WPCM450_PINCFG(71,	  fi7, MFSEL2, 7,	  none, NONE, 0),
+	WPCM450_PINCFG(72,	  fi8, MFSEL2, 8,	  none, NONE, 0),
+	WPCM450_PINCFG(73,	  fi9, MFSEL2, 9,	  none, NONE, 0),
+	WPCM450_PINCFG(74,	 fi10, MFSEL2, 10,	  none, NONE, 0),
+	WPCM450_PINCFG(75,	 fi11, MFSEL2, 11,	  none, NONE, 0),
+	WPCM450_PINCFG(76,	 fi12, MFSEL2, 12,	  none, NONE, 0),
+	WPCM450_PINCFG(77,	 fi13, MFSEL2, 13,	  none, NONE, 0),
+	WPCM450_PINCFG(78,	 fi14, MFSEL2, 14,	  none, NONE, 0),
+	WPCM450_PINCFG(79,	 fi15, MFSEL2, 15,	  none, NONE, 0),
 	WPCM450_PINCFG(80,	 pwm0, MFSEL2, 16,	  none, NONE, 0),
 	WPCM450_PINCFG(81,	 pwm1, MFSEL2, 17,	  none, NONE, 0),
 	WPCM450_PINCFG(82,	 pwm2, MFSEL2, 18,	  none, NONE, 0),
 	WPCM450_PINCFG(83,	 pwm3, MFSEL2, 19,	  none, NONE, 0),
-	WPCM450_PINCFG(84,	   r2, MFSEL1, 14,	  none, NONE, 0),
-	WPCM450_PINCFG(85,	   r2, MFSEL1, 14,	  none, NONE, 0),
-	WPCM450_PINCFG(86,	   r2, MFSEL1, 14,	  none, NONE, 0),
-	WPCM450_PINCFG(87,	   r2, MFSEL1, 14,	  none, NONE, 0),
-	WPCM450_PINCFG(88,	   r2, MFSEL1, 14,	  none, NONE, 0),
-	WPCM450_PINCFG(89,	   r2, MFSEL1, 14,	  none, NONE, 0),
+	WPCM450_PINCFG(84,	rmii2, MFSEL1, 14,	  none, NONE, 0),
+	WPCM450_PINCFG(85,	rmii2, MFSEL1, 14,	  none, NONE, 0),
+	WPCM450_PINCFG(86,	rmii2, MFSEL1, 14,	  none, NONE, 0),
+	WPCM450_PINCFG(87,	rmii2, MFSEL1, 14,	  none, NONE, 0),
+	WPCM450_PINCFG(88,	rmii2, MFSEL1, 14,	  none, NONE, 0),
+	WPCM450_PINCFG(89,	rmii2, MFSEL1, 14,	  none, NONE, 0),
 	WPCM450_PINCFG(90,	r2err, MFSEL1, 15,	  none, NONE, 0),
 	WPCM450_PINCFG(91,	 r2md, MFSEL1, 16,	  none, NONE, 0),
 	WPCM450_PINCFG(92,	 r2md, MFSEL1, 16,	  none, NONE, 0),

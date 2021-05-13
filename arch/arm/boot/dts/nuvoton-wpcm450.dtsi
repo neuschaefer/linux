@@ -173,12 +173,12 @@
 				function = "kbcc";
 			};
 
-			dvo0_pins: dvo-pins {
+			dvo0_pins: dvo0-pins {
 				groups = "dvo";
 				function = "dvo0";
 			};
 
-			dvo3_pins: dvo-pins {
+			dvo3_pins: dvo3-pins {
 				groups = "dvo";
 				function = "dvo3";
 			};
