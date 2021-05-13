@@ -33,6 +33,32 @@
 		interrupt-parent = <&aic>;
 		ranges;
 
+		reset: reset@b0000220 {
+			compatible = "nuvoton,wpcm450-reset";
+			reg = <0xb0000220 4>;
+			#reset-cells = <1>;
+		};
+
+		ethernet0: ethernet@b0002000 {
+			compatible = "nuvoton,wpcm450-emc";
+			reg = <0xb0002000 0x1000>;
+			interrupts = <16 IRQ_TYPE_LEVEL_HIGH
+				      15 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&clk24m &clk24m>; // dummy, FIXME
+			clock-names = "main", "RMII";
+			status = "disabled";
+		};
+
+		ethernet1: ethernet@b0003000 {
+			compatible = "nuvoton,wpcm450-emc";
+			reg = <0xb0003000 0x1000>;
+			interrupts = <18 IRQ_TYPE_LEVEL_HIGH
+				      17 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&clk24m &clk24m>; // dummy, FIXME
+			clock-names = "main", "RMII";
+			status = "disabled";
+		};
+
 		serial0: serial@b8000000 {
 			compatible = "nuvoton,wpcm450-uart";
 			reg = <0xb8000000 0x20>;
