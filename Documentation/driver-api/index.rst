@@ -57,6 +57,7 @@ Bus-level documentation
    auxiliary_bus
    cxl/index
    eisa
+   exi
    firewire
    i3c/index
    isa
