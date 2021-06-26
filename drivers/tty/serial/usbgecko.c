@@ -66,9 +66,6 @@ static struct ug_adapter ug_adapters[2];
  * Hardware interface.
  */
 
-/*
- *
- */
 static void ug_exi_io_transaction(struct exi_device *exi_device, u16 i, u16 *o)
 {
 	u16 data;
@@ -81,9 +78,6 @@ static void ug_exi_io_transaction(struct exi_device *exi_device, u16 i, u16 *o)
 }
 
 #if 0
-/*
- *
- */
 static void ug_io_transaction(struct ug_adapter *adapter, u16 i, u16 *o)
 {
 	struct exi_device *exi_device = adapter->exi_device;
@@ -93,9 +87,6 @@ static void ug_io_transaction(struct ug_adapter *adapter, u16 i, u16 *o)
 }
 #endif
 
-/*
- *
- */
 static int ug_check_adapter(struct exi_device *exi_device)
 {
 	u16 data;
@@ -108,9 +99,6 @@ static int ug_check_adapter(struct exi_device *exi_device)
 }
 
 #if 0
-/*
- *
- */
 static int ug_is_txfifo_empty(struct ug_adapter *adapter)
 {
 	struct exi_device *exi_device = adapter->exi_device;
@@ -127,9 +115,6 @@ static int ug_is_txfifo_empty(struct ug_adapter *adapter)
 	return 0;
 }
 
-/*
- *
- */
 static int ug_is_rxfifo_empty(struct ug_adapter *adapter)
 {
 	struct exi_device *exi_device = adapter->exi_device;
@@ -146,9 +131,6 @@ static int ug_is_rxfifo_empty(struct ug_adapter *adapter)
 	return 0;
 }
 
-/*
- *
- */
 static int ug_putc(struct ug_adapter *adapter, char c)
 {
 	struct exi_device *exi_device = adapter->exi_device;
@@ -165,9 +147,6 @@ static int ug_putc(struct ug_adapter *adapter, char c)
 	return 0;
 }
 
-/*
- *
- */
 static int ug_getc(struct ug_adapter *adapter, char *c)
 {
 	struct exi_device *exi_device = adapter->exi_device;
@@ -188,9 +167,6 @@ static int ug_getc(struct ug_adapter *adapter, char *c)
 }
 #endif
 
-/*
- *
- */
 static int ug_safe_putc(struct ug_adapter *adapter, char c)
 {
 	struct exi_device *exi_device = adapter->exi_device;
@@ -209,9 +185,6 @@ static int ug_safe_putc(struct ug_adapter *adapter, char c)
 	return 0;
 }
 
-/*
- *
- */
 static int ug_safe_getc(struct ug_adapter *adapter, char *c)
 {
 	struct exi_device *exi_device = adapter->exi_device;
@@ -242,27 +215,19 @@ static int ug_safe_getc(struct ug_adapter *adapter, char *c)
  * Linux console interface.
  */
 
-/*
- *
- */
 static void ug_console_write(struct console *co, const char *buf,
 			      unsigned int count)
 {
 	struct ug_adapter *adapter = co->data;
-	char *b = (char *)buf;
 
 	while (count--) {
-		if (*b == '\n')
+		if (*buf == '\n')
 			ug_safe_putc(adapter, '\r');
-		ug_safe_putc(adapter, *b++);
+		ug_safe_putc(adapter, *buf++);
 	}
 }
 
-/*
- *
- */
-static int ug_console_read(struct console *co, char *buf,
-			    unsigned int count)
+static int ug_console_read(struct console *co, char *buf, unsigned int count)
 {
 	struct ug_adapter *adapter = co->data;
 	int i;
@@ -405,10 +370,9 @@ static void ug_tty_close(struct tty_struct *tty, struct file *filp)
 }
 
 static int ug_tty_write(struct tty_struct *tty,
-			 const unsigned char *buf, int count)
+			const unsigned char *buf, int count)
 {
 	struct ug_adapter *adapter = tty->driver_data;
-	char *b = (char *)buf;
 	int index;
 	int i;
 
@@ -418,7 +382,7 @@ static int ug_tty_write(struct tty_struct *tty,
 	index = tty->index;
 	adapter = &ug_adapters[index];
 	for (i = 0; i < count; i++)
-		ug_safe_putc(adapter, *b++);
+		ug_safe_putc(adapter, *buf++);
 	return count;
 }
 
@@ -492,9 +456,6 @@ static void ug_tty_exit(void)
  * EXI layer interface.
  */
 
-/*
- *
- */
 static int ug_probe(struct exi_device *exi_device)
 {
 	struct console *console;
@@ -556,7 +517,7 @@ static void ug_remove(struct exi_device *exi_device)
 		   'A'+slot);
 }
 
-static const struct exi_device_id ug_eid_table[] = {
+static struct exi_device_id ug_eid_table[] = {
 	[0] = {
 	       .channel = UG_SLOTA_CHANNEL,
 	       .device = UG_SLOTA_DEVICE,
