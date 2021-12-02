@@ -1,0 +1,58 @@
+; /*
+; Copyright:
+; -----------------------------------------------------------------------------
+;  This confidential and proprietary software may be used only as authorised
+;  by a licensing agreement from ARM Limited.
+;          (C) COPYRIGHT 2008-2009 ARM Limited , ALL RIGHTS RESERVED
+;  The entire notice above must be reproduced on all authorised copies and
+;  copies may only be made to the extent permitted by a licensing agreement
+;  from ARM Limited.
+; -----------------------------------------------------------------------------
+;  $LastChangedRevision: 2860 $
+; -----------------------------------------------------------------------------
+; */
+;
+
+; /* ==========================================================================
+;    Includes
+; ========================================================================== */
+#include "./include/tgt_memory_map.h"
+
+; /* ==========================================================================
+;    Scatter file
+; ========================================================================== */
+ROM_LOAD VA_CODE_BASE NOCOMPRESS
+{
+    KERNEL_CODE VA_CODE_BASE PA_CODE_LEN
+    {
+        tgt_boot_init.o     (Init, +FIRST)
+        tgt_boot_pic.o      (+RO)
+        *                   (+RO)
+    }
+
+    MONITOR_CODE VA_MON_CODE_BASE FIXED PA_MON_CODE_LEN
+    {
+        mon_vectors.o       (sttzsMonitorVect, +FIRST)
+        mon_init.o          (+RO, +RW, +ZI)
+        mon_switch.o        (+RO, +RW, +ZI)
+    }
+
+    STACK VA_STACK_DATA_BASE FIXED FILL 0x0 PA_STACK_DATA_LEN
+    {
+    
+    }
+
+    KERNEL_DATA VA_RWZI_DATA_BASE FIXED PA_RWZI_DATA_LEN
+    {
+        *                   (+RW, +ZI)
+    }
+
+    HEAP VA_HEAP_DATA_BASE FIXED FILL 0x0 PA_HEAP_DATA_LEN
+    {
+    }
+
+    MONITOR_STACK VA_MON_STACK_DATA_BASE FIXED FILL 0x0 PA_MON_STACK_DATA_LEN
+    {
+
+    }
+}

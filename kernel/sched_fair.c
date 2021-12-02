@@ -802,6 +802,8 @@ static void clear_buddies(struct cfs_rq *cfs_rq, struct sched_entity *se)
 static void
 dequeue_entity(struct cfs_rq *cfs_rq, struct sched_entity *se, int flags)
 {
+	u64 min_vruntime;
+
 	/*
 	 * Update run-time statistics of the 'current'.
 	 */
@@ -826,6 +828,8 @@ dequeue_entity(struct cfs_rq *cfs_rq, struct sched_entity *se, int flags)
 	if (se != cfs_rq->curr)
 		__dequeue_entity(cfs_rq, se);
 	account_entity_dequeue(cfs_rq, se);
+
+	min_vruntime = cfs_rq->min_vruntime;
 	update_min_vruntime(cfs_rq);
 
 	/*
@@ -834,7 +838,7 @@ dequeue_entity(struct cfs_rq *cfs_rq, struct sched_entity *se, int flags)
 	 * movement in our normalized position.
 	 */
 	if (!(flags & DEQUEUE_SLEEP))
-		se->vruntime -= cfs_rq->min_vruntime;
+		se->vruntime -= min_vruntime;
 }
 
 /*
@@ -3706,6 +3710,16 @@ static void task_move_group_fair(struct task_struct *p, int on_rq)
 	if (!on_rq)
 		p->se.vruntime += cfs_rq_of(&p->se)->min_vruntime;
 }
+
+static void prep_move_group_fair(struct task_struct *p, int on_rq)
+{
+	struct cfs_rq *cfs_rq = task_cfs_rq(p);
+	struct sched_entity *se = &p->se;
+
+	/* normalize the runtime of a sleeping task before moving it */
+	if (!on_rq)
+		se->vruntime -= cfs_rq->min_vruntime;
+}
 #endif
 
 static unsigned int get_rr_interval_fair(struct rq *rq, struct task_struct *task)
@@ -3757,6 +3771,7 @@ static const struct sched_class fair_sched_class = {
 
 #ifdef CONFIG_FAIR_GROUP_SCHED
 	.task_move_group	= task_move_group_fair,
+	.prep_move_group	= prep_move_group_fair,
 #endif
 };
 

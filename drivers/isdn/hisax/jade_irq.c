@@ -1,4 +1,4 @@
-/* $Id: jade_irq.c,v 1.7.2.4 2004/02/11 13:21:34 keil Exp $
+/* $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/isdn/hisax/jade_irq.c#1 $
  *
  * Low level JADE IRQ stuff (derived from original hscx_irq.c)
  *

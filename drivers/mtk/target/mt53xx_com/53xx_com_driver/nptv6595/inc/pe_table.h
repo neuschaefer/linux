@@ -1,0 +1,1123 @@
+/*----------------------------------------------------------------------------*
+ * Copyright Statement:                                                       *
+ *                                                                            *
+ *   This software/firmware and related documentation ("MediaTek Software")   *
+ * are protected under international and related jurisdictions'copyright laws *
+ * as unpublished works. The information contained herein is confidential and *
+ * proprietary to MediaTek Inc. Without the prior written permission of       *
+ * MediaTek Inc., any reproduction, modification, use or disclosure of        *
+ * MediaTek Software, and information contained herein, in whole or in part,  *
+ * shall be strictly prohibited.                                              *
+ * MediaTek Inc. Copyright (C) 2010. All rights reserved.                     *
+ *                                                                            *
+ *   BY OPENING THIS FILE, RECEIVER HEREBY UNEQUIVOCALLY ACKNOWLEDGES AND     *
+ * AGREES TO THE FOLLOWING:                                                   *
+ *                                                                            *
+ *   1)Any and all intellectual property rights (including without            *
+ * limitation, patent, copyright, and trade secrets) in and to this           *
+ * Software/firmware and related documentation ("MediaTek Software") shall    *
+ * remain the exclusive property of MediaTek Inc. Any and all intellectual    *
+ * property rights (including without limitation, patent, copyright, and      *
+ * trade secrets) in and to any modifications and derivatives to MediaTek     *
+ * Software, whoever made, shall also remain the exclusive property of        *
+ * MediaTek Inc.  Nothing herein shall be construed as any transfer of any    *
+ * title to any intellectual property right in MediaTek Software to Receiver. *
+ *                                                                            *
+ *   2)This MediaTek Software Receiver received from MediaTek Inc. and/or its *
+ * representatives is provided to Receiver on an "AS IS" basis only.          *
+ * MediaTek Inc. expressly disclaims all warranties, expressed or implied,    *
+ * including but not limited to any implied warranties of merchantability,    *
+ * non-infringement and fitness for a particular purpose and any warranties   *
+ * arising out of course of performance, course of dealing or usage of trade. *
+ * MediaTek Inc. does not provide any warranty whatsoever with respect to the *
+ * software of any third party which may be used by, incorporated in, or      *
+ * supplied with the MediaTek Software, and Receiver agrees to look only to   *
+ * such third parties for any warranty claim relating thereto.  Receiver      *
+ * expressly acknowledges that it is Receiver's sole responsibility to obtain *
+ * from any third party all proper licenses contained in or delivered with    *
+ * MediaTek Software.  MediaTek is not responsible for any MediaTek Software  *
+ * releases made to Receiver's specifications or to conform to a particular   *
+ * standard or open forum.                                                    *
+ *                                                                            *
+ *   3)Receiver further acknowledge that Receiver may, either presently       *
+ * and/or in the future, instruct MediaTek Inc. to assist it in the           *
+ * development and the implementation, in accordance with Receiver's designs, *
+ * of certain softwares relating to Receiver's product(s) (the "Services").   *
+ * Except as may be otherwise agreed to in writing, no warranties of any      *
+ * kind, whether express or implied, are given by MediaTek Inc. with respect  *
+ * to the Services provided, and the Services are provided on an "AS IS"      *
+ * basis. Receiver further acknowledges that the Services may contain errors  *
+ * that testing is important and it is solely responsible for fully testing   *
+ * the Services and/or derivatives thereof before they are used, sublicensed  *
+ * or distributed. Should there be any third party action brought against     *
+ * MediaTek Inc. arising out of or relating to the Services, Receiver agree   *
+ * to fully indemnify and hold MediaTek Inc. harmless.  If the parties        *
+ * mutually agree to enter into or continue a business relationship or other  *
+ * arrangement, the terms and conditions set forth herein shall remain        *
+ * effective and, unless explicitly stated otherwise, shall prevail in the    *
+ * event of a conflict in the terms in any agreements entered into between    *
+ * the parties.                                                               *
+ *                                                                            *
+ *   4)Receiver's sole and exclusive remedy and MediaTek Inc.'s entire and    *
+ * cumulative liability with respect to MediaTek Software released hereunder  *
+ * will be, at MediaTek Inc.'s sole discretion, to replace or revise the      *
+ * MediaTek Software at issue.                                                *
+ *                                                                            *
+ *   5)The transaction contemplated hereunder shall be construed in           *
+ * accordance with the laws of Singapore, excluding its conflict of laws      *
+ * principles.  Any disputes, controversies or claims arising thereof and     *
+ * related thereto shall be settled via arbitration in Singapore, under the   *
+ * then current rules of the International Chamber of Commerce (ICC).  The    *
+ * arbitration shall be conducted in English. The awards of the arbitration   *
+ * shall be final and binding upon both parties and shall be entered and      *
+ * enforceable in any court of competent jurisdiction.                        *
+ *---------------------------------------------------------------------------*/
+/*-----------------------------------------------------------------------------
+ */
+
+/** @file pe_table.h
+ *  
+ *  
+ */
+
+#ifndef _PE_TABLE_H_
+#define _PE_TABLE_H_
+
+///////////////////////////////////////////////////////////////////////////////////
+// The following is quality item setting.
+// Remember to update QUALITY_ITEM_BEGIN/QUALITY_ITEM_END,
+// if QUALITY_ITEM table is changed.
+enum
+{
+    //  General
+    QUALITY_CONTRAST,
+    QUALITY_CONTRAST_MSB,
+    QUALITY_BRIGHTNESS,
+    QUALITY_SATURATION,
+    QUALITY_SATURATION_MSB,
+    QUALITY_HUE,
+    QUALITY_BACKLIGHT,
+
+    //  HSHARP
+    QUALITY_HSHARP_LOW,
+    QUALITY_HSHARP_LOW_NEG,
+    QUALITY_HSHARP_MID,
+    QUALITY_HSHARP_MID_NEG,
+    QUALITY_HSHARP_HIGH,
+    QUALITY_HSHARP_HIGH_NEG,
+
+    QUALITY_HSHARP_LOW_CORING,
+    QUALITY_HSHARP_MID_CORING,
+    QUALITY_HSHARP_HIGH_CORING,
+
+    QUALITY_HSHARP_LOW_LIMIT_POS,
+    QUALITY_HSHARP_LOW_LIMIT_NEG,
+    QUALITY_HSHARP_MID_LIMIT_POS,
+    QUALITY_HSHARP_MID_LIMIT_NEG,
+    QUALITY_HSHARP_HIGH_LIMIT_POS,
+    QUALITY_HSHARP_HIGH_LIMIT_NEG,
+
+    QUALITY_HSHARP_CLIP_POS_EN,
+    QUALITY_HSHARP_CLIP_NEG_EN,
+    QUALITY_HSHARP_GB_CLIP_POS_EN_L,
+    QUALITY_HSHARP_GB_CLIP_NEG_EN_L,
+    QUALITY_HSHARP_GB_CLIP_POS_EN_M,
+    QUALITY_HSHARP_GB_CLIP_NEG_EN_M,
+    QUALITY_HSHARP_GB_CLIP_POS_EN_H,
+    QUALITY_HSHARP_GB_CLIP_NEG_EN_H,
+
+    QUALITY_HSHARP_CLIP_FRONT_THR_LOW,
+    QUALITY_HSHARP_CLIP_FRONT_THR_HIGH,
+    QUALITY_HSHARP_CLIP_POS,
+    QUALITY_HSHARP_CLIP_NEG,
+    QUALITY_HSHARP_SOFT_CLIP_GAIN,
+
+    QUALITY_HSHARP_LC_LOW,
+    QUALITY_HSHARP_LC_LOW_NEG,
+    QUALITY_HSHARP_LC_MID,
+    QUALITY_HSHARP_LC_MID_NEG,
+    QUALITY_HSHARP_LC_HIGH,
+    QUALITY_HSHARP_LC_HIGH_NEG,
+
+    QUALITY_HSHARP_LC_LOW_CORING,
+    QUALITY_HSHARP_LC_MID_CORING,
+    QUALITY_HSHARP_LC_HIGH_CORING,
+
+    QUALITY_HSHARP_LC_LOW_LIMIT_POS,
+    QUALITY_HSHARP_LC_LOW_LIMIT_NEG,
+    QUALITY_HSHARP_LC_MID_LIMIT_POS,
+    QUALITY_HSHARP_LC_MID_LIMIT_NEG,
+    QUALITY_HSHARP_LC_HIGH_LIMIT_POS,
+    QUALITY_HSHARP_LC_HIGH_LIMIT_NEG,
+
+    QUALITY_HSHARP_LC_CLIP_POS_EN,
+    QUALITY_HSHARP_LC_CLIP_NEG_EN,
+    QUALITY_HSHARP_LC_TABLE_SEL,
+    QUALITY_HSHARP_LC_TABLE_GAIN,
+    QUALITY_HSHARP_LC_TABLE_OFFSET,
+    QUALITY_HSHARP_AC_LPF_EN,
+    QUALITY_HSHARP_AC_LPF_COEF,
+
+    //  TDSHARP
+    QUALITY_TDSHARP_H1_GAIN,
+    QUALITY_TDSHARP_H1_GAIN_NEG,
+    QUALITY_TDSHARP_H2_GAIN,
+    QUALITY_TDSHARP_H2_GAIN_NEG,
+    QUALITY_TDSHARP_H3_GAIN,
+    QUALITY_TDSHARP_H3_GAIN_NEG,
+    QUALITY_TDSHARP_H4_GAIN,
+    QUALITY_TDSHARP_H4_GAIN_NEG,
+    QUALITY_TDSHARP_V1_GAIN,
+    QUALITY_TDSHARP_V1_GAIN_NEG,
+    QUALITY_TDSHARP_V2_GAIN,
+    QUALITY_TDSHARP_V2_GAIN_NEG,
+    QUALITY_TDSHARP_X1_GAIN,
+    QUALITY_TDSHARP_X1_GAIN_NEG,
+    QUALITY_TDSHARP_X2_GAIN,
+    QUALITY_TDSHARP_X2_GAIN_NEG,
+
+    QUALITY_TDSHARP_H3_SEL,
+    QUALITY_TDSHARP_V4_SEL,
+
+    QUALITY_TDSHARP_H1_CORING,
+    QUALITY_TDSHARP_H1_SOFT_COR_GAIN,
+    QUALITY_TDSHARP_H2_CORING,
+    QUALITY_TDSHARP_H2_SOFT_COR_GAIN,
+    QUALITY_TDSHARP_H3_CORING,
+    QUALITY_TDSHARP_H3_SOFT_COR_GAIN,
+    QUALITY_TDSHARP_H4_CORING,
+    QUALITY_TDSHARP_H4_SOFT_COR_GAIN,
+    QUALITY_TDSHARP_V1_CORING,
+    QUALITY_TDSHARP_V1_SOFT_COR_GAIN,
+    QUALITY_TDSHARP_V2_CORING,
+    QUALITY_TDSHARP_V2_SOFT_COR_GAIN,
+    QUALITY_TDSHARP_X1_CORING,
+    QUALITY_TDSHARP_X1_SOFT_COR_GAIN,
+    QUALITY_TDSHARP_X2_CORING,
+    QUALITY_TDSHARP_X2_SOFT_COR_GAIN,
+
+    QUALITY_TDSHARP_H1_LIMIT_POS,
+    QUALITY_TDSHARP_H1_LIMIT_NEG,
+    QUALITY_TDSHARP_H2_LIMIT_POS,
+    QUALITY_TDSHARP_H2_LIMIT_NEG,
+    QUALITY_TDSHARP_H3_LIMIT_POS,
+    QUALITY_TDSHARP_H3_LIMIT_NEG,
+    QUALITY_TDSHARP_H4_LIMIT_POS,
+    QUALITY_TDSHARP_H4_LIMIT_NEG,
+    QUALITY_TDSHARP_V1_LIMIT_POS,
+    QUALITY_TDSHARP_V1_LIMIT_NEG,
+    QUALITY_TDSHARP_V2_LIMIT_POS,
+    QUALITY_TDSHARP_V2_LIMIT_NEG,
+    QUALITY_TDSHARP_X1_LIMIT_POS,
+    QUALITY_TDSHARP_X1_LIMIT_NEG,
+    QUALITY_TDSHARP_X2_LIMIT_POS,
+    QUALITY_TDSHARP_X2_LIMIT_NEG,
+    QUALITY_TDSHARP_LIMIT_POS_ALL,
+    QUALITY_TDSHARP_LIMIT_NEG_ALL,
+
+    QUALITY_TDSHARP_H1_CLIP_THPOS,
+    QUALITY_TDSHARP_H1_CLIP_THNEG,
+    QUALITY_TDSHARP_H1_SOFT_CLIP_GAIN,
+    QUALITY_TDSHARP_H2_CLIP_THPOS,
+    QUALITY_TDSHARP_H2_CLIP_THNEG,
+    QUALITY_TDSHARP_H2_SOFT_CLIP_GAIN,
+    QUALITY_TDSHARP_H3_CLIP_THPOS,
+    QUALITY_TDSHARP_H3_CLIP_THNEG,
+    QUALITY_TDSHARP_H3_SOFT_CLIP_GAIN,
+    QUALITY_TDSHARP_H4_CLIP_THPOS,
+    QUALITY_TDSHARP_H4_CLIP_THNEG,
+    QUALITY_TDSHARP_H4_SOFT_CLIP_GAIN,
+    QUALITY_TDSHARP_V1_CLIP_THPOS,
+    QUALITY_TDSHARP_V1_CLIP_THNEG,
+    QUALITY_TDSHARP_V1_SOFT_CLIP_GAIN,
+    QUALITY_TDSHARP_V2_CLIP_THPOS,
+    QUALITY_TDSHARP_V2_CLIP_THNEG,
+    QUALITY_TDSHARP_V2_SOFT_CLIP_GAIN,
+    QUALITY_TDSHARP_X1_CLIP_THPOS,
+    QUALITY_TDSHARP_X1_CLIP_THNEG,
+    QUALITY_TDSHARP_X1_SOFT_CLIP_GAIN,
+    QUALITY_TDSHARP_X2_CLIP_THPOS,
+    QUALITY_TDSHARP_X2_CLIP_THNEG,
+    QUALITY_TDSHARP_X2_SOFT_CLIP_GAIN,
+    QUALITY_TDSHARP_POS_CLIP,
+    QUALITY_TDSHARP_NEG_CLIP,
+    QUALITY_TDSHARP_CLIP_GAIN,
+
+    QUALITY_TDSHARP_AC_LPF_EN,
+    QUALITY_TDSHARP_AC_LPF_COE,
+    QUALITY_TDSHARP_H1_LPF_SEL,
+    QUALITY_TDSHARP_H2_LPF_SEL,
+    QUALITY_TDSHARP_H3_LPF_SEL,
+    QUALITY_TDSHARP_H4_LPF_SEL,
+
+    QUALITY_TDSHARP_ADSHP_LC_EN,
+    QUALITY_TDSHARP_ADSHP_YLEV_EN,
+
+    QUALITY_TDSHARP_ADSHP_P1,
+    QUALITY_TDSHARP_ADSHP_P2,
+    QUALITY_TDSHARP_ADSHP_P3,
+    QUALITY_TDSHARP_ADSHP_G1,
+    QUALITY_TDSHARP_ADSHP_G2,
+    QUALITY_TDSHARP_ADSHP_G3,
+    QUALITY_TDSHARP_ADSHP_OFFSET,
+
+    QUALITY_TDSHARP_YLEV_ADAP_ENA,
+    QUALITY_TDSHARP_YLEV_ADL_ENA,
+    QUALITY_TDSHARP_YLEV_APL_ENA,    
+    QUALITY_TDSHARP_YLEV_ADL_GAIN,
+    QUALITY_TDSHARP_YLEV_APL_ZERO,
+    QUALITY_TDSHARP_YLEV_APL_THR,        
+    QUALITY_TDSHARP_YLEV_P1,
+    QUALITY_TDSHARP_YLEV_P2,
+    QUALITY_TDSHARP_YLEV_P3,
+    QUALITY_TDSHARP_YLEV_P4,
+    QUALITY_TDSHARP_YLEV_G1,
+    QUALITY_TDSHARP_YLEV_G2,
+    QUALITY_TDSHARP_YLEV_G3,
+    QUALITY_TDSHARP_YLEV_G4, 
+    
+    QUALITY_MO_SHARP_EN, 
+    QUALITY_MO_SHP_XLUT_GAIN,       
+    QUALITY_MO_SHP_YLUT_GAIN,  
+    QUALITY_MO_SHP_LEVEL,    
+    
+    // 3D Sharpness 
+    QUALITY_SHARP_3D_FS_H,
+    QUALITY_SHARP_3D_FS_V,
+    QUALITY_SHARP_3D_TTD_H,
+    QUALITY_SHARP_3D_TTD_V,
+    QUALITY_SHARP_3D_SBS_H,
+    QUALITY_SHARP_3D_SBS_V,
+    QUALITY_SHARP_3D_TB_H,
+    QUALITY_SHARP_3D_TB_V,
+    QUALITY_SHARP_3D_SS_H,
+    QUALITY_SHARP_3D_SS_V,
+    QUALITY_SHARP_3D_RD_H,
+    QUALITY_SHARP_3D_RD_V,
+
+    // PBC
+    QUALITY_PBC_EN_1,
+    QUALITY_PBC_BAND_SEL_1,
+    QUALITY_PBC_GAIN_SIGN_1,
+    QUALITY_PBC_GAIN_1,
+    QUALITY_PBC_CORING_1,
+    QUALITY_PBC_THETA_C_1,
+    QUALITY_PBC_RADIUS_C_1,
+    QUALITY_PBC_THETA_RANGE_1,
+    QUALITY_PBC_RADIUS_RANGE_1,
+    QUALITY_PBC_LOWER_BOUND_1,
+    QUALITY_PBC_UPPER_BOUND_1,
+    QUALITY_PBC_EN_2,
+    QUALITY_PBC_BAND_SEL_2,
+    QUALITY_PBC_GAIN_SIGN_2,
+    QUALITY_PBC_GAIN_2,
+    QUALITY_PBC_CORING_2,
+    QUALITY_PBC_THETA_C_2,
+    QUALITY_PBC_RADIUS_C_2,
+    QUALITY_PBC_THETA_RANGE_2,
+    QUALITY_PBC_RADIUS_RANGE_2,
+    QUALITY_PBC_LOWER_BOUND_2,
+    QUALITY_PBC_UPPER_BOUND_2,
+    QUALITY_PBC_EN_3,
+    QUALITY_PBC_BAND_SEL_3,
+    QUALITY_PBC_GAIN_SIGN_3,
+    QUALITY_PBC_GAIN_3,
+    QUALITY_PBC_CORING_3,
+    QUALITY_PBC_THETA_C_3,
+    QUALITY_PBC_RADIUS_C_3,
+    QUALITY_PBC_THETA_RANGE_3,
+    QUALITY_PBC_RADIUS_RANGE_3,
+    QUALITY_PBC_LOWER_BOUND_3,
+    QUALITY_PBC_UPPER_BOUND_3,
+    QUALITY_PBC_EN_4,
+    QUALITY_PBC_BAND_SEL_4,
+    QUALITY_PBC_GAIN_SIGN_4,
+    QUALITY_PBC_GAIN_4,
+    QUALITY_PBC_CORING_4,
+    QUALITY_PBC_THETA_C_4,
+    QUALITY_PBC_RADIUS_C_4,
+    QUALITY_PBC_THETA_RANGE_4,
+    QUALITY_PBC_RADIUS_RANGE_4,
+    QUALITY_PBC_LOWER_BOUND_4,
+    QUALITY_PBC_UPPER_BOUND_4,
+
+    //  LTI
+    QUALITY_LTI_GAIN1,
+    QUALITY_LTI_GAIN_NEG1,
+    QUALITY_LTI_LIMIT_POS1,
+    QUALITY_LTI_LIMIT_NEG1,
+    QUALITY_LTI_CORING1,
+    QUALITY_LTI_SOFT_CLIP_GAIN1,
+    QUALITY_LTI_GAIN2,
+    QUALITY_LTI_GAIN_NEG2,
+    QUALITY_LTI_LIMIT_POS2,
+    QUALITY_LTI_LIMIT_NEG2,
+    QUALITY_LTI_CORING2,
+    QUALITY_LTI_SOFT_CLIP_GAIN2,
+    QUALITY_HLTI_HDEG_GAIN,
+    QUALITY_HLTI_HDIFF_OFFSET,
+    QUALITY_HLTI_VDEG_GAIN,
+    QUALITY_HLTI_VDIFF_OFFSET,
+
+    //  CTIF
+    QUALITY_CTIF_ENA,
+    QUALITY_CTIF_HD,
+    QUALITY_CTIF_LPF1,
+    QUALITY_CTIF_LPF1_SEL,
+    QUALITY_CTIF_FLPF,
+    QUALITY_CTIF_FLPF_SEL,
+    QUALITY_CTIF_U_WND_SZ,
+    QUALITY_CTIF_V_WND_SZ,
+    QUALITY_CTIF_U_STB_GAIN,
+    QUALITY_CTIF_V_STB_GAIN,
+    QUALITY_CTIF_U_STB_OFST1,
+    QUALITY_CTIF_V_STB_OFST1,
+    QUALITY_CTIF_U_STB_OFST2,
+    QUALITY_CTIF_V_STB_OFST2,
+    QUALITY_CTIF_FLAT_GAIN,
+    QUALITY_CTIF_FLAT_OFST1,
+    QUALITY_CTIF_FLAT_OFST2,
+    QUALITY_CTIF_COR,
+
+    //  CTIR
+    QUALITY_CTIR_ENA,
+    QUALITY_CTIR_HD,
+    QUALITY_CTIR_LPF1,
+    QUALITY_CTIR_LPF1_SEL,
+    QUALITY_CTIR_FLPF,
+    QUALITY_CTIR_FLPF_SEL,
+    QUALITY_CTIR_U_WND_SZ,
+    QUALITY_CTIR_V_WND_SZ,
+    QUALITY_CTIR_U_STB_GAIN,
+    QUALITY_CTIR_V_STB_GAIN,
+    QUALITY_CTIR_U_STB_OFST1,
+    QUALITY_CTIR_V_STB_OFST1,
+    QUALITY_CTIR_U_STB_OFST2,
+    QUALITY_CTIR_V_STB_OFST2,
+    QUALITY_CTIR_FLAT_GAIN,
+    QUALITY_CTIR_FLAT_OFST1,
+    QUALITY_CTIR_FLAT_OFST2,
+    QUALITY_CTIR_COR,
+
+    // CBE
+    QUALITY_CBE_WEI_IT3,
+    QUALITY_CBE_WEI_IT5,
+
+    // IRR
+    QUALITY_IRR_EN,
+    QUALITY_IRR_FILTER,
+    QUALITY_IRR_FILTER_CLIP,
+    QUALITY_IRR_LEVEL,
+    QUALITY_IRR_TAP,
+    QUALITY_IRR_EDGE_TH,
+    QUALITY_IRR_EDGE_SLOPE,
+    QUALITY_IRR_LF_TH,
+    QUALITY_IRR_LF_SLOPE,
+    QUALITY_IRR_HF_TH,
+    QUALITY_IRR_HF_SLOPE,
+    QUALITY_IRR_RIPPLE_TH,
+    QUALITY_IRR_DEACY_ER,
+    QUALITY_IRR_DEACY_TH,
+    QUALITY_IRR_FLAT_TH,
+    QUALITY_IRR_FLAT_SLOPE,
+    QUALITY_IRR_FLAT_LEVEL,    
+
+    // 2DNR
+	QUALITY_SNR_MESSSFT_SM_CO1MO,
+	QUALITY_SNR_MESSTHL_SM_CO1MO,
+	QUALITY_SNR_MESSSFT_MESS_CO1MO,
+	QUALITY_SNR_MESSTHL_MESS_CO1MO,
+	QUALITY_SNR_MESSSFT_EDGE_CO1MO,
+	QUALITY_SNR_MESSTHL_EDGE_CO1MO,
+	QUALITY_SNR_MESSSFT_SM_CO1ST,
+	QUALITY_SNR_MESSTHL_SM_CO1ST,
+	QUALITY_SNR_MESSSFT_MESS_CO1ST,
+	QUALITY_SNR_MESSTHL_MESS_CO1ST,
+	QUALITY_SNR_MESSSFT_EDGE_CO1ST,
+	QUALITY_SNR_MESSTHL_EDGE_CO1ST,
+	QUALITY_SNR_BLDLV_SM_CO1,
+	QUALITY_SNR_BLDLV_MESS_CO1,
+	QUALITY_SNR_BLDLV_EDGE_CO1,
+	QUALITY_SNR_MESSSFT_SM_CO2MO,
+	QUALITY_SNR_MESSTHL_SM_CO2MO,
+	QUALITY_SNR_MESSSFT_MESS_CO2MO,
+	QUALITY_SNR_MESSTHL_MESS_CO2MO,
+	QUALITY_SNR_MESSSFT_EDGE_CO2MO,
+	QUALITY_SNR_MESSTHL_EDGE_CO2MO,
+	QUALITY_SNR_MESSSFT_SM_CO2ST,
+	QUALITY_SNR_MESSTHL_SM_CO2ST,
+	QUALITY_SNR_MESSSFT_MESS_CO2ST,
+	QUALITY_SNR_MESSTHL_MESS_CO2ST,
+	QUALITY_SNR_MESSSFT_EDGE_CO2ST,
+	QUALITY_SNR_MESSTHL_EDGE_CO2ST,
+	QUALITY_SNR_BLDLV_SM_CO2,
+	QUALITY_SNR_BLDLV_MESS_CO2,
+	QUALITY_SNR_BLDLV_EDGE_CO2,
+	QUALITY_SNR_MESSSFT_SM_CO3MO,
+	QUALITY_SNR_MESSTHL_SM_CO3MO,
+	QUALITY_SNR_MESSSFT_MESS_CO3MO,
+	QUALITY_SNR_MESSTHL_MESS_CO3MO,
+	QUALITY_SNR_MESSSFT_EDGE_CO3MO,
+	QUALITY_SNR_MESSTHL_EDGE_CO3MO,
+	QUALITY_SNR_MESSSFT_SM_CO3ST,
+	QUALITY_SNR_MESSTHL_SM_CO3ST,
+	QUALITY_SNR_MESSSFT_MESS_CO3ST,
+	QUALITY_SNR_MESSTHL_MESS_CO3ST,
+	QUALITY_SNR_MESSSFT_EDGE_CO3ST,
+	QUALITY_SNR_MESSTHL_EDGE_CO3ST,
+	QUALITY_SNR_BLDLV_SM_CO3,
+	QUALITY_SNR_BLDLV_MESS_CO3,
+	QUALITY_SNR_BLDLV_EDGE_CO3,
+	QUALITY_SNR_MESSSFT_SM_FRST,
+	QUALITY_SNR_MESSTHL_SM_FRST,
+	QUALITY_SNR_MESSSFT_MESS_FRST,
+	QUALITY_SNR_MESSTHL_MESS_FRST,
+	QUALITY_SNR_MESSSFT_EDGE_FRST,
+	QUALITY_SNR_MESSTHL_EDGE_FRST,
+	QUALITY_SNR_BLDLV_SM_FRST,
+	QUALITY_SNR_BLDLV_MESS_FRST,
+	QUALITY_SNR_BLDLV_EDGE_FRST,
+	QUALITY_SNR_MESSSFT_SM_MO,
+	QUALITY_SNR_MESSTHL_SM_MO,
+	QUALITY_SNR_MESSSFT_MESS_MO,
+	QUALITY_SNR_MESSTHL_MESS_MO,
+	QUALITY_SNR_MESSSFT_EDGE_MO,
+	QUALITY_SNR_MESSTHL_EDGE_MO,
+	QUALITY_SNR_BLDLV_SM_MO,
+	QUALITY_SNR_BLDLV_MESS_MO,
+	QUALITY_SNR_BLDLV_EDGE_MO,
+	QUALITY_SNR_MESSSFT_SM_ST,
+	QUALITY_SNR_MESSTHL_SM_ST,
+	QUALITY_SNR_MESSSFT_MESS_ST,
+	QUALITY_SNR_MESSTHL_MESS_ST,
+	QUALITY_SNR_MESSSFT_EDGE_ST,
+	QUALITY_SNR_MESSTHL_EDGE_ST,
+	QUALITY_SNR_BLDLV_SM_ST,
+	QUALITY_SNR_BLDLV_MESS_ST,
+	QUALITY_SNR_BLDLV_EDGE_ST,
+	QUALITY_SNR_MESSSFT_SM_BK,
+	QUALITY_SNR_MESSTHL_SM_BK,
+	QUALITY_SNR_MESSSFT_MESS_BK,
+	QUALITY_SNR_MESSTHL_MESS_BK,
+	QUALITY_SNR_MESSSFT_EDGE_BK,
+	QUALITY_SNR_MESSTHL_EDGE_BK,
+	QUALITY_SNR_BLDLV_SM_BK,
+	QUALITY_SNR_BLDLV_MESS_BK,
+	QUALITY_SNR_BLDLV_EDGE_BK,
+	QUALITY_SNR_MESSSFT_SM_DEF,
+	QUALITY_SNR_MESSTHL_SM_DEF,
+	QUALITY_SNR_MESSSFT_MESS_DEF,
+	QUALITY_SNR_MESSTHL_MESS_DEF,
+	QUALITY_SNR_MESSSFT_EDGE_DEF,
+	QUALITY_SNR_MESSTHL_EDGE_DEF,
+	QUALITY_SNR_BLDLV_SM_DEF,
+	QUALITY_SNR_BLDLV_MESS_DEF,
+	QUALITY_SNR_BLDLV_EDGE_DEF,
+	QUALITY_SNR_GLOBAL_BLEND,
+	
+	// MPEG NR
+	QUALITY_SNR_MESSSFT_MOS_CO1MO,
+	QUALITY_SNR_MESSTHL_MOS_CO1MO,
+	QUALITY_SNR_MESSSFT_MOS_CO1ST,
+	QUALITY_SNR_MESSTHL_MOS_CO1ST,
+	QUALITY_SNR_BLDLV_BK_CO1,
+	QUALITY_SNR_BLDLV_MOS_CO1,
+	QUALITY_SNR_MESSSFT_MOS_CO2MO,
+	QUALITY_SNR_MESSTHL_MOS_CO2MO,
+	QUALITY_SNR_MESSSFT_MOS_CO2ST,
+	QUALITY_SNR_MESSTHL_MOS_CO2ST,
+	QUALITY_SNR_BLDLV_BK_CO2,
+	QUALITY_SNR_BLDLV_MOS_CO2,
+	QUALITY_SNR_MESSSFT_MOS_CO3MO,
+	QUALITY_SNR_MESSTHL_MOS_CO3MO,
+	QUALITY_SNR_MESSSFT_MOS_CO3ST,
+	QUALITY_SNR_MESSTHL_MOS_CO3ST,
+	QUALITY_SNR_BLDLV_BK_CO3,
+	QUALITY_SNR_BLDLV_MOS_CO3,
+	QUALITY_SNR_MESSSFT_MOS_FRST,
+	QUALITY_SNR_MESSTHL_MOS_FRST,
+	QUALITY_SNR_BLDLV_BK_FRST,
+	QUALITY_SNR_BLDLV_MOS_FRST,
+	QUALITY_SNR_MESSSFT_MOS_MO,
+	QUALITY_SNR_MESSTHL_MOS_MO,
+	QUALITY_SNR_BLDLV_BK_MO,
+	QUALITY_SNR_BLDLV_MOS_MO,
+	QUALITY_SNR_MESSSFT_MOS_ST,
+	QUALITY_SNR_MESSTHL_MOS_ST,
+	QUALITY_SNR_BLDLV_BK_ST,
+	QUALITY_SNR_BLDLV_MOS_ST,
+	QUALITY_SNR_MESSSFT_MOS_BK,
+	QUALITY_SNR_MESSTHL_MOS_BK,
+	QUALITY_SNR_BLDLV_BK_BK,
+	QUALITY_SNR_BLDLV_MOS_BK,
+	QUALITY_SNR_MESSSFT_MOS_DEF,
+	QUALITY_SNR_MESSTHL_MOS_DEF,
+	QUALITY_SNR_BLDLV_MOS_DEF,
+	QUALITY_SNR_CUR_SM_NUM,
+	QUALITY_SNR_CUR_SM_THR,
+	QUALITY_SNR_NEAREDGE_SELWIDTH,
+	QUALITY_SNR_NEAREDGE_EDGE_THR,
+
+	// 3DNR
+    QUALITY_TNR_REG_TBTHX1,
+    QUALITY_TNR_REG_TBTHX2,
+    QUALITY_TNR_REG_TBTHX3,
+    QUALITY_TNR_REG_TBTHX4,
+    QUALITY_TNR_REG_TBTHX5,
+    QUALITY_TNR_REG_TBTHX6,
+    QUALITY_TNR_REG_TBTHX7,
+    QUALITY_TNR_REG_TBTHX8,
+    QUALITY_TNR_DEF_TBL0,
+    QUALITY_TNR_DEF_TBL1,
+    QUALITY_TNR_DEF_TBL2,
+    QUALITY_TNR_DEF_TBL3,
+    QUALITY_TNR_DEF_TBL4,
+    QUALITY_TNR_DEF_TBL5,
+    QUALITY_TNR_DEF_TBL6,
+    QUALITY_TNR_DEF_TBL7,
+    QUALITY_TNR_CIIR_TBL0,
+    QUALITY_TNR_CIIR_TBL1,
+    QUALITY_TNR_CIIR_TBL2,
+    QUALITY_TNR_CIIR_TBL3,
+    QUALITY_TNR_CIIR_TBL4,
+    QUALITY_TNR_CIIR_TBL5,
+    QUALITY_TNR_CIIR_TBL6,
+    QUALITY_TNR_CIIR_TBL7,
+
+    // Auto NR
+    QUALITY_ANR_SAT_LV0,
+    QUALITY_ANR_DEF_TBL0_LV0,
+    QUALITY_ANR_DEF_TBL1_LV0,
+    QUALITY_ANR_DEF_TBL2_LV0,
+    QUALITY_ANR_DEF_TBL3_LV0,
+    QUALITY_ANR_DEF_TBL4_LV0,
+    QUALITY_ANR_DEF_TBL5_LV0,
+    QUALITY_ANR_DEF_TBL6_LV0,
+    QUALITY_ANR_DEF_TBL7_LV0,
+    QUALITY_ANR_MOTION_THX1_LV0,
+
+    QUALITY_ANR_SAT_LV1,
+    QUALITY_ANR_DEF_TBL0_LV1,
+    QUALITY_ANR_DEF_TBL1_LV1,
+    QUALITY_ANR_DEF_TBL2_LV1,
+    QUALITY_ANR_DEF_TBL3_LV1,
+    QUALITY_ANR_DEF_TBL4_LV1,
+    QUALITY_ANR_DEF_TBL5_LV1,
+    QUALITY_ANR_DEF_TBL6_LV1,
+    QUALITY_ANR_DEF_TBL7_LV1,
+    QUALITY_ANR_MOTION_THX1_LV1,
+
+    QUALITY_ANR_SAT_LV2,
+    QUALITY_ANR_DEF_TBL0_LV2,
+    QUALITY_ANR_DEF_TBL1_LV2,
+    QUALITY_ANR_DEF_TBL2_LV2,
+    QUALITY_ANR_DEF_TBL3_LV2,
+    QUALITY_ANR_DEF_TBL4_LV2,
+    QUALITY_ANR_DEF_TBL5_LV2,
+    QUALITY_ANR_DEF_TBL6_LV2,
+    QUALITY_ANR_DEF_TBL7_LV2,
+    QUALITY_ANR_MOTION_THX1_LV2,
+
+    QUALITY_ANR_SAT_LV3,
+    QUALITY_ANR_DEF_TBL0_LV3,
+    QUALITY_ANR_DEF_TBL1_LV3,
+    QUALITY_ANR_DEF_TBL2_LV3,
+    QUALITY_ANR_DEF_TBL3_LV3,
+    QUALITY_ANR_DEF_TBL4_LV3,
+    QUALITY_ANR_DEF_TBL5_LV3,
+    QUALITY_ANR_DEF_TBL6_LV3,
+    QUALITY_ANR_DEF_TBL7_LV3,
+    QUALITY_ANR_MOTION_THX1_LV3,
+
+    QUALITY_ANR_SAT_LV4,
+    QUALITY_ANR_DEF_TBL0_LV4,
+    QUALITY_ANR_DEF_TBL1_LV4,
+    QUALITY_ANR_DEF_TBL2_LV4,
+    QUALITY_ANR_DEF_TBL3_LV4,
+    QUALITY_ANR_DEF_TBL4_LV4,
+    QUALITY_ANR_DEF_TBL5_LV4,
+    QUALITY_ANR_DEF_TBL6_LV4,
+    QUALITY_ANR_DEF_TBL7_LV4,
+    QUALITY_ANR_MOTION_THX1_LV4,
+
+    QUALITY_ANR_SAT_LV5,
+    QUALITY_ANR_DEF_TBL0_LV5,
+    QUALITY_ANR_DEF_TBL1_LV5,
+    QUALITY_ANR_DEF_TBL2_LV5,
+    QUALITY_ANR_DEF_TBL3_LV5,
+    QUALITY_ANR_DEF_TBL4_LV5,
+    QUALITY_ANR_DEF_TBL5_LV5,
+    QUALITY_ANR_DEF_TBL6_LV5,
+    QUALITY_ANR_DEF_TBL7_LV5,
+    QUALITY_ANR_MOTION_THX1_LV5,
+
+    QUALITY_ANR_SAT_LV6,
+    QUALITY_ANR_DEF_TBL0_LV6,
+    QUALITY_ANR_DEF_TBL1_LV6,
+    QUALITY_ANR_DEF_TBL2_LV6,
+    QUALITY_ANR_DEF_TBL3_LV6,
+    QUALITY_ANR_DEF_TBL4_LV6,
+    QUALITY_ANR_DEF_TBL5_LV6,
+    QUALITY_ANR_DEF_TBL6_LV6,
+    QUALITY_ANR_DEF_TBL7_LV6,
+    QUALITY_ANR_MOTION_THX1_LV6,
+
+    QUALITY_ANR_SAT_LV7,
+    QUALITY_ANR_DEF_TBL0_LV7,
+    QUALITY_ANR_DEF_TBL1_LV7,
+    QUALITY_ANR_DEF_TBL2_LV7,
+    QUALITY_ANR_DEF_TBL3_LV7,
+    QUALITY_ANR_DEF_TBL4_LV7,
+    QUALITY_ANR_DEF_TBL5_LV7,
+    QUALITY_ANR_DEF_TBL6_LV7,
+    QUALITY_ANR_DEF_TBL7_LV7,
+    QUALITY_ANR_MOTION_THX1_LV7,
+    
+	// Adaptive Luma 
+    QUALITY_CBOOST_ONOFF,
+    QUALITY_CBOOST_MINUS_EN,
+    QUALITY_CBOOST_GAIN,
+    QUALITY_CBOOST_RNG_SEL,
+    QUALITY_CBOOST_LMT_U,
+    QUALITY_CBOOST_LMT_L,  
+    
+    QUALITY_AL_ON_1_OFF_0,
+    QUALITY_AL_GAIN,
+    QUALITY_AL_OFFSET,
+    QUALITY_AL_LIMIT,
+    
+    QUALITY_AL_BWS_BLACK_ON_1_OFF_0,
+    QUALITY_AL_BWS_BLACK_LEVEL,
+    QUALITY_AL_BWS_BLACK_GAIN,
+    QUALITY_AL_BWS_BLACK_OFFSET,
+    QUALITY_AL_BWS_BLACK_RATIO,
+    QUALITY_AL_BWS_BLACK_LIMIT,
+
+    QUALITY_AL_BWS_WHITE_ON_1_OFF_0,
+    QUALITY_AL_BWS_WHITE_LEVEL,
+    QUALITY_AL_BWS_WHITE_GAIN,
+    QUALITY_AL_BWS_WHITE_OFFSET,
+    QUALITY_AL_BWS_WHITE_RATIO,
+    QUALITY_AL_BWS_WHITE_LIMIT,
+
+    QUALITY_AL_DYNBS_EN,
+    QUALITY_AL_DYNBS_RANGE,
+    QUALITY_AL_DYNBS_PXL_THD1,
+    QUALITY_AL_DYNBS_PXL_THD2,
+    QUALITY_AL_DYNBS_DIST_THDH,
+    QUALITY_AL_DYNBS_DIST_THDM,
+    QUALITY_AL_DYNBS_DIST_THDL,
+    QUALITY_AL_DYNBS_LMT_BTM,
+    QUALITY_AL_DYNBS_LMT_TOP,
+    QUALITY_AL_DYNBS_GAIN_BTM,
+    QUALITY_AL_DYNBS_GAIN_TOP,
+    QUALITY_AL_DYNBS_OFST_BTM,
+    QUALITY_AL_DYNBS_OFST_TOP,
+
+    QUALITY_AL_YGAMMA_DECAY_BRIGHT,
+    QUALITY_AL_YGAMMA_DECAY_LO,
+    QUALITY_AL_YGAMMA_DECAY_HI,
+    QUALITY_AL_YGAMMA_SEL,
+
+    QUALITY_AL_BWS_KEEP_MID_ONOFF,
+    QUALITY_AL_BWS_KEEP_MID_X_LVL,
+    QUALITY_AL_BWS_KEEP_MID_Y_POS,
+    
+    //RGB Gain offset
+    QUALITY_R_GAIN,    
+    QUALITY_G_GAIN,   
+    QUALITY_B_GAIN,
+    QUALITY_R_GAIN_MSB,   
+    QUALITY_G_GAIN_MSB,
+    QUALITY_B_GAIN_MSB, 
+    QUALITY_R_OFFSET, 
+    QUALITY_G_OFFSET,  
+    QUALITY_B_OFFSET,
+    QUALITY_R_OFFSET_MSB,       
+    QUALITY_G_OFFSET_MSB,      
+    QUALITY_B_OFFSET_MSB,
+    
+    //Blue stretch
+    QUALITY_BLUE_STRETCH_ENABLE,
+    QUALITY_BLUE_STRETCH_GAIN_R,
+    QUALITY_BLUE_STRETCH_GAIN_G,
+    QUALITY_BLUE_STRETCH_GAIN_B,
+    QUALITY_BLUE_STRETCH_LUMA_THD,
+    QUALITY_BLUE_STRETCH_SAT_THD,
+
+    //GAMMA
+    QUALITY_GAMMA_CURVE_SEL,
+
+    //SCE
+    QUALITY_SCE_LUMA_GAIN,
+    QUALITY_SCE_SAT_GAIN,
+    QUALITY_SCE_HUE_GAIN,
+  
+    //SKIN_LUMA    
+    QUALITY_SKIN_LUMA_GAIN,
+    QUALITY_SKIN_SAT_GAIN,
+    QUALITY_SKIN_HUE_GAIN,    
+
+    QUALITY_MAX
+};
+
+#define QUALITY_SHARP_BEGIN         		QUALITY_HSHARP_LOW
+#define QUALITY_SHARP_END                   QUALITY_HLTI_VDIFF_OFFSET
+
+#define QUALITY_SHARP_H_BEGIN				QUALITY_TDSHARP_H1_GAIN
+#define QUALITY_SHARP_H_END        			QUALITY_TDSHARP_H4_GAIN_NEG
+
+#define QUALITY_SHARP_V_BEGIN   			QUALITY_TDSHARP_V1_GAIN
+#define QUALITY_SHARP_V_END          		QUALITY_TDSHARP_V2_GAIN_NEG
+
+#define QUALITY_LTI_BEGIN                   QUALITY_LTI_GAIN1
+#define QUALITY_LTI_END                     QUALITY_HLTI_VDIFF_OFFSET
+
+#define QUALITY_CTI_BEGIN				    QUALITY_CTIF_ENA
+#define QUALITY_CTI_END						QUALITY_CTIR_COR
+
+#define QUALITY_CBE_BEGIN				    QUALITY_CBE_WEI_IT3
+#define QUALITY_CBE_END						QUALITY_CBE_WEI_IT5
+
+#define QUALITY_IRR_BEGIN				    QUALITY_IRR_EN
+#define QUALITY_IRR_END						QUALITY_IRR_FLAT_LEVEL
+
+#define QUALITY_TNR_BEGIN				    QUALITY_TNR_REG_TBTHX1
+#define QUALITY_TNR_END				    	QUALITY_ANR_MOTION_THX1_LV7
+
+#define QUALITY_SNR_BEGIN			        QUALITY_SNR_MESSSFT_SM_CO1MO
+#define QUALITY_SNR_END				    	QUALITY_SNR_GLOBAL_BLEND
+
+#define QUALITY_ANR_BEGIN			        QUALITY_ANR_SAT_LV0
+#define QUALITY_ANR_END				        QUALITY_ANR_MOTION_THX1_LV7
+#define QUALITY_ANR_SIZE_PER_LV             (QUALITY_ANR_SAT_LV1-QUALITY_ANR_SAT_LV0)
+
+#define QUALITY_MPEGNR_BEGIN				QUALITY_SNR_MESSSFT_MOS_CO1MO
+#define QUALITY_MPEGNR_END					QUALITY_SNR_NEAREDGE_EDGE_THR
+
+#define QUALITY_AL_BEGIN                    QUALITY_AL_ON_1_OFF_0
+#define QUALITY_AL_END                      QUALITY_AL_BWS_KEEP_MID_Y_POS
+
+#define QUALITY_AL_BS_BEGIN                 QUALITY_AL_BWS_BLACK_ON_1_OFF_0
+#define QUALITY_AL_BS_END                   QUALITY_AL_BWS_BLACK_LIMIT
+
+#define QUALITY_AL_WS_BEGIN                 QUALITY_AL_BWS_WHITE_ON_1_OFF_0
+#define QUALITY_AL_WS_END                   QUALITY_AL_BWS_WHITE_LIMIT
+
+#define QUALITY_BS_BEGIN 					QUALITY_BLUE_STRETCH_ENABLE
+#define QUALITY_BS_END 						QUALITY_BLUE_STRETCH_SAT_THD
+
+#define QUALITY_GAMMA_BEGIN     			QUALITY_GAMMA_CURVE_SEL
+#define QUALITY_GAMMA_END       			QUALITY_GAMMA_CURVE_SEL
+
+#define QUALITY_SCE_BEGIN     				QUALITY_SCE_LUMA_GAIN
+#define QUALITY_SCE_END       				QUALITY_SCE_HUE_GAIN
+
+#define QUALITY_SKIN_BEGIN     			    QUALITY_SKIN_LUMA_GAIN
+#define QUALITY_SKIN_END       			    QUALITY_SKIN_HUE_GAIN
+
+
+enum
+{
+    PQ_CONTRAST,
+    PQ_BRIGHTNESS,
+    PQ_SATURATION,
+    PQ_HUE,
+    PQ_MAX
+};
+
+///////////////////////////////////////////////////////////////////////////////////
+extern UINT8 QUALITY_TBL[QUALITY_MAX];
+UINT16 wReadQualityTable(UINT16 wAddr);
+void wWriteQualityTable(UINT16 wAddr, UINT16 wData);
+
+// For flash PQ architecture.
+#define FROM_DFT		0xFFFF
+
+// Define the maximum number of items in custom quality table.
+#ifndef CUSTOM_QTY_TBL_DIM
+    #define CUSTOM_QTY_TBL_DIM	512 // Change dimension number in drv_opt, not here.
+#endif // #ifndef CUSTOM_QTY_TBL_DIM
+
+#define VIDEO_GAIN_DFT              0x200
+#define VIDEO_EXT_GAIN_DFT      0x254
+#define VIDEO_EXT_GAIN_MAX      0x3FF
+#define VIDEO_OFST_DFT              0x0
+#define VIDEO_EXT_OFST_DFT      0x3C0
+#define VIDEO_EXT_OFST_MAX      0x3FF
+#define VIDEO_EXT_APL_UPPER_BOUND	200
+#define VIDEO_EXT_APL_LOWER_BOUND	80
+#define VIDEO_EXT_FIND_MAX_HIST_INDEX_TH	80
+#define	ADAPTIVE_BACKLIGHT_FIND_MAX_HIST_INDEX_TH	1000
+
+#define VIDEO_EXT_FRAME_COUNT	48
+
+enum
+{
+    ADP_BACKLIGHT_HIGH_IDX = 0,
+    ADP_BACKLIGHT_MIDDLE_IDX,
+    ADP_BACKLIGHT_LOW_IDX,
+    ADP_BACKLIGHT_END_IDX
+};
+
+/**
+ * @ DFT_QTY	denotes the min, max, and default HW values of corresponding quality item.
+ * 				These values are default setting for all of the video timing.
+ */
+enum
+{
+    DFT_QTY_MIN = 0,
+    DFT_QTY_MAX,
+    DFT_QTY_DFT,
+    DFT_QTY_REFERENCE,
+    DFT_QTY_ITEM,
+    DFT_QTY_DIM
+};
+
+//typedef
+typedef struct
+{
+    UINT8 bDftQtyMin;
+    UINT8 bDftQtyMax;
+    UINT8 bDftQtyDft;
+    UINT16 wDftQtyRefenence;
+    UINT16 wQtyItem;    
+}tagDFT_QTY;
+
+/**
+ * @ MDY_QTY	denotes the min, max, and default HW values of corresponding quality item.
+ * 				These values are dedicated to MDY_QTY_INDEX video timing.
+ */
+enum
+{
+    MDY_QTY_MIN = 0,
+    MDY_QTY_MAX,
+    MDY_QTY_DFT,
+    MDY_QTY_INDEX,
+    MDY_QTY_ITEM,
+    MDY_QTY_DIM
+};
+
+/**
+ * @ QTY_IDX_RANGE	denotes the range of quality index timing.
+ */
+enum
+{
+    QTY_IDX_RANGE_BEGIN = 0,
+    QTY_IDX_RANGE_END,
+    QTY_IDX_RANGE_DIM
+};
+
+enum
+{
+    REGISTER_CALLBACK,
+    REGISTER_PATH,
+    REGISTER_ON_OFF,
+    REGISTER_APPLY_TIME,
+    REGISTER_DIM,
+};
+
+enum
+{
+    BL_STATE_POWERON,
+    BL_STATE_OUTPUT_FR_CHANGE,
+};
+
+#define DFT_GAMMA_TABLE_SIZE	768     // 256*3
+#define DFT_SCE_TABLE_SIZE		1456    // 360*4 + 16 (chroma comp)
+#define DFT_QTY_TABLE_SIZE		256
+#define DFT_QTY_TIMING_SIZE		12
+
+#define FLASHPQ_ID		"PQHD"  // size: TBL_HEAD_ID_SIZE
+#define FLASHPQ_ID_EX	"PQEX"  // size: TBL_HEAD_ID_SIZE
+#define GAMMA_ID		"GAID"  // size: TBL_HEAD_ID_SIZE
+#define SCE_ID			"SCID"  // size: TBL_HEAD_ID_SIZE
+#define QTY_ID			"QTID"  // size: TBL_HEAD_ID_SIZE
+#define OD_ID			"ODID"  // size: TBL_HEAD_ID_SIZE
+#define QTY_ITEM		"QUALITY ITEMS"
+
+#define QTY_ITEM_MAX	0xFFFF
+
+#define TBL_FILE_ID_SIZE	6
+#define FILE_HEAD_VER_SIZE	10
+
+#define TBL_HEAD_ID_SIZE	    4
+#define TBL_HEAD_CFG_SIZE	    4
+#define TBL_HEAD_SCRIPT_SIZE	24
+#define TBL_HEAD_DATE_SIZE		12
+#define TBL_HEAD_HASH			4
+#define TBL_HEAD_SIZE (TBL_HEAD_ID_SIZE+TBL_HEAD_CFG_SIZE+TBL_HEAD_SCRIPT_SIZE+TBL_HEAD_DATE_SIZE+TBL_HEAD_HASH)
+
+#define TIMING_SCRIPT_SIZE	    16
+
+typedef struct tagFileHead
+{
+    UINT8 bID[TBL_FILE_ID_SIZE];
+	UINT8 bNumOfSmartPic;
+    UINT8 bChipID;    
+    UINT16 wNumOfGamma;
+    UINT16 wSizeOfGammaTable;
+    UINT16 wNumOfSCE;
+    UINT16 wSizeOfSCETable;
+    UINT16 wNumOfQty;
+    UINT16 wSizeOfQtyTable;
+    UINT8 bNumOfTiming;
+    UINT8 bQtyXmlVer[FILE_HEAD_VER_SIZE];
+    UINT8 bRes;  
+    UINT16 wConfigOfOd;
+    UINT16 wNumOfOd;
+    UINT16 wSizeOfOdTable;    
+    // If add new items, should remove the size from bReserved
+    // to keep the FILE HEAD 16 byte align
+    UINT8 bReserved[26];
+} FLASH_PQ_FILE_HEAD;
+
+typedef struct tagTblHead
+{
+    UINT8 bID[TBL_HEAD_ID_SIZE];
+    UINT8 bConfig[TBL_HEAD_CFG_SIZE];
+    UINT8 bScript[TBL_HEAD_SCRIPT_SIZE];
+    UINT8 bDate[TBL_HEAD_DATE_SIZE];
+	UINT8 bHash[TBL_HEAD_HASH];
+} FLASH_PQ_TABLE_HEAD;
+
+enum RESERVED_BYTE
+{
+    RES_SUPPORT_QTY_TIMING_DESCRIPT = 0x01,	// [0]
+    RES_02		                    = 0x02, // [1]
+    RES_SUPPORT_QTY_MAX_MIN			= 0x04, // [2]
+    RES_08		                    = 0x08,	// [3]
+    RES_SUPPORT_QTY_HASH			= 0x10,	// [4]
+    RES_20 = 0x20,              // [5]
+    RES_40 = 0x40,              // [6]
+    RES_80 = 0x80,              // [7]
+};
+
+enum FLASHPQ_TYPE
+{
+    TYPE_PQ_HEADER = 0,
+    TYPE_GAMMA_HEADER,
+    TYPE_SCE_HEADER,
+    TYPE_QTY_HEADER,
+    TYPE_QTY_DESCRIPT,
+    TYPE_QTY_CONTENT,
+    TYPE_OD_HEADER,
+    TYPE_FILE_END
+};
+
+enum FLASHPQ_VER
+{
+    FLASHPQ_XML_VER,
+    FLASHPQ_GAMMA_VER,
+    FLASHPQ_SCE_VER,
+    FLASHPQ_QTY_VER,    
+    FLASHPQ_OD_VER
+};
+
+/** 
+ *  min, max, default values of UI video quality item.
+ */
+typedef struct _PE_UI_RANGE_T
+{
+    INT32 i4Min;
+    INT32 i4Max;
+    INT32 i4Dft;
+} PE_UI_RANGE_T;
+
+// Video plane argument.
+// Don't forget to sync with MTVDO_ARG_TYPE_T in mtvdo.h
+// and ucPeUiType in api_peui.c
+typedef enum
+{
+    PE_ARG_BRIGHTNESS=0,
+    PE_ARG_CONTRAST,
+    PE_ARG_HUE,
+    PE_ARG_SATURATION,
+    PE_ARG_CTI,
+    PE_ARG_SHARPNESS,
+    PE_ARG_SHARPNESS_H,
+    PE_ARG_SHARPNESS_L,
+    PE_ARG_LTI,
+    PE_ARG_R_GAIN,
+    PE_ARG_G_GAIN,
+    PE_ARG_B_GAIN,
+    PE_ARG_R_OFFSET,
+    PE_ARG_G_OFFSET,
+    PE_ARG_B_OFFSET,
+    PE_ARG_NR,
+    PE_ARG_GAMMA,
+    PE_ARG_WHITE_PEAK_LMT,
+    PE_ARG_SCE,
+    PE_ARG_SKIN_COLOR,
+    PE_ARG_ADAPTIVE_LUMA,
+    PE_ARG_BACK_LIGHT_LVL,
+    PE_ARG_ADAPTIVE_BACK_LIGHT,
+    PE_ARG_3D_NR,
+    PE_ARG_DEMO,
+    PE_ARG_DI_FILM_MODE,
+    PE_ARG_DI_MA,
+    PE_ARG_DI_EDGE_PRESERVE,
+    PE_ARG_MJC_MODE,
+    PE_ARG_MJC_EFFECT,
+    PE_ARG_MJC_DEMO,
+    PE_ARG_XVYCC,
+    PE_ARG_WCG,
+    PE_ARG_GAME_MODE,
+    PE_ARG_BLUE_STRETCH,
+    PE_ARG_MPEG_NR,
+    PE_ARG_BLACK_STRETCH,
+    PE_ARG_WHITE_STRETCH,
+    PE_ARG_SHARPNESS_ON_OFF,     
+    PE_ARG_OPC_CURVE,
+    PE_ARG_IRR,
+    PE_ARG_CBE,
+    PE_ARG_TDES,
+    PE_ARG_LCDIM,	
+    PE_ARG_TDTV_PACKING,
+    PE_ARG_TDTV_INVERSE,
+    PE_ARG_TDTV_DEPTH,
+    PE_ARG_TDTV_3D_TO_2D,
+    PE_ARG_TDTV_FPR,
+    PE_ARG_TDTV_PROTRUDE,
+    PE_ARG_TDTV_DISTANCE,
+    PE_ARG_TDTV_OSD_DEPTH,              
+    PE_ARG_NS                      
+} PE_ARG_TYPE;
+
+// Video update by register event.
+typedef enum
+{
+    // PreProc : Before Scaler
+    PE_EVENT_IN_3x3,
+    // PostPro : Before MJC
+	PE_EVENT_SCE,       // This is the first item before MJC, don't change this position    
+	PE_EVENT_ADAPTIVE_LUMA,
+	PE_EVENT_LUMA_CURVE,
+	PE_EVENT_SHARPNESS_ON_OFF,
+	PE_EVENT_SHARPNESS,
+ 	PE_EVENT_XVYCC,
+	PE_EVENT_XVRGB_GAIN,
+	PE_EVENT_OUT_3x3,
+	// Outsatage : After MJC
+	PE_EVENT_R_GAIN,    // This is the first item after MJC, don't change this position
+	PE_EVENT_G_GAIN,
+	PE_EVENT_B_GAIN,
+	PE_EVENT_R_OFFSET,
+	PE_EVENT_G_OFFSET,
+	PE_EVENT_B_OFFSET,
+	PE_EVENT_RGB_GAIN_OFST,
+	PE_EVENT_RGB_GAIN,
+	PE_EVENT_RGB_OFST1,
+	PE_EVENT_RGB_OFST2,	
+	PE_EVENT_GAMMA,
+	PE_EVENT_OPC_CURVE,
+	PE_EVENT_OD,
+    PE_EVENT_NS                      
+} PE_EVENT_TYPE;
+
+#define PE_EVENT_BEFORE_SCALER      PE_EVENT_SCE
+#define PE_EVENT_BEFORE_MJC         PE_EVENT_R_GAIN
+
+#endif /* _PE_TABLE_H_ */
+
+

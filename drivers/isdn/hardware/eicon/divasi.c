@@ -1,4 +1,4 @@
-/* $Id: divasi.c,v 1.25.6.2 2005/01/31 12:22:20 armin Exp $
+/* $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/isdn/hardware/eicon/divasi.c#1 $
  *
  * Driver for Eicon DIVA Server ISDN cards.
  * User Mode IDI Interface 
@@ -27,7 +27,7 @@
 #include "um_xdi.h"
 #include "um_idi.h"
 
-static char *main_revision = "$Revision: 1.25.6.2 $";
+static char *main_revision = "$Revision: #1 $";
 
 static int major;
 

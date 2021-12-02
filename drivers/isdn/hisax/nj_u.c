@@ -1,4 +1,4 @@
-/* $Id: nj_u.c,v 2.14.2.3 2004/01/13 14:31:26 keil Exp $ 
+/* $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/isdn/hisax/nj_u.c#1 $ 
  *
  * This software may be used and distributed according to the terms
  * of the GNU General Public License, incorporated herein by reference.
@@ -14,7 +14,7 @@
 #include <linux/ppp_defs.h>
 #include "netjet.h"
 
-static const char *NETjet_U_revision = "$Revision: 2.14.2.3 $";
+static const char *NETjet_U_revision = "$Revision: #1 $";
 
 static u_char dummyrr(struct IsdnCardState *cs, int chan, u_char off)
 {

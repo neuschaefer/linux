@@ -1,0 +1,3 @@
+#ifndef MAXIMUM_MULTIPLEXES
+    #define MAXIMUM_MULTIPLEXES 250
+#endif

@@ -1,4 +1,4 @@
-/* $Id: t1pci.c,v 1.1.2.2 2004/01/16 21:09:27 keil Exp $
+/* $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/isdn/hardware/avm/t1pci.c#1 $
  * 
  * Module for AVM T1 PCI-card.
  * 
@@ -29,7 +29,7 @@
 #undef CONFIG_T1PCI_POLLDEBUG
 
 /* ------------------------------------------------------------- */
-static char *revision = "$Revision: 1.1.2.2 $";
+static char *revision = "$Revision: #1 $";
 /* ------------------------------------------------------------- */
 
 static struct pci_device_id t1pci_pci_tbl[] = {

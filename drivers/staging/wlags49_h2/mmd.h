@@ -7,7 +7,7 @@
 *
 * FILE	  : mmd.h
 *
-* DATE    : $Date: 2004/07/19 08:16:14 $   $Revision: 1.2 $
+* DATE    : $Date: 2012/04/27 $   $Revision: #1 $
 * Original: 2004/05/17 07:33:14    Revision: 1.18      Tag: hcf7_t20040602_01
 * Original: 2004/05/11 06:22:59    Revision: 1.17      Tag: hcf7_t7_20040513_01
 * Original: 2004/04/15 09:24:42    Revision: 1.13      Tag: hcf7_t7_20040415_01

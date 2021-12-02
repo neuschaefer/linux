@@ -1,0 +1,3 @@
+#ifndef EIT_MAXIMUM_CACHE_SIZE
+    #define EIT_MAXIMUM_CACHE_SIZE 5242880
+#endif

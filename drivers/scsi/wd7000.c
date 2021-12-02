@@ -1,4 +1,4 @@
-/* $Id: $
+/* $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/scsi/wd7000.c#1 $
  *  linux/drivers/scsi/wd7000.c
  *
  *  Copyright (C) 1992  Thomas Wuensche

@@ -10,7 +10,7 @@
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
  *
- * $Id: enc28j60.c,v 1.22 2007/12/20 10:47:01 claudio Exp $
+ * $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/net/enc28j60.c#1 $
  */
 
 #include <linux/module.h>

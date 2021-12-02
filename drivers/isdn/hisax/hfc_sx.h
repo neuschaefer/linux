@@ -1,4 +1,4 @@
-/* $Id: hfc_sx.h,v 1.2.6.1 2001/09/23 22:24:48 kai Exp $
+/* $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/isdn/hisax/hfc_sx.h#1 $
  *
  * specific defines for CCD's HFC 2BDS0 S+,SP chips
  *

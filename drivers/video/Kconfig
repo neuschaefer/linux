@@ -2229,6 +2229,16 @@ config FB_BROADSHEET
 	  and could also have been called by other names when coupled with
 	  a bridge adapter.
 
+config FB_MT53XX
+        tristate "MediaTek MT53xx series frame buffer support"
+        depends on FB
+        help
+          This is the frame buffer device driver for the mt53xx series
+          TV chipsets. Specs not available.
+
+          To compile this driver as a module, choose M here; the module
+          will be called mt53xxfb.
+
 source "drivers/video/omap/Kconfig"
 source "drivers/video/omap2/Kconfig"
 

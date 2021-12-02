@@ -6,6 +6,10 @@ ifeq ($(CONFIG_MMC_DEBUG),y)
 	EXTRA_CFLAGS		+= -DDEBUG
 endif
 
+obj-$(CONFIG_MMC_MT5368)    += msdc_drv.o
+obj-$(CONFIG_MMC_MT5389)    += msdc_drv.o
+obj-$(CONFIG_MMC_MT5396)    += msdc_drv.o
+obj-$(CONFIG_MTKEMMC_PARTITION) += mtk_msdcpart.o
 obj-$(CONFIG_MMC_ARMMMCI)	+= mmci.o
 obj-$(CONFIG_MMC_PXA)		+= pxamci.o
 obj-$(CONFIG_MMC_IMX)		+= imxmmc.o

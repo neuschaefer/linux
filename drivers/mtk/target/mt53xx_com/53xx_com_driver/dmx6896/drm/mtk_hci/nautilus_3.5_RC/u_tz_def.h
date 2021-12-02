@@ -1,0 +1,59 @@
+/********************************************************************************************
+ *     LEGAL DISCLAIMER
+ *
+ *     (Header of MediaTek Software/Firmware Release or Documentation)
+ *
+ *     BY OPENING OR USING THIS FILE, BUYER HEREBY UNEQUIVOCALLY ACKNOWLEDGES AND AGREES
+ *     THAT THE SOFTWARE/FIRMWARE AND ITS DOCUMENTATIONS ("MEDIATEK SOFTWARE") RECEIVED
+ *     FROM MEDIATEK AND/OR ITS REPRESENTATIVES ARE PROVIDED TO BUYER ON AN "AS-IS" BASIS
+ *     ONLY. MEDIATEK EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES, EXPRESS OR IMPLIED,
+ *     INCLUDING BUT NOT LIMITED TO THE IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR
+ *     A PARTICULAR PURPOSE OR NONINFRINGEMENT. NEITHER DOES MEDIATEK PROVIDE ANY WARRANTY
+ *     WHATSOEVER WITH RESPECT TO THE SOFTWARE OF ANY THIRD PARTY WHICH MAY BE USED BY,
+ *     INCORPORATED IN, OR SUPPLIED WITH THE MEDIATEK SOFTWARE, AND BUYER AGREES TO LOOK
+ *     ONLY TO SUCH THIRD PARTY FOR ANY WARRANTY CLAIM RELATING THERETO. MEDIATEK SHALL ALSO
+ *     NOT BE RESPONSIBLE FOR ANY MEDIATEK SOFTWARE RELEASES MADE TO BUYER'S SPECIFICATION
+ *     OR TO CONFORM TO A PARTICULAR STANDARD OR OPEN FORUM.
+ *
+ *     BUYER'S SOLE AND EXCLUSIVE REMEDY AND MEDIATEK'S ENTIRE AND CUMULATIVE LIABILITY WITH
+ *     RESPECT TO THE MEDIATEK SOFTWARE RELEASED HEREUNDER WILL BE, AT MEDIATEK'S OPTION,
+ *     TO REVISE OR REPLACE THE MEDIATEK SOFTWARE AT ISSUE, OR REFUND ANY SOFTWARE LICENSE
+ *     FEES OR SERVICE CHARGE PAID BY BUYER TO MEDIATEK FOR SUCH MEDIATEK SOFTWARE AT ISSUE.
+ *
+ *     THE TRANSACTION CONTEMPLATED HEREUNDER SHALL BE CONSTRUED IN ACCORDANCE WITH THE LAWS
+ *     OF THE STATE OF CALIFORNIA, USA, EXCLUDING ITS CONFLICT OF LAWS PRINCIPLES.
+ ************************************************************************************************/
+
+#ifndef _U_TZ_DEF_H_
+#define _U_TZ_DEF_H_
+
+
+/*-----------------------------------------------------------------------------
+                    include files
+-----------------------------------------------------------------------------*/
+
+/*-----------------------------------------------------------------------------
+                    macros, defines, typedefs, enums
+ ----------------------------------------------------------------------------*/
+
+/* TZ ID boundary */
+
+#define TZ_IDBOUND_KRN  0x00000000      /* 0 ~ 65535 */
+#define TZ_IDBOUND_USR  0x00010000      /* 65536 ~ 131071 */
+#define TZ_IDBOUND_CUS  0x00020000      /* 131072 ~ 196608 */
+
+/* TZ ID using user space */
+#define TZ_CPSM_MARLIN_SET_DEVID_ID                 (TZ_IDBOUND_USR + 0)
+#define TZ_CPSM_SCH_GET_FE_MSG                      (TZ_IDBOUND_USR + 1)
+
+
+/* TZ ID for customer */
+/* SONY MARLINBB NAUTILUS_FOR_LINUX*/
+#define TZ_NAUTILUS_TR_INIT                         (TZ_IDBOUND_CUS + 0)
+#define TZ_NAUTILUS_TR_FIN                          (TZ_IDBOUND_CUS + 1)
+#define TZ_NAUTILUS_TR_PROCMSG_STEP1                (TZ_IDBOUND_CUS + 2)
+#define TZ_NAUTILUS_TR_PROCMSG_STEP2                (TZ_IDBOUND_CUS + 3)
+
+
+#endif /* _U_TZ_DEF_H_ */
+

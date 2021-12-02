@@ -1,0 +1,3 @@
+#ifndef TELETEXT_FULL_SCREEN
+    #define TELETEXT_FULL_SCREEN 1
+#endif

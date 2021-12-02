@@ -1,0 +1,19 @@
+[build]
+TARGETNAME = fci_wlancard
+TARGETTYPE = library
+
+SOURCES = wlan_os_.c sdio.c
+
+CCFLAGS += -DWLAN_HIF_SDIO \
+
+INCLUDES += ../ \
+
+[build_linux_ko]
+TARGETNAME =
+TARGETTYPE =
+
+SOURCES = wlan_os_.c sdio.c
+
+CCFLAGS += -DWLAN_HIF_SDIO \
+
+INCLUDES += ../ \

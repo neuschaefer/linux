@@ -696,6 +696,7 @@ int usb_get_configuration(struct usb_device *dev)
 	for (; cfgno < ncfg; cfgno++) {
 		/* We grab just the first descriptor so we know how long
 		 * the whole configuration is */
+		 msleep(1); // 20111213 delay to do usb device enumeration
 		result = usb_get_descriptor(dev, USB_DT_CONFIG, cfgno,
 		    desc, USB_DT_CONFIG_SIZE);
 		if (result < 0) {
@@ -720,6 +721,7 @@ int usb_get_configuration(struct usb_device *dev)
 			result = -ENOMEM;
 			goto err;
 		}
+		msleep(1); // 20111213 delay to do usb device enumeration
 		result = usb_get_descriptor(dev, USB_DT_CONFIG, cfgno,
 		    bigbuffer, length);
 		if (result < 0) {

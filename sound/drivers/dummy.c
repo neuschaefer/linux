@@ -36,22 +36,212 @@
 #include <sound/info.h>
 #include <sound/initval.h>
 
-MODULE_AUTHOR("Jaroslav Kysela <perex@perex.cz>");
-MODULE_DESCRIPTION("Dummy soundcard (/dev/null)");
+MODULE_AUTHOR("MTK");
+MODULE_DESCRIPTION("MTK soundcard (/dev/dsp)");
 MODULE_LICENSE("GPL");
-MODULE_SUPPORTED_DEVICE("{{ALSA,Dummy soundcard}}");
+MODULE_SUPPORTED_DEVICE("{{ALSA,MTK soundcard}}");
 
 #define MAX_PCM_DEVICES		4
-#define MAX_PCM_SUBSTREAMS	128
+#define MAX_PCM_SUBSTREAMS	16 //MTK
 #define MAX_MIDI_DEVICES	2
+
+////////////////////////////////////////
+//MTK ALSA Audio Interface
+////////////////////////////////////////
+
+#define ALSA_DBG_MSG 0
+#define ALSA_DBG_MSG_MIXER 0
+
+#define AUD_PLAYBACK_USE_MIXSND 1
+
+int record_src = 1; // 0: Line-In, 1: Upload, 2: SBC
+
+typedef unsigned int UINT32;
+typedef unsigned short UINT16;
+typedef unsigned char UINT8;
+typedef signed int INT32;
+typedef bool BOOL;
+
+extern UINT32 u4Virtual(UINT32 u4Addr);
+
+extern UINT32 u4GetAFIFOStart(UINT8 uDecIndex);
+extern UINT32 u4GetAFIFOEnd(UINT8 uDecIndex);
+extern UINT32 u4GetABufPnt(UINT8 uDecIndex);
+extern UINT32 u4GetAWritePnt(UINT8 uDecIndex);
+extern void vSetAWritePnt(UINT32 u4WritePointer);
+
+extern void AUD_InitALSAPlayback_MixSnd(void);
+extern void AUD_DeInitALSAPlayback_MixSnd(void);
+extern UINT32 u4GetMixSndFIFOStart(void);
+extern UINT32 u4GetMixSndFIFOEnd(void);
+extern UINT32 u4GetMixSndReadPtr(void);
+extern void vSetMixSndWritePtr(UINT32 u4WritePtr);
+
+extern UINT32 u4GetSBCEncFIFOStart(void);
+extern UINT32 u4GetSBCEncFIFOEnd(void);
+extern UINT32 u4GetSBCEncWritePnt(void);
+
+extern UINT32 u4GetUploadFIFOStart(void);
+extern UINT32 u4GetUploadFIFOEnd(void);
+extern UINT32 u4GetUploadWritePnt(void);
+
+extern void AUD_InitALSAPlayback(void);
+extern void AUD_DeInitALSAPlayback(void);
+extern void AUD_InitALSARecordLineIn(void);
+extern void AUD_DeInitALSARecordLineIn(void);
+extern void AUD_InitALSARecordSpeaker(void);
+extern void AUD_DeInitALSARecordSpeaker(void);
+extern void AUD_InitALSARecordSBC(void);
+extern void AUD_DeInitALSARecordSBC(void);
+extern void AUD_PlayMixSndRingFifo(UINT32 u4SampleRate, UINT8 u1StereoOnOff, UINT8 u1BitDepth, UINT32 u4BufferSize);
+
+#if AUD_PLAYBACK_USE_MIXSND
+#define vInitAlsaPlayback() AUD_InitALSAPlayback_MixSnd()
+#define vDeInitAlsaPlayback() AUD_DeInitALSAPlayback_MixSnd()
+#define u4GetPlayBufSA() u4GetMixSndFIFOStart()
+#define u4GetPlayBufEA() u4GetMixSndFIFOEnd()
+#define u4GetPlayBufCA() u4GetMixSndReadPtr()
+#define vSetPlayBufWA(wp)   vSetMixSndWritePtr(wp) 
+#define vSetPlayParm(u4SampleRate,u1StereoOnOff,u1BitDepth,u4BufferSize) AUD_PlayMixSndRingFifo(u4SampleRate,u1StereoOnOff,u1BitDepth,u4BufferSize)
+#else
+#define vInitAlsaPlayback() AUD_InitALSAPlayback()
+#define vDeInitAlsaPlayback() AUD_DeInitALSAPlayback()
+#define u4GetPlayBufSA() u4GetAFIFOStart(0)
+#define u4GetPlayBufEA() u4GetAFIFOEnd(0)
+#define u4GetPlayBufCA() u4GetABufPnt(0)
+#define vSetPlayBufWA(wp)   vSetAWritePnt(wp) 
+#define vSetPlayParm(u4SampleRate,u1StereoOnOff,u1BitDepth,u4BufferSize)
+#endif
+
+#if 1
+UINT32 u4GetRecBufSA(void)
+{
+    if (record_src == 1)
+    {
+        return u4GetUploadFIFOStart();
+    }
+    else if (record_src == 2)
+    {
+        return u4GetSBCEncFIFOStart();
+    }
+    else
+    {
+    #if 0
+        //USe AFIFO1 for test
+        return u4GetAFIFOStart(0);
+    #else
+        //USe AFIFO2 for test    
+        return u4GetAFIFOStart(1);
+    #endif    
+    }
+}
+
+UINT32 u4GetRecBufEA(void)
+{
+    UINT32 u4FifoSA;
+    UINT32 u4FifoSZ;
+    if (record_src == 1)
+    {
+        u4FifoSA = u4GetUploadFIFOStart();
+        u4FifoSZ = ((u4GetUploadFIFOEnd() - u4GetUploadFIFOStart())); //&0xffff0000); //size 4096 bytes aligned
+    }
+    else if (record_src == 2)
+    {
+        u4FifoSA = u4GetSBCEncFIFOStart();
+        u4FifoSZ = ((u4GetSBCEncFIFOEnd() - u4GetSBCEncFIFOStart())); //&0xffff0000); //size 4096 bytes aligned
+    }
+    else
+    {
+    #if 0
+        //USe AFIFO1 for test    
+        u4FifoSA = u4GetAFIFOStart(0);
+        u4FifoSZ = (u4GetAFIFOEnd(0) - u4GetAFIFOStart(0)); //size 4096 bytes aligned
+    #else
+        //USe AFIFO2 for test    
+        u4FifoSA = u4GetAFIFOStart(1);
+        u4FifoSZ = ((u4GetAFIFOEnd(1) - u4GetAFIFOStart(1))&0xffff0000); //size 4096 bytes aligned
+    #endif
+    }
+
+    return u4FifoSA + u4FifoSZ;
+}
+
+UINT32 u4GetRecBufCA(void)
+{
+    if (record_src == 1)
+    {
+        return u4GetUploadWritePnt();
+    }
+    else if (record_src == 2)
+    {
+        return u4GetSBCEncWritePnt();
+    }
+    else
+    {
+        return u4GetAWritePnt(1);
+    }
+}
+
+void AUD_InitALSARecord(void)
+{
+    if (record_src == 1)
+    {
+        #if ALSA_DBG_MSG
+        printk(KERN_ERR "!@#!@# @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ record_src - speaker\n"); //0513
+        #endif    
+        AUD_InitALSARecordSpeaker();
+    }
+    else if (record_src == 2)
+    {
+        #if ALSA_DBG_MSG
+        printk(KERN_ERR "!@#!@# @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ record_src - sbc\n"); //0513
+        #endif        
+        AUD_InitALSARecordSBC();
+    }
+    else
+    {
+        #if ALSA_DBG_MSG
+        printk(KERN_ERR "!@#!@# @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ record_src - line-in\n"); //0513
+        #endif        
+        AUD_InitALSARecordLineIn();
+    }
+}
+
+void AUD_DeInitALSARecord(void)
+{
+    if (record_src == 1)
+    {
+        AUD_DeInitALSARecordSpeaker();
+    }
+    else if (record_src == 2)
+    {
+        AUD_DeInitALSARecordSBC();
+    }
+    else
+    {
+        AUD_DeInitALSARecordLineIn();
+    }
+}
+#else
+#define u4GetRecBufSA() u4GetAFIFOStart(1)
+#define u4GetRecBufEA() u4GetAFIFOEnd(1)
+#define u4GetRecBufCA() u4GetAWritePnt(1)
+
+#define AUD_InitALSARecord() AUD_InitALSARecordLineIn()
+#define AUD_DeInitALSARecord() AUD_DeInitALSARecordLineIn()
+#endif
+
+////////////////////////////////////////
+//End
+////////////////////////////////////////
 
 /* defaults */
 #define MAX_BUFFER_SIZE		(64*1024)
 #define MIN_PERIOD_SIZE		64
 #define MAX_PERIOD_SIZE		MAX_BUFFER_SIZE
-#define USE_FORMATS 		(SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE)
-#define USE_RATE		SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000
-#define USE_RATE_MIN		5500
+#define USE_FORMATS 		SNDRV_PCM_FMTBIT_S16_LE
+#define USE_RATE                (SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000) //SNDRV_PCM_RATE_48000
+#define USE_RATE_MIN		8000
 #define USE_RATE_MAX		48000
 #define USE_CHANNELS_MIN 	1
 #define USE_CHANNELS_MAX 	2
@@ -66,9 +256,9 @@ static int pcm_devs[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 1};
 static int pcm_substreams[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 8};
 //static int midi_devs[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 2};
 #ifdef CONFIG_HIGH_RES_TIMERS
-static int hrtimer = 1;
+static int hrtimer = 0;
 #endif
-static int fake_buffer = 1;
+static int fake_buffer = 0; //MTK
 
 module_param_array(index, int, NULL, 0444);
 MODULE_PARM_DESC(index, "Index value for dummy soundcard.");
@@ -81,7 +271,7 @@ MODULE_PARM_DESC(model, "Soundcard model.");
 module_param_array(pcm_devs, int, NULL, 0444);
 MODULE_PARM_DESC(pcm_devs, "PCM devices # (0-4) for dummy driver.");
 module_param_array(pcm_substreams, int, NULL, 0444);
-MODULE_PARM_DESC(pcm_substreams, "PCM substreams # (1-128) for dummy driver.");
+MODULE_PARM_DESC(pcm_substreams, "PCM substreams # (1-16) for dummy driver."); //MTK
 //module_param_array(midi_devs, int, NULL, 0444);
 //MODULE_PARM_DESC(midi_devs, "MIDI devices # (0-2) for dummy driver.");
 module_param(fake_buffer, bool, 0444);
@@ -100,7 +290,8 @@ static struct platform_device *devices[SNDRV_CARDS];
 #define MIXER_ADDR_CD		4
 #define MIXER_ADDR_LAST		4
 
-struct dummy_timer_ops {
+struct dummy_timer_ops 
+{
 	int (*create)(struct snd_pcm_substream *);
 	void (*free)(struct snd_pcm_substream *);
 	int (*prepare)(struct snd_pcm_substream *);
@@ -109,26 +300,9 @@ struct dummy_timer_ops {
 	snd_pcm_uframes_t (*pointer)(struct snd_pcm_substream *);
 };
 
-struct dummy_model {
-	const char *name;
-	int (*playback_constraints)(struct snd_pcm_runtime *runtime);
-	int (*capture_constraints)(struct snd_pcm_runtime *runtime);
-	u64 formats;
-	size_t buffer_bytes_max;
-	size_t period_bytes_min;
-	size_t period_bytes_max;
-	unsigned int periods_min;
-	unsigned int periods_max;
-	unsigned int rates;
-	unsigned int rate_min;
-	unsigned int rate_max;
-	unsigned int channels_min;
-	unsigned int channels_max;
-};
-
-struct snd_dummy {
+struct snd_dummy 
+{
 	struct snd_card *card;
-	struct dummy_model *model;
 	struct snd_pcm *pcm;
 	struct snd_pcm_hardware pcm_hw;
 	spinlock_t mixer_lock;
@@ -138,96 +312,10 @@ struct snd_dummy {
 };
 
 /*
- * card models
- */
-
-static int emu10k1_playback_constraints(struct snd_pcm_runtime *runtime)
-{
-	int err;
-	err = snd_pcm_hw_constraint_integer(runtime, SNDRV_PCM_HW_PARAM_PERIODS);
-	if (err < 0)
-		return err;
-	err = snd_pcm_hw_constraint_minmax(runtime, SNDRV_PCM_HW_PARAM_BUFFER_BYTES, 256, UINT_MAX);
-	if (err < 0)
-		return err;
-	return 0;
-}
-
-struct dummy_model model_emu10k1 = {
-	.name = "emu10k1",
-	.playback_constraints = emu10k1_playback_constraints,
-	.buffer_bytes_max = 128 * 1024,
-};
-
-struct dummy_model model_rme9652 = {
-	.name = "rme9652",
-	.buffer_bytes_max = 26 * 64 * 1024,
-	.formats = SNDRV_PCM_FMTBIT_S32_LE,
-	.channels_min = 26,
-	.channels_max = 26,
-	.periods_min = 2,
-	.periods_max = 2,
-};
-
-struct dummy_model model_ice1712 = {
-	.name = "ice1712",
-	.buffer_bytes_max = 256 * 1024,
-	.formats = SNDRV_PCM_FMTBIT_S32_LE,
-	.channels_min = 10,
-	.channels_max = 10,
-	.periods_min = 1,
-	.periods_max = 1024,
-};
-
-struct dummy_model model_uda1341 = {
-	.name = "uda1341",
-	.buffer_bytes_max = 16380,
-	.formats = SNDRV_PCM_FMTBIT_S16_LE,
-	.channels_min = 2,
-	.channels_max = 2,
-	.periods_min = 2,
-	.periods_max = 255,
-};
-
-struct dummy_model model_ac97 = {
-	.name = "ac97",
-	.formats = SNDRV_PCM_FMTBIT_S16_LE,
-	.channels_min = 2,
-	.channels_max = 2,
-	.rates = SNDRV_PCM_RATE_48000,
-	.rate_min = 48000,
-	.rate_max = 48000,
-};
-
-struct dummy_model model_ca0106 = {
-	.name = "ca0106",
-	.formats = SNDRV_PCM_FMTBIT_S16_LE,
-	.buffer_bytes_max = ((65536-64)*8),
-	.period_bytes_max = (65536-64),
-	.periods_min = 2,
-	.periods_max = 8,
-	.channels_min = 2,
-	.channels_max = 2,
-	.rates = SNDRV_PCM_RATE_48000|SNDRV_PCM_RATE_96000|SNDRV_PCM_RATE_192000,
-	.rate_min = 48000,
-	.rate_max = 192000,
-};
-
-struct dummy_model *dummy_models[] = {
-	&model_emu10k1,
-	&model_rme9652,
-	&model_ice1712,
-	&model_uda1341,
-	&model_ac97,
-	&model_ca0106,
-	NULL
-};
-
-/*
  * system timer interface
  */
-
-struct dummy_systimer_pcm {
+struct dummy_systimer_pcm 
+{
 	spinlock_t lock;
 	struct timer_list timer;
 	unsigned long base_time;
@@ -493,29 +581,265 @@ static int dummy_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 {
 	struct snd_dummy *dummy = snd_pcm_substream_chip(substream);
 
-	switch (cmd) {
-	case SNDRV_PCM_TRIGGER_START:
-	case SNDRV_PCM_TRIGGER_RESUME:
-		return dummy->timer_ops->start(substream);
-	case SNDRV_PCM_TRIGGER_STOP:
-	case SNDRV_PCM_TRIGGER_SUSPEND:
-		return dummy->timer_ops->stop(substream);
-	}
-	return -EINVAL;
+    switch (cmd) 
+    {
+    case SNDRV_PCM_TRIGGER_START:
+        #if ALSA_DBG_MSG
+        printk(KERN_ERR "!@#!@# @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ snd_card_dummy_pcm_trigger - start\n"); //0513
+        #endif
+        return dummy->timer_ops->start(substream);
+    case SNDRV_PCM_TRIGGER_RESUME:
+        #if ALSA_DBG_MSG
+        printk(KERN_ERR "!@#!@# @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ snd_card_dummy_pcm_trigger - resume\n"); //0513
+        #endif
+        return dummy->timer_ops->start(substream);
+    case SNDRV_PCM_TRIGGER_STOP:
+        #if ALSA_DBG_MSG
+        printk(KERN_ERR "!@#!@# @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ snd_card_dummy_pcm_trigger - stop\n"); //0513
+        #endif
+        return dummy->timer_ops->stop(substream);
+    case SNDRV_PCM_TRIGGER_SUSPEND:
+        #if ALSA_DBG_MSG
+        printk(KERN_ERR "!@#!@# @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ snd_card_dummy_pcm_trigger - suspend\n"); //0513                       
+        #endif
+        return dummy->timer_ops->stop(substream);
+    }
+	return -EINVAL;    
 }
 
-static int dummy_pcm_prepare(struct snd_pcm_substream *substream)
+//MTK
+UINT32 aapl_ptr = 0;
+UINT32 arp = 0;
+int repeat_cnt = 0;
+//MTK
+
+static int dummy_pcm_playback_prepare(struct snd_pcm_substream *substream)
 {
+	struct snd_pcm_runtime *runtime = substream->runtime;
 	struct snd_dummy *dummy = snd_pcm_substream_chip(substream);
+	UINT8 u1StereoOnOff = 0;
+
+    #if ALSA_DBG_MSG
+    printk(KERN_ERR "!@#!@# @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ snd_card_dummy_playback_pcm_prepare\n"); //0513
+    #endif
+
+	if(2 == runtime->channels)
+	{
+		u1StereoOnOff = 1;
+	}
+	else
+	{
+		u1StereoOnOff = 0;
+	}
+
+    vSetPlayParm(runtime->rate, u1StereoOnOff, 16, snd_pcm_lib_buffer_bytes(substream));
+
+    if (runtime->dma_area == 0)
+    {
+        runtime->dma_area = (unsigned char*)u4Virtual(u4GetPlayBufSA());
+        runtime->dma_addr = 0;
+        runtime->dma_bytes = snd_pcm_lib_buffer_bytes(substream);
+    }
+
+    printk(KERN_ERR "format: %d rate: %d channels: %d\n", runtime->format, runtime->rate, runtime->channels);
+    printk(KERN_ERR "runtime->buffer_size: %x\n", (unsigned int)(runtime->buffer_size));
+    printk(KERN_ERR "runtime->period_size: %x\n", (unsigned int)(runtime->period_size));
+    //printk(KERN_ERR "dpcm->pcm_bps: %x\n", dpcm->pcm_bps);
+    //printk(KERN_ERR "dpcm->pcm_hz: %x\n", dpcm->pcm_hz);
+    printk(KERN_ERR "snd_pcm_lib_buffer_bytes(substream): %x\n", snd_pcm_lib_buffer_bytes(substream));
+    printk(KERN_ERR "snd_pcm_lib_period_bytes(substream): %x\n", snd_pcm_lib_period_bytes(substream));
+    #if ALSA_DBG_MSG
+    printk(KERN_ERR "runtime->dma_area: 0x%08x\n", runtime->dma_area);
+    printk(KERN_ERR "runtime->dma_addr: 0x%08x\n", runtime->dma_addr);
+    printk(KERN_ERR "runtime->dma_bytes: 0x%08x\n", runtime->dma_bytes);
+    #endif
+
+    aapl_ptr = 0;
+    arp = 0;
+    repeat_cnt = 0;
 
 	return dummy->timer_ops->prepare(substream);
 }
 
-static snd_pcm_uframes_t dummy_pcm_pointer(struct snd_pcm_substream *substream)
+static int dummy_pcm_capture_prepare(struct snd_pcm_substream *substream)
 {
+	struct snd_pcm_runtime *runtime = substream->runtime;
+	struct snd_dummy *dummy = snd_pcm_substream_chip(substream);
+
+    #if ALSA_DBG_MSG
+    printk(KERN_ERR "!@#!@# @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ snd_card_dummy_record_pcm_prepare\n"); //0513
+    #if 0
+    if (dpcm->dummy)
+    {
+        printk(KERN_ERR "  RECSRC MASTER: %d\n", dpcm->dummy->capture_source[MIXER_ADDR_MASTER][0]);
+        printk(KERN_ERR "  RECSRC LINE: %d\n", dpcm->dummy->capture_source[MIXER_ADDR_LINE][0]);
+        printk(KERN_ERR "  RECSRC MIC: %d\n", dpcm->dummy->capture_source[MIXER_ADDR_MIC][0]);
+        printk(KERN_ERR "  RECSRC SYNTH: %d\n", dpcm->dummy->capture_source[MIXER_ADDR_SYNTH][0]);
+        printk(KERN_ERR "  RECSRC CD: %d\n", dpcm->dummy->capture_source[MIXER_ADDR_LAST][0]);
+    }
+    else
+    {
+        printk(KERN_ERR "  dpcm->dummy is null pointer !!!\n");
+    }
+    #endif
+    #endif
+
+    //snd_pcm_format_set_silence(runtime->format, runtime->dma_area, bytes_to_samples(runtime, runtime->dma_bytes));
+    if (runtime->dma_area == 0)
+    {
+        runtime->dma_area = (unsigned char*)(u4Virtual(u4GetRecBufSA()));
+        runtime->dma_addr = 0;
+        runtime->dma_bytes = u4GetRecBufEA() - u4GetRecBufSA();
+
+        AUD_InitALSARecord();
+    }
+
+	return dummy->timer_ops->prepare(substream);
+}
+
+//MTK
+#define FIRST_RECORD_DBG 0
+
+#if FIRST_RECORD_DBG
+int first_record = 0;
+#endif
+//MTK
+
+static snd_pcm_uframes_t dummy_pcm_playback_pointer(struct snd_pcm_substream *substream)
+{
+	struct snd_pcm_runtime *runtime = substream->runtime;
+
+#if 1
+    UINT32 u4Start = u4GetPlayBufSA();
+    UINT32 u4ABufPnt = u4GetPlayBufCA();
+    UINT32 u4WritePnt;
+    if(2 == runtime->channels)
+    {
+        u4WritePnt = u4Start + (((runtime->control->appl_ptr * 4) % snd_pcm_lib_buffer_bytes(substream))&0xffffff00);
+    }
+    else
+    {
+        u4WritePnt = u4Start + (((runtime->control->appl_ptr * 2) % snd_pcm_lib_buffer_bytes(substream))&0xffffff00);
+    }
+
+    if (runtime->control->appl_ptr == aapl_ptr)
+    {
+        repeat_cnt++;
+        if (repeat_cnt == 2)
+        {
+            if(2 == runtime->channels)
+            {
+                //u4WritePnt = u4Start + ((((runtime->control->appl_ptr-0x100) * 4) % snd_pcm_lib_buffer_bytes(substream))&0xffffff00);
+            }
+            else
+            {
+                //u4WritePnt = u4Start + ((((runtime->control->appl_ptr-0x100) * 2) % snd_pcm_lib_buffer_bytes(substream))&0xffffff00);
+            }
+            repeat_cnt = 0;
+            //printk(KERN_ERR "u4ABufPnt: 0x%08x appl_ptr: 0x%08x\n", u4ABufPnt, runtime->control->appl_ptr);            
+        }        
+    }
+    else
+    {
+        repeat_cnt = 0;
+    }
+    aapl_ptr = runtime->control->appl_ptr;
+    
+  #if AUD_PLAYBACK_USE_MIXSND
+    if (u4ABufPnt == u4WritePnt)
+    {
+        //printk(KERN_ERR "u4ABufPnt: 0x%08x", u4WritePnt);
+    }
+    else
+    {
+        vSetPlayBufWA(u4WritePnt);    
+    }
+  #else
+    vSetPlayBufWA(u4WritePnt);      
+    if ((aapl_ptr == runtime->control->appl_ptr) && (arp == u4ABufPnt))
+    {
+        repeat_cnt++;
+        if (repeat_cnt > 3)
+        {
+            #if ALSA_DBG_MSG
+            printk(KERN_ERR "aapl_ptr: 0x%08x arp: 0x%08x\n", aapl_ptr, arp);            
+            #endif
+            //u4ABufPnt += 0x400;
+            u4ABufPnt = u4Start + ((runtime->control->appl_ptr * 4) % snd_pcm_lib_buffer_bytes(substream));
+        }
+    }
+    else
+    {
+        aapl_ptr = runtime->control->appl_ptr;
+        arp = u4ABufPnt;
+        repeat_cnt = 0;
+    } 
+  #endif
+    {
+      #if 0
+        if(2 == runtime->channels)
+        {   
+            return ((u4ABufPnt - u4Start)>>2);
+        }
+        else
+        {
+            return ((u4ABufPnt - u4Start)>>1);
+        }
+      #else
+        struct snd_dummy *dummy = snd_pcm_substream_chip(substream);
+        return dummy->timer_ops->pointer(substream);
+      #endif        
+    }    
+#else
 	struct snd_dummy *dummy = snd_pcm_substream_chip(substream);
 
 	return dummy->timer_ops->pointer(substream);
+#endif
+}
+
+static snd_pcm_uframes_t dummy_pcm_capture_pointer(struct snd_pcm_substream *substream)
+{
+#if 1
+	struct snd_pcm_runtime *runtime = substream->runtime;
+
+    UINT32 u4Start = u4GetRecBufSA();
+    UINT32 u4ABufPnt = u4GetRecBufCA();
+    //printk(KERN_ERR "SA: 0x%08x WP: 0x%08x\n", u4Start, u4ABufPnt);
+    #if FIRST_RECORD_DBG
+    if (!first_record)
+    {
+        UINT32 ptr;
+        
+        printk(KERN_ERR "u4Start: 0x%08x u4ABufPnt: 0x%08x\n", u4Start, u4ABufPnt);  
+        ptr = u4Virtual(u4Start);
+        printk(KERN_ERR "%08x %08x %08x %08x\n", *((UINT32*)ptr), *((UINT32*)(ptr+4)), *((UINT32*)(ptr+8)), *((UINT32*)(ptr+12)));
+        ptr = u4Virtual(u4ABufPnt);
+        printk(KERN_ERR "%08x %08x %08x %08x\n", *((UINT32*)ptr), *((UINT32*)(ptr+4)), *((UINT32*)(ptr+8)), *((UINT32*)(ptr+12)));
+
+        first_record = 1;
+    }
+    #endif
+    
+    {
+      #if 1
+        if(2 == runtime->channels)
+        {   
+            return ((u4ABufPnt - u4Start)>>2);
+        }
+        else
+        {
+            return ((u4ABufPnt - u4Start)>>1);        
+        }
+      #else
+    	struct snd_dummy *dummy = snd_pcm_substream_chip(substream);    
+    	return dummy->timer_ops->pointer(substream);
+      #endif
+    }
+#else
+	struct snd_dummy *dummy = snd_pcm_substream_chip(substream);
+
+	return dummy->timer_ops->pointer(substream);
+#endif
 }
 
 static struct snd_pcm_hardware dummy_pcm_hardware = {
@@ -537,31 +861,239 @@ static struct snd_pcm_hardware dummy_pcm_hardware = {
 	.fifo_size =		0,
 };
 
+static struct snd_pcm_hardware dummy_pcm_playback_hardware = {
+	.info =			(SNDRV_PCM_INFO_MMAP |
+				 SNDRV_PCM_INFO_INTERLEAVED |
+				 SNDRV_PCM_INFO_RESUME |
+				 SNDRV_PCM_INFO_MMAP_VALID),
+	.formats =		USE_FORMATS,
+	.rates =		USE_RATE,
+	.rate_min =		USE_RATE_MIN,
+	.rate_max =		USE_RATE_MAX,
+	.channels_min =		USE_CHANNELS_MIN,
+	.channels_max =		USE_CHANNELS_MAX,
+	.buffer_bytes_max =	MAX_BUFFER_SIZE,
+	.period_bytes_min =	MIN_PERIOD_SIZE,
+	.period_bytes_max =	MAX_PERIOD_SIZE,
+	.periods_min =		USE_PERIODS_MIN,
+	.periods_max =		USE_PERIODS_MAX,
+	.fifo_size =		0,
+};
+
+static struct snd_pcm_hardware dummy_pcm_capture_hardware = {
+	.info =			(SNDRV_PCM_INFO_MMAP |
+				 SNDRV_PCM_INFO_INTERLEAVED |
+				 SNDRV_PCM_INFO_RESUME |
+				 SNDRV_PCM_INFO_MMAP_VALID),
+	.formats =		USE_FORMATS,
+	.rates =		USE_RATE,
+	.rate_min =		USE_RATE_MIN,
+	.rate_max =		USE_RATE_MAX,
+	.channels_min =		USE_CHANNELS_MIN,
+	.channels_max =		USE_CHANNELS_MAX,
+	.buffer_bytes_max =	MAX_BUFFER_SIZE,
+	.period_bytes_min =	MIN_PERIOD_SIZE,
+	.period_bytes_max =	MAX_PERIOD_SIZE,
+	.periods_min =		USE_PERIODS_MIN,
+	.periods_max =		USE_PERIODS_MAX,
+	.fifo_size =		0,
+};
+
 static int dummy_pcm_hw_params(struct snd_pcm_substream *substream,
 			       struct snd_pcm_hw_params *hw_params)
 {
+    int ret;
+    //struct snd_pcm_runtime *runtime = substream->runtime;    
+
+    #if ALSA_DBG_MSG
+    printk(KERN_ERR "!@#!@# @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ snd_card_dummy_hw_params\n"); //0513
+    printk(KERN_ERR "params_buffer_bytes(hw_params): 0x%08x\n", params_buffer_bytes(hw_params));
+    //printk(KERN_ERR "[Before]\n");
+    //printk(KERN_ERR "runtime->dma_area: 0x%08x\n", (UINT32)(runtime->dma_area));
+    //printk(KERN_ERR "runtime->dma_addr: 0x%08x\n", (UINT32)(runtime->dma_addr));
+    //printk(KERN_ERR "runtime->dma_bytes: 0x%08x\n", (UINT32)(runtime->dma_bytes));
+    #endif
+
+#if 1
+    ret = 0;
+#else
 	if (fake_buffer) {
 		/* runtime->dma_bytes has to be set manually to allow mmap */
 		substream->runtime->dma_bytes = params_buffer_bytes(hw_params);
-		return 0;
+		ret = 0;
 	}
-	return snd_pcm_lib_malloc_pages(substream,
-					params_buffer_bytes(hw_params));
+    else
+    {
+	  ret = snd_pcm_lib_malloc_pages(substream,	params_buffer_bytes(hw_params));
+    } 
+#endif
+    #if ALSA_DBG_MSG
+    //printk(KERN_ERR "[After] ret: %d\n", ret);
+    //printk(KERN_ERR "runtime->dma_area: 0x%08x\n", (UINT32)(runtime->dma_area));
+    //printk(KERN_ERR "runtime->dma_addr: 0x%08x\n", (UINT32)(runtime->dma_addr));
+    //printk(KERN_ERR "runtime->dma_bytes: 0x%08x\n", (UINT32)(runtime->dma_bytes));   
+    {
+        int i;
+        printk(KERN_ERR "flags: %08x\n", hw_params->flags);
+        for (i=SNDRV_PCM_HW_PARAM_FIRST_MASK;i<=SNDRV_PCM_HW_PARAM_LAST_MASK;i++)
+            printk(KERN_ERR "masks[%d]: %08x\n", i, hw_params->masks[i].bits[0]);
+        for (i=SNDRV_PCM_HW_PARAM_FIRST_INTERVAL;i<=SNDRV_PCM_HW_PARAM_LAST_INTERVAL;i++)
+            printk(KERN_ERR "internals[%d]: (%d,%d) omin=%d omax=%d int=%d empty=%d\n",
+                            i,
+                            hw_params->intervals[i-SNDRV_PCM_HW_PARAM_FIRST_INTERVAL].min,
+                            hw_params->intervals[i-SNDRV_PCM_HW_PARAM_FIRST_INTERVAL].max,
+                            hw_params->intervals[i-SNDRV_PCM_HW_PARAM_FIRST_INTERVAL].openmin,
+                            hw_params->intervals[i-SNDRV_PCM_HW_PARAM_FIRST_INTERVAL].openmax,
+                            hw_params->intervals[i-SNDRV_PCM_HW_PARAM_FIRST_INTERVAL].integer,
+                            hw_params->intervals[i-SNDRV_PCM_HW_PARAM_FIRST_INTERVAL].empty);
+        printk(KERN_ERR "rmask: %08x\n", hw_params->rmask);
+        printk(KERN_ERR "cmask: %08x\n", hw_params->cmask);
+        printk(KERN_ERR "info: %08x\n", hw_params->info);
+        printk(KERN_ERR "msbits: %d\n", hw_params->msbits);
+        printk(KERN_ERR "rate: %d/%d\n", hw_params->rate_num,hw_params->rate_den);
+        printk(KERN_ERR "fifo: %d\n", hw_params->fifo_size);
+    }
+    #endif
+
+    return ret;
 }
 
 static int dummy_pcm_hw_free(struct snd_pcm_substream *substream)
 {
+    int ret;
+    struct snd_pcm_runtime *runtime = substream->runtime;
+
+    #if ALSA_DBG_MSG
+    printk(KERN_ERR "!@#!@# @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ snd_card_dummy_hw_free\n"); //0513
+    printk(KERN_ERR "[Before]\n");
+    printk(KERN_ERR "runtime->dma_area: 0x%08x\n", (UINT32)(runtime->dma_area));
+    printk(KERN_ERR "runtime->dma_addr: 0x%08x\n", (UINT32)(runtime->dma_addr));
+    printk(KERN_ERR "runtime->dma_bytes: 0x%08x\n", (UINT32)(runtime->dma_bytes));
+    #endif
+
+#if 1
+    ret = 0;
+    if (runtime->dma_area)
+    {
+        runtime->dma_area = 0;
+        runtime->dma_addr = 0;
+        runtime->dma_bytes = 0;
+    }
+#else
 	if (fake_buffer)
-		return 0;
-	return snd_pcm_lib_free_pages(substream);
+		ret = 0;
+    else
+        ret = snd_pcm_lib_free_pages(substream);
+#endif
+
+    #if ALSA_DBG_MSG
+    printk(KERN_ERR "[After] ret: %d\n", ret);
+    printk(KERN_ERR "runtime->dma_area: 0x%08x\n", (UINT32)(runtime->dma_area));
+    printk(KERN_ERR "runtime->dma_addr: 0x%08x\n", (UINT32)(runtime->dma_addr));
+    printk(KERN_ERR "runtime->dma_bytes: 0x%08x\n", (UINT32)(runtime->dma_bytes));
+    #endif
+    return ret;
 }
 
-static int dummy_pcm_open(struct snd_pcm_substream *substream)
+static int dummy_pcm_playback_open(struct snd_pcm_substream *substream)
 {
 	struct snd_dummy *dummy = snd_pcm_substream_chip(substream);
-	struct dummy_model *model = dummy->model;
+	struct snd_pcm_runtime *runtime = substream->runtime;    
+	int err;
+
+	dummy->timer_ops = &dummy_systimer_ops;
+#ifdef CONFIG_HIGH_RES_TIMERS
+	if (hrtimer)
+		dummy->timer_ops = &dummy_hrtimer_ops;
+#endif
+
+    #if ALSA_DBG_MSG
+    printk(KERN_ERR "!@#!@# @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ snd_card_dummy_playback_open\n"); //0513
+    printk(KERN_ERR "  substream->number: %d\n", substream->number);
+    printk(KERN_ERR "  substream->stream: %d\n", substream->stream);
+    printk(KERN_ERR "AFIFO start addr: 0x%08x\n", u4GetPlayBufSA());
+    printk(KERN_ERR "AFIFO end addr: 0x%08x\n", u4GetPlayBufEA());
+    printk(KERN_ERR "[VIRTUAL ADDRESS]\n");
+    printk(KERN_ERR "AFIFO start addr: 0x%08x\n", u4Virtual(u4GetPlayBufSA()));
+    printk(KERN_ERR "AFIFO end addr: 0x%08x\n", u4Virtual(u4GetPlayBufEA()));
+    #endif
+
+    vInitAlsaPlayback();
+
+    dummy_pcm_playback_hardware.buffer_bytes_max = u4GetPlayBufEA() - u4GetPlayBufSA();
+    dummy_pcm_playback_hardware.period_bytes_max = u4GetPlayBufEA() - u4GetPlayBufSA();
+    dummy_pcm_hardware.buffer_bytes_max = u4GetPlayBufEA() - u4GetPlayBufSA();
+    dummy_pcm_hardware.period_bytes_max = u4GetPlayBufEA() - u4GetPlayBufSA();
+
+	err = dummy->timer_ops->create(substream);
+	if (err < 0)
+		return err;
+
+	//runtime->hw = dummy->pcm_hw;
+    runtime->hw = dummy_pcm_playback_hardware; //MTK
+
+	if (substream->pcm->device & 1) {
+		runtime->hw.info &= ~SNDRV_PCM_INFO_INTERLEAVED;
+		runtime->hw.info |= SNDRV_PCM_INFO_NONINTERLEAVED;
+	}
+	if (substream->pcm->device & 2)
+		runtime->hw.info &= ~(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_MMAP_VALID);
+
+	return 0;
+}
+
+static int dummy_pcm_capture_open(struct snd_pcm_substream *substream)
+{
+	struct snd_dummy *dummy = snd_pcm_substream_chip(substream);
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	int err;
+
+    #if ALSA_DBG_MSG
+    printk(KERN_ERR "!@#!@# @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ snd_card_dummy_capture_open\n"); //0513
+    printk(KERN_ERR "  substream->number: %d\n", substream->number);
+    printk(KERN_ERR "  substream->stream: %d\n", substream->stream);    
+    printk(KERN_ERR "[PHYSICAL ADDRESS]\n");
+    printk(KERN_ERR "AFIFO start addr: 0x%08x\n", u4GetRecBufSA());
+    printk(KERN_ERR "AFIFO end addr: 0x%08x\n", u4GetRecBufEA());
+    printk(KERN_ERR "[VIRTUAL ADDRESS]\n");
+    printk(KERN_ERR "AFIFO start addr: 0x%08x\n", u4Virtual(u4GetRecBufSA()));
+    printk(KERN_ERR "AFIFO end addr: 0x%08x\n", u4Virtual(u4GetRecBufEA()));
+    #if 0
+    if (dpcm->dummy)
+    {
+        printk(KERN_ERR "  RECSRC MASTER: %d\n", dpcm->dummy->capture_source[MIXER_ADDR_MASTER][0]);
+        printk(KERN_ERR "  RECSRC LINE: %d\n", dpcm->dummy->capture_source[MIXER_ADDR_LINE][0]);
+        printk(KERN_ERR "  RECSRC MIC: %d\n", dpcm->dummy->capture_source[MIXER_ADDR_MIC][0]);
+        printk(KERN_ERR "  RECSRC SYNTH: %d\n", dpcm->dummy->capture_source[MIXER_ADDR_SYNTH][0]);
+        printk(KERN_ERR "  RECSRC CD: %d\n", dpcm->dummy->capture_source[MIXER_ADDR_CD][0]);
+        if (dpcm->dummy->capture_source[MIXER_ADDR_CD][0])
+        {
+            record_src = 2; //SBC
+        }
+        else if (dpcm->dummy->capture_source[MIXER_ADDR_SYNTH])
+        {
+            record_src = 1; //Upload
+        }
+        else
+        {
+            record_src = 0; //line-in
+        }
+    }
+    else
+    {
+        printk(KERN_ERR "  dpcm->dummy is null pointer !!!\n");
+    }
+    #endif
+    #endif
+
+    //AUD_InitALSARecord();
+
+    dummy_pcm_capture_hardware.buffer_bytes_max = u4GetRecBufEA() - u4GetRecBufSA();
+    dummy_pcm_capture_hardware.period_bytes_max = u4GetRecBufEA() - u4GetRecBufSA();
+
+    #if FIRST_RECORD_DBG
+    first_record = 0;
+    #endif
 
 	dummy->timer_ops = &dummy_systimer_ops;
 #ifdef CONFIG_HIGH_RES_TIMERS
@@ -573,36 +1105,43 @@ static int dummy_pcm_open(struct snd_pcm_substream *substream)
 	if (err < 0)
 		return err;
 
-	runtime->hw = dummy->pcm_hw;
+	//runtime->hw = dummy->pcm_hw;
+	runtime->hw = dummy_pcm_capture_hardware; //MTK
 	if (substream->pcm->device & 1) {
 		runtime->hw.info &= ~SNDRV_PCM_INFO_INTERLEAVED;
 		runtime->hw.info |= SNDRV_PCM_INFO_NONINTERLEAVED;
 	}
 	if (substream->pcm->device & 2)
-		runtime->hw.info &= ~(SNDRV_PCM_INFO_MMAP |
-				      SNDRV_PCM_INFO_MMAP_VALID);
+		runtime->hw.info &= ~(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_MMAP_VALID);
 
-	if (model == NULL)
-		return 0;
-
-	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
-		if (model->playback_constraints)
-			err = model->playback_constraints(substream->runtime);
-	} else {
-		if (model->capture_constraints)
-			err = model->capture_constraints(substream->runtime);
-	}
-	if (err < 0) {
-		dummy->timer_ops->free(substream);
-		return err;
-	}
 	return 0;
 }
 
-static int dummy_pcm_close(struct snd_pcm_substream *substream)
+static int dummy_pcm_playback_close(struct snd_pcm_substream *substream)
 {
 	struct snd_dummy *dummy = snd_pcm_substream_chip(substream);
 	dummy->timer_ops->free(substream);
+
+    #if ALSA_DBG_MSG
+    printk(KERN_ERR "!@#!@# @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ snd_card_dummy_playback_close\n"); //0513
+    #endif
+
+    vDeInitAlsaPlayback();
+
+	return 0;
+}
+
+static int dummy_pcm_capture_close(struct snd_pcm_substream *substream)
+{
+	struct snd_dummy *dummy = snd_pcm_substream_chip(substream);
+	dummy->timer_ops->free(substream);
+
+    #if ALSA_DBG_MSG
+    printk(KERN_ERR "!@#!@# @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ snd_card_dummy_capture_close\n"); //0513    
+    #endif
+
+    AUD_DeInitALSARecord();
+
 	return 0;
 }
 
@@ -660,26 +1199,51 @@ static struct page *dummy_pcm_page(struct snd_pcm_substream *substream,
 	return virt_to_page(dummy_page[substream->stream]); /* the same page */
 }
 
-static struct snd_pcm_ops dummy_pcm_ops = {
-	.open =		dummy_pcm_open,
-	.close =	dummy_pcm_close,
+static struct snd_pcm_ops dummy_pcm_playback_ops = {
+	.open =		dummy_pcm_playback_open,
+	.close =	dummy_pcm_playback_close,
 	.ioctl =	snd_pcm_lib_ioctl,
 	.hw_params =	dummy_pcm_hw_params,
 	.hw_free =	dummy_pcm_hw_free,
-	.prepare =	dummy_pcm_prepare,
+	.prepare =	dummy_pcm_playback_prepare,
 	.trigger =	dummy_pcm_trigger,
-	.pointer =	dummy_pcm_pointer,
+	.pointer =	dummy_pcm_playback_pointer,
 };
 
-static struct snd_pcm_ops dummy_pcm_ops_no_buf = {
-	.open =		dummy_pcm_open,
-	.close =	dummy_pcm_close,
+static struct snd_pcm_ops dummy_pcm_capture_ops = {
+	.open =		dummy_pcm_capture_open,
+	.close =	dummy_pcm_capture_close,
 	.ioctl =	snd_pcm_lib_ioctl,
 	.hw_params =	dummy_pcm_hw_params,
 	.hw_free =	dummy_pcm_hw_free,
-	.prepare =	dummy_pcm_prepare,
+	.prepare =	dummy_pcm_capture_prepare,
 	.trigger =	dummy_pcm_trigger,
-	.pointer =	dummy_pcm_pointer,
+	.pointer =	dummy_pcm_capture_pointer,
+};
+
+static struct snd_pcm_ops dummy_pcm_playback_ops_no_buf = {
+	.open =		dummy_pcm_playback_open,
+	.close =	dummy_pcm_playback_close,
+	.ioctl =	snd_pcm_lib_ioctl,
+	.hw_params =	dummy_pcm_hw_params,
+	.hw_free =	dummy_pcm_hw_free,
+	.prepare =	dummy_pcm_playback_prepare,
+	.trigger =	dummy_pcm_trigger,
+	.pointer =	dummy_pcm_playback_pointer,
+	.copy =		dummy_pcm_copy,
+	.silence =	dummy_pcm_silence,
+	.page =		dummy_pcm_page,
+};
+
+static struct snd_pcm_ops dummy_pcm_capture_ops_no_buf = {
+	.open =		dummy_pcm_capture_open,
+	.close =	dummy_pcm_capture_close,
+	.ioctl =	snd_pcm_lib_ioctl,
+	.hw_params =	dummy_pcm_hw_params,
+	.hw_free =	dummy_pcm_hw_free,
+	.prepare =	dummy_pcm_capture_prepare,
+	.trigger =	dummy_pcm_trigger,
+	.pointer =	dummy_pcm_capture_pointer,
 	.copy =		dummy_pcm_copy,
 	.silence =	dummy_pcm_silence,
 	.page =		dummy_pcm_page,
@@ -689,8 +1253,13 @@ static int __devinit snd_card_dummy_pcm(struct snd_dummy *dummy, int device,
 					int substreams)
 {
 	struct snd_pcm *pcm;
-	struct snd_pcm_ops *ops;
+	struct snd_pcm_ops *playback_ops;
+    struct snd_pcm_ops *capture_ops;
 	int err;
+
+    #if ALSA_DBG_MSG
+    printk(KERN_ERR "!@#!@# @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ snd_card_dummy_pcm\n");
+    #endif
 
 	err = snd_pcm_new(dummy->card, "Dummy PCM", device,
 			       substreams, substreams, &pcm);
@@ -698,15 +1267,22 @@ static int __devinit snd_card_dummy_pcm(struct snd_dummy *dummy, int device,
 		return err;
 	dummy->pcm = pcm;
 	if (fake_buffer)
-		ops = &dummy_pcm_ops_no_buf;
+    {
+		playback_ops = &dummy_pcm_playback_ops_no_buf;
+        capture_ops = &dummy_pcm_capture_ops_no_buf;
+    }
 	else
-		ops = &dummy_pcm_ops;
-	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, ops);
-	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_CAPTURE, ops);
+    {
+		playback_ops = &dummy_pcm_playback_ops;
+		capture_ops = &dummy_pcm_capture_ops;
+    }
+	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, playback_ops);
+	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_CAPTURE, capture_ops);
 	pcm->private_data = dummy;
 	pcm->info_flags = 0;
 	strcpy(pcm->name, "Dummy PCM");
-	if (!fake_buffer) {
+	if (!fake_buffer) 
+    {
 		snd_pcm_lib_preallocate_pages_for_all(pcm,
 			SNDRV_DMA_TYPE_CONTINUOUS,
 			snd_dma_continuous_data(GFP_KERNEL),
@@ -731,6 +1307,10 @@ static int __devinit snd_card_dummy_pcm(struct snd_dummy *dummy, int device,
 static int snd_dummy_volume_info(struct snd_kcontrol *kcontrol,
 				 struct snd_ctl_elem_info *uinfo)
 {
+#if ALSA_DBG_MSG_MIXER
+    printk(KERN_ERR "!@#!@# snd_dummy_volume_info\n");
+#endif
+
 	uinfo->type = SNDRV_CTL_ELEM_TYPE_INTEGER;
 	uinfo->count = 2;
 	uinfo->value.integer.min = -50;
@@ -743,6 +1323,12 @@ static int snd_dummy_volume_get(struct snd_kcontrol *kcontrol,
 {
 	struct snd_dummy *dummy = snd_kcontrol_chip(kcontrol);
 	int addr = kcontrol->private_value;
+
+#if ALSA_DBG_MSG_MIXER
+    printk(KERN_ERR "!@#!@# snd_dummy_volume_get (addr=%d)\n", addr);
+    printk(KERN_ERR "!@#!@# dummy->mixer_volume[%d][0]: %d\n", addr, dummy->mixer_volume[addr][0]);
+    printk(KERN_ERR "!@#!@# dummy->mixer_volume[%d][1]: %d\n", addr, dummy->mixer_volume[addr][1]);
+#endif
 
 	spin_lock_irq(&dummy->mixer_lock);
 	ucontrol->value.integer.value[0] = dummy->mixer_volume[addr][0];
@@ -757,6 +1343,12 @@ static int snd_dummy_volume_put(struct snd_kcontrol *kcontrol,
 	struct snd_dummy *dummy = snd_kcontrol_chip(kcontrol);
 	int change, addr = kcontrol->private_value;
 	int left, right;
+
+#if ALSA_DBG_MSG_MIXER
+    printk(KERN_ERR "!@#!@# snd_dummy_volume_put (addr=%d)\n", addr);
+    printk(KERN_ERR "!@#!@# ucontrol->value.integer.value[0]: %d\n", ucontrol->value.integer.value[0]);
+    printk(KERN_ERR "!@#!@# ucontrol->value.integer.value[1]: %d\n", ucontrol->value.integer.value[1]);
+#endif
 
 	left = ucontrol->value.integer.value[0];
 	if (left < -50)
@@ -793,6 +1385,12 @@ static int snd_dummy_capsrc_get(struct snd_kcontrol *kcontrol,
 	struct snd_dummy *dummy = snd_kcontrol_chip(kcontrol);
 	int addr = kcontrol->private_value;
 
+#if ALSA_DBG_MSG_MIXER
+    printk(KERN_ERR "!@#!@# snd_dummy_capsrc_get (addr=%d)\n", addr);
+    printk(KERN_ERR "!@#!@# dummy->capture_source[%d][0]: %d\n", addr, dummy->capture_source[addr][0]);
+    printk(KERN_ERR "!@#!@# dummy->capture_source[%d][1]: %d\n", addr, dummy->capture_source[addr][1]);
+#endif
+
 	spin_lock_irq(&dummy->mixer_lock);
 	ucontrol->value.integer.value[0] = dummy->capture_source[addr][0];
 	ucontrol->value.integer.value[1] = dummy->capture_source[addr][1];
@@ -806,6 +1404,12 @@ static int snd_dummy_capsrc_put(struct snd_kcontrol *kcontrol, struct snd_ctl_el
 	int change, addr = kcontrol->private_value;
 	int left, right;
 
+#if ALSA_DBG_MSG_MIXER
+    printk(KERN_ERR "!@#!@# snd_dummy_capsrc_put (addr=%d)\n",addr);
+    printk(KERN_ERR "!@#!@# ucontrol->value.integer.value[0]: %d\n", ucontrol->value.integer.value[0]);
+    printk(KERN_ERR "!@#!@# ucontrol->value.integer.value[1]: %d\n", ucontrol->value.integer.value[1]);
+#endif
+
 	left = ucontrol->value.integer.value[0] & 1;
 	right = ucontrol->value.integer.value[1] & 1;
 	spin_lock_irq(&dummy->mixer_lock);
@@ -813,11 +1417,26 @@ static int snd_dummy_capsrc_put(struct snd_kcontrol *kcontrol, struct snd_ctl_el
 	         dummy->capture_source[addr][1] != right;
 	dummy->capture_source[addr][0] = left;
 	dummy->capture_source[addr][1] = right;
+    //TEST
+    if (dummy->capture_source[MIXER_ADDR_CD][0])
+    {
+        record_src = 2; //SBC
+    }
+    else if (dummy->capture_source[MIXER_ADDR_SYNTH][0])
+    {
+        record_src = 1; //SPEAKER
+    }
+    else
+    {
+        record_src = 0; //LINE-IN
+    }
+    //TEST
 	spin_unlock_irq(&dummy->mixer_lock);
 	return change;
 }
 
-static struct snd_kcontrol_new snd_dummy_controls[] = {
+static struct snd_kcontrol_new snd_dummy_controls[] = 
+{
 DUMMY_VOLUME("Master Volume", 0, MIXER_ADDR_MASTER),
 DUMMY_CAPSRC("Master Capture Switch", 0, MIXER_ADDR_MASTER),
 DUMMY_VOLUME("Synth Volume", 0, MIXER_ADDR_SYNTH),
@@ -836,10 +1455,15 @@ static int __devinit snd_card_dummy_new_mixer(struct snd_dummy *dummy)
 	unsigned int idx;
 	int err;
 
+    #if ALSA_DBG_MSG || ALSA_DBG_MSG_MIXER
+    printk(KERN_ERR "!@#!@# @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ snd_card_dummy_new_mixer\n");
+    #endif
+
 	spin_lock_init(&dummy->mixer_lock);
 	strcpy(card->mixername, "Dummy Mixer");
 
-	for (idx = 0; idx < ARRAY_SIZE(snd_dummy_controls); idx++) {
+	for (idx = 0; idx < ARRAY_SIZE(snd_dummy_controls); idx++) 
+    {
 		err = snd_ctl_add(card, snd_ctl_new1(&snd_dummy_controls[idx], dummy));
 		if (err < 0)
 			return err;
@@ -981,9 +1605,12 @@ static int __devinit snd_dummy_probe(struct platform_device *devptr)
 {
 	struct snd_card *card;
 	struct snd_dummy *dummy;
-	struct dummy_model *m = NULL, **mdl;
 	int idx, err;
 	int dev = devptr->id;
+
+    #if ALSA_DBG_MSG
+    printk(KERN_ERR "!@#!@# @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ snd_dummy_probe\n");
+    #endif
 
 	err = snd_card_create(index[dev], id[dev], THIS_MODULE,
 			      sizeof(struct snd_dummy), &card);
@@ -991,15 +1618,7 @@ static int __devinit snd_dummy_probe(struct platform_device *devptr)
 		return err;
 	dummy = card->private_data;
 	dummy->card = card;
-	for (mdl = dummy_models; *mdl && model[dev]; mdl++) {
-		if (strcmp(model[dev], (*mdl)->name) == 0) {
-			printk(KERN_INFO
-				"snd-dummy: Using model '%s' for card %i\n",
-				(*mdl)->name, card->number);
-			m = dummy->model = *mdl;
-			break;
-		}
-	}
+
 	for (idx = 0; idx < MAX_PCM_DEVICES && idx < pcm_devs[dev]; idx++) {
 		if (pcm_substreams[dev] < 1)
 			pcm_substreams[dev] = 1;
@@ -1011,30 +1630,6 @@ static int __devinit snd_dummy_probe(struct platform_device *devptr)
 	}
 
 	dummy->pcm_hw = dummy_pcm_hardware;
-	if (m) {
-		if (m->formats)
-			dummy->pcm_hw.formats = m->formats;
-		if (m->buffer_bytes_max)
-			dummy->pcm_hw.buffer_bytes_max = m->buffer_bytes_max;
-		if (m->period_bytes_min)
-			dummy->pcm_hw.period_bytes_min = m->period_bytes_min;
-		if (m->period_bytes_max)
-			dummy->pcm_hw.period_bytes_max = m->period_bytes_max;
-		if (m->periods_min)
-			dummy->pcm_hw.periods_min = m->periods_min;
-		if (m->periods_max)
-			dummy->pcm_hw.periods_max = m->periods_max;
-		if (m->rates)
-			dummy->pcm_hw.rates = m->rates;
-		if (m->rate_min)
-			dummy->pcm_hw.rate_min = m->rate_min;
-		if (m->rate_max)
-			dummy->pcm_hw.rate_max = m->rate_max;
-		if (m->channels_min)
-			dummy->pcm_hw.channels_min = m->channels_min;
-		if (m->channels_max)
-			dummy->pcm_hw.channels_max = m->channels_max;
-	}
 
 	err = snd_card_dummy_new_mixer(dummy);
 	if (err < 0)
@@ -1048,7 +1643,8 @@ static int __devinit snd_dummy_probe(struct platform_device *devptr)
 	snd_card_set_dev(card, &devptr->dev);
 
 	err = snd_card_register(card);
-	if (err == 0) {
+	if (err == 0) 
+    {
 		platform_set_drvdata(devptr, card);
 		return 0;
 	}
@@ -1086,14 +1682,16 @@ static int snd_dummy_resume(struct platform_device *pdev)
 
 #define SND_DUMMY_DRIVER	"snd_dummy"
 
-static struct platform_driver snd_dummy_driver = {
+static struct platform_driver snd_dummy_driver = 
+{
 	.probe		= snd_dummy_probe,
 	.remove		= __devexit_p(snd_dummy_remove),
 #ifdef CONFIG_PM
 	.suspend	= snd_dummy_suspend,
 	.resume		= snd_dummy_resume,
 #endif
-	.driver		= {
+	.driver		= 
+    {
 		.name	= SND_DUMMY_DRIVER
 	},
 };
@@ -1112,39 +1710,78 @@ static int __init alsa_card_dummy_init(void)
 {
 	int i, cards, err;
 
+    printk(KERN_ERR "!@#!@# @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ alsa_card_dummy_init 201105032315\n");
+	if (fake_buffer == 0)
+	{
+		printk(KERN_ERR "!@#!@# @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ fake_buffer=0\n");
+	}
+
 	err = platform_driver_register(&snd_dummy_driver);
 	if (err < 0)
 		return err;
 
 	err = alloc_fake_buffer();
-	if (err < 0) {
+	if (err < 0) 
+    {
 		platform_driver_unregister(&snd_dummy_driver);
+        #if ALSA_DBG_MSG
+        printk(KERN_ERR "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ opm_driver_register fail\n");
+        #endif
 		return err;
 	}
 
 	cards = 0;
-	for (i = 0; i < SNDRV_CARDS; i++) {
+	for (i = 0; i < SNDRV_CARDS; i++) 
+    {
 		struct platform_device *device;
+
+        #if ALSA_DBG_MSG
+        printk(KERN_ERR "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ try - %d\n", i);	    
+        #endif
 		if (! enable[i])
+        {
+            #if ALSA_DBG_MSG
+            printk(KERN_ERR "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ !enable[i] continue - %d\n", i);	    
+            #endif
 			continue;
-		device = platform_device_register_simple(SND_DUMMY_DRIVER,
-							 i, NULL, 0);
+        }
+		device = platform_device_register_simple(SND_DUMMY_DRIVER,i, NULL, 0);
+        #if ALSA_DBG_MSG
+        //printk(KERN_ERR "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ device 0x%08x 0x%08x 0x%08x %s - %d\n", device, device->dev, device->dev.driver_data, device->name, i);
+        #endif
+
 		if (IS_ERR(device))
+		{
+            #if ALSA_DBG_MSG
+            printk(KERN_ERR "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ IS_ERR(device) continue - %d\n", i);	    
+            #endif
 			continue;
-		if (!platform_get_drvdata(device)) {
+		}
+		if (!platform_get_drvdata(device)) 
+        {
+            #if ALSA_DBG_MSG
+            printk(KERN_ERR "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ opm_get_drvdata fail - %d\n", i);
+            #endif
 			platform_device_unregister(device);
 			continue;
 		}
 		devices[i] = device;
 		cards++;
 	}
-	if (!cards) {
+	if (!cards) 
+    {
+        #if ALSA_DBG_MSG
+        printk(KERN_ERR "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ Dummy soundcard not found or device busy\n");	    
+        #endif
 #ifdef MODULE
 		printk(KERN_ERR "Dummy soundcard not found or device busy\n");
 #endif
 		snd_dummy_unregister_all();
 		return -ENODEV;
 	}
+
+    printk(KERN_ERR "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ alsa_card_dummy_init end\n");
+
 	return 0;
 }
 

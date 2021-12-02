@@ -95,6 +95,7 @@ obj-$(CONFIG_CPU_IDLE)		+= cpuidle/
 obj-$(CONFIG_MMC)		+= mmc/
 obj-$(CONFIG_MEMSTICK)		+= memstick/
 obj-$(CONFIG_NEW_LEDS)		+= leds/
+obj-$(CONFIG_NEW_LEDS)		+= switch/
 obj-$(CONFIG_INFINIBAND)	+= infiniband/
 obj-$(CONFIG_SGI_SN)		+= sn/
 obj-y				+= firmware/
@@ -113,3 +114,25 @@ obj-$(CONFIG_VLYNQ)		+= vlynq/
 obj-$(CONFIG_STAGING)		+= staging/
 obj-y				+= platform/
 obj-y				+= ieee802154/
+obj-$(CONFIG_OPM)		+= opm/
+ifeq ($(CONFIG_MT5391_DRIVERS),y)
+obj-$(CONFIG_MT5391_DRIVERS)    += mtk/mt5392b/
+endif
+ifeq ($(CONFIG_MT5363_DRIVERS),y)
+obj-$(CONFIG_MT5363_DRIVERS)    += mtk/mt5363/
+endif
+ifeq ($(CONFIG_MT5365_DRIVERS),y)
+obj-$(CONFIG_MT5365_DRIVERS)    += mtk/mt5365/
+endif
+ifeq ($(CONFIG_MT5395_DRIVERS),y)
+obj-$(CONFIG_MT5395_DRIVERS)    += mtk/mt5395/
+endif
+ifeq ($(CONFIG_MT5396_DRIVERS),y)
+obj-$(CONFIG_MT5396_DRIVERS)    += mtk/mt5396/
+endif
+ifeq ($(CONFIG_MT5368_DRIVERS),y)
+obj-$(CONFIG_MT5368_DRIVERS)    += mtk/mt5368/
+endif
+ifeq ($(CONFIG_MT5389_DRIVERS),y)
+obj-$(CONFIG_MT5389_DRIVERS)    += mtk/mt5389/
+endif

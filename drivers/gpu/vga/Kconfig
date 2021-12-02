@@ -1,6 +1,6 @@
 config VGA_ARB
 	bool "VGA Arbitration" if EMBEDDED
-	default y
+	default n
 	depends on PCI
 	help
 	  Some "legacy" VGA devices implemented on PCI typically have the same

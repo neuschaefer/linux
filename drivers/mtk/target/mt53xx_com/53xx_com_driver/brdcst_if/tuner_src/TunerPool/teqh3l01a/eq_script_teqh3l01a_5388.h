@@ -1,0 +1,109 @@
+/*----------------------------------------------------------------------------*
+ * Copyright Statement:                                                       *
+ *                                                                            *
+ *   This software/firmware and related documentation ("MediaTek Software")   *
+ * are protected under international and related jurisdictions'copyright laws *
+ * as unpublished works. The information contained herein is confidential and *
+ * proprietary to MediaTek Inc. Without the prior written permission of       *
+ * MediaTek Inc., any reproduction, modification, use or disclosure of        *
+ * MediaTek Software, and information contained herein, in whole or in part,  *
+ * shall be strictly prohibited.                                              *
+ * MediaTek Inc. Copyright (C) 2010. All rights reserved.                     *
+ *                                                                            *
+ *   BY OPENING THIS FILE, RECEIVER HEREBY UNEQUIVOCALLY ACKNOWLEDGES AND     *
+ * AGREES TO THE FOLLOWING:                                                   *
+ *                                                                            *
+ *   1)Any and all intellectual property rights (including without            *
+ * limitation, patent, copyright, and trade secrets) in and to this           *
+ * Software/firmware and related documentation ("MediaTek Software") shall    *
+ * remain the exclusive property of MediaTek Inc. Any and all intellectual    *
+ * property rights (including without limitation, patent, copyright, and      *
+ * trade secrets) in and to any modifications and derivatives to MediaTek     *
+ * Software, whoever made, shall also remain the exclusive property of        *
+ * MediaTek Inc.  Nothing herein shall be construed as any transfer of any    *
+ * title to any intellectual property right in MediaTek Software to Receiver. *
+ *                                                                            *
+ *   2)This MediaTek Software Receiver received from MediaTek Inc. and/or its *
+ * representatives is provided to Receiver on an "AS IS" basis only.          *
+ * MediaTek Inc. expressly disclaims all warranties, expressed or implied,    *
+ * including but not limited to any implied warranties of merchantability,    *
+ * non-infringement and fitness for a particular purpose and any warranties   *
+ * arising out of course of performance, course of dealing or usage of trade. *
+ * MediaTek Inc. does not provide any warranty whatsoever with respect to the *
+ * software of any third party which may be used by, incorporated in, or      *
+ * supplied with the MediaTek Software, and Receiver agrees to look only to   *
+ * such third parties for any warranty claim relating thereto.  Receiver      *
+ * expressly acknowledges that it is Receiver's sole responsibility to obtain *
+ * from any third party all proper licenses contained in or delivered with    *
+ * MediaTek Software.  MediaTek is not responsible for any MediaTek Software  *
+ * releases made to Receiver's specifications or to conform to a particular   *
+ * standard or open forum.                                                    *
+ *                                                                            *
+ *   3)Receiver further acknowledge that Receiver may, either presently       *
+ * and/or in the future, instruct MediaTek Inc. to assist it in the           *
+ * development and the implementation, in accordance with Receiver's designs, *
+ * of certain softwares relating to Receiver's product(s) (the "Services").   *
+ * Except as may be otherwise agreed to in writing, no warranties of any      *
+ * kind, whether express or implied, are given by MediaTek Inc. with respect  *
+ * to the Services provided, and the Services are provided on an "AS IS"      *
+ * basis. Receiver further acknowledges that the Services may contain errors  *
+ * that testing is important and it is solely responsible for fully testing   *
+ * the Services and/or derivatives thereof before they are used, sublicensed  *
+ * or distributed. Should there be any third party action brought against     *
+ * MediaTek Inc. arising out of or relating to the Services, Receiver agree   *
+ * to fully indemnify and hold MediaTek Inc. harmless.  If the parties        *
+ * mutually agree to enter into or continue a business relationship or other  *
+ * arrangement, the terms and conditions set forth herein shall remain        *
+ * effective and, unless explicitly stated otherwise, shall prevail in the    *
+ * event of a conflict in the terms in any agreements entered into between    *
+ * the parties.                                                               *
+ *                                                                            *
+ *   4)Receiver's sole and exclusive remedy and MediaTek Inc.'s entire and    *
+ * cumulative liability with respect to MediaTek Software released hereunder  *
+ * will be, at MediaTek Inc.'s sole discretion, to replace or revise the      *
+ * MediaTek Software at issue.                                                *
+ *                                                                            *
+ *   5)The transaction contemplated hereunder shall be construed in           *
+ * accordance with the laws of Singapore, excluding its conflict of laws      *
+ * principles.  Any disputes, controversies or claims arising thereof and     *
+ * related thereto shall be settled via arbitration in Singapore, under the   *
+ * then current rules of the International Chamber of Commerce (ICC).  The    *
+ * arbitration shall be conducted in English. The awards of the arbitration   *
+ * shall be final and binding upon both parties and shall be entered and      *
+ * enforceable in any court of competent jurisdiction.                        *
+ *---------------------------------------------------------------------------*/
+UINT8 EQTEQH3L01AMN[] = {
+0x0F, 0xFD, 0x00, 0x04, 0x0F, 0xFF, 0x0F, 0xFC, 0x00, 0x08, 0x0F, 0xFA, 0x0F, 0xFF, 
+0x00, 0x08, 0x0F, 0xF9, 0x00, 0x00, 0x00, 0x07, 0x0F, 0xF9, 0x0F, 0xFF, 0x00, 0x06, 
+0x0F, 0xFA, 0x00, 0x00, 0x00, 0x04, 0x0F, 0xFA, 0x00, 0x01, 0x00, 0x04, 0x0F, 0xFB, 
+0x00, 0x00, 0x00, 0x04, 0x0F, 0xFD, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 
+0x0F, 0xFA, 0x00, 0x00, 0x00, 0x0E, 0x0F, 0xF6, 0x0F, 0xF6, 0x00, 0x1B, 0x0F, 0xFD, 
+0x0F, 0xE9, 0x00, 0x25, 0x00, 0x10, 0x0F, 0xD8, 0x00, 0x1A, 0x00, 0x1B, 0x0F, 0xC4, 
+0x00, 0x04, 0x00, 0x27, 0x0F, 0xD0, 0x00, 0x3E, 0x00, 0x51, 0x0E, 0xB9, 0x04, 0x31, 
+0x00, 0x49, 0x00, 0xC6, 0x0F, 0xA3, 0x0F, 0xCD, 0x00, 0x54, 0x0F, 0xCC, 0x0F, 0xC1, 
+0x00, 0x37, 0x0F, 0xF8, 0x0F, 0xD6, 0x00, 0x27, 0x00, 0x09, 0x0F, 0xE8, 0x00, 0x16, 
+0x0F, 0xFF, 0x0F, 0xEF, 0x00, 0x19, 0x0F, 0xFB, 0x0F, 0xEA, 0x00, 0x1B, 0x00, 0x02, 
+0x0F, 0xE6, 0x00, 0x17, 0x00, 0x06, 0x0F, 0xE5, 0x00, 0x12, 0x00, 0x0A, 0x0F, 0xE7, 
+0x00, 0x0C, 0x00, 0x0B, 0x0F, 0xEC, 0x00, 0x08, 0x00, 0x09, 0x0F, 0xEE, 0x00, 0x08, 
+0x00, 0x09, 0x0F, 0xF0, 0x00, 0x08, 0x00, 0x08, 0x0F, 0xF1, 0x00, 0x08, 0x00, 0x03, 
+0x0F, 0xF4, 0x00, 0x0D, 0x0F, 0xF7, 0x00, 0x03, 0x00, 0x01, 0x00, 0x00, 0x00, 0x40, 
+0x00, 0x00, 0x00, 0x44, 0x00, 0x21, 0x00, 0x12, 0x0F, 0xDE
+};
+
+UINT8 EQTEQH3L01AMNWeak[] = {
+0x00, 0x00, 0x00, 0x02, 0x0F, 0xFD, 0x00, 0x02, 0x0F, 0xFF, 0x0F, 0xFE, 0x00, 0x03, 
+0x0F, 0xFF, 0x0F, 0xFE, 0x00, 0x04, 0x0F, 0xFF, 0x0F, 0xFE, 0x00, 0x04, 0x0F, 0xFE, 
+0x0F, 0xFD, 0x00, 0x04, 0x0F, 0xFF, 0x0F, 0xFD, 0x00, 0x05, 0x0F, 0xFF, 0x0F, 0xFB, 
+0x00, 0x05, 0x00, 0x00, 0x0F, 0xFB, 0x00, 0x05, 0x00, 0x01, 0x0F, 0xFA, 0x00, 0x05, 
+0x00, 0x03, 0x0F, 0xFA, 0x00, 0x05, 0x00, 0x03, 0x0F, 0xF9, 0x00, 0x07, 0x00, 0x07, 
+0x0F, 0xFA, 0x00, 0x0B, 0x00, 0x0C, 0x0F, 0xF4, 0x00, 0x05, 0x00, 0x0A, 0x0F, 0xE7, 
+0x0F, 0xFD, 0x00, 0x1D, 0x0F, 0xF0, 0x0F, 0xED, 0x00, 0x29, 0x00, 0x31, 0x02, 0x56, 
+0x01, 0x02, 0x00, 0xBD, 0x0F, 0xE0, 0x0F, 0xC2, 0x00, 0x12, 0x0F, 0xF2, 0x0F, 0xDD, 
+0x00, 0x0B, 0x00, 0x01, 0x0F, 0xEC, 0x00, 0x0B, 0x00, 0x09, 0x0F, 0xF4, 0x00, 0x05, 
+0x00, 0x08, 0x0F, 0xF8, 0x00, 0x05, 0x00, 0x06, 0x0F, 0xF9, 0x00, 0x03, 0x00, 0x08, 
+0x0F, 0xFB, 0x00, 0x01, 0x00, 0x06, 0x0F, 0xFC, 0x0F, 0xFF, 0x00, 0x04, 0x0F, 0xFC, 
+0x0F, 0xFF, 0x00, 0x04, 0x0F, 0xFD, 0x0F, 0xFF, 0x00, 0x03, 0x0F, 0xFE, 0x00, 0x00, 
+0x00, 0x03, 0x0F, 0xFE, 0x00, 0x00, 0x00, 0x02, 0x0F, 0xFE, 0x00, 0x01, 0x00, 0x01, 
+0x0F, 0xFE, 0x00, 0x02, 0x0F, 0xFE, 0x00, 0x01, 0x0F, 0xFF, 0x00, 0x00, 0x00, 0x40, 
+0x00, 0x00, 0x00, 0x43, 0x00, 0x21, 0x00, 0x12, 0x0F, 0xDE
+};

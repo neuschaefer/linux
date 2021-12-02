@@ -122,13 +122,15 @@ static int mmc_decode_csd(struct mmc_card *card)
 	 * v1.2 has extra information in bits 15, 11 and 10.
 	 */
 	csd_struct = UNSTUFF_BITS(resp, 126, 2);
-	if (csd_struct != 1 && csd_struct != 2) {
+	// Modify by shunli.wang at 20110519
+	if (csd_struct != 1 && csd_struct != 2 && csd_struct != 3) {
 		printk(KERN_ERR "%s: unrecognised CSD structure version %d\n",
 			mmc_hostname(card->host), csd_struct);
 		return -EINVAL;
 	}
 
 	csd->mmca_vsn	 = UNSTUFF_BITS(resp, 122, 4);
+	printk(KERN_CRIT "mmc version = 0X%02X---------------------------\n", csd->mmca_vsn);
 	m = UNSTUFF_BITS(resp, 115, 4);
 	e = UNSTUFF_BITS(resp, 112, 3);
 	csd->tacc_ns	 = (tacc_exp[e] * tacc_mant[m] + 9) / 10;
@@ -165,7 +167,10 @@ static int mmc_read_ext_csd(struct mmc_card *card)
 	BUG_ON(!card);
 
 	if (card->csd.mmca_vsn < CSD_SPEC_VER_4)
+	{
+	    printk(KERN_ERR "card->csd.mmca_vsn < CSD_SPEC_VER_4\n");
 		return 0;
+	}
 
 	/*
 	 * As the ext_csd is so large and mostly unused, we don't store the
@@ -406,7 +411,9 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 		 */
 		err = mmc_read_ext_csd(card);
 		if (err)
+		{
 			goto free_card;
+		}
 	}
 
 	/*
@@ -416,18 +423,19 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 		(host->caps & MMC_CAP_MMC_HIGHSPEED)) {
 		err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
 			EXT_CSD_HS_TIMING, 1);
+
 		if (err && err != -EBADMSG)
 			goto free_card;
 
 		if (err) {
-			printk(KERN_WARNING "%s: switch to highspeed failed\n",
-			       mmc_hostname(card->host));
+			       mmc_hostname(card->host);
 			err = 0;
 		} else {
 			mmc_card_set_highspeed(card);
 			mmc_set_timing(card->host, MMC_TIMING_MMC_HS);
 		}
 	}
+
 
 	/*
 	 * Compute bus speed.
@@ -442,6 +450,7 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 	}
 
 	mmc_set_clock(host, max_dtr);
+
 
 	/*
 	 * Activate wide bus (if supported).
@@ -473,6 +482,7 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 			mmc_set_bus_width(card->host, bus_width);
 		}
 	}
+
 
 	if (!oldcard)
 		host->card = card;

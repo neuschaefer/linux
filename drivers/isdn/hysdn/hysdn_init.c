@@ -1,4 +1,4 @@
-/* $Id: hysdn_init.c,v 1.6.6.6 2001/09/23 22:24:54 kai Exp $
+/* $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/isdn/hysdn/hysdn_init.c#1 $
  *
  * Linux driver for HYSDN cards, init functions.
  *
@@ -36,7 +36,7 @@ MODULE_DESCRIPTION("ISDN4Linux: Driver for HYSDN cards");
 MODULE_AUTHOR("Werner Cornelius");
 MODULE_LICENSE("GPL");
 
-static char *hysdn_init_revision = "$Revision: 1.6.6.6 $";
+static char *hysdn_init_revision = "$Revision: #1 $";
 static int cardmax;		/* number of found cards */
 hysdn_card *card_root = NULL;	/* pointer to first card */
 static hysdn_card *card_last = NULL;	/* pointer to first card */

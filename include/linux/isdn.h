@@ -1,4 +1,4 @@
-/* $Id: isdn.h,v 1.125.2.3 2004/02/10 01:07:14 keil Exp $
+/* $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/include/linux/isdn.h#1 $
  *
  * Main header for the Linux ISDN subsystem (linklevel).
  *

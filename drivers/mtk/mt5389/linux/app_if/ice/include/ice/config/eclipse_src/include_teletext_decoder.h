@@ -1,0 +1,3 @@
+#ifndef INCLUDE_TELETEXT_DECODER
+    #define INCLUDE_TELETEXT_DECODER 1
+#endif

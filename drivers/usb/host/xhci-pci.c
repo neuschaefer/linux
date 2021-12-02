@@ -28,6 +28,9 @@
 #define PCI_VENDOR_ID_FRESCO_LOGIC	0x1b73
 #define PCI_DEVICE_ID_FRESCO_LOGIC_PDK	0x1000
 
+#define PCI_VENDOR_ID_ETRON		0x1b6f
+#define PCI_DEVICE_ID_ASROCK_P67	0x7023
+
 static const char hcd_name[] = "xhci_hcd";
 
 /* called after powerup, by probe or system-pm "wakeup" */
@@ -53,6 +56,7 @@ static int xhci_pci_setup(struct usb_hcd *hcd)
 	struct xhci_hcd		*xhci = hcd_to_xhci(hcd);
 	struct pci_dev		*pdev = to_pci_dev(hcd->self.controller);
 	int			retval;
+	u32			temp;
 
 	hcd->self.sg_tablesize = TRBS_PER_SEGMENT - 2;
 
@@ -80,6 +84,11 @@ static int xhci_pci_setup(struct usb_hcd *hcd)
 	}
 	if (pdev->vendor == PCI_VENDOR_ID_NEC)
 		xhci->quirks |= XHCI_NEC_HOST;
+	if (pdev->vendor == PCI_VENDOR_ID_ETRON &&
+			pdev->device == PCI_DEVICE_ID_ASROCK_P67) {
+		xhci->quirks |= XHCI_RESET_ON_RESUME;
+		xhci_dbg(xhci, "QUIRK: Resetting on resume\n");
+	}
 
 	/* Make sure the HC is halted. */
 	retval = xhci_halt(xhci);
@@ -93,6 +102,19 @@ static int xhci_pci_setup(struct usb_hcd *hcd)
 		return retval;
 	xhci_dbg(xhci, "Reset complete\n");
 
+	temp = xhci_readl(xhci, &xhci->cap_regs->hcc_params);
+	if (HCC_64BIT_ADDR(temp)) {
+		xhci_dbg(xhci, "Enabling 64-bit DMA addresses.\n");
+#if defined(CONFIG_MT53XX_MAP_CHANNELB_DRAM) || defined(CONFIG_MT53XX_USE_CHANNELB_DRAM)
+        hcd->self.controller->coherent_dma_mask = 0x1fffffff;
+        hcd->self.controller->dma_mask = &hcd->self.controller->coherent_dma_mask;       
+#else
+		dma_set_mask(hcd->self.controller, DMA_BIT_MASK(64));
+#endif
+	} else {
+		dma_set_mask(hcd->self.controller, DMA_BIT_MASK(32));
+	}
+
 	xhci_dbg(xhci, "Calling HCD init\n");
 	/* Initialize HCD and host controller data structures. */
 	retval = xhci_init(hcd);
@@ -104,8 +126,42 @@ static int xhci_pci_setup(struct usb_hcd *hcd)
 	xhci_dbg(xhci, "Got SBRN %u\n", (unsigned int) xhci->sbrn);
 
 	/* Find any debug ports */
-	return xhci_pci_reinit(xhci, pdev);
+	retval = xhci_pci_reinit(xhci, pdev);
+	if (retval)
+		return retval;
+
+	xhci_set_hardware_charger(hcd, 1);
+	return 0;
 }
+
+#ifdef CONFIG_PM
+static int xhci_pci_suspend(struct usb_hcd *hcd)
+{
+	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
+	int	retval = 0;
+
+	if (hcd->state != HC_STATE_SUSPENDED)
+		return -EINVAL;
+
+	retval = xhci_suspend(xhci);
+	if (!retval)
+		xhci_set_hardware_charger(hcd, 2);
+
+	return retval;
+}
+
+static int xhci_pci_resume(struct usb_hcd *hcd, bool hibernated)
+{
+	struct xhci_hcd		*xhci = hcd_to_xhci(hcd);
+	int			retval = 0;
+
+	retval = xhci_resume(xhci, hibernated);
+	if (!retval)
+		xhci_set_hardware_charger(hcd, 3);
+
+	return retval;
+}
+#endif /* CONFIG_PM */
 
 static const struct hc_driver xhci_pci_hc_driver = {
 	.description =		hcd_name,
@@ -123,7 +179,10 @@ static const struct hc_driver xhci_pci_hc_driver = {
 	 */
 	.reset =		xhci_pci_setup,
 	.start =		xhci_run,
-	/* suspend and resume implemented later */
+#ifdef CONFIG_PM
+	.pci_suspend =          xhci_pci_suspend,
+	.pci_resume =           xhci_pci_resume,
+#endif
 	.stop =			xhci_stop,
 	.shutdown =		xhci_shutdown,
 
@@ -143,7 +202,7 @@ static const struct hc_driver xhci_pci_hc_driver = {
 	.reset_bandwidth =	xhci_reset_bandwidth,
 	.address_device =	xhci_address_device,
 	.update_hub_device =	xhci_update_hub_device,
-	.reset_device =		xhci_reset_device,
+	.reset_device =		xhci_discover_or_reset_device,
 
 	/*
 	 * scheduling support
@@ -153,6 +212,8 @@ static const struct hc_driver xhci_pci_hc_driver = {
 	/* Root hub support */
 	.hub_control =		xhci_hub_control,
 	.hub_status_data =	xhci_hub_status_data,
+	.bus_suspend =		xhci_bus_suspend,
+	.bus_resume =		xhci_bus_resume,
 };
 
 /*-------------------------------------------------------------------------*/
@@ -177,6 +238,11 @@ static struct pci_driver xhci_pci_driver = {
 	/* suspend and resume implemented later */
 
 	.shutdown = 	usb_hcd_pci_shutdown,
+#ifdef CONFIG_PM_SLEEP
+	.driver = {
+		.pm = &usb_hcd_pci_pm_ops
+	},
+#endif
 };
 
 int xhci_register_pci(void)

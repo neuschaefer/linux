@@ -7,7 +7,7 @@
 
   */
 
-/* $Id: nsp_io.h,v 1.3 2003/08/04 21:15:26 elca Exp $ */
+/* $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/scsi/pcmcia/nsp_io.h#1 $ */
 
 #ifndef __NSP_IO_H__
 #define __NSP_IO_H__

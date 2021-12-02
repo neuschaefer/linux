@@ -13,7 +13,7 @@
  * General Public License for more details.
  *
  *
- * $Id: aha152x.c,v 2.7 2004/01/24 11:42:59 fischer Exp $
+ * $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/scsi/aha152x.c#1 $
  *
  * $Log: aha152x.c,v $
  * Revision 2.7  2004/01/24 11:42:59  fischer

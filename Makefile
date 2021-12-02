@@ -10,6 +10,9 @@ NAME = Yokohama
 # Comments in this file are targeted only to the developer, do not
 # expect to learn how to build the kernel reading this file.
 
+# Force remove extraversion.
+EXTRAVERSION = 
+
 # Do not:
 # o  use make's built-in rules and variables
 #    (this increases performance and avoids hard-to-debug behaviour);
@@ -99,7 +102,7 @@ ifeq ($(KBUILD_SRC),)
 # OK, Make called in directory where kernel src resides
 # Do we want to locate output files in a separate directory?
 ifeq ("$(origin O)", "command line")
-  KBUILD_OUTPUT := $(O)
+  export KBUILD_OUTPUT := $(O)
 endif
 
 # That's our default target when none is given on the command line
@@ -113,7 +116,7 @@ ifneq ($(KBUILD_OUTPUT),)
 # Invoke a second make in the output directory, passing relevant variables
 # check that the output directory actually exists
 saved-output := $(KBUILD_OUTPUT)
-KBUILD_OUTPUT := $(shell cd $(KBUILD_OUTPUT) && /bin/pwd)
+KBUILD_OUTPUT := $(shell mkdir -p $(KBUILD_OUTPUT) && cd $(KBUILD_OUTPUT) && /bin/pwd)
 $(if $(KBUILD_OUTPUT),, \
      $(error output directory "$(saved-output)" does not exist))
 
@@ -146,7 +149,8 @@ _all: modules
 endif
 
 srctree		:= $(if $(KBUILD_SRC),$(KBUILD_SRC),$(CURDIR))
-objtree		:= $(CURDIR)
+#objtree		:= $(CURDIR)
+objtree		:= $(if $(KBUILD_OUTPUT),$(KBUILD_OUTPUT),$(CURDIR))
 src		:= $(srctree)
 obj		:= $(objtree)
 
@@ -188,9 +192,29 @@ SUBARCH := $(shell uname -m | sed -e s/i.86/i386/ -e s/sun4u/sparc64/ \
 # Default value for CROSS_COMPILE is not to prefix executables
 # Note: Some architectures assign CROSS_COMPILE in their arch/*/Makefile
 export KBUILD_BUILDHOST := $(SUBARCH)
-ARCH		?= $(SUBARCH)
-CROSS_COMPILE	?=
-CROSS_COMPILE	?= $(CONFIG_CROSS_COMPILE:"%"=%)
+#ARCH		?= $(SUBARCH)
+#CROSS_COMPILE	?=
+#CROSS_COMPILE	?= $(CONFIG_CROSS_COMPILE:"%"=%)
+VM_LINUX_ROOT ?= $(word 1, $(subst /vm_linux/,/vm_linux /, $(shell pwd)))
+MTK_TARGET_CPU := $(shell if [ ! -d $(VM_LINUX_ROOT)/output ]; then echo ''; else find $(VM_LINUX_ROOT)/output -name .mtk_target_cpu; fi)
+MTK_TARGET_COMPILE := $(shell if [ ! -d $(VM_LINUX_ROOT)/output ]; then echo ''; else find $(VM_LINUX_ROOT)/output -name .mtk_cross_compile; fi)
+
+ARCH := $(shell if [ -f "$(KERNEL_OBJ_ROOT)/.mtk_target_cpu" ]; then \
+			cat "$(KERNEL_OBJ_ROOT)/.mtk_target_cpu"; \
+		else \
+			if [ -f "$(MTK_TARGET_CPU)" ]; then \
+				cat $(MTK_TARGET_CPU); \
+			else \
+				echo $(SUBARCH); \
+			fi; \
+		fi)
+CROSS_COMPILE   = $(shell if [ -f "$(KERNEL_OBJ_ROOT)/.mtk_cross_compile" ]; then \
+			          cat "$(KERNEL_OBJ_ROOT)/.mtk_cross_compile"; \
+			  else \
+				if [ -f "$(MTK_TARGET_COMPILE)" ]; then \
+					cat $(MTK_TARGET_COMPILE); \
+				fi; \
+			  fi)
 
 # Architecture as present in compile.h
 UTS_MACHINE 	:= $(ARCH)
@@ -315,7 +339,7 @@ include $(srctree)/scripts/Kbuild.include
 
 AS		= $(CROSS_COMPILE)as
 LD		= $(CROSS_COMPILE)ld
-CC		= $(CROSS_COMPILE)gcc
+CC		?= $(CROSS_COMPILE)gcc
 CPP		= $(CC) -E
 AR		= $(CROSS_COMPILE)ar
 NM		= $(CROSS_COMPILE)nm
@@ -345,15 +369,16 @@ CFLAGS_GCOV	= -fprofile-arcs -ftest-coverage
 # Needed to be compatible with the O= option
 LINUXINCLUDE    := -I$(srctree)/arch/$(hdr-arch)/include -Iinclude \
                    $(if $(KBUILD_SRC), -I$(srctree)/include) \
+                   $(if $(KBUILD_OUTPUT), -I$(objtree)/include) \
                    -include include/generated/autoconf.h
 
 KBUILD_CPPFLAGS := -D__KERNEL__
 
 KBUILD_CFLAGS   := -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
 		   -fno-strict-aliasing -fno-common \
-		   -Werror-implicit-function-declaration \
 		   -Wno-format-security \
 		   -fno-delete-null-pointer-checks
+#		   -Werror-implicit-function-declaration
 KBUILD_AFLAGS   := -D__ASSEMBLY__
 
 # Read KERNELRELEASE from include/config/kernel.release (if it exists)
@@ -373,7 +398,16 @@ export KBUILD_AFLAGS AFLAGS_KERNEL AFLAGS_MODULE
 # When compiling out-of-tree modules, put MODVERDIR in the module
 # tree rather than in the kernel tree. The kernel tree might
 # even be read-only.
+
+ifndef OBJ_ROOT
 export MODVERDIR := $(if $(KBUILD_EXTMOD),$(firstword $(KBUILD_EXTMOD))/).tmp_versions
+
+else
+MTK_EXTMOD_M     := $(word 2, $(subst /vm_linux/,/vm_linux/ , $(KBUILD_EXTMOD)))
+MTK_EXTMOD_OBJ   := $(OBJ_ROOT)/$(MTK_EXTMOD_M)
+
+export MODVERDIR := $(if $(KBUILD_EXTMOD),$(firstword $(MTK_EXTMOD_OBJ))/).tmp_versions
+endif
 
 # Files to ignore in find ... statements
 
@@ -532,13 +566,27 @@ all: vmlinux
 ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
 KBUILD_CFLAGS	+= -Os
 else
+ifdef CONFIG_DEBUG_INFO
+KBUILD_CFLAGS	+= -O1
+else
 KBUILD_CFLAGS	+= -O2
+endif
 endif
 
 include $(srctree)/arch/$(SRCARCH)/Makefile
 
 ifneq ($(CONFIG_FRAME_WARN),0)
 KBUILD_CFLAGS += $(call cc-option,-Wframe-larger-than=${CONFIG_FRAME_WARN})
+endif
+
+# Read mtk cfg.mak if it exists, otherwise ignore
+CFG_MAK_NAME := cfg.mak
+INC_CFG_MAK := $(shell if [ -e $(KERNEL_CFG_DIR)/$(CFG_MAK_NAME) ];then echo "$(KERNEL_CFG_DIR)/$(CFG_MAK_NAME)"; else echo ""; fi)
+
+ifneq "$(INC_CFG_MAK)" ""
+include $(INC_CFG_MAK)
+KBUILD_CFLAGS += $(KERNEL_DEFINES)
+KBUILD_AFLAGS += $(KERNEL_DEFINES)
 endif
 
 # Force gcc to behave correct even for buggy distributions
@@ -555,10 +603,22 @@ else
 KBUILD_CFLAGS	+= -fomit-frame-pointer
 endif
 
+ifdef CONFIG_KERNEL_NO_INLINE
+KBUILD_CFLAGS	+= -fno-inline
+endif
+
 ifdef CONFIG_DEBUG_INFO
 KBUILD_CFLAGS	+= -g
+#for codevisor
+KBUILD_CFLAGS	+= -gdwarf-2
 KBUILD_AFLAGS	+= -gdwarf-2
+
+#for t32
+#KBUILD_CFLAGS	+= -gstabs+
+#KBUILD_AFLAGS	+= -gstabs+
 endif
+
+#KBUILD_AFLAGS	+= -gstabs
 
 ifdef CONFIG_FUNCTION_TRACER
 KBUILD_CFLAGS	+= -pg
@@ -630,6 +690,12 @@ export	INSTALL_PATH ?= /boot
 # relocations required by build roots.  This is not defined in the
 # makefile but the argument can be passed to make if needed.
 #
+INSTALL_MOD_PATH ?= $(shell \
+	if [ -n "`which mtk-whereami 2> /dev/null`" ] ; then \
+	 if [ -f .mtk_target_installdir ]; then \
+		echo -n "`mtk-whereami`/../devkit/`cat .mtk_target_installdir`/target"; \
+	 fi \
+	fi)
 
 MODLIB	= $(INSTALL_MOD_PATH)/lib/modules/$(KERNELRELEASE)
 export MODLIB
@@ -912,6 +978,9 @@ ifneq ($(KBUILD_SRC),)
 		echo "  in the '$(srctree)' directory.";\
 		/bin/false; \
 	fi;
+	$(Q)ln -fsn $(objtree)/include/asm-$(ARCH) $(objtree)/include/asm
+#	$(Q)mkdir $(objtree)/include/asm/arch
+#	$(Q)ln -fsn $(srctree)/arch/arm/mach-mt5391/include $(objtree)/include/asm/arch/inc
 endif
 
 # prepare2 creates a makefile if using a separate output directory
@@ -1296,10 +1365,13 @@ $(objtree)/Module.symvers:
 	echo "           is missing; modules will have no dependencies and modversions."; \
 	echo )
 
-module-dirs := $(addprefix _module_,$(KBUILD_EXTMOD))
+MTK_EXTMOD_M     := $(word 2, $(subst /vm_linux/,/vm_linux/ , $(KBUILD_EXTMOD)))
+MTK_EXTMOD_OBJ   := $(OBJ_ROOT)/$(MTK_EXTMOD_M)
+module-dirs := $(addprefix _module_,$(MTK_EXTMOD_OBJ))
+
 PHONY += $(module-dirs) modules
 $(module-dirs): crmodverdir $(objtree)/Module.symvers
-	$(Q)$(MAKE) $(build)=$(patsubst _module_%,%,$@)
+	$(Q)$(MAKE) $(build)=$(patsubst _module_%,%,$@) ORIG_SRC=$(KBUILD_EXTMOD)
 
 modules: $(module-dirs)
 	@$(kecho) '  Building modules, stage 2.';

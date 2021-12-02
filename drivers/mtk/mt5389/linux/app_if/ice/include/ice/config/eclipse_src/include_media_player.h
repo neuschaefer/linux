@@ -1,0 +1,3 @@
+#ifndef INCLUDE_MEDIA_PLAYER
+    #define INCLUDE_MEDIA_PLAYER 1
+#endif

@@ -1,4 +1,4 @@
-/* $Id: callc.c,v 2.59.2.4 2004/02/11 13:21:32 keil Exp $
+/* $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/isdn/hisax/callc.c#1 $
  *
  * Author       Karsten Keil
  * Copyright    by Karsten Keil      <keil@isdn4linux.de>
@@ -22,7 +22,7 @@
 #include "hisax.h"
 #include <linux/isdn/capicmd.h>
 
-const char *lli_revision = "$Revision: 2.59.2.4 $";
+const char *lli_revision = "$Revision: #1 $";
 
 extern struct IsdnCard cards[];
 

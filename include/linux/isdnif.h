@@ -1,4 +1,4 @@
-/* $Id: isdnif.h,v 1.43.2.2 2004/01/12 23:08:35 keil Exp $
+/* $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/include/linux/isdnif.h#1 $
  *
  * Linux ISDN subsystem
  * Definition of the interface between the subsystem and its low-level drivers.

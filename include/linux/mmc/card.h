@@ -12,6 +12,27 @@
 
 #include <linux/mmc/core.h>
 
+/*
+ * max 32 partitions per card
+ */
+#define MMC_SHIFT	5
+
+// mtk emmc partition information.
+// 0 is the first partion for whole disk.
+typedef struct 
+{
+    char         name[32];
+    unsigned int start_sect;
+    unsigned int nr_sects;
+    unsigned int mask_flags;
+} mtk_part_info;
+
+typedef struct
+{
+	unsigned char   nparts;
+	mtk_part_info   partition[1<<MMC_SHIFT];
+} mtk_partmap_info;
+
 struct mmc_cid {
 	unsigned int		manfid;
 	char			prod_name[8];
@@ -24,6 +45,7 @@ struct mmc_cid {
 };
 
 struct mmc_csd {
+	unsigned char		structure;
 	unsigned char		mmca_vsn;
 	unsigned short		cmdclass;
 	unsigned short		tacc_clks;

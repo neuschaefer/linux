@@ -6,6 +6,7 @@
 #include <linux/romfs_fs.h>
 #include <linux/initrd.h>
 #include <linux/sched.h>
+#include <linux/suspend.h>
 #include <linux/freezer.h>
 
 #include "do_mounts.h"
@@ -64,6 +65,11 @@ static void __init handle_initrd(void)
 
 	current->flags &= ~PF_FREEZER_SKIP;
 
+	if (!resume_attempted)
+		printk(KERN_ERR "TuxOnIce: No attempt was made to resume from "
+				"any image that might exist.\n");
+	clear_toi_state(TOI_BOOT_TIME);
+
 	/* move initrd to rootfs' /old */
 	sys_fchdir(old_fd);
 	sys_mount("/", ".", NULL, MS_MOVE, NULL);
@@ -113,6 +119,9 @@ int __init initrd_load(void)
 		 * unless /dev/ram0 is supposed to be our actual root device,
 		 * in that case the ram disk is just set up here, and gets
 		 * mounted in the normal path.
+		 *
+		 * If requiring NFSB root filesystem images, do not execute it
+		 * as initrd.
 		 */
 		if (rd_load_image("/initrd.image") && ROOT_DEV != Root_RAM0) {
 			sys_unlink("/initrd.image");

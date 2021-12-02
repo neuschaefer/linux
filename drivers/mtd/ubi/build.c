@@ -47,7 +47,10 @@
 #include "ubi.h"
 
 /* Maximum length of the 'mtd=' parameter */
-#define MTD_PARAM_LEN_MAX 64
+#define MTD_PARAM_LEN_MAX       64
+#define UBI_IF_MAJOR_NUM        190
+#define UBI_DEV_NUM             10
+#define UBI_CTRL_CDEV_MINOR     64
 
 #ifdef CONFIG_MTD_UBI_MODULE
 #define ubi_is_module() 1
@@ -80,7 +83,8 @@ struct kmem_cache *ubi_wl_entry_slab;
 
 /* UBI control character device */
 static struct miscdevice ubi_ctrl_cdev = {
-	.minor = MISC_DYNAMIC_MINOR,
+	//.minor = MISC_DYNAMIC_MINOR,
+	.minor = UBI_CTRL_CDEV_MINOR,
 	.name = "ubi_ctrl",
 	.fops = &ubi_ctrl_cdev_operations,
 };
@@ -484,6 +488,7 @@ static int uif_init(struct ubi_device *ubi, int *ref)
 	*ref = 0;
 	sprintf(ubi->ubi_name, UBI_NAME_STR "%d", ubi->ubi_num);
 
+#if 0
 	/*
 	 * Major numbers for the UBI character devices are allocated
 	 * dynamically. Major numbers of volume character devices are
@@ -497,6 +502,15 @@ static int uif_init(struct ubi_device *ubi, int *ref)
 		ubi_err("cannot register UBI character devices");
 		return err;
 	}
+#else
+    if (ubi->ubi_num >= UBI_DEV_NUM)
+    {
+        ubi_err("ubi device number %d cannot exceed than %d", ubi->ubi_num, UBI_DEV_NUM);
+        return -1;
+    }
+
+    dev = MKDEV(ubi->ubi_num + UBI_IF_MAJOR_NUM, 0);
+#endif
 
 	ubi_assert(MINOR(dev) == 0);
 	cdev_init(&ubi->cdev, &ubi_cdev_operations);

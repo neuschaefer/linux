@@ -1,4 +1,4 @@
-/* $Id: hfc_sx.c,v 1.12.2.5 2004/02/11 13:21:33 keil Exp $
+/* $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/isdn/hisax/hfc_sx.c#1 $
  *
  * level driver for Cologne Chip Designs hfc-s+/sp based cards
  *
@@ -19,7 +19,7 @@
 #include <linux/isapnp.h>
 #include <linux/slab.h>
 
-static const char *hfcsx_revision = "$Revision: 1.12.2.5 $";
+static const char *hfcsx_revision = "$Revision: #1 $";
 
 /***************************************/
 /* IRQ-table for CCDs demo board       */

@@ -1,0 +1,4 @@
+#ifndef OPTIONAL_CXXFLAGS
+    #define OPTIONAL_CXXFLAGS 
+    #define OPTIONAL_CXXFLAGS_IS_
+#endif

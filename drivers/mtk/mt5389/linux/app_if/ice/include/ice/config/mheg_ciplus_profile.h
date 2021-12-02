@@ -1,0 +1,3 @@
+#ifndef MHEG_CIPLUS_PROFILE
+    #define MHEG_CIPLUS_PROFILE 1
+#endif

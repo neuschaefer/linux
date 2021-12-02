@@ -1,4 +1,4 @@
-/* $Id: hysdn_procconf.c,v 1.8.6.4 2001/09/23 22:24:54 kai Exp $
+/* $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/isdn/hysdn/hysdn_procconf.c#1 $
  *
  * Linux driver for HYSDN cards, /proc/net filesystem dir and conf functions.
  *
@@ -22,7 +22,7 @@
 
 #include "hysdn_defs.h"
 
-static char *hysdn_procconf_revision = "$Revision: 1.8.6.4 $";
+static char *hysdn_procconf_revision = "$Revision: #1 $";
 
 #define INFO_OUT_LEN 80		/* length of info line including lf */
 

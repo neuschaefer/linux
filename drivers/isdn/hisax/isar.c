@@ -1,4 +1,4 @@
-/* $Id: isar.c,v 1.22.2.6 2004/02/11 13:21:34 keil Exp $
+/* $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/isdn/hisax/isar.c#1 $
  *
  * isar.c   ISAR (Siemens PSB 7110) specific routines
  *

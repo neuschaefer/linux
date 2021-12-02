@@ -4,6 +4,33 @@
 
 comment "MMC/SD/SDIO Host Controller Drivers"
 
+config MMC_MT5368
+    tristate "MMC support for MT5368 SoC"
+    depends on ARCH_MT5368
+    help
+      This enables the MMC controller on the MT5368 SoCs
+
+      No board specfic support is done by this driver, each board
+      must advertise a platform_device for the driver to attach.
+      
+config MMC_MT5389
+    tristate "MMC support for MT5389 SoC"
+    depends on ARCH_MT5389
+    help
+      This enables the MMC controller on the MT5389 SoCs
+
+      No board specfic support is done by this driver, each board
+      must advertise a platform_device for the driver to attach.
+          
+config MMC_MT5396
+    tristate "MMC support for MT5396 SoC"
+    depends on ARCH_MT5396
+    help
+      This enables the MMC controller on the MT5396 SoCs
+
+      No board specfic support is done by this driver, each board
+      must advertise a platform_device for the driver to attach.
+      
 config MMC_ARMMMCI
 	tristate "ARM AMBA Multimedia Card Interface support"
 	depends on ARM_AMBA

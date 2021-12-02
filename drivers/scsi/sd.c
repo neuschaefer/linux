@@ -1719,7 +1719,28 @@ got_data:
 				sd_printk(KERN_NOTICE, sdkp,
 					  "%u-byte physical blocks\n",
 					  sdkp->hw_sector_size);
+			
 		}
+		#if 1
+		//leon-20100504 porting from 2.6.27, for time-shit informatio to dm.
+		/*
+		 * The msdos fs needs to know the hardware sector size
+		 * So I have created this table. See ll_rw_blk.c
+		 * Jacques Gelinas (Jacques@solucorp.qc.ca)
+		 */
+		int hard_sector = sector_size;
+		sector_t sz1 = (sdkp->capacity/2) * (hard_sector/256);
+		sector_t mb = sz1;
+
+		/* avoid 64-bit division on 32-bit platforms */
+		sector_div(sz1, 625);
+		mb -= sz1 - 974;
+		sector_div(mb, 1950);
+		sdp->device_sz = (unsigned long long)mb;
+		sdp->sector_number = sdkp->capacity;
+		#endif
+	
+				  
 	}
 
 	/* Rescale capacity to 512-byte units */
@@ -1731,7 +1752,7 @@ got_data:
 		sdkp->capacity <<= 1;
 	else if (sector_size == 256)
 		sdkp->capacity >>= 1;
-
+	
 	blk_queue_physical_block_size(sdp->request_queue, sdkp->hw_sector_size);
 	sdkp->device->sector_size = sector_size;
 }

@@ -1,0 +1,3 @@
+#ifndef MAXIMUM_SERVICES
+    #define MAXIMUM_SERVICES 10000
+#endif

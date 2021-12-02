@@ -1,5 +1,5 @@
 /*
- * $Id: sbew_ioc.h,v 1.0 2005/09/28 00:10:10 rickd PMCC4_3_1B $
+ * $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/staging/cxt1e1/sbew_ioc.h#1 $
  */
 
 #ifndef _INC_SBEWIOC_H_
@@ -25,9 +25,9 @@
  *
  *-----------------------------------------------------------------------------
  * RCS info:
- * RCS revision: $Revision: 1.0 $
- * Last changed on $Date: 2005/09/28 00:10:10 $
- * Changed by $Author: rickd $
+ * RCS revision: $Revision: #1 $
+ * Last changed on $Date: 2012/04/27 $
+ * Changed by $Author: dtvbm11 $
  *-----------------------------------------------------------------------------
  * $Log: sbew_ioc.h,v $
  * Revision 1.0  2005/09/28 00:10:10  rickd

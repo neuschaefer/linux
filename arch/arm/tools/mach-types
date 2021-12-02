@@ -2950,3 +2950,11 @@ davinci_dm365_dvr	MACH_DAVINCI_DM365_DVR	DAVINCI_DM365_DVR	2963
 netviz			MACH_NETVIZ		NETVIZ			2964
 flexibity		MACH_FLEXIBITY		FLEXIBITY		2965
 wlan_computer		MACH_WLAN_COMPUTER	WLAN_COMPUTER		2966
+mt5391          MACH_MT5391         MT5391          5391
+mt5363          MACH_MT5363         MT5363          5363
+mt5365          MACH_MT5365         MT5365          5365
+mt5395          MACH_MT5395         MT5395          5395
+mt5368          MACH_MT5368         MT5368          5368
+mt5396          MACH_MT5396         MT5396          5396
+mt5389          MACH_MT5389         MT5389          5389
+

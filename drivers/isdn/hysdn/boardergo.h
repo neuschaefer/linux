@@ -1,4 +1,4 @@
-/* $Id: boardergo.h,v 1.2.6.1 2001/09/23 22:24:54 kai Exp $
+/* $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/isdn/hysdn/boardergo.h#1 $
  *
  * Linux driver for HYSDN cards, definitions for ergo type boards (buffers..).
  *

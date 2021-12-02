@@ -1,3 +1,10 @@
+config MTD_NAND_IDS
+	tristate "Include chip ids for known NAND devices."
+	depends on MTD
+	help
+	  Useful for NAND drivers that do not use the NAND subsystem but
+	  still like to take advantage of the known chip information.
+
 config MTD_NAND_ECC
 	tristate
 
@@ -122,9 +129,6 @@ config MTD_NAND_OMAP_PREFETCH_DMA
 	 or in DMA interrupt mode.
 	 Say y for DMA mode or MPU mode will be used
 
-config MTD_NAND_IDS
-	tristate
-
 config MTD_NAND_RICOH
 	tristate "Ricoh xD card reader"
 	default n
@@ -192,6 +196,51 @@ config MTD_NAND_PPCHAMELEONEVB
 	help
 	  This enables the NAND flash driver on the PPChameleon EVB Board.
 
+config MTD_NAND_MT5365
+    tristate "NAND Flash support for MT5365 SoC"
+    depends on ARCH_MT5365 && MTD_NAND
+    help
+      This enables the NAND flash controller on the MT5365 SoCs
+
+      No board specfic support is done by this driver, each board
+      must advertise a platform_device for the driver to attach.
+      
+config MTD_NAND_MT5395
+    tristate "NAND Flash support for MT5395 SoC"
+    depends on ARCH_MT5395 && MTD_NAND
+    help
+      This enables the NAND flash controller on the MT5395 SoCs
+
+      No board specfic support is done by this driver, each board
+      must advertise a platform_device for the driver to attach.
+      
+config MTD_NAND_MT5368
+    tristate "NAND Flash support for MT5368 SoC"
+    depends on ARCH_MT5368 && MTD_NAND
+    help
+      This enables the NAND flash controller on the MT5368 SoCs
+
+      No board specfic support is done by this driver, each board
+      must advertise a platform_device for the driver to attach.
+    
+config MTD_NAND_MT5389
+    tristate "NAND Flash support for MT5389 SoC"
+    depends on ARCH_MT5389 && MTD_NAND
+    help
+      This enables the NAND flash controller on the MT5389 SoCs
+
+      No board specfic support is done by this driver, each board
+      must advertise a platform_device for the driver to attach.
+    
+config MTD_NAND_MT5396
+    tristate "NAND Flash support for MT5396 SoC"
+    depends on ARCH_MT5396 && MTD_NAND
+    help
+      This enables the NAND flash controller on the MT5396 SoCs
+
+      No board specfic support is done by this driver, each board
+      must advertise a platform_device for the driver to attach.
+           
 config MTD_NAND_S3C2410
 	tristate "NAND Flash support for Samsung S3C SoCs"
 	depends on ARCH_S3C2410 || ARCH_S3C64XX

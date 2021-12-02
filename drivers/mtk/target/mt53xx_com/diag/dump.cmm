@@ -1,0 +1,24 @@
+;init status
+; execute me
+
+local &addr_start &block_size  &host_cmd &file_flag
+
+(
+	if 0<1		; add you condition here
+	(
+		&addr_start=varvalue(prDmxMMData->u4StartAddr)			; Please give you Buffer start address
+		&block_size=varvalue(prDmxMMData->u4FrameSize)			; Please give you block size
+		&block_size=&block_size-0x01							; block_size-1 (fix me, do not change)
+		
+		;CFORMAT()
+		;$file_flag=time()
+		
+		&file_flag=varValue(prSwdmxInst->rFmtInfo.rSwdmxMpgInfo.rVar.u8SendedSize)
+		&host_cmd="d.save.binary d:\data-&file_flag.dat &addr_start++&block_size"
+		&host_cmd
+	)
+	else
+	(
+	)
+	
+)

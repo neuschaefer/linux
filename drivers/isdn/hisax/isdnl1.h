@@ -1,4 +1,4 @@
-/* $Id: isdnl1.h,v 2.12.2.3 2004/02/11 13:21:34 keil Exp $
+/* $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/isdn/hisax/isdnl1.h#1 $
  *
  * Layer 1 defines
  *

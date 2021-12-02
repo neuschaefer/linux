@@ -1,0 +1,298 @@
+; Script to restore system state save by _save.cmm
+; Stop at boot loader and run this script.
+; After this script is done, run attach.cmm and mt53xx_ko.cmm to debug.
+;
+; MEMEND     : Memory end of memory (can be lookup using max_pfn_low in kernel)
+; MEMBSTART  : ChB memory start (Enable to save ChB)
+; MEMBEND    : ChB memor end.
+; MEMBFILE   : File name to save ChB memory. Will save ChB memory if defined.
+; use_smp    : Save SMP state.
+; 
+
+local &CPFILE &REGFILE &CP1FILE &REG1FILE &MEMFILE &MEMEND &use_smp
+local &MEMBSTART &MEMBEND &MEMBFILE
+
+&MEMEND=0x10300000            ; 259MB
+&use_smp=1
+
+
+;&MEMBSTART=0x20000000        ; ChB Start
+;&MEMBEND=0x38800000          ; Before MJC
+;&MEMBFILE="memory_chb.bin"
+
+&CPFILE="cpregs0.bin"
+&REGFILE="registers0.bin"
+&CP1FILE="cpregs1.bin"
+&REG1FILE="registers1.bin"
+&MEMFILE="memory_all.bin"
+
+
+
+;=========================================================
+if VERSION.BUILD()==0x100000
+(
+    if &use_smp>0
+    (
+        ; CVD, dual core
+        SYSTEM.CPU CortexA9MPCoreSMP2
+        SYS.JC 15.0MHz
+    )
+    else
+    (
+        ; CVD, single core
+        SYSTEM.CPU CortexA9
+        SYS.JC 15.0MHz
+    )
+)
+else
+(
+    if &use_smp>0
+    (
+        ;T32 dual core
+        SYSTEM.CPU CortexA9MPCoreSMP2
+        SYS.JC 15.0MHz
+        do "t32mpcore.cmm"
+    )
+    else
+    (
+        ;T32 single core
+        SYSTEM.CPU CortexA9MPCore
+        SYS.JC 15.0MHz
+        do "t32upcore.cmm"
+    )
+)
+
+sys.mode attach
+
+if run()
+    break
+
+
+core 0
+GOSUB inv_L1
+
+if &use_smp>0
+(
+    core 1
+    GOSUB inv_L1
+)
+
+
+core 0
+
+; Load all registers
+GOSUB load_registers &REGFILE
+
+; Load CP regs
+GOSUB load_cp_registers &CPFILE
+
+
+if &use_smp>0
+(
+    core 1
+    GOSUB load_registers &REG1FILE
+    GOSUB load_cp_registers &CP1FILE
+)
+
+
+; Restore memory
+data.load.binary &MEMFILE asd:0x0--&MEMEND
+
+; Restore for CHB memory
+if ("&MEMBFILE"!="")
+    data.load.binary &MEMBFILE asd:&MEMBSTART--&MEMBEND
+
+; Optional, read HW registers.
+
+
+mmu.reset
+ENDDO
+
+inv_L1:
+	ENTRY
+
+	; DWB + DSB
+	d.s c15:0x4A7 0
+	d.s c15:0x5A7 0
+
+	wait 100.ms
+
+	; invalidate D cache
+	local &ways &index &i &j &v
+	&ways=4
+	&index=0x100
+
+	&i=0
+	repeat &ways
+	(
+		&j=0
+		repeat &index
+		(
+			&v=&i+&j
+			d.s c15:0x267 &v
+			&j=&j+0x20
+		)
+
+		&i=&i+0x40000000
+	)
+	 
+	; DWB + DSB
+	d.s c15:0x4A7 0
+	d.s c15:0x5A7 0
+
+	wait 100.ms
+	RETURN
+
+
+load_registers:
+	ENTRY &file
+	OPEN #1 &file /READ
+	GOSUB load_reg R0
+	GOSUB load_reg R1
+	GOSUB load_reg R2
+	GOSUB load_reg R3
+	GOSUB load_reg R4
+	GOSUB load_reg R5
+	GOSUB load_reg R6
+	GOSUB load_reg R7
+	GOSUB load_reg R8
+	GOSUB load_reg R9
+	GOSUB load_reg R10
+	GOSUB load_reg R11
+	GOSUB load_reg R12
+	GOSUB load_reg R13
+	GOSUB load_reg R14
+	GOSUB load_reg PC
+	GOSUB load_reg CPSR
+	GOSUB load_reg SPSR
+	GOSUB load_reg R8_usr
+	GOSUB load_reg R9_usr
+	GOSUB load_reg R10_usr
+	GOSUB load_reg R11_usr
+	GOSUB load_reg R12_usr
+	GOSUB load_reg R13_usr
+	GOSUB load_reg R14_usr
+	GOSUB load_reg R8_fiq
+	GOSUB load_reg R9_fiq
+	GOSUB load_reg R10_fiq
+	GOSUB load_reg R11_fiq
+	GOSUB load_reg R12_fiq
+	GOSUB load_reg R13_fiq
+	GOSUB load_reg R14_fiq
+	GOSUB load_reg SPSR_fiq
+	GOSUB load_reg R13_irq
+	GOSUB load_reg R14_irq
+	GOSUB load_reg SPSR_irq
+	GOSUB load_reg R13_svc
+	GOSUB load_reg R14_svc
+	GOSUB load_reg SPSR_svc
+	GOSUB load_reg R13_mon
+	GOSUB load_reg R14_mon
+	GOSUB load_reg SPSR_mon
+	GOSUB load_reg R13_abt
+	GOSUB load_reg R14_abt
+	GOSUB load_reg SPSR_abt
+	GOSUB load_reg R13_und
+	GOSUB load_reg R14_und
+	GOSUB load_reg SPSR_und
+	CLOSE #1
+	RETURN
+
+load_reg:
+	ENTRY &reg
+
+	local &c1
+	READ #1 &c1
+	register.set &reg   &c1
+	RETURN
+
+load_cp_registers:
+	ENTRY &file
+	OPEN #1 &file /READ
+	GOSUB read_cpd c15:0x0000
+	GOSUB read_cpd c15:0x0100
+	GOSUB read_cpd c15:0x0200
+	GOSUB read_cpd c15:0x0300
+	GOSUB read_cpd c15:0x0500
+	GOSUB read_cpd c15:0x0010
+	GOSUB read_cpd c15:0x0110
+	GOSUB read_cpd c15:0x0210
+	GOSUB read_cpd c15:0x0310
+	GOSUB read_cpd c15:0x0410
+	GOSUB read_cpd c15:0x0510
+	GOSUB read_cpd c15:0x0610
+	GOSUB read_cpd c15:0x0710
+	GOSUB read_cpd c15:0x0020
+	GOSUB read_cpd c15:0x0120
+	GOSUB read_cpd c15:0x0220
+	GOSUB read_cpd c15:0x0320
+	GOSUB read_cpd c15:0x0420
+	GOSUB read_cpd c15:0x1100
+	GOSUB read_cpd c15:0x1700
+	GOSUB read_cpd c15:0x1000
+	GOSUB read_cp c15:0x2000
+	GOSUB read_cp c15:0x0001
+	GOSUB read_cpd c15:0x0101
+	GOSUB read_cp c15:0x0201
+	GOSUB read_cpd c15:0x0011
+	GOSUB read_cpd c15:0x0111
+	GOSUB read_cpd c15:0x0211
+	GOSUB read_cp c15:0x0002
+	GOSUB read_cp c15:0x0102
+	GOSUB read_cp c15:0x0202
+	GOSUB read_cp c15:0x0003
+	GOSUB read_cp c15:0x0005
+	GOSUB read_cp c15:0x0105
+	GOSUB read_cp c15:0x0015
+	GOSUB read_cp c15:0x0115
+	GOSUB read_cp c15:0x0006
+	GOSUB read_cp c15:0x0206
+	GOSUB read_cpd c15:0x000A
+	GOSUB read_cp c15:0x002A
+	GOSUB read_cp c15:0x012A
+	GOSUB read_cp c15:0x000c
+	GOSUB read_cpd c15:0x010c
+	GOSUB read_cpd c15:0x001c
+	GOSUB read_cpd c15:0x011c
+	GOSUB read_cp c15:0x000d
+	GOSUB read_cp c15:0x010d
+	GOSUB read_cp c15:0x020d
+	GOSUB read_cp c15:0x030d
+	GOSUB read_cp c15:0x040d
+	GOSUB read_cpd c15:0x004f
+	GOSUB read_cpd c15:0x400f
+	GOSUB read_cpd c15:0x525F
+	GOSUB read_cpd c15:0x526F
+	GOSUB read_cpd c15:0x527F
+
+	if VERSION.BUILD()==0x100000
+	(
+	; cp10/cp11 only support by CVD
+	GOSUB read_cp c10:0x0000
+	GOSUB read_cp c10:0x0001
+	GOSUB read_cp c10:0x0008
+	GOSUB read_cp c10:0x0007
+	GOSUB read_cp c10:0x0006
+	GOSUB read_cp c11:0x0000
+	GOSUB read_cp c11:0x0001
+	GOSUB read_cp c11:0x0008
+	GOSUB read_cp c11:0x0007
+	GOSUB read_cp c11:0x0006
+	)
+
+	CLOSE #1
+	RETURN
+
+read_cpd:
+	ENTRY &cpreg
+	local &c1
+	READ #1 &c1
+	RETURN
+
+read_cp:
+	ENTRY &cpreg
+	local &c1
+	READ #1 &c1
+	data.set &cpreg %long &c1
+	RETURN
+

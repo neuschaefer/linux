@@ -1,0 +1,3 @@
+#ifndef INCLUDE_COMPONENT_VIDEO
+    #define INCLUDE_COMPONENT_VIDEO 1
+#endif

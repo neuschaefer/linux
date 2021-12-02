@@ -1,0 +1,3 @@
+#ifndef SVG_PATH_SMOOTHING_STEP
+    #define SVG_PATH_SMOOTHING_STEP 30
+#endif

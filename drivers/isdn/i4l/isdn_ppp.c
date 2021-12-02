@@ -1,4 +1,4 @@
-/* $Id: isdn_ppp.c,v 1.1.2.3 2004/02/10 01:07:13 keil Exp $
+/* $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/isdn/i4l/isdn_ppp.c#1 $
  *
  * Linux ISDN subsystem, functions for synchronous PPP (linklevel).
  *
@@ -72,7 +72,7 @@ static void isdn_ppp_mp_cleanup( isdn_net_local * lp );
 static int isdn_ppp_bundle(struct ippp_struct *, int unit);
 #endif	/* CONFIG_ISDN_MPP */
   
-char *isdn_ppp_revision = "$Revision: 1.1.2.3 $";
+char *isdn_ppp_revision = "$Revision: #1 $";
 
 static struct ippp_struct *ippp_table[ISDN_MAX_CHANNELS];
 

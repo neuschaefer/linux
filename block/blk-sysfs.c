@@ -464,6 +464,9 @@ static void blk_release_queue(struct kobject *kobj)
 
 	blk_sync_queue(q);
 
+	if (q->elevator)
+		elevator_exit(q->elevator);
+
 	if (rl->rq_pool)
 		mempool_destroy(rl->rq_pool);
 

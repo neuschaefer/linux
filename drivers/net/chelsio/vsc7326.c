@@ -1,4 +1,4 @@
-/* $Date: 2006/04/28 19:20:06 $ $RCSfile: vsc7326.c,v $ $Revision: 1.19 $ */
+/* $Date: 2012/04/27 $ $RCSfile: vsc7326.c,v $ $Revision: #1 $ */
 
 /* Driver for Vitesse VSC7326 (Schaumburg) MAC */
 

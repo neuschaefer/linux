@@ -20,7 +20,7 @@
 
 #define MTD_CHAR_MAJOR 90
 #define MTD_BLOCK_MAJOR 31
-
+#define MAX_MTD_DEVICES 32
 #define MTD_ERASE_PENDING      	0x01
 #define MTD_ERASING		0x02
 #define MTD_ERASE_SUSPEND	0x04
@@ -28,6 +28,16 @@
 #define MTD_ERASE_FAILED        0x10
 
 #define MTD_FAIL_ADDR_UNKNOWN -1LL
+
+//-----------------------------------------------------------------------------
+// Partition encypt information 
+//-----------------------------------------------------------------------------
+typedef struct
+{
+    u_int32_t u4PgStart;
+    u_int32_t u4PgEnd;
+    u_int32_t u4Encryped;
+} mtd_enc_info_t;
 
 /* If the erase fails, fail_addr might indicate exactly which block failed.  If
    fail_addr = MTD_FAIL_ADDR_UNKNOWN, the failure was not at the device level or was not

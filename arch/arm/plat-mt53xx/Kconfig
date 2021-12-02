@@ -1,0 +1,143 @@
+# arch/arm/plat-mt53xx/Kconfig
+#
+# by lh.hsiao
+#
+# Licensed under GPLv2
+
+
+if PLAT_MT53XX
+# boot configurations
+choice
+	prompt "ARCH/MACH select"
+default MACH_MT5396_FPGA
+
+####################################################
+#legancy ARCH 1-to-1 mapping to MACH
+#
+config ARCH_MT5391
+	bool "MediaTek MT5391"
+	help
+	  This enables support for MediaTek MT5391.
+
+config ARCH_MT5363
+	bool "MediaTek MT5363"
+	help
+	  This enables support for MediaTek MT5363.
+
+config ARCH_MT5365
+	bool "MediaTek MT5365"
+	select ARCH_USES_GETTIMEOFFSET
+	select CPU_V6
+	select CPU_32v6K
+	help
+	  This enables support for MediaTek MT5365.
+
+config ARCH_MT5395
+	bool "MediaTek MT5395"
+	select ARCH_USES_GETTIMEOFFSET
+	select CPU_V6
+	select CPU_32v6K
+	select CACHE_L2X0
+	select CACHE_PL310
+	help
+	  This enables support for MediaTek MT5395.
+	  
+#
+#end  of legancy
+#####################################################
+config MACH_MT5368
+	bool "MediaTek MT5368(Cortex-A9 single-core)"
+	select CPU_V7
+	select ARM_GIC
+	select ARCH_MT5368
+	help
+	  This enables support for MediaTek MT5368.
+
+config MACH_MT5396
+	bool "MediaTek MT5396(Cortex-A9 dual-core)"
+	select CPU_V7
+	select SMP 
+	select ARM_GIC
+	select ARCH_MT5396
+	help
+	  This enables support for MediaTek MT5396.
+
+config MACH_MT5369
+	bool "MediaTek MT5369(Cortex-A9 single-core)"
+	select CPU_V7
+	select ARM_GIC
+	select ARCH_MT5396	       	# Share code with MT5396
+	select MT53XX_UP_CHECK
+	help
+	  This enables support for MediaTek MT5369.
+
+config MACH_MT5389
+	bool "MediaTek MT5389(Arm11)"
+	select CPU_V6
+	select CPU_32v6K
+	select ARCH_MT5389
+	select CACHE_L2X0
+	select CACHE_PL310
+	help
+	  This enables support for MediaTek MT5389.
+
+config MACH_MT5368_FPGA
+	bool "MediaTek MT5368_FPGA(ARM11)"
+	select CPU_V6
+	select ARCH_MT5368
+	select MT53_FPGA
+	help
+	  This enables support for MediaTek MT5368.
+
+config MACH_MT5396_FPGA
+	bool "MediaTek MT5396_FPGA(ARM11)"
+	select CPU_V7
+	select ARCH_MT5396
+	select MT53_FPGA
+	help
+	  This enables support for MediaTek MT5396.
+endchoice  
+
+config ARCH_MT5368
+	bool "MediaTek MT5368" if MACH_MT5368 || MACH_MT5368_FPGA
+	default n
+	select GENERIC_TIME
+	select GENERIC_CLOCKEVENTS
+	help
+	  This enables support for MediaTek MT5368.
+
+config ARCH_MT5396
+	bool "MediaTek MT5396" if MACH_MT5396 || MACH_MT5396_FPGA
+	default n
+	select GENERIC_TIME
+	select GENERIC_CLOCKEVENTS
+	#select ARCH_USES_GETTIMEOFFSET
+	help
+	  This enables support for MediaTek MT5396.
+
+config ARCH_MT5389
+	bool "MediaTek MT5389" if MACH_MT5389
+	default n
+	select GENERIC_TIME
+	select GENERIC_CLOCKEVENTS
+	help
+	  This enables support for MediaTek MT5389.
+
+config MT53_FPGA
+	bool "FPGA environment"
+	default n
+
+config MT53XX_UP_CHECK
+	bool
+	default n
+
+config MT53XX_USE_CHANNELB_DRAM
+	bool "Map channel B DRAM as Linux kernel memory"
+	depends on ARCH_MT5396
+	default n
+	select HIGHMEM
+	select ZONE_DMA
+	help
+	  Map unused channel B DRAM for Linux kernel usage.
+
+endif

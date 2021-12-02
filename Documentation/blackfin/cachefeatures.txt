@@ -6,7 +6,7 @@
  * Created:
  * Description:  This file contains the simple DMA Implementation for Blackfin
  *
- * Rev:          $Id: cachefeatures.txt 2384 2006-11-01 04:12:43Z magicyang $
+ * Rev:          $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/Documentation/blackfin/cachefeatures.txt#1 $
  *
  * Modified:
  *               Copyright 2004-2006 Analog Devices Inc.

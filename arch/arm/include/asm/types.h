@@ -5,7 +5,7 @@
 
 #ifndef __ASSEMBLY__
 
-typedef unsigned short umode_t;
+typedef unsigned int umode_t;
 
 #endif /* __ASSEMBLY__ */
 

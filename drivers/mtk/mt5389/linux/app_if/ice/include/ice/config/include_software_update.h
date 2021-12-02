@@ -1,0 +1,3 @@
+#ifndef INCLUDE_SOFTWARE_UPDATE
+    #define INCLUDE_SOFTWARE_UPDATE 1
+#endif

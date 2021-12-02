@@ -1,0 +1,3 @@
+#ifndef INCLUDE_GIF_DECODER
+    #define INCLUDE_GIF_DECODER 1
+#endif

@@ -22,6 +22,10 @@ endif
 #   PARAMS_PHYS must be within 4MB of ZRELADDR
 #   INITRD_PHYS must be in RAM
 ZRELADDR    := $(zreladdr-y)
+#ZRELADDR    := 0x8000
+ZRELADDR0    := $(shell printf "%d" $(ZRELADDR))
+ZRELADDR1    := $(shell expr $(ZRELADDR0) + 64)
+ZRELADDRE    := $(shell printf "0x%.x" $(ZRELADDR1))
 PARAMS_PHYS := $(params_phys-y)
 INITRD_PHYS := $(initrd_phys-y)
 
@@ -61,7 +65,7 @@ endif
 
 quiet_cmd_uimage = UIMAGE  $@
       cmd_uimage = $(CONFIG_SHELL) $(MKIMAGE) -A arm -O linux -T kernel \
-		   -C none -a $(LOADADDR) -e $(STARTADDR) \
+		   -C none -a $(ZRELADDR) -e $(ZRELADDRE) \
 		   -n 'Linux-$(KERNELRELEASE)' -d $< $@
 
 ifeq ($(CONFIG_ZBOOT_ROM),y)

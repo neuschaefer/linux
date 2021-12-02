@@ -356,6 +356,7 @@ void *dm_vcalloc(unsigned long nmemb, unsigned long elem_size);
 #define DMEMIT(x...) sz += ((sz >= maxlen) ? \
 			  0 : scnprintf(result + sz, maxlen - sz, x))
 
+#define SECTOR_SIZE 512
 #define SECTOR_SHIFT 9
 
 /*

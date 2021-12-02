@@ -216,6 +216,7 @@ unifdef-y += filter.h
 unifdef-y += flat.h
 unifdef-y += futex.h
 unifdef-y += fs.h
+unifdef-y += freezer.h
 unifdef-y += gameport.h
 unifdef-y += generic_serial.h
 unifdef-y += hdlcdrv.h

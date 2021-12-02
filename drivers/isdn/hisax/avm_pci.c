@@ -1,4 +1,4 @@
-/* $Id: avm_pci.c,v 1.29.2.4 2004/02/11 13:21:32 keil Exp $
+/* $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/isdn/hisax/avm_pci.c#1 $
  *
  * low level stuff for AVM Fritz!PCI and ISA PnP isdn cards
  *
@@ -21,7 +21,7 @@
 #include <linux/isapnp.h>
 #include <linux/interrupt.h>
 
-static const char *avm_pci_rev = "$Revision: 1.29.2.4 $";
+static const char *avm_pci_rev = "$Revision: #1 $";
 
 #define  AVM_FRITZ_PCI		1
 #define  AVM_FRITZ_PNP		2

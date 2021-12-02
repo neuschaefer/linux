@@ -1,4 +1,4 @@
-/* $Id: gazel.c,v 2.19.2.4 2004/01/14 16:04:48 keil Exp $
+/* $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/isdn/hisax/gazel.c#1 $
  *
  * low level stuff for Gazel isdn cards
  *
@@ -19,7 +19,7 @@
 #include "ipac.h"
 #include <linux/pci.h>
 
-static const char *gazel_revision = "$Revision: 2.19.2.4 $";
+static const char *gazel_revision = "$Revision: #1 $";
 
 #define R647      1
 #define R685      2

@@ -1,4 +1,4 @@
-/* $Id: isdn_divertif.h,v 1.4.6.1 2001/09/23 22:25:05 kai Exp $
+/* $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/include/linux/isdn_divertif.h#1 $
  *
  * Header for the diversion supplementary interface for i4l.
  *

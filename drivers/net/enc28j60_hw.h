@@ -1,7 +1,7 @@
 /*
  * enc28j60_hw.h: EDTP FrameThrower style enc28j60 registers
  *
- * $Id: enc28j60_hw.h,v 1.9 2007/12/14 11:59:16 claudio Exp $
+ * $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/net/enc28j60_hw.h#1 $
  */
 
 #ifndef _ENC28J60_HW_H

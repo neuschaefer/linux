@@ -1,0 +1,3 @@
+#ifndef INCLUDE_BISS_ENCRYPTION
+    #define INCLUDE_BISS_ENCRYPTION 1
+#endif

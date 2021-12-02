@@ -10,6 +10,7 @@ obj-$(CONFIG_TI_DAVINCI_EMAC) += davinci_emac.o
 
 obj-$(CONFIG_E1000) += e1000/
 obj-$(CONFIG_E1000E) += e1000e/
+obj-$(CONFIG_R8168) += r8168/
 obj-$(CONFIG_IBM_NEW_EMAC) += ibm_newemac/
 obj-$(CONFIG_IGB) += igb/
 obj-$(CONFIG_IGBVF) += igbvf/
@@ -162,6 +163,8 @@ obj-$(CONFIG_PPP_BSDCOMP) += bsd_comp.o
 obj-$(CONFIG_PPP_MPPE) += ppp_mppe.o
 obj-$(CONFIG_PPPOE) += pppox.o pppoe.o
 obj-$(CONFIG_PPPOL2TP) += pppox.o
+obj-$(CONFIG_PPPOLAC) += pppox.o pppolac.o
+obj-$(CONFIG_PPPOPNS) += pppox.o pppopns.o
 
 obj-$(CONFIG_SLIP) += slip.o
 obj-$(CONFIG_SLHC) += slhc.o
@@ -295,3 +298,27 @@ obj-$(CONFIG_WIMAX) += wimax/
 obj-$(CONFIG_CAIF) += caif/
 
 obj-$(CONFIG_OCTEON_MGMT_ETHERNET) += octeon/
+#use MT539X internal MAC
+obj-$(CONFIG_MAC539X) += mmac/
+
+#use MT5363 internal MAC
+obj-$(CONFIG_MAC5363) += mmac/
+
+#use MT5365 internal MAC
+ifeq ($(CONFIG_MAC5365_RMII),y)
+obj-$(CONFIG_MAC5365_RMII) += star_mac/
+endif
+
+ifeq ($(CONFIG_MAC5366_MII),y)
+obj-$(CONFIG_MAC5366_MII) += star_mac/
+endif
+
+ifeq ($(CONFIG_MAC5395_MII),y)
+obj-$(CONFIG_MAC5395_MII) += star_mac/
+endif
+
+obj-$(CONFIG_MAC5396_MII) += star_mac/
+
+obj-$(CONFIG_MAC5368_MII) += star_mac/
+
+obj-$(CONFIG_MAC5389_MII) += star_mac/

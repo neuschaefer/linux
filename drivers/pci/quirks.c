@@ -2728,29 +2728,225 @@ DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_RICOH, PCI_DEVICE_ID_RICOH_R5CE823, ricoh_
 DECLARE_PCI_FIXUP_RESUME_EARLY(PCI_VENDOR_ID_RICOH, PCI_DEVICE_ID_RICOH_R5CE823, ricoh_mmc_fixup_r5c832);
 #endif /*CONFIG_MMC_RICOH_MMC*/
 
-#if defined(CONFIG_DMAR) || defined(CONFIG_INTR_REMAP)
-#define VTUNCERRMSK_REG	0x1ac
-#define VTD_MSK_SPEC_ERRORS	(1 << 31)
-/*
- * This is a quirk for masking vt-d spec defined errors to platform error
- * handling logic. With out this, platforms using Intel 7500, 5500 chipsets
- * (and the derivative chipsets like X58 etc) seem to generate NMI/SMI (based
- * on the RAS config settings of the platform) when a vt-d fault happens.
- * The resulting SMI caused the system to hang.
- *
- * VT-d spec related errors are already handled by the VT-d OS code, so no
- * need to report the same error through other channels.
- */
-static void vtd_mask_spec_errors(struct pci_dev *dev)
+#define PCIE_RDW(offset)   (*((volatile u32*)(PCIE_MMIO_BASE+offset)))
+#define PCIE_WDW(offset, val)   (*((volatile u32*)(PCIE_MMIO_BASE+offset)) = (val))
+static void __devinit quirk_etron_early(struct pci_dev *dev)
 {
-	u32 word;
+    u8 u1Data;
+    
+    //printk("quirk_etron_early start.\n");
 
-	pci_read_config_dword(dev, VTUNCERRMSK_REG, &word);
-	pci_write_config_dword(dev, VTUNCERRMSK_REG, word | VTD_MSK_SPEC_ERRORS);
+    /* Sequence 1 */
+    pci_read_config_byte(dev, 0x9B, &u1Data);
+    u1Data &= ~0xC0;
+    u1Data |= 0x80;
+    pci_write_config_byte(dev, 0x9B, u1Data);
+
+    pci_read_config_byte(dev, 0x9C, &u1Data);
+    u1Data &= ~0x0C;
+    u1Data |= 0x08;
+    pci_write_config_byte(dev, 0x9C, u1Data);
+
+    pci_read_config_byte(dev, 0xEC, &u1Data);
+    u1Data |= 0x04;
+    pci_write_config_byte(dev, 0xEC, u1Data);
+
+    pci_read_config_byte(dev, 0xF5, &u1Data);
+    u1Data |= 0x40;
+    pci_write_config_byte(dev, 0xF5, u1Data);
+
+    /* Sequence 2 */    
+    pci_write_config_dword(dev, 0x44, 0x3);    
+    pci_write_config_dword(dev, 0x2C, 0x539614C3);   // Sub ID=0x5396, VID = 0x14C3: MediaTek.
+    pci_write_config_dword(dev, 0x68, 0x190001C1);   
+    msleep(1);
+
+    pci_write_config_dword(dev, 0x68, 0x18005000);    
+    pci_write_config_dword(dev, 0x68, 0x197001C8);    
+    msleep(1);
+
+    pci_write_config_dword(dev, 0x68, 0x18005000);    
+    pci_write_config_dword(dev, 0x68, 0x197001C9);    
+    msleep(1);
+
+    pci_write_config_dword(dev, 0x68, 0x18005000);    
+    pci_write_config_dword(dev, 0x68, 0x199801D4);    
+    msleep(1);
+    
+    pci_write_config_dword(dev, 0x68, 0x18005000);    
+    pci_write_config_dword(dev, 0x68, 0x192C01D5);    
+    msleep(1);
+
+    pci_write_config_dword(dev, 0x68, 0x18005000);    
+    pci_write_config_dword(dev, 0x68, 0x198C01D8);    
+    msleep(1);
+
+    pci_write_config_dword(dev, 0x68, 0x18005000);    
+    pci_write_config_dword(dev, 0x68, 0x198401D9);    
+    msleep(1);
+
+    pci_write_config_dword(dev, 0x68, 0x18005000);    
+    pci_write_config_dword(dev, 0x68, 0x190C01E0);    
+    msleep(1);
+
+    pci_write_config_dword(dev, 0x68, 0x18005000);    
+    pci_write_config_dword(dev, 0x68, 0x199A01E1);    
+    msleep(1);
+
+    pci_write_config_dword(dev, 0x68, 0x18005000);    
+    pci_write_config_dword(dev, 0x68, 0x19C001E4);    
+    msleep(1);
+
+    pci_write_config_dword(dev, 0x68, 0x18005000);    
+    pci_write_config_dword(dev, 0x68, 0x194001C1);    
+    msleep(1);
+
+    pci_write_config_dword(dev, 0x68, 0x18005000);    
+    pci_write_config_dword(dev, 0x68, 0x193E01C5);    
+    msleep(1);
+
+    pci_write_config_dword(dev, 0x68, 0x18005000);    
+    pci_write_config_dword(dev, 0x68, 0x19C001C1);    
+    msleep(1);
+
+    pci_write_config_dword(dev, 0x68, 0x18005000);    
+    pci_write_config_dword(dev, 0x68, 0x198001D1);    
+    msleep(1);
+
+    pci_write_config_dword(dev, 0x68, 0x18005000);    
+    pci_write_config_dword(dev, 0x68, 0x190401C4);    
+    msleep(1);
+
+    pci_write_config_dword(dev, 0x68, 0x18005000);    
+    pci_write_config_dword(dev, 0x68, 0x194A01D8);    
+    msleep(1);
+
+    pci_write_config_dword(dev, 0x68, 0x18005000);    
+    pci_write_config_dword(dev, 0x68, 0x19D001C1);    
+    msleep(1);
+
+    pci_write_config_dword(dev, 0x68, 0x18005000);    
+    pci_write_config_dword(dev, 0x68, 0x190401C4);    
+    msleep(1);
+
+    pci_write_config_dword(dev, 0x68, 0x18005000);    
+    pci_write_config_dword(dev, 0x68, 0x194A01D8);    
+    msleep(1);
+
+    pci_write_config_dword(dev, 0x68, 0x18005000);    
+
+    /* Sequence 3 */    
+    pci_write_config_dword(dev, 0x68, 0x19EB5003);    
+    msleep(1);
+    
+    pci_write_config_dword(dev, 0x68, 0x19305004);    
+    msleep(1);
+
+    pci_write_config_dword(dev, 0x68, 0x19005005);    
+    msleep(1);
+
+    //pci_write_config_dword(dev, 0x68, 0x19045007);    
+    //msleep(1);
+
+    pci_write_config_dword(dev, 0x68, 0x1910500C);    
+    msleep(1);
+
+    pci_write_config_dword(dev, 0x68, 0x19FF5022);    
+    msleep(1);
+
+    pci_write_config_dword(dev, 0x68, 0x10000000);    
+    pci_write_config_dword(dev, 0x44, 0x00000001);    
+    msleep(1);
+    
+    //printk("quirk_etron_early end.\n");    
 }
-DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, 0x342e, vtd_mask_spec_errors);
-DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, 0x3c28, vtd_mask_spec_errors);
-#endif
+
+static void __devinit quirk_etron_enable(struct pci_dev *dev)
+{
+    u32 u4Val;
+    
+    //printk("quirk_etron_enable start.\n");
+
+    /* Sequence 4 */
+    u4Val = PCIE_RDW(0x1810);
+    u4Val &= ~0xFF00;
+    u4Val |= 0x6000;
+    PCIE_WDW(0x1810, u4Val);
+
+    PCIE_WDW(0x4000, 0x18A004C4);
+
+    u4Val = PCIE_RDW(0x1810);
+    u4Val &= ~0xFF00;
+    u4Val |= 0x6100;
+    PCIE_WDW(0x1810, u4Val);
+
+    u4Val = PCIE_RDW(0x4040);
+    u4Val &= ~0xFF;
+    u4Val |= 0x0E;
+    PCIE_WDW(0x4040, u4Val);
+
+    PCIE_WDW(0x4048, 0xFF81FF81);
+
+    u4Val = PCIE_RDW(0x4060);
+    u4Val &= ~0xFF0000FF;
+    u4Val |= 0x03000007;
+    PCIE_WDW(0x4060, u4Val);
+
+    u4Val = PCIE_RDW(0x40A0);
+    u4Val &= ~0xFF;
+    u4Val |= 0xA4;
+    PCIE_WDW(0x40A0, u4Val);
+    
+    u4Val = PCIE_RDW(0x40B0);
+    u4Val &= ~0xFF;
+    u4Val |= 0xA4;
+    PCIE_WDW(0x40B0, u4Val);
+
+    u4Val = PCIE_RDW(0x40C0);
+    u4Val &= ~0xFF;
+    u4Val |= 0x0E;
+    PCIE_WDW(0x40C0, u4Val);
+
+    PCIE_WDW(0x40C8, 0xFF81FF81);
+
+    u4Val = PCIE_RDW(0x404C);
+    u4Val &= ~0xFF000000;
+    u4Val |= 0x0D000000;
+    PCIE_WDW(0x404C, u4Val);
+
+    u4Val = PCIE_RDW(0x4070);
+    u4Val &= ~0x00FF0000;
+    u4Val |= 0x003E0000;
+    PCIE_WDW(0x4070, u4Val);
+
+    u4Val = PCIE_RDW(0x4074);
+    u4Val &= ~0x00FFFF00;
+    u4Val |= 0x000A0000;
+    PCIE_WDW(0x4074, u4Val);
+
+    u4Val = PCIE_RDW(0x4080);
+    u4Val |= 0x0000FFFF;
+    PCIE_WDW(0x4080, u4Val);
+
+    u4Val = PCIE_RDW(0x4084);
+    u4Val |= 0x0000FFFF;
+    PCIE_WDW(0x4084, u4Val);
+
+    u4Val = PCIE_RDW(0x4090);
+    u4Val |= 0x0000FFFF;
+    PCIE_WDW(0x4090, u4Val);
+
+    u4Val = PCIE_RDW(0x4094);
+    u4Val |= 0x0000FFFF;
+    PCIE_WDW(0x4094, u4Val);
+    
+    //printk("quirk_etron_enable end.\n");    
+}
+/*
+ * Etron EJ168 EEPROM replacement.
+ */
+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_ETRON,	PCI_DEVICE_ID_EJ168,	quirk_etron_early);
+DECLARE_PCI_FIXUP_ENABLE(PCI_VENDOR_ID_ETRON,	PCI_DEVICE_ID_EJ168,	quirk_etron_enable);
 
 static void __devinit fixup_ti816x_class(struct pci_dev* dev)
 {
@@ -2790,6 +2986,29 @@ extern struct pci_fixup __end_pci_fixups_resume_early[];
 extern struct pci_fixup __start_pci_fixups_suspend[];
 extern struct pci_fixup __end_pci_fixups_suspend[];
 
+#if defined(CONFIG_DMAR) || defined(CONFIG_INTR_REMAP)
+#define VTUNCERRMSK_REG	0x1ac
+#define VTD_MSK_SPEC_ERRORS	(1 << 31)
+/*
+ * This is a quirk for masking vt-d spec defined errors to platform error
+ * handling logic. With out this, platforms using Intel 7500, 5500 chipsets
+ * (and the derivative chipsets like X58 etc) seem to generate NMI/SMI (based
+ * on the RAS config settings of the platform) when a vt-d fault happens.
+ * The resulting SMI caused the system to hang.
+ *
+ * VT-d spec related errors are already handled by the VT-d OS code, so no
+ * need to report the same error through other channels.
+ */
+static void vtd_mask_spec_errors(struct pci_dev *dev)
+{
+	u32 word;
+
+	pci_read_config_dword(dev, VTUNCERRMSK_REG, &word);
+	pci_write_config_dword(dev, VTUNCERRMSK_REG, word | VTD_MSK_SPEC_ERRORS);
+}
+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, 0x342e, vtd_mask_spec_errors);
+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, 0x3c28, vtd_mask_spec_errors);
+#endif
 
 void pci_fixup_device(enum pci_fixup_pass pass, struct pci_dev *dev)
 {

@@ -95,7 +95,8 @@ struct scsi_device {
 	unsigned int manufacturer;	/* Manufacturer of device, for using 
 					 * vendor-specific cmd's */
 	unsigned sector_size;	/* size in bytes */
-
+  unsigned long long sector_number; /*sector number*/
+  unsigned long long device_sz;     /*device size*/
 	void *hostdata;		/* available to low-level driver */
 	char type;
 	char scsi_level;

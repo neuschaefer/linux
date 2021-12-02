@@ -1,5 +1,5 @@
 /*
- * $Id: musycc.h,v 1.3 2005/09/28 00:10:08 rickd PMCC4_3_1B $
+ * $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/staging/cxt1e1/musycc.h#1 $
  */
 
 #ifndef _INC_MUSYCC_H_
@@ -25,9 +25,9 @@
  * SBE, Inc.  San Ramon, California  U.S.A.
  *-----------------------------------------------------------------------------
  * RCS info:
- * RCS revision: $Revision: 1.3 $
- * Last changed on $Date: 2005/09/28 00:10:08 $
- * Changed by $Author: rickd $
+ * RCS revision: $Revision: #1 $
+ * Last changed on $Date: 2012/04/27 $
+ * Changed by $Author: dtvbm11 $
  *-----------------------------------------------------------------------------
  * $Log: musycc.h,v $
  * Revision 1.3  2005/09/28 00:10:08  rickd

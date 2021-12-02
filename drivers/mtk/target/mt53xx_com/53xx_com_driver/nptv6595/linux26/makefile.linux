@@ -1,0 +1,82 @@
+###########################################################################
+#
+#  Copyright (c) 2004, MediaTek, Inc.
+#  All rights reserved
+#
+#  Unauthorized use, practice, perform, copy, distribution, reproduction,
+#  or disclosure of this information in whole or in part is prohibited.
+###########################################################################
+# $RCSfile: makefile.linux,v $
+# $Revision: #1 $
+# $Date: 2009/02/10 $
+# $Author: adamyang $
+#
+# Description:
+#         Leave-level makefile to build the subcomponent of driver library.
+#
+#         Specify the source files to be compile in SRC.
+#############################################################################
+
+THIS_COMPONENT = nptv
+
+ifndef DRV_ROOT
+DRV_ROOT ?= $(CURDIR)/drivers/char/mt537x/nptv
+endif
+
+export DRV_ROOT
+export LINUX_NPTV = 1
+
+SRC =
+
+OBJ =
+
+SUB_COMPONENTS = src
+
+
+# SUB_COMPONENTS = \
+	bsp util osdrv dbs share_lib \
+	gfx osd nim \
+	dmx fbm psr mpv vdp pmx tve \
+	pod fci ide nor ir sif nand aud \
+	uart crypto cli debug \
+	vin mw_if i1394
+
+# OPT_COMPONENTS = \
+	dhrystone t32 fnt jpg pvr tsfs slt
+
+# i1394
+
+OPTIONAL_SUB_COMPONENTS =
+
+
+DEFINES += -DCC_SCPOS_MUTE_MASK
+
+CC_INC +=
+
+#############################################################################
+#
+# Include the makefile common to all components
+#
+
+include $(DRV_ROOT)/driver.mak
+
+
+
+xfer_back:
+	rm -f nptv.mak
+	rm -f driver.mak
+	rm -f Makefile
+	for i in `find . -name Makefile`; do \
+		 sed 's/#L@export/export/g' $$i > $$i.bak; \
+		 mv $$i.bak $$i ;\
+		 done
+
+	# filename change for makefile
+	if [ -f ./src/Makefile ] ; then mv ./src/Makefile ./src/makefile ;fi
+	if [ -f  ./makefile.nuclues ] ; then mv ./makefile.nuclues ./makefile ; fi
+	#
+
+check:
+	@echo $(DRV_ROOT)
+
+

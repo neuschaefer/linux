@@ -1,0 +1,3 @@
+#ifndef INCLUDE_DECODER_MP3
+    #define INCLUDE_DECODER_MP3 1
+#endif

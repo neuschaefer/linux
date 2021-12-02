@@ -446,4 +446,4 @@ development and maintenance. Special thanks!
 -------------------------------------------------------------------------
 Written by Kurt Garloff <kurt@garloff.de> 1998/06/11
 Last updated 2000/11/28, driver revision 2.0e7
-$Id: README.tmscsim,v 2.25.2.7 2000/12/20 01:07:12 garloff Exp $
+$Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/Documentation/scsi/tmscsim.txt#1 $

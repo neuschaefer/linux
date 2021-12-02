@@ -1568,6 +1568,8 @@ static struct inode *shmem_get_inode(struct super_block *sb, const struct inode 
 		memset(info, 0, (char *)inode - (char *)info);
 		spin_lock_init(&info->lock);
 		info->flags = flags & VM_NORESERVE;
+		if (flags & VM_ATOMIC_COPY)
+			inode->i_flags |= S_ATOMIC_COPY;
 		INIT_LIST_HEAD(&info->swaplist);
 		cache_no_acl(inode);
 
@@ -2738,6 +2740,14 @@ put_memory:
 	return ERR_PTR(error);
 }
 EXPORT_SYMBOL_GPL(shmem_file_setup);
+
+void shmem_set_file(struct vm_area_struct *vma, struct file *file)
+{
+	if (vma->vm_file)
+		fput(vma->vm_file);
+	vma->vm_file = file;
+	vma->vm_ops = &shmem_vm_ops;
+}
 
 /**
  * shmem_zero_setup - setup a shared anonymous mapping

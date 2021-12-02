@@ -97,6 +97,19 @@ if BLOCK
 menu "DOS/FAT/NT Filesystems"
 
 source "fs/fat/Kconfig"
+config FAT_FAST_EXPAND
+	bool "Expand FAT file without filling zeroes"
+	depends on FAT_FS
+	help
+	  FAT file system do not support holes. So when enlarge FAT file, all
+	  added size should be filled with zero to prevent information leak.
+	  So it will take a long time to create large temp file. 
+
+	  If you say Y, the file system will enlarge file without filling zeroes.
+	  The creation is very quick but newly created file will contain garbage.
+
+	  If unsure, say N.
+
 source "fs/ntfs/Kconfig"
 
 endmenu

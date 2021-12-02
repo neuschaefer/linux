@@ -1,4 +1,4 @@
-/* $Id: icn.c,v 1.65.6.8 2001/09/23 22:24:55 kai Exp $
+/* $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/isdn/icn/icn.c#1 $
  *
  * ISDN low-level module for the ICN active ISDN-Card.
  *
@@ -43,7 +43,7 @@ MODULE_PARM_DESC(icn_id2, "ID-String of first card, second S0 (4B only)");
 #undef MAP_DEBUG
 
 static char
-*revision = "$Revision: 1.65.6.8 $";
+*revision = "$Revision: #1 $";
 
 static int icn_addcard(int, char *, char *);
 

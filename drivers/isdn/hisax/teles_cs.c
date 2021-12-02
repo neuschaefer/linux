@@ -1,4 +1,4 @@
-/* $Id: teles_cs.c,v 1.1.2.2 2004/01/25 15:07:06 keil Exp $ */
+/* $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/isdn/hisax/teles_cs.c#1 $ */
 /*======================================================================
 
     A teles S0 PCMCIA client driver

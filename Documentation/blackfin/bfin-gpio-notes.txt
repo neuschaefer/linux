@@ -3,7 +3,7 @@
  * Based on:
  * Author:
  *
- * Created:      $Id: bfin-gpio-note.txt 2008-11-24 16:42 grafyang $
+ * Created:      $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/Documentation/blackfin/bfin-gpio-notes.txt#1 $
  * Description:  This file contains the notes in developing/using bfin-gpio.
  *
  *

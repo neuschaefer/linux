@@ -1,0 +1,206 @@
+/*----------------------------------------------------------------------------*
+ * Copyright Statement:                                                       *
+ *                                                                            *
+ *   This software/firmware and related documentation ("MediaTek Software")   *
+ * are protected under international and related jurisdictions'copyright laws *
+ * as unpublished works. The information contained herein is confidential and *
+ * proprietary to MediaTek Inc. Without the prior written permission of       *
+ * MediaTek Inc., any reproduction, modification, use or disclosure of        *
+ * MediaTek Software, and information contained herein, in whole or in part,  *
+ * shall be strictly prohibited.                                              *
+ * MediaTek Inc. Copyright (C) 2010. All rights reserved.                     *
+ *                                                                            *
+ *   BY OPENING THIS FILE, RECEIVER HEREBY UNEQUIVOCALLY ACKNOWLEDGES AND     *
+ * AGREES TO THE FOLLOWING:                                                   *
+ *                                                                            *
+ *   1)Any and all intellectual property rights (including without            *
+ * limitation, patent, copyright, and trade secrets) in and to this           *
+ * Software/firmware and related documentation ("MediaTek Software") shall    *
+ * remain the exclusive property of MediaTek Inc. Any and all intellectual    *
+ * property rights (including without limitation, patent, copyright, and      *
+ * trade secrets) in and to any modifications and derivatives to MediaTek     *
+ * Software, whoever made, shall also remain the exclusive property of        *
+ * MediaTek Inc.  Nothing herein shall be construed as any transfer of any    *
+ * title to any intellectual property right in MediaTek Software to Receiver. *
+ *                                                                            *
+ *   2)This MediaTek Software Receiver received from MediaTek Inc. and/or its *
+ * representatives is provided to Receiver on an "AS IS" basis only.          *
+ * MediaTek Inc. expressly disclaims all warranties, expressed or implied,    *
+ * including but not limited to any implied warranties of merchantability,    *
+ * non-infringement and fitness for a particular purpose and any warranties   *
+ * arising out of course of performance, course of dealing or usage of trade. *
+ * MediaTek Inc. does not provide any warranty whatsoever with respect to the *
+ * software of any third party which may be used by, incorporated in, or      *
+ * supplied with the MediaTek Software, and Receiver agrees to look only to   *
+ * such third parties for any warranty claim relating thereto.  Receiver      *
+ * expressly acknowledges that it is Receiver's sole responsibility to obtain *
+ * from any third party all proper licenses contained in or delivered with    *
+ * MediaTek Software.  MediaTek is not responsible for any MediaTek Software  *
+ * releases made to Receiver's specifications or to conform to a particular   *
+ * standard or open forum.                                                    *
+ *                                                                            *
+ *   3)Receiver further acknowledge that Receiver may, either presently       *
+ * and/or in the future, instruct MediaTek Inc. to assist it in the           *
+ * development and the implementation, in accordance with Receiver's designs, *
+ * of certain softwares relating to Receiver's product(s) (the "Services").   *
+ * Except as may be otherwise agreed to in writing, no warranties of any      *
+ * kind, whether express or implied, are given by MediaTek Inc. with respect  *
+ * to the Services provided, and the Services are provided on an "AS IS"      *
+ * basis. Receiver further acknowledges that the Services may contain errors  *
+ * that testing is important and it is solely responsible for fully testing   *
+ * the Services and/or derivatives thereof before they are used, sublicensed  *
+ * or distributed. Should there be any third party action brought against     *
+ * MediaTek Inc. arising out of or relating to the Services, Receiver agree   *
+ * to fully indemnify and hold MediaTek Inc. harmless.  If the parties        *
+ * mutually agree to enter into or continue a business relationship or other  *
+ * arrangement, the terms and conditions set forth herein shall remain        *
+ * effective and, unless explicitly stated otherwise, shall prevail in the    *
+ * event of a conflict in the terms in any agreements entered into between    *
+ * the parties.                                                               *
+ *                                                                            *
+ *   4)Receiver's sole and exclusive remedy and MediaTek Inc.'s entire and    *
+ * cumulative liability with respect to MediaTek Software released hereunder  *
+ * will be, at MediaTek Inc.'s sole discretion, to replace or revise the      *
+ * MediaTek Software at issue.                                                *
+ *                                                                            *
+ *   5)The transaction contemplated hereunder shall be construed in           *
+ * accordance with the laws of Singapore, excluding its conflict of laws      *
+ * principles.  Any disputes, controversies or claims arising thereof and     *
+ * related thereto shall be settled via arbitration in Singapore, under the   *
+ * then current rules of the International Chamber of Commerce (ICC).  The    *
+ * arbitration shall be conducted in English. The awards of the arbitration   *
+ * shall be final and binding upon both parties and shall be entered and      *
+ * enforceable in any court of competent jurisdiction.                        *
+ *---------------------------------------------------------------------------*/
+/*-----------------------------------------------------------------------------
+ *
+ * $Author: dtvbm11 $
+ * $Date  $
+ * $RCSfile: vdec_mw.h,v $
+ * $Revision: #1 $
+ *
+ *---------------------------------------------------------------------------*/
+
+#ifndef _VDEC_MW_H
+#define _VDEC_MW_H
+
+/* Notify function */
+typedef VOID (*x_signal_usr_nfy_fct) (BOOL OnOffStatus);//singnal booster add by Hua 0609    
+
+
+typedef struct _NotifyStatus
+{
+    UINT8 u1SigStatus; // No signal, stable, or no support
+    UINT8 u1ColSys;	   // Color System
+    TV_DEC_RESOLUTION_INFO_T t_resolution;	// Resolution
+    UINT8 u1NeedNotify;
+    UCHAR ucVdpId;
+} _NotifyStatus;
+
+typedef struct _vsrc_comp_id_match
+{
+  UINT16 u2Type;
+  UINT16  u2SubId;
+} VSRC_COMP_ID_MATCH;
+
+
+void vSetCapibility(UINT8 u1Path);
+
+//#define TV_DEC_CAPABILITY   (TV_DEC_CAP_COLOR_SYS|TV_DEC_CAP_CLOCK|TV_DEC_CAP_PHASE|TV_DEC_CAP_H_POSITION|TV_DEC_CAP_V_POSITION|TV_DEC_CAP_CC)
+#define TVD_CAPABILITY      (TV_DEC_CAP_COLOR_SYS|TV_DEC_CAP_CC/*|TV_DEC_CAP_CONTENT_ADV |TV_DEC_CAP_ACTIVE_COLOR_SYS*/ |TV_DEC_CAP_TTX|TV_DEC_CAP_VPS|TV_DEC_CAP_EU_WSS )
+#define VGA_CAPABILITY      (TV_DEC_CAP_CLOCK|TV_DEC_CAP_PHASE|TV_DEC_CAP_H_POSITION|TV_DEC_CAP_V_POSITION|TV_DEC_CAP_AUTO_CLK_PHS_POS|TV_DEC_CAP_AUTO_COLOR)
+#define YPBPR_CAPABILITY    (TV_DEC_CAP_PHASE|TV_DEC_CAP_H_POSITION|TV_DEC_CAP_V_POSITION|TV_DEC_CAP_AUTO_CLK_PHS_POS|TV_DEC_CAP_CC|TV_DEC_CAP_AUTO_COLOR|TV_DEC_CAP_TTX|TV_DEC_CAP_EU_WSS )
+#define DVI_CAPABILITY      (0)
+
+VOID _Tvd_NotifyTVSig(UINT8 u1Path, UINT8 u1SigState);
+VOID _TvdNotifyResolutionChg(UINT8 u1Path, UINT8 u1SigState);
+VOID _TvdNotifyColorSystem(UINT8 u1Path, UINT8 u1SigState);
+VOID TvdNotifyTtxData(UINT8 u1Path, UINT16 u2NumPktAvail, UINT32 _dVbiReadPtr);
+VOID TvdNotifyTtxData(UINT8 u1Path, UINT16 u2NumPktAvail, UINT32 _dVbiReadPtr);
+VOID TvdNotifyVPSCNIData(UINT16 u2Data);
+VOID TvdNotifyVPSData(UINT8  au1Data[]);
+VOID TvdNotifyEUWSSData(UINT8 u1Path, UINT16 u2Data);
+VOID TvdNotifyUSWSSData(UINT8 u1Path, UINT16 u2Data);
+
+VOID TvdConnectMainToVGA( VOID );
+
+BOOL TvdGetMainSigStatus( VOID );
+
+extern VOID TvdGetCurrInputSrcInfo( UINT16                ui2_tvd_id,
+                                    DRV_TYPE_T*           pe_type, /* OUT */
+                                    UINT16*               pui2_id, /* OUT */
+                                    TV_DEC_TIMING_TYPE_T* pe_timing ); /* OUT */
+
+extern VOID TvdNfyVdpResChgRegister( UINT16     ui2_tvd_id,
+                                     UCHAR      uc_vdp_id );
+
+
+/* for tve interface */
+void _TveSetScartOutSource(UINT8 u1_scartid, UINT8 u1source);
+UINT8 _TveGetScartOutSource(UINT8 u1_scartid);
+BOOL _fgIsTveUsed(UINT8 u1_scartid);
+
+
+extern UINT32                      _u4MwIfDbgFlags ;
+
+/* TVD Message Flags used in _u4TvdMsgFlags */
+#define TVD_MSG_FLAG_CC_DATA_STATUS         (((UINT32) 1) << 0)
+#define TVD_MSG_FLAG_CC_DBG_ERROR           (((UINT32) 1) << 1)
+#define TVD_MSG_FLAG_CC_DBG_INFO            (((UINT32) 1) << 2)
+#define TVD_MSG_FLAG_TVD_DBG_INFO           (((UINT32) 1) << 3)
+#define VDP_MSG_FLAG_DBG_INFO           (((UINT32) 1) << 4)
+#define VDP_SRCR_FLAG_DBG_INFO           (((UINT32) 1) << 5)
+#define VDP_OUTR_FLAG_DBG_INFO           (((UINT32) 1) << 6)
+#define VDP_SET_MSG_FLAG_DBG_INFO           (((UINT32) 1) << 7)
+#define VDP_OVERSCAN_DBG_INFO           (((UINT32) 1) << 8)
+
+
+/* macros */
+#ifndef NDEBUG
+
+#define TVD_DBG_MSG(m...)  {if ( _u4MwIfDbgFlags & TVD_MSG_FLAG_TVD_DBG_INFO ) {  Printf(m); }}
+
+#define TVD_DBG_CC_MSG(m...)   {if ( _u4MwIfDbgFlags & TVD_MSG_FLAG_CC_DBG_INFO ) { Printf(m); }}
+
+#define TVD_DBG_CC_ERR(m...)   {if ( _u4MwIfDbgFlags & TVD_MSG_FLAG_CC_DBG_ERROR ) { Printf(m); }}
+#define VDP_DBG_MSG(m...)  {if ( _u4MwIfDbgFlags & VDP_MSG_FLAG_DBG_INFO ) {  Printf(m);  }}
+#define VDP_SET_DBG_MSG(m...)  {if ( _u4MwIfDbgFlags & VDP_SET_MSG_FLAG_DBG_INFO ) {  Printf(m);  }}
+#define PrintfOverscan(m...) {if ( _u4MwIfDbgFlags & VDP_OVERSCAN_DBG_INFO) {  Printf(m);  }}
+#define PrintfSrcRegion(region)\
+        {\
+            if ( _u4MwIfDbgFlags & VDP_SRCR_FLAG_DBG_INFO )\
+            {\
+            Printf("%s\n", #region);\
+            Printf("ui4_x %d\n", region.ui4_x);\
+            Printf("ui4_y %d\n", region.ui4_y);\
+            Printf("ui4_width %d\n", region.ui4_width);\
+            Printf("ui4_height %d\n", region.ui4_height);\
+            }\
+        }
+#define PrintfOutRegion(region)\
+        {\
+            if ( _u4MwIfDbgFlags & VDP_OUTR_FLAG_DBG_INFO )\
+            {\
+            Printf("%s\n", #region);\
+            Printf("ui4_x %d\n", region.ui4_x);\
+            Printf("ui4_y %d\n", region.ui4_y);\
+            Printf("ui4_width %d\n", region.ui4_width);\
+            Printf("ui4_height %d\n", region.ui4_height);\
+            }\
+        }        
+#else
+
+#define TVD_DBG_MSG(m...)  
+
+#define TVD_DBG_CC_MSG(m...)  
+
+#define TVD_DBG_CC_ERR(m...) 
+#define VDP_DBG_MSG(m...)      
+#define PrintfSrcRegion(region)
+#define PrintfOutRegion(region)
+#define PrintfOverscan(m...)
+#define VDP_SET_DBG_MSG(m...)  
+
+#endif
+
+#endif /* _VDEC_MW_H */

@@ -11,6 +11,7 @@
 #include <linux/compat.h>
 #include <linux/mount.h>
 #include <linux/time.h>
+#include <linux/msdos_fs.h>
 #include <linux/buffer_head.h>
 #include <linux/writeback.h>
 #include <linux/backing-dev.h>
@@ -177,6 +178,59 @@ const struct file_operations fat_file_operations = {
 	.splice_read	= generic_file_splice_read,
 };
 
+#ifdef CONFIG_FAT_FAST_EXPAND
+/* This function will enlarge FAT file without filling zero. 
+ * Warning: FAT do not support holes. So this function is not secure.
+ * Please do use it in multi users environment. 
+ */
+static int fat_fast_expand(struct inode *inode, loff_t size)
+{
+	struct msdos_sb_info *sbi = MSDOS_SB(inode->i_sb);
+	int nr_clusters_new, nr_clusters_old, nr_clusters_add;
+	unsigned long limit;
+	int i,err;
+
+	/* Make sure new size is not too large. */
+	err = -EFBIG;
+	limit = current->signal->rlim[RLIMIT_FSIZE].rlim_cur;
+	if (limit != RLIM_INFINITY && size > (loff_t)limit) {
+		send_sig(SIGXFSZ, current, 0);
+		return err;
+	}
+	if (size > inode->i_sb->s_maxbytes)
+		return err;
+
+	/* Get number of clusters to add into the inode. */
+	nr_clusters_new = (size + (sbi->cluster_size - 1)) >> sbi->cluster_bits;
+	nr_clusters_old = (inode->i_size + (sbi->cluster_size -1)) >> sbi->cluster_bits;
+	nr_clusters_add = nr_clusters_new - nr_clusters_old;
+
+	for (i = 0; i < nr_clusters_add; i++) {
+
+		err = fat_add_cluster(inode);
+
+		if (err) {
+			/* Discard all allocated clusters. */
+			fat_truncate_blocks(inode, inode->i_size);
+			return err;
+		}
+	}
+
+	i_size_write(inode, size);
+	MSDOS_I(inode)->mmu_private = inode->i_size;
+	MSDOS_I(inode)->i_attrs |= ATTR_ARCH;
+	inode->i_mtime = inode->i_ctime = CURRENT_TIME_SEC;
+	
+	/* There is no umount utility in DTV. We have to flush inode immediately
+	 * to lower the risk of losting data. What a pity!
+	 */ 
+	mark_inode_dirty(inode);
+	err = write_inode_now(inode, 1);
+
+	return err;
+}
+#else /* !CONFIG_FAT_FAST_EXPAND */
+
 static int fat_cont_expand(struct inode *inode, loff_t size)
 {
 	struct address_space *mapping = inode->i_mapping;
@@ -212,6 +266,7 @@ static int fat_cont_expand(struct inode *inode, loff_t size)
 out:
 	return err;
 }
+#endif /* CONFIG_FAT_FAST_EXPAND */
 
 /* Free all clusters after the skip'th cluster. */
 static int fat_free(struct inode *inode, int skip)
@@ -395,7 +450,11 @@ int fat_setattr(struct dentry *dentry, struct iattr *attr)
 	 */
 	if (attr->ia_valid & ATTR_SIZE) {
 		if (attr->ia_size > inode->i_size) {
-			error = fat_cont_expand(inode, attr->ia_size);
+#ifdef CONFIG_FAT_FAST_EXPAND
+			error = fat_fast_expand(inode, attr->ia_size);	
+#else
+			error = fat_cont_expand(inode, attr->ia_size);            
+#endif
 			if (error || attr->ia_valid == ATTR_SIZE)
 				goto out;
 			attr->ia_valid &= ~ATTR_SIZE;

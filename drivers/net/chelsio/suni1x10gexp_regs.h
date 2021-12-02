@@ -1,8 +1,8 @@
 /*****************************************************************************
  *                                                                           *
  * File: suni1x10gexp_regs.h                                                 *
- * $Revision: 1.9 $                                                          *
- * $Date: 2005/06/22 00:17:04 $                                              *
+ * $Revision: #1 $                                                          *
+ * $Date: 2012/04/27 $                                              *
  * Description:                                                              *
  *  PMC/SIERRA (pm3393) MAC-PHY functionality.                               *
  *  part of the Chelsio 10Gb Ethernet Driver.                                *

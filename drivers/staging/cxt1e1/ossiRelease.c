@@ -1,5 +1,5 @@
 /*
- * $Id: ossiRelease.c,v 1.2 2008/05/08 20:14:03 rdobbs PMCC4_3_1B $
+ * $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/staging/cxt1e1/ossiRelease.c#1 $
  */
 
 /*-----------------------------------------------------------------------------
@@ -27,9 +27,9 @@
  *
  *-----------------------------------------------------------------------------
  * RCS info:
- * RCS revision: $Revision: 1.2 $
- * Last changed on $Date: 2008/05/08 20:14:03 $
- * Changed by $Author: rdobbs $
+ * RCS revision: $Revision: #1 $
+ * Last changed on $Date: 2012/04/27 $
+ * Changed by $Author: dtvbm11 $
  *-----------------------------------------------------------------------------
  */
 

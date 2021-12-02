@@ -7,7 +7,7 @@
 *
 * FILE	 : hcfcfg.tpl // hcfcfg.h
 *
-* DATE   : $Date: 2004/08/05 11:47:10 $   $Revision: 1.6 $
+* DATE   : $Date: 2012/04/27 $   $Revision: #1 $
 * Original: 2004/04/08 15:18:16    Revision: 1.40      Tag: t20040408_01
 * Original: 2004/04/01 15:32:55    Revision: 1.38      Tag: t7_20040401_01
 * Original: 2004/03/10 15:39:28    Revision: 1.34      Tag: t20040310_01

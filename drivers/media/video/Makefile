@@ -172,7 +172,15 @@ obj-$(CONFIG_VIDEO_SH_VOU)		+= sh_vou.o
 
 obj-$(CONFIG_VIDEO_AU0828) += au0828/
 
-obj-$(CONFIG_USB_VIDEO_CLASS)	+= uvc/
+ifeq ($(USB_CAM),LOG)
+	obj-$(CONFIG_USB_VIDEO_CLASS)	+= uvc_Log/
+else
+ifeq ($(USB_CAM),MAX)
+	obj-$(CONFIG_USB_VIDEO_CLASS)	+= uvc_Max/
+else
+	obj-$(CONFIG_USB_VIDEO_CLASS)	+= uvc/
+endif
+endif
 obj-$(CONFIG_VIDEO_SAA7164)     += saa7164/
 
 obj-$(CONFIG_VIDEO_IR_I2C)  += ir-kbd-i2c.o

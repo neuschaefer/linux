@@ -1,4 +1,4 @@
-/* $Id: hysdn_net.c,v 1.8.6.4 2001/09/23 22:24:54 kai Exp $
+/* $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/isdn/hysdn/hysdn_net.c#1 $
  *
  * Linux driver for HYSDN cards, net (ethernet type) handling routines.
  *
@@ -27,7 +27,7 @@ unsigned int hynet_enable = 0xffffffff;
 module_param(hynet_enable, uint, 0);
 
 /* store the actual version for log reporting */
-char *hysdn_net_revision = "$Revision: 1.8.6.4 $";
+char *hysdn_net_revision = "$Revision: #1 $";
 
 #define MAX_SKB_BUFFERS 20	/* number of buffers for keeping TX-data */
 

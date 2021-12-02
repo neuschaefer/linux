@@ -1,4 +1,4 @@
-/*  $Id: aty128.h,v 1.1 1999/10/12 11:00:40 geert Exp $
+/*  $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/include/video/aty128.h#1 $
  *  linux/drivers/video/aty128.h
  *  Register definitions for ATI Rage128 boards
  *

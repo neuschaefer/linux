@@ -1,4 +1,4 @@
-/* $Id: b1isa.c,v 1.1.2.3 2004/02/10 01:07:12 keil Exp $
+/* $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/isdn/hardware/avm/b1isa.c#1 $
  * 
  * Module for AVM B1 ISA-card.
  * 
@@ -27,7 +27,7 @@
 
 /* ------------------------------------------------------------- */
 
-static char *revision = "$Revision: 1.1.2.3 $";
+static char *revision = "$Revision: #1 $";
 
 /* ------------------------------------------------------------- */
 

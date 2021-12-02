@@ -107,6 +107,7 @@ void show_pte(struct mm_struct *mm, unsigned long addr)
 			break;
 
 		pte = pte_offset_map(pmd, addr);
+                printk(", pte=%p", pte);
 		printk(", *pte=%08lx", pte_val(*pte));
 		printk(", *ppte=%08lx", pte_val(pte[-PTRS_PER_PTE]));
 		pte_unmap(pte);
@@ -147,6 +148,32 @@ __do_kernel_fault(struct mm_struct *mm, unsigned long addr, unsigned int fsr,
 	do_exit(SIGKILL);
 }
 
+#ifdef CC_BUG_ON_ENABLE
+unsigned int _change_user_fault_to_panic=1;
+#else
+unsigned int _change_user_fault_to_panic=0;
+#endif
+EXPORT_SYMBOL(_change_user_fault_to_panic);
+#define SUPER_PROCESS_NAME_LEN  32
+static char g_super_process_name[SUPER_PROCESS_NAME_LEN]="";
+static int g_super_process_set = 0;
+
+void do_set_super_process(char* process_name)
+{
+    if (process_name)
+    {
+        if (g_super_process_set != 1)
+        {
+            strncpy(g_super_process_name, process_name, SUPER_PROCESS_NAME_LEN-1);
+            g_super_process_set = 1;
+        }
+        else
+        {
+            printk("super procss is set already\n");
+        }
+    }
+}
+
 /*
  * Something tried to access memory that isn't in our memory map..
  * User mode accesses just cause a SIGSEGV
@@ -166,6 +193,20 @@ __do_user_fault(struct task_struct *tsk, unsigned long addr,
 		show_regs(regs);
 	}
 #endif
+
+	printk("__do_user_fault Process is \"%s \" (pid: %i) \n", tsk->comm,tsk->pid);
+	printk("super process=%s\n", g_super_process_name);
+	if (_change_user_fault_to_panic)
+	{
+		if (strcmp(tsk->comm, g_super_process_name) == 0)
+		{
+			printk("ST: Y!W!\n");
+		}   
+		else
+		{
+			BUG_ON(1); // to avoid reboot fail in signal handler
+		}   
+	}   
 
 	tsk->thread.address = addr;
 	tsk->thread.error_code = fsr;
@@ -413,7 +454,16 @@ do_translation_fault(unsigned long addr, unsigned int fsr,
 	pmd_k = pmd_offset(pgd_k, addr);
 	pmd   = pmd_offset(pgd, addr);
 
-	if (pmd_none(*pmd_k))
+	/*
+	 * On ARM one Linux PGD entry contains two hardware entries (see page
+	 * tables layout in pgtable.h). We normally guarantee that we always
+	 * fill both L1 entries. But create_mapping() doesn't follow the rule.
+	 * It can create inidividual L1 entries, so here we have to call
+	 * pmd_none() check for the entry really corresponded to address, not
+	 * for the first of pair.
+	 */
+	index = (addr >> SECTION_SHIFT) & 1;
+	if (pmd_none(pmd_k[index]))
 		goto bad_area;
 
 	copy_pmd(pmd, pmd_k);
@@ -463,15 +513,10 @@ static struct fsr_info {
 	 * defines these to be "precise" aborts.
 	 */
 	{ do_bad,		SIGSEGV, 0,		"vector exception"		   },
-	{ do_bad,		SIGILL,	 BUS_ADRALN,	"alignment exception"		   },
+	{ do_bad,		SIGBUS,	 BUS_ADRALN,	"alignment exception"		   },
 	{ do_bad,		SIGKILL, 0,		"terminal exception"		   },
-	{ do_bad,		SIGILL,	 BUS_ADRALN,	"alignment exception"		   },
-/* Do we need runtime check ? */
-#if __LINUX_ARM_ARCH__ < 6
+	{ do_bad,		SIGBUS,	 BUS_ADRALN,	"alignment exception"		   },
 	{ do_bad,		SIGBUS,	 0,		"external abort on linefetch"	   },
-#else
-	{ do_translation_fault,	SIGSEGV, SEGV_MAPERR,	"I-cache maintenance fault"	   },
-#endif
 	{ do_translation_fault,	SIGSEGV, SEGV_MAPERR,	"section translation fault"	   },
 	{ do_bad,		SIGBUS,	 0,		"external abort on linefetch"	   },
 	{ do_page_fault,	SIGSEGV, SEGV_MAPERR,	"page translation fault"	   },
@@ -508,13 +553,15 @@ static struct fsr_info {
 
 void __init
 hook_fault_code(int nr, int (*fn)(unsigned long, unsigned int, struct pt_regs *),
-		int sig, const char *name)
+		int sig, int code, const char *name)
 {
-	if (nr >= 0 && nr < ARRAY_SIZE(fsr_info)) {
-		fsr_info[nr].fn   = fn;
-		fsr_info[nr].sig  = sig;
-		fsr_info[nr].name = name;
-	}
+	if (nr < 0 || nr >= ARRAY_SIZE(fsr_info))
+		BUG();
+
+	fsr_info[nr].fn   = fn;
+	fsr_info[nr].sig  = sig;
+	fsr_info[nr].code = code;
+	fsr_info[nr].name = name;
 }
 
 /*
@@ -525,12 +572,27 @@ do_DataAbort(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
 {
 	const struct fsr_info *inf = fsr_info + fsr_fs(fsr);
 	struct siginfo info;
+	int print = 1;
 
 	if (!inf->fn(addr, fsr & ~FSR_LNX_PF, regs))
 		return;
 
-	printk(KERN_ALERT "Unhandled fault: %s (0x%03x) at 0x%08lx\n",
-		inf->name, fsr, addr);
+#ifdef CONFIG_DEBUG_USER
+	if (user_debug) {
+		struct task_struct *tsk = current;
+		print = 0;
+		printk(KERN_DEBUG "%s: Unhandled fault: %s (%d) at 0x%08lx, code 0x%03x\n",
+		       tsk->comm, inf->name, inf->sig, addr, fsr);
+		show_pte(tsk->mm, addr);
+		show_regs(regs);
+	}
+#endif
+
+	if (print)
+	{
+		printk(KERN_ALERT "Unhandled fault: %s (0x%03x) at 0x%08lx\n",
+			inf->name, fsr, addr);
+	}
 
 	info.si_signo = inf->sig;
 	info.si_errno = 0;
@@ -580,12 +642,27 @@ do_PrefetchAbort(unsigned long addr, unsigned int ifsr, struct pt_regs *regs)
 {
 	const struct fsr_info *inf = ifsr_info + fsr_fs(ifsr);
 	struct siginfo info;
+	int print = 1;
 
 	if (!inf->fn(addr, ifsr | FSR_LNX_PF, regs))
 		return;
 
-	printk(KERN_ALERT "Unhandled prefetch abort: %s (0x%03x) at 0x%08lx\n",
-		inf->name, ifsr, addr);
+#ifdef CONFIG_DEBUG_USER
+	if (user_debug) {
+		struct task_struct *tsk = current;
+		print = 0;
+		printk(KERN_DEBUG "%s: Unhandled prefetch abort: %s (%d) at 0x%08lx, code 0x%03x\n",
+		       tsk->comm, inf->name, inf->sig, addr, ifsr);
+		show_pte(tsk->mm, addr);
+		show_regs(regs);
+	}
+#endif
+
+	if (print)
+	{
+		printk(KERN_ALERT "Unhandled prefetch abort: %s (0x%03x) at 0x%08lx\n",
+			inf->name, ifsr, addr);
+	}
 
 	info.si_signo = inf->sig;
 	info.si_errno = 0;
@@ -594,3 +671,25 @@ do_PrefetchAbort(unsigned long addr, unsigned int ifsr, struct pt_regs *regs)
 	arm_notify_die("", regs, &info, ifsr, 0);
 }
 
+static int __init exceptions_init(void)
+{
+	if (cpu_architecture() >= CPU_ARCH_ARMv6) {
+		hook_fault_code(4, do_translation_fault, SIGSEGV, SEGV_MAPERR,
+				"I-cache maintenance fault");
+	}
+
+	if (cpu_architecture() >= CPU_ARCH_ARMv7) {
+		/*
+		 * TODO: Access flag faults introduced in ARMv6K.
+		 * Runtime check for 'K' extension is needed
+		 */
+		hook_fault_code(3, do_bad, SIGSEGV, SEGV_MAPERR,
+				"section access flag fault");
+		hook_fault_code(6, do_bad, SIGSEGV, SEGV_MAPERR,
+				"section access flag fault");
+	}
+
+	return 0;
+}
+
+arch_initcall(exceptions_init);

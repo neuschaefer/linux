@@ -1,4 +1,4 @@
-/* $Id: l3dss1.c,v 2.32.2.3 2004/01/13 14:31:25 keil Exp $
+/* $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/isdn/hisax/l3dss1.c#1 $
  *
  * EURO/DSS1 D-channel protocol
  *
@@ -26,7 +26,7 @@
 #include <linux/slab.h>
 
 extern char *HiSax_getrev(const char *revision);
-static const char *dss1_revision = "$Revision: 2.32.2.3 $";
+static const char *dss1_revision = "$Revision: #1 $";
 
 #define EXT_BEARER_CAPS 1
 

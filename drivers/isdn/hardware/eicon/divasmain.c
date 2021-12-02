@@ -1,4 +1,4 @@
-/* $Id: divasmain.c,v 1.55.4.6 2005/02/09 19:28:20 armin Exp $
+/* $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/isdn/hardware/eicon/divasmain.c#1 $
  *
  * Low level driver for Eicon DIVA Server ISDN cards.
  *
@@ -38,7 +38,7 @@
 #include "diva_dma.h"
 #include "diva_pci.h"
 
-static char *main_revision = "$Revision: 1.55.4.6 $";
+static char *main_revision = "$Revision: #1 $";
 
 static int major;
 

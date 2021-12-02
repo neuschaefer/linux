@@ -1,4 +1,4 @@
-/* $Id: os_bri.h,v 1.1.2.2 2001/02/08 12:25:44 armin Exp $ */
+/* $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/isdn/hardware/eicon/os_bri.h#1 $ */
 
 #ifndef __DIVA_OS_BRI_REV_1_H__
 #define __DIVA_OS_BRI_REV_1_H__

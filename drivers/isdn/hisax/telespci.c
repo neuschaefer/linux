@@ -1,4 +1,4 @@
-/* $Id: telespci.c,v 2.23.2.3 2004/01/13 14:31:26 keil Exp $
+/* $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/isdn/hisax/telespci.c#1 $
  *
  * low level stuff for Teles PCI isdn cards
  *
@@ -19,7 +19,7 @@
 #include "isdnl1.h"
 #include <linux/pci.h>
 
-static const char *telespci_revision = "$Revision: 2.23.2.3 $";
+static const char *telespci_revision = "$Revision: #1 $";
 
 #define ZORAN_PO_RQ_PEN	0x02000000
 #define ZORAN_PO_WR	0x00800000

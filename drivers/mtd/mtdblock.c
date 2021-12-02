@@ -16,6 +16,7 @@
 
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/blktrans.h>
+#include <linux/mtd/mt53xx_part_oper.h>
 #include <linux/mutex.h>
 
 
@@ -31,6 +32,105 @@ struct mtdblk_dev {
 
 static struct mutex mtdblks_lock;
 
+static u_int32_t *squashfs_mapping_table[MAX_MTD_DEVICES];
+
+static int mtdblock_is_squashfs(struct mtd_info *mtd)
+{
+    if (!mtd)
+    {
+        return 0;
+    }
+    
+    /* if bad block checking not available, do nothing */
+    if (!mtd->block_isbad)
+    {
+        return 0;
+    }
+    
+    if (!mtd->name)
+    {
+        return 0;
+    }
+    
+    if (i4NFBPartitionFastboot(mtd))
+    {
+        return 0;
+    }
+
+    return 1;
+}
+
+static void squashfs_create_mapping_table (struct mtd_info *mtd)
+{
+    u_int32_t i, index = 0, numBlocks;
+    u_int32_t *mapping_table;
+    
+    mapping_table = squashfs_mapping_table[mtd->index];	
+    if (mapping_table)
+    {
+        return;
+    }
+	
+    numBlocks = mtd->size >> mtd->erasesize_shift;
+    mapping_table = kmalloc(numBlocks * sizeof(mapping_table[0]), GFP_KERNEL);
+    if (!mapping_table)
+    {
+        BUG();
+        return;
+    }
+    
+    memset(mapping_table, 0xFFFFFFFF, numBlocks * sizeof(mapping_table[0]));
+
+    for (i = 0; i < numBlocks; i++)
+    {
+        if (mtd->block_isbad(mtd, i * mtd->erasesize))
+        {
+            printk(KERN_INFO "mtdblock%d: block %d is bad!\n", mtd->index, i);
+            continue;
+        }
+        
+        mapping_table[index] = i;
+        index++;
+    }
+    
+    squashfs_mapping_table[mtd->index] = mapping_table;
+}
+
+static void squashfs_remove_mapping_table (struct mtd_info *mtd)
+{
+    int i = mtd->index;
+    
+    if (squashfs_mapping_table[i])
+    {
+        kfree(squashfs_mapping_table[i]);
+        squashfs_mapping_table[i] = NULL;
+    }
+}
+
+static void squashfs_init_mapping_table (void)
+{
+    int i;
+    
+    for (i = 0; i < MAX_MTD_DEVICES; i++)
+    {
+    	squashfs_mapping_table[i] = NULL;
+    }
+}
+
+static void squashfs_clean_mapping_table (void)
+{
+    int i;
+  
+    for (i = 0; i < MAX_MTD_DEVICES; i++)
+    {
+        if (squashfs_mapping_table[i])
+        {
+            kfree(squashfs_mapping_table[i]);
+            squashfs_mapping_table[i] = NULL;
+        }
+    }
+}
+
 /*
  * Cache stuff...
  *
@@ -40,13 +140,13 @@ static struct mutex mtdblks_lock;
  * and to speed things up, we locally cache a whole flash sector while it is
  * being written to until a different sector is required.
  */
-
 static void erase_callback(struct erase_info *done)
 {
 	wait_queue_head_t *wait_q = (wait_queue_head_t *)done->priv;
 	wake_up(wait_q);
 }
 
+int _i4TestMTDPerformance = 0;
 static int erase_write (struct mtd_info *mtd, unsigned long pos,
 			int len, const char *buf)
 {
@@ -56,43 +156,123 @@ static int erase_write (struct mtd_info *mtd, unsigned long pos,
 	size_t retlen;
 	int ret;
 
-	/*
-	 * First, let's erase the flash block.
-	 */
+    if (_i4TestMTDPerformance)
+    {
+        int i;
+        for (i = 0; i < 30; i++)
+        {
+            struct timeval t0, t1;
+            size_t temp;
 
-	init_waitqueue_head(&wait_q);
-	erase.mtd = mtd;
-	erase.callback = erase_callback;
-	erase.addr = pos;
-	erase.len = len;
-	erase.priv = (u_long)&wait_q;
+            size_t test_len = 8;
+            uint8_t *testbuf = vmalloc(test_len * 1024 * 1024);
 
-	set_current_state(TASK_INTERRUPTIBLE);
-	add_wait_queue(&wait_q, &wait);
+            if (!testbuf)
+            {
+                BUG();
+                return -ENOMEM;
+            }
+            
+            if ((i % 3) == 0)
+            {
+            memset(testbuf, 0, test_len * 1024 * 1024);
+            }
+            else if ((i % 3) == 1)
+            {
+                memset(testbuf, 0x5A, test_len * 1024 * 1024);
+            }
+            else
+            {
+                memset(testbuf, 0xA5, test_len * 1024 * 1024);
+            }
+                
+            init_waitqueue_head(&wait_q);
+            erase.mtd = mtd;
+            erase.callback = erase_callback;
+            erase.addr = pos;
+            erase.len = test_len * 1024 * 1024;
+            erase.priv = (u_long)&wait_q;
 
-	ret = mtd->erase(mtd, &erase);
-	if (ret) {
-		set_current_state(TASK_RUNNING);
-		remove_wait_queue(&wait_q, &wait);
-		printk (KERN_WARNING "mtdblock: erase of region [0x%lx, 0x%x] "
-				     "on \"%s\" failed\n",
-			pos, len, mtd->name);
-		return ret;
-	}
+            set_current_state(TASK_INTERRUPTIBLE);
+            add_wait_queue(&wait_q, &wait);
 
-	schedule();  /* Wait for erase to finish. */
-	remove_wait_queue(&wait_q, &wait);
+            do_gettimeofday(&t0);
+            mtd->erase(mtd, &erase);
+            do_gettimeofday(&t1);
+            temp = (t1.tv_sec - t0.tv_sec)*1000000 + (t1.tv_usec - t0.tv_usec);
+            printk(KERN_CRIT "erase time(8M):  %d us, erase speed: %d (0.1M/s)\n",
+                (int)temp, test_len*1000000*10/temp);
 
-	/*
-	 * Next, write the data to flash.
-	 */
+            schedule();  /* Wait for erase to finish. */
+            remove_wait_queue(&wait_q, &wait);
 
-	ret = mtd->write(mtd, pos, len, &retlen, buf);
-	if (ret)
-		return ret;
-	if (retlen != len)
-		return -EIO;
-	return 0;
+            do_gettimeofday(&t0);
+            mtd->write(mtd, pos, test_len * 1024 * 1024, &retlen, testbuf);
+            do_gettimeofday(&t1);
+            temp = (t1.tv_sec - t0.tv_sec)*1000000 + (t1.tv_usec - t0.tv_usec);
+            printk(KERN_CRIT "write time(8M):  %d us, write speed: %d (0.1M/s)\n", 
+                (int)temp, test_len*1000000*10/temp);
+
+            do_gettimeofday(&t0);
+            mtd->read(mtd, pos, test_len * 1024 * 1024, &retlen, testbuf);
+            do_gettimeofday(&t1);
+            temp = (t1.tv_sec - t0.tv_sec)*1000000 + (t1.tv_usec - t0.tv_usec);
+            printk(KERN_CRIT "read time(8M):  %d us, read speed: %d (0.1M/s)\n", 
+                (int)temp, test_len*1000000*10/temp);
+            
+            printk(KERN_CRIT "\n");
+
+            vfree(testbuf);
+        }
+    }
+
+    if (i4NFBPartitionFastboot(mtd))
+    {
+        return i4NFBPartitionWrite(mtd->index, pos, (u_int32_t)buf, len);
+    }
+
+    /*
+     * First, let's erase the flash block.
+     */
+    init_waitqueue_head(&wait_q);
+    erase.mtd = mtd;
+    erase.callback = erase_callback;
+    erase.addr = pos;
+    erase.len = len;
+    erase.priv = (u_long)&wait_q;
+
+    set_current_state(TASK_INTERRUPTIBLE);
+    add_wait_queue(&wait_q, &wait);
+
+    ret = mtd->erase(mtd, &erase);
+    if (ret)
+    {
+        set_current_state(TASK_RUNNING);
+        remove_wait_queue(&wait_q, &wait);
+        printk (KERN_WARNING "mtdblock: erase of region [0x%lx, 0x%x] "
+                     "on \"%s\" failed\n", pos, len, mtd->name);
+        return ret;
+    }
+
+    schedule();  /* Wait for erase to finish. */
+    remove_wait_queue(&wait_q, &wait);
+
+    /*
+     * Next, writhe data to flash.
+     */
+
+    ret = mtd->write(mtd, pos, len, &retlen, buf);
+    if (ret)
+    {
+        return ret;
+    }
+    
+    if (retlen != len)
+    {
+        return -EIO;
+    }
+
+    return 0;
 }
 
 
@@ -136,62 +316,106 @@ static int do_cached_write (struct mtdblk_dev *mtdblk, unsigned long pos,
 	DEBUG(MTD_DEBUG_LEVEL2, "mtdblock: write on \"%s\" at 0x%lx, size 0x%x\n",
 		mtd->name, pos, len);
 
-	if (!sect_size)
-		return mtd->write(mtd, pos, len, &retlen, buf);
+    if (!sect_size)
+    {
+        if (i4NFBPartitionFastboot(mtd))
+        {
+            return i4NFBPartitionWrite(mtd->index, pos, (u_int32_t)buf, len);
+        }
+        else
+        {
+            return mtd->write(mtd, pos, len, &retlen, buf);
+        }
+    }
 
-	while (len > 0) {
-		unsigned long sect_start = (pos/sect_size)*sect_size;
-		unsigned int offset = pos - sect_start;
-		unsigned int size = sect_size - offset;
-		if( size > len )
-			size = len;
+    while (len > 0) 
+    {
+        unsigned long sect_start = (pos/sect_size)*sect_size;
+        unsigned int offset = pos - sect_start;
+        unsigned int size = sect_size - offset;
+        if( size > len )
+        {
+            size = len;
+        }
 
-		if (size == sect_size) {
-			/*
-			 * We are covering a whole sector.  Thus there is no
-			 * need to bother with the cache while it may still be
-			 * useful for other partial writes.
-			 */
-			ret = erase_write (mtd, pos, size, buf);
-			if (ret)
-				return ret;
-		} else {
-			/* Partial sector: need to use the cache */
+        if (size == sect_size)
+        {
+            /*
+             * We are covering a whole sector.  Thus there is no
+             * need to bother with the cache while it may still be
+             * useful for other partial writes.
+             */
+            ret = erase_write (mtd, pos, size, buf);
+            if (ret)
+            {
+                return ret;
+            }
+        }
+        else
+        {
+            /* Partial sector: need to use the cache */
 
-			if (mtdblk->cache_state == STATE_DIRTY &&
-			    mtdblk->cache_offset != sect_start) {
-				ret = write_cached_data(mtdblk);
-				if (ret)
-					return ret;
-			}
+            if (mtdblk->cache_state == STATE_DIRTY &&
+                mtdblk->cache_offset != sect_start) 
+            {
+                ret = write_cached_data(mtdblk);
+                if (ret)
+                {
+                    return ret;
+                }
+            }
 
-			if (mtdblk->cache_state == STATE_EMPTY ||
-			    mtdblk->cache_offset != sect_start) {
-				/* fill the cache with the current sector */
-				mtdblk->cache_state = STATE_EMPTY;
-				ret = mtd->read(mtd, sect_start, sect_size,
-						&retlen, mtdblk->cache_data);
-				if (ret)
-					return ret;
-				if (retlen != sect_size)
-					return -EIO;
+            if (mtdblk->cache_state == STATE_EMPTY ||
+                mtdblk->cache_offset != sect_start) 
+            {
+                /* fill the cache with the current sector */
+                mtdblk->cache_state = STATE_EMPTY;
 
-				mtdblk->cache_offset = sect_start;
-				mtdblk->cache_size = sect_size;
-				mtdblk->cache_state = STATE_CLEAN;
-			}
+                if (i4NFBPartitionFastboot(mtd))
+                {
+                    ret = i4NFBPartitionRead(mtd->index, sect_start, (u_int32_t)mtdblk->cache_data, sect_size);
+                    if (ret)
+                    {
+                        return ret;
+                    }
+                }
+                else
+                {
+                    ret = mtd->read(mtd, sect_start, sect_size, &retlen, mtdblk->cache_data);
+                    if (ret)
+                    {
+                        if (ret == -EUCLEAN)
+                        {
+                            printk(KERN_INFO "Total %d fixable bit-flips has been detected \n", mtd->ecc_stats.corrected);
+                        }
+                        else
+                        {
+                            return ret;
+                        }
+                    }
+                    
+                    if (retlen != sect_size)
+                    {
+                        return -EIO;
+                    }
+                }
 
-			/* write data to our local cache */
-			memcpy (mtdblk->cache_data + offset, buf, size);
-			mtdblk->cache_state = STATE_DIRTY;
-		}
+                mtdblk->cache_offset = sect_start;
+                mtdblk->cache_size = sect_size;
+                mtdblk->cache_state = STATE_CLEAN;
+            }
 
-		buf += size;
-		pos += size;
-		len -= size;
-	}
+            /* write data to our local cache */
+            memcpy (mtdblk->cache_data + offset, buf, size);
+            mtdblk->cache_state = STATE_DIRTY;
+        }
 
-	return 0;
+        buf += size;
+        pos += size;
+        len -= size;
+    }
+
+    return 0;
 }
 
 
@@ -200,14 +424,36 @@ static int do_cached_read (struct mtdblk_dev *mtdblk, unsigned long pos,
 {
 	struct mtd_info *mtd = mtdblk->mbd.mtd;
 	unsigned int sect_size = mtdblk->cache_size;
-	size_t retlen;
+	size_t retlen = 0;
 	int ret;
 
 	DEBUG(MTD_DEBUG_LEVEL2, "mtdblock: read on \"%s\" at 0x%lx, size 0x%x\n",
 			mtd->name, pos, len);
 
 	if (!sect_size)
-		return mtd->read(mtd, pos, len, &retlen, buf);
+    {
+        ret = mtd->read(mtd, pos, len, &retlen, buf);
+        if (ret)
+        {
+            if (ret == -EUCLEAN)
+            {
+                printk(KERN_INFO "Total %d fixable bit-flips has been detected \n", mtd->ecc_stats.corrected);
+            }
+            else
+            {
+                return ret;
+            }
+        }
+        
+        if (retlen != len)
+        {
+            return -EIO;
+        }
+        else
+        {
+            return 0;
+        }
+    }
 
 	while (len > 0) {
 		unsigned long sect_start = (pos/sect_size)*sect_size;
@@ -228,7 +474,20 @@ static int do_cached_read (struct mtdblk_dev *mtdblk, unsigned long pos,
 		} else {
 			ret = mtd->read(mtd, pos, size, &retlen, buf);
 			if (ret)
-				return ret;
+            {
+                 if (ret == -EUCLEAN) 
+  			/*
+  			 * -EUCLEAN is reported if there was a bit-flip which
+  			 * was corrected, so this is harmless.
+  			 *
+  			 * We do not report about it here unless debugging is
+  			 * enabled. A corresponding message will be printed
+  			 * later, when it is has been scrubbed.
+      			 */
+                     printk(KERN_INFO "Total %d fixable bit-flips has been detected \n", mtd->ecc_stats.corrected);
+                 else
+                     return ret;
+            }
 			if (retlen != size)
 				return -EIO;
 		}
@@ -241,11 +500,49 @@ static int do_cached_read (struct mtdblk_dev *mtdblk, unsigned long pos,
 	return 0;
 }
 
+static int squashfs_readsect(struct mtdblk_dev *mtdblk, unsigned long pos, int len, char *buf)
+{
+    struct mtd_info *mtd = mtdblk->mbd.mtd;
+    u_int32_t *mapping_table;
+    u_int32_t numBlocks, phyblock;
+
+    // For squashfs read
+    mapping_table = squashfs_mapping_table[mtd->index];
+    if (!mapping_table)
+    {
+        BUG();
+    }
+    
+    numBlocks = mtd->size >> mtd->erasesize_shift;
+    phyblock = mapping_table[pos >> mtd->erasesize_shift];
+    
+    if (phyblock >= numBlocks)
+    {
+        printk(KERN_ERR "squashfs_readsect: too many bad block, phyblock = %d, numBlocks = %d!n", phyblock, numBlocks);
+        BUG();
+    }
+
+    pos = (phyblock * mtd->erasesize) | (pos & (mtd->erasesize - 1));
+    return do_cached_read(mtdblk, pos, len, buf);
+}
+
 static int mtdblock_readsect(struct mtd_blktrans_dev *dev,
 			      unsigned long block, char *buf)
 {
 	struct mtdblk_dev *mtdblk = container_of(dev, struct mtdblk_dev, mbd);
-	return do_cached_read(mtdblk, block<<9, 512, buf);
+	struct mtd_info *mtd = dev->mtd;
+
+    if (i4NFBPartitionFastboot(mtd))
+    {
+        return i4NFBPartitionRead(mtd->index, block<<11, (u_int32_t)buf, 2048);
+    }
+    
+    if (mtdblock_is_squashfs(mtd))
+    {
+        return squashfs_readsect(mtdblk, block<<11, 2048, buf);
+    }
+
+    return do_cached_read(mtdblk, block<<11, 2048, buf);
 }
 
 static int mtdblock_writesect(struct mtd_blktrans_dev *dev,
@@ -261,7 +558,7 @@ static int mtdblock_writesect(struct mtd_blktrans_dev *dev,
 		 * return -EAGAIN sometimes, but why bother?
 		 */
 	}
-	return do_cached_write(mtdblk, block<<9, 512, buf);
+	return do_cached_write(mtdblk, block<<11, 2048, buf);
 }
 
 static int mtdblock_open(struct mtd_blktrans_dev *mbd)
@@ -271,6 +568,12 @@ static int mtdblock_open(struct mtd_blktrans_dev *mbd)
 	DEBUG(MTD_DEBUG_LEVEL1,"mtdblock_open\n");
 
 	mutex_lock(&mtdblks_lock);
+	
+    if (mtdblock_is_squashfs(mbd->mtd))
+    {
+        squashfs_create_mapping_table(mbd->mtd);
+    }
+	
 	if (mtdblk->count) {
 		mtdblk->count++;
 		mutex_unlock(&mtdblks_lock);
@@ -342,7 +645,7 @@ static void mtdblock_add_mtd(struct mtd_blktrans_ops *tr, struct mtd_info *mtd)
 	dev->mbd.mtd = mtd;
 	dev->mbd.devnum = mtd->index;
 
-	dev->mbd.size = mtd->size >> 9;
+	dev->mbd.size = mtd->size >> 11;
 	dev->mbd.tr = tr;
 
 	if (!(mtd->flags & MTD_WRITEABLE))
@@ -354,6 +657,8 @@ static void mtdblock_add_mtd(struct mtd_blktrans_ops *tr, struct mtd_info *mtd)
 
 static void mtdblock_remove_dev(struct mtd_blktrans_dev *dev)
 {
+    squashfs_remove_mapping_table(dev->mtd);
+    
 	del_mtd_blktrans_dev(dev);
 }
 
@@ -361,7 +666,7 @@ static struct mtd_blktrans_ops mtdblock_tr = {
 	.name		= "mtdblock",
 	.major		= 31,
 	.part_bits	= 0,
-	.blksize 	= 512,
+	.blksize 	= 2048,
 	.open		= mtdblock_open,
 	.flush		= mtdblock_flush,
 	.release	= mtdblock_release,
@@ -376,11 +681,13 @@ static int __init init_mtdblock(void)
 {
 	mutex_init(&mtdblks_lock);
 
+	squashfs_init_mapping_table();
 	return register_mtd_blktrans(&mtdblock_tr);
 }
 
 static void __exit cleanup_mtdblock(void)
 {
+    squashfs_clean_mapping_table();
 	deregister_mtd_blktrans(&mtdblock_tr);
 }
 

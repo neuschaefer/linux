@@ -20,7 +20,7 @@ Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
 Author's address: how@isl.stanford.edu
 
-$Id: README,v 1.15 1992/05/20 00:25:32 how E $
+$Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/Documentation/crypto/descore-readme.txt#1 $
 
 
 ==>> To compile after untarring/unsharring, just `make' <<==

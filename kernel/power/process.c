@@ -15,6 +15,14 @@
 #include <linux/syscalls.h>
 #include <linux/freezer.h>
 #include <linux/delay.h>
+#include <linux/wakelock.h>
+#include <linux/buffer_head.h>
+
+int freezer_state;
+EXPORT_SYMBOL_GPL(freezer_state);
+
+int freezer_sync = 1;
+EXPORT_SYMBOL_GPL(freezer_sync);
 
 /* 
  * Timeout for stopping processes
@@ -38,6 +46,7 @@ static int try_to_freeze_tasks(bool sig_only)
 	struct timeval start, end;
 	u64 elapsed_csecs64;
 	unsigned int elapsed_csecs;
+	unsigned int wakeup = 0;
 
 	do_gettimeofday(&start);
 
@@ -63,6 +72,10 @@ static int try_to_freeze_tasks(bool sig_only)
 				todo++;
 		} while_each_thread(g, p);
 		read_unlock(&tasklist_lock);
+		if (todo && has_wake_lock(WAKE_LOCK_SUSPEND)) {
+			wakeup = 1;
+			break;
+		}
 		if (!todo || time_after(jiffies, end_time))
 			break;
 
@@ -84,14 +97,22 @@ static int try_to_freeze_tasks(bool sig_only)
 		 * and caller must call thaw_processes() if something fails),
 		 * but it cleans up leftover PF_FREEZE requests.
 		 */
-		printk("\n");
-		printk(KERN_ERR "Freezing of tasks failed after %d.%02d seconds "
-				"(%d tasks refusing to freeze):\n",
-				elapsed_csecs / 100, elapsed_csecs % 100, todo);
+		if(wakeup) {
+			printk("\n");
+			printk(KERN_ERR "Freezing of %s aborted\n",
+					sig_only ? "user space " : "tasks ");
+		}
+		else {
+			printk("\n");
+			printk(KERN_ERR "Freezing of tasks failed after %d.%02d seconds "
+					"(%d tasks refusing to freeze):\n",
+					elapsed_csecs / 100, elapsed_csecs % 100, todo);
+		}
 		read_lock(&tasklist_lock);
 		do_each_thread(g, p) {
 			task_lock(p);
-			if (freezing(p) && !freezer_should_skip(p))
+			if (freezing(p) && !freezer_should_skip(p) &&
+				elapsed_csecs > 100)
 				sched_show_task(p);
 			cancel_freezing(p);
 			task_unlock(p);
@@ -112,17 +133,26 @@ int freeze_processes(void)
 {
 	int error;
 
-	printk("Freezing user space processes ... ");
+	printk(KERN_INFO "Stopping fuse filesystems.\n");
+	freeze_filesystems(FS_FREEZER_FUSE);
+	freezer_state = FREEZER_FILESYSTEMS_FROZEN;
+	printk(KERN_INFO "Freezing user space processes ... ");
 	error = try_to_freeze_tasks(true);
 	if (error)
 		goto Exit;
 	printk("done.\n");
 
-	printk("Freezing remaining freezable tasks ... ");
+	if (freezer_sync)
+		sys_sync();
+	printk(KERN_INFO "Stopping normal filesystems.\n");
+	freeze_filesystems(FS_FREEZER_NORMAL);
+	freezer_state = FREEZER_USERSPACE_FROZEN;
+	printk(KERN_INFO "Freezing remaining freezable tasks ... ");
 	error = try_to_freeze_tasks(false);
 	if (error)
 		goto Exit;
 	printk("done.");
+	freezer_state = FREEZER_FULLY_ON;
 
 	oom_killer_disable();
  Exit:
@@ -131,6 +161,7 @@ int freeze_processes(void)
 
 	return error;
 }
+EXPORT_SYMBOL_GPL(freeze_processes);
 
 static void thaw_tasks(bool nosig_only)
 {
@@ -154,12 +185,39 @@ static void thaw_tasks(bool nosig_only)
 
 void thaw_processes(void)
 {
+	int old_state = freezer_state;
+
+	if (old_state == FREEZER_OFF)
+		return;
+
+	freezer_state = FREEZER_OFF;
+
 	oom_killer_enable();
 
+	printk(KERN_INFO "Restarting all filesystems ...\n");
+	thaw_filesystems(FS_FREEZER_ALL);
+
+	printk(KERN_INFO "Restarting tasks ... ");
+	if (old_state == FREEZER_FULLY_ON)
+		thaw_tasks(true);
+
 	printk("Restarting tasks ... ");
-	thaw_tasks(true);
 	thaw_tasks(false);
 	schedule();
 	printk("done.\n");
 }
+EXPORT_SYMBOL_GPL(thaw_processes);
 
+void thaw_kernel_threads(void)
+{
+	freezer_state = FREEZER_USERSPACE_FROZEN;
+	printk(KERN_INFO "Restarting normal filesystems.\n");
+	thaw_filesystems(FS_FREEZER_NORMAL);
+	thaw_tasks(true);
+}
+
+/*
+ * It's ugly putting this EXPORT down here, but it's necessary so that it
+ * doesn't matter whether the fs-freezing patch is applied or not.
+ */
+EXPORT_SYMBOL_GPL(thaw_kernel_threads);

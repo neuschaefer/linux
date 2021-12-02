@@ -328,6 +328,12 @@ config MTD_OOPS
 	  To use, add console=ttyMTDx to the kernel command line,
 	  where x is the MTD device number to use.
 
+config MTD_PARTITION_LAYOUT
+	bool "MT5391 mtd partition layout"
+	depends on MTD
+	help
+	  Include other mtd layout table.
+
 source "drivers/mtd/chips/Kconfig"
 
 source "drivers/mtd/maps/Kconfig"

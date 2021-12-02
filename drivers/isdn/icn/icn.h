@@ -1,4 +1,4 @@
-/* $Id: icn.h,v 1.30.6.5 2001/09/23 22:24:55 kai Exp $
+/* $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/isdn/icn/icn.h#1 $
  *
  * ISDN lowlevel-module for the ICN active ISDN-Card.
  *

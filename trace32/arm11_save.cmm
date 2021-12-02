@@ -1,0 +1,201 @@
+; Script to save all system state.
+; Must use attach script to attach system first.
+;
+; MEMEND     : Memory end of memory (can be lookup using max_pfn_low in kernel)
+; MEMBSTART  : ChB memory start (Enable to save ChB)
+; MEMBEND    : ChB memor end.
+; MEMBFILE   : File name to save ChB memory. Will save ChB memory if defined.
+; with_l2c   : System with L2 cache (ex, 5395/5389)
+; run6596    : MT5365/95 soc ?
+; 
+
+local &CPFILE &REGFILE &MEMFILE &MEMEND &with_l2c &run6595
+local &MEMBSTART &MEMBEND &MEMBFILE
+
+&MEMEND=0x10300000            ; 259MB
+&with_l2c=1
+&run6595=0
+
+
+;&MEMBSTART=0x20000000        ; ChB Start
+;&MEMBEND=0x38800000          ; Before MJC
+;&MEMBFILE="memory_chb.bin"
+
+&CPFILE="cpregs0.bin"
+&REGFILE="registers0.bin"
+&MEMFILE="memory_all.bin"
+
+
+
+
+;=========================================================
+if run()
+    break
+
+ wait 100.ms
+
+ ; clean and invalidate D cache
+ d.s c15:0xE7 0
+ 
+ ; DWB + DSB
+ d.s c15:0x4A7 0
+ d.s c15:0x5A7 0
+
+if &with_l2c>0
+(
+	; Flush L2
+	local &freg
+	wait 100.ms
+	; Clean&Inv Way
+	&freg=0xffff
+	d.s sd:0xf20007fc %long &freg
+	wait 100.ms
+	; Sync
+	d.s sd:0xf2000730 %long 0
+	wait 100.ms
+)
+
+if &run6595>0
+(
+	; Flush FIFO
+	&freg=data.long(sd:0xf0008114)
+	&freg=&freg|10;
+	d.s sd:0xf0008114 %long &freg
+	wait 100.ms
+)
+
+; Save all registers
+GOSUB save_registers &REGFILE
+
+; Save CP regs
+OPEN #1 &CPFILE /Create
+GOSUB save_cp c15:0x0000
+GOSUB save_cp c15:0x0001
+GOSUB save_cp c15:0x0101
+GOSUB save_cp c15:0x0201
+GOSUB save_cp c15:0x0011
+GOSUB save_cp c15:0x0111
+GOSUB save_cp c15:0x0211
+GOSUB save_cp c15:0x0010
+GOSUB save_cp c15:0x0110
+GOSUB save_cp c15:0x0210
+GOSUB save_cp c15:0x0310
+GOSUB save_cp c15:0x0410
+GOSUB save_cp c15:0x0510
+GOSUB save_cp c15:0x0610
+GOSUB save_cp c15:0x0710
+GOSUB save_cp c15:0x0020
+GOSUB save_cp c15:0x0120
+GOSUB save_cp c15:0x0220
+GOSUB save_cp c15:0x0320
+GOSUB save_cp c15:0x0420
+GOSUB save_cp c15:0x0520
+GOSUB save_cp c15:0x000C
+GOSUB save_cp c15:0x010C
+GOSUB save_cp c15:0x001C
+
+; MMU
+GOSUB save_cp c15:0x0300
+GOSUB save_cp c15:0x0002
+GOSUB save_cp c15:0x0102
+GOSUB save_cp c15:0x0202
+GOSUB save_cp c15:0x0003
+GOSUB save_cp c15:0x0005
+GOSUB save_cp c15:0x0105
+GOSUB save_cp c15:0x0006
+GOSUB save_cp c15:0x0106
+GOSUB save_cp c15:0x0206
+GOSUB save_cp c15:0x0078
+GOSUB save_cp c15:0x0178
+GOSUB save_cp c15:0x0278
+GOSUB save_cp c15:0x000A
+GOSUB save_cp c15:0x002A
+GOSUB save_cp c15:0x012A
+GOSUB save_cp c15:0x000D
+GOSUB save_cp c15:0x010D
+GOSUB save_cp c15:0x042F
+GOSUB save_cp c15:0x524F
+GOSUB save_cp c15:0x525F
+GOSUB save_cp c15:0x526F
+GOSUB save_cp c15:0x527F
+CLOSE #1
+
+; Save memory
+data.save.binary memory_all.bin asd:0x0--&MEMEND
+
+; Save CHB memory
+if ("&MEMBFILE"!="")
+    data.save.binary &MEMBFILE asd:&MEMBSTART--&MEMBEND
+
+; Optional, save HW registers.
+
+ENDDO
+
+save_registers:
+	ENTRY &file
+	OPEN #1 &file /Create
+	GOSUB save_reg R0
+	GOSUB save_reg R1
+	GOSUB save_reg R2
+	GOSUB save_reg R3
+	GOSUB save_reg R4
+	GOSUB save_reg R5
+	GOSUB save_reg R6
+	GOSUB save_reg R7
+	GOSUB save_reg R8
+	GOSUB save_reg R9
+	GOSUB save_reg R10
+	GOSUB save_reg R11
+	GOSUB save_reg R12
+	GOSUB save_reg R13
+	GOSUB save_reg R14
+	GOSUB save_reg PC
+	GOSUB save_reg CPSR
+	GOSUB save_reg SPSR
+	GOSUB save_reg R8_usr
+	GOSUB save_reg R9_usr
+	GOSUB save_reg R10_usr
+	GOSUB save_reg R11_usr
+	GOSUB save_reg R12_usr
+	GOSUB save_reg R13_usr
+	GOSUB save_reg R14_usr
+	GOSUB save_reg R8_fiq
+	GOSUB save_reg R9_fiq
+	GOSUB save_reg R10_fiq
+	GOSUB save_reg R11_fiq
+	GOSUB save_reg R12_fiq
+	GOSUB save_reg R13_fiq
+	GOSUB save_reg R14_fiq
+	GOSUB save_reg SPSR_fiq
+	GOSUB save_reg R13_irq
+	GOSUB save_reg R14_irq
+	GOSUB save_reg SPSR_irq
+	GOSUB save_reg R13_svc
+	GOSUB save_reg R14_svc
+	GOSUB save_reg SPSR_svc
+	GOSUB save_reg R13_mon
+	GOSUB save_reg R14_mon
+	GOSUB save_reg SPSR_mon
+	GOSUB save_reg R13_abt
+	GOSUB save_reg R14_abt
+	GOSUB save_reg SPSR_abt
+	GOSUB save_reg R13_und
+	GOSUB save_reg R14_und
+	GOSUB save_reg SPSR_und
+	CLOSE #1
+	RETURN
+
+save_reg:
+	ENTRY &reg
+	local &c1
+	&c1=r(&reg)
+	WRITE #1 &c1
+	RETURN
+
+save_cp:
+	ENTRY &cpreg
+	local &c1
+	&c1=data.long(&cpreg)
+	WRITE #1 &c1
+	RETURN
+	

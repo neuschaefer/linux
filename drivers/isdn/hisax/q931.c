@@ -1,4 +1,4 @@
-/* $Id: q931.c,v 1.12.2.3 2004/01/13 14:31:26 keil Exp $
+/* $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/isdn/hisax/q931.c#1 $
  *
  * code to decode ITU Q.931 call control messages
  *

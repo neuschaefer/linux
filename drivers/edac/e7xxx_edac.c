@@ -18,7 +18,7 @@
  *	That One Guy (Some other place)
  *	Wang Zhenyu (intel.com)
  *
- * $Id: edac_e7xxx.c,v 1.5.2.9 2005/10/05 00:43:44 dsp_llnl Exp $
+ * $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/edac/e7xxx_edac.c#1 $
  *
  */
 

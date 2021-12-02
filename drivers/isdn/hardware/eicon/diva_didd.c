@@ -1,4 +1,4 @@
-/* $Id: diva_didd.c,v 1.13.6.4 2005/02/11 19:40:25 armin Exp $
+/* $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/isdn/hardware/eicon/diva_didd.c#1 $
  *
  * DIDD Interface module for Eicon active cards.
  * 
@@ -24,7 +24,7 @@
 #include "divasync.h"
 #include "did_vers.h"
 
-static char *main_revision = "$Revision: 1.13.6.4 $";
+static char *main_revision = "$Revision: #1 $";
 
 static char *DRIVERNAME =
     "Eicon DIVA - DIDD table (http://www.melware.net)";

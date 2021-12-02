@@ -5,6 +5,108 @@
 menu "Serial drivers"
 	depends on HAS_IOMEM
 
+
+config SERIAL_MT5391
+	tristate "MediaTek Mt5391 serial port support"
+	depends on ARCH_MT5391
+	select SERIAL_CORE
+	---help---
+	  This selects MediaTek Mt5391 internal UART. Say Y or M here if you
+	  are using a Mt5391 based board.
+
+config SERIAL_MT5391_CONSOLE
+	bool "Support for console on Mt5391 serial port"
+	depends on SERIAL_MT5391=y
+	select SERIAL_CORE_CONSOLE
+	---help---
+	  Say Y here if you wish to use Mt5391 internal UART as the system
+	  console. You should alter the default console setting by kernel
+	  command line option "console=ttyMT0" or "console=ttyMT1", etc.
+
+config SERIAL_MT5363
+	tristate "MediaTek MT5363 serial port support"
+	depends on ARCH_MT5363
+	default y
+	select SERIAL_CORE
+	---help---
+	  This selects MediaTek MT5363 internal UART. Say Y or M
+	  here if you are using a MT5363 board.
+
+config SERIAL_MT5363_CONSOLE
+	bool "Support for console on MT5363 serial port"
+	depends on SERIAL_MT5363=y
+	default y
+	select SERIAL_CORE_CONSOLE
+	---help---
+	  Say Y here if you wish to use MT5363 internal UART as the system
+	  console. You should alter the default console setting by kernel
+	  command line option "console=ttyMT0" or "console=ttyMT1".
+
+config SERIAL_MT5365
+	tristate "MediaTek MT5365 serial port support"
+	depends on ARCH_MT5365
+	default y
+	select SERIAL_CORE
+	---help---
+	  This selects MediaTek MT5365 internal UART. Say Y or M
+	  here if you are using a MT5365 board.
+
+config SERIAL_MT5365_CONSOLE
+	bool "Support for console on MT5365 serial port"
+	depends on SERIAL_MT5365=y
+	default y
+	select SERIAL_CORE_CONSOLE
+	---help---
+	  Say Y here if you wish to use MT5365 internal UART as the system
+	  console. You should alter the default console setting by kernel
+	  command line option "console=ttyMT0" or "console=ttyMT1".
+
+config SERIAL_MT5395
+	tristate "MediaTek MT5395 serial port support"
+	depends on ARCH_MT5395
+	default y
+	select SERIAL_CORE
+	---help---
+	  This selects MediaTek MT5395 internal UART. Say Y or M
+	  here if you are using a MT5395 board.
+
+config SERIAL_MT5395_CONSOLE
+	bool "Support for console on MT5395 serial port"
+	depends on SERIAL_MT5395=y
+	default y
+	select SERIAL_CORE_CONSOLE
+	---help---
+	  Say Y here if you wish to use MT5395 internal UART as the system
+	  console. You should alter the default console setting by kernel
+	  command line option "console=ttyMT0" or "console=ttyMT1".
+
+
+config SERIAL_MT53XX
+	tristate "MediaTek MT53XX serial port support"
+	depends on PLAT_MT53XX
+	default n
+	select SERIAL_CORE
+	---help---
+	  This selects MediaTek MT53XX internal UART. Say Y or M
+	  here if you are using a MT53XX board.
+
+config SERIAL_MT53XX_CONSOLE
+	bool "Support for console on MT53XX serial port"
+	depends on PLAT_MT53XX
+	default n
+	select SERIAL_CORE_CONSOLE
+	---help---
+	  Say Y here if you wish to use MT53XX internal UART as the system
+	  console. You should alter the default console setting by kernel
+	  command line option "console=ttyMT0" or "console=ttyMT1".
+
+config SERIAL_MT53XX_FACTORY_SUPPORT
+	bool "Support for factory tty on MT53xx serial port"
+	depends on (SERIAL_MT53XX=y || SERIAL_MT5365 || SERIAL_MT5395)
+	default y
+	---help---
+	  Say Y here if you wish to enable MT53xx virtual tty for factory mode support.
+
 #
 # The new 8250/16550 serial drivers
 config SERIAL_8250

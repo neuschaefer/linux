@@ -16,7 +16,7 @@
 #include <linux/sched.h>
 #include "rtc-core.h"
 
-static dev_t rtc_devt;
+static dev_t rtc_devt = MKDEV(245, 0);;
 
 #define RTC_DEV_MAX 16 /* 16 RTCs should be enough for everyone... */
 
@@ -522,7 +522,8 @@ void __init rtc_dev_init(void)
 {
 	int err;
 
-	err = alloc_chrdev_region(&rtc_devt, 0, RTC_DEV_MAX, "rtc");
+	//err = alloc_chrdev_region(&rtc_devt, 0, RTC_DEV_MAX, "rtc");
+	err = register_chrdev_region(rtc_devt, 1, "rtc");//cli conflict workaround
 	if (err < 0)
 		printk(KERN_ERR "%s: failed to allocate char dev region\n",
 			__FILE__);

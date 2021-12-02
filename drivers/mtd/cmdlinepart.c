@@ -150,6 +150,13 @@ static struct mtd_partition * newpart(char *s,
 		s += 2;
         }
 
+    /* if enc is found, this partition is encypted*/
+    if (strncmp(s, "enc", 3) == 0)
+    {
+        mask_flags |= MTD_ENCYPTED;
+        s += 3;
+    }
+
 	/* test if more partitions are following */
 	if (*s == ',')
 	{

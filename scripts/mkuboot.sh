@@ -3,8 +3,9 @@
 #
 # Build U-Boot image when `mkimage' tool is available.
 #
-
-MKIMAGE=$(type -path "${CROSS_COMPILE}mkimage")
+if [ ! -z ${MTK_MKIMAGE} ]; then
+	MKIMAGE=${MTK_MKIMAGE}
+fi
 
 if [ -z "${MKIMAGE}" ]; then
 	MKIMAGE=$(type -path mkimage)
@@ -17,3 +18,4 @@ fi
 
 # Call "mkimage" to create U-Boot image
 ${MKIMAGE} "$@"
+

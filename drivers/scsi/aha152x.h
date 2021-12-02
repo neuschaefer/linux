@@ -2,14 +2,14 @@
 #define _AHA152X_H
 
 /*
- * $Id: aha152x.h,v 2.7 2004/01/24 11:39:03 fischer Exp $
+ * $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/scsi/aha152x.h#1 $
  */
 
 /* number of queueable commands
    (unless we support more than 1 cmd_per_lun this should do) */
 #define AHA152X_MAXQUEUE 7
 
-#define AHA152X_REVID "Adaptec 152x SCSI driver; $Revision: 2.7 $"
+#define AHA152X_REVID "Adaptec 152x SCSI driver; $Revision: #1 $"
 
 /* port addresses */
 #define SCSISEQ      (HOSTIOPORT0+0x00)    /* SCSI sequence control */

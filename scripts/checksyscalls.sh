@@ -205,5 +205,10 @@ sed -n -e '/^\#define/ s/[^_]*__NR_\([^[:space:]]*\).*/\
 \#endif/p' $1
 }
 
+if [ "$1" == "odbc" ];
+then
+	exit 0;
+fi
+
 (ignore_list && syscall_list ${srctree}/arch/x86/include/asm/unistd_32.h) | \
 $* -E -x c - > /dev/null

@@ -1,4 +1,4 @@
-/* $Id: command.c,v 1.4.10.1 2001/09/23 22:24:59 kai Exp $
+/* $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/isdn/sc/command.c#1 $
  *
  * Copyright (C) 1996  SpellCaster Telecommunications Inc.
  *

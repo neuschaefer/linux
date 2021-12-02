@@ -1,0 +1,219 @@
+###############################################################################
+# Copyright Statement:                                                        #
+#                                                                             #
+#   This software/firmware and related documentation ("MediaTek Software")    #
+# are protected under international and related jurisdictions'copyright laws  #
+# as unpublished works. The information contained herein is confidential and  #
+# proprietary to MediaTek Inc. Without the prior written permission of        #
+# MediaTek Inc., any reproduction, modification, use or disclosure of         #
+# MediaTek Software, and information contained herein, in whole or in part,   #
+# shall be strictly prohibited.                                               #
+# MediaTek Inc. Copyright (C) 2010. All rights reserved.                      #
+#                                                                             #
+#   BY OPENING THIS FILE, RECEIVER HEREBY UNEQUIVOCALLY ACKNOWLEDGES AND      #
+# AGREES TO THE FOLLOWING:                                                    #
+#                                                                             #
+#   1)Any and all intellectual property rights (including without             #
+# limitation, patent, copyright, and trade secrets) in and to this            #
+# Software/firmware and related documentation ("MediaTek Software") shall     #
+# remain the exclusive property of MediaTek Inc. Any and all intellectual     #
+# property rights (including without limitation, patent, copyright, and       #
+# trade secrets) in and to any modifications and derivatives to MediaTek      #
+# Software, whoever made, shall also remain the exclusive property of         #
+# MediaTek Inc.  Nothing herein shall be construed as any transfer of any     #
+# title to any intellectual property right in MediaTek Software to Receiver.  #
+#                                                                             #
+#   2)This MediaTek Software Receiver received from MediaTek Inc. and/or its  #
+# representatives is provided to Receiver on an "AS IS" basis only.           #
+# MediaTek Inc. expressly disclaims all warranties, expressed or implied,     #
+# including but not limited to any implied warranties of merchantability,     #
+# non-infringement and fitness for a particular purpose and any warranties    #
+# arising out of course of performance, course of dealing or usage of trade.  #
+# MediaTek Inc. does not provide any warranty whatsoever with respect to the  #
+# software of any third party which may be used by, incorporated in, or       #
+# supplied with the MediaTek Software, and Receiver agrees to look only to    #
+# such third parties for any warranty claim relating thereto.  Receiver       #
+# expressly acknowledges that it is Receiver's sole responsibility to obtain  #
+# from any third party all proper licenses contained in or delivered with     #
+# MediaTek Software.  MediaTek is not responsible for any MediaTek Software   #
+# releases made to Receiver's specifications or to conform to a particular    #
+# standard or open forum.                                                     #
+#                                                                             #
+#   3)Receiver further acknowledge that Receiver may, either presently        #
+# and/or in the future, instruct MediaTek Inc. to assist it in the            #
+# development and the implementation, in accordance with Receiver's designs,  #
+# of certain softwares relating to Receiver's product(s) (the "Services").    #
+# Except as may be otherwise agreed to in writing, no warranties of any       #
+# kind, whether express or implied, are given by MediaTek Inc. with respect   #
+# to the Services provided, and the Services are provided on an "AS IS"       #
+# basis. Receiver further acknowledges that the Services may contain errors   #
+# that testing is important and it is solely responsible for fully testing    #
+# the Services and/or derivatives thereof before they are used, sublicensed   #
+# or distributed. Should there be any third party action brought against      #
+# MediaTek Inc. arising out of or relating to the Services, Receiver agree    #
+# to fully indemnify and hold MediaTek Inc. harmless.  If the parties         #
+# mutually agree to enter into or continue a business relationship or other   #
+# arrangement, the terms and conditions set forth herein shall remain         #
+# effective and, unless explicitly stated otherwise, shall prevail in the     #
+# event of a conflict in the terms in any agreements entered into between     #
+# the parties.                                                                #
+#                                                                             #
+#   4)Receiver's sole and exclusive remedy and MediaTek Inc.'s entire and     #
+# cumulative liability with respect to MediaTek Software released hereunder   #
+# will be, at MediaTek Inc.'s sole discretion, to replace or revise the       #
+# MediaTek Software at issue.                                                 #
+#                                                                             #
+#   5)The transaction contemplated hereunder shall be construed in            #
+# accordance with the laws of Singapore, excluding its conflict of laws       #
+# principles.  Any disputes, controversies or claims arising thereof and      #
+# related thereto shall be settled via arbitration in Singapore, under the    #
+# then current rules of the International Chamber of Commerce (ICC).  The     #
+# arbitration shall be conducted in English. The awards of the arbitration    #
+# shall be final and binding upon both parties and shall be entered and       #
+# enforceable in any court of competent jurisdiction.                         #
+###############################################################################
+###########################################################################
+# $RCSfile: Makefile,v $
+# $Revision: #1 $
+# $Date: 2012/04/27 $
+# $Author: dtvbm11 $
+#
+# Description:
+#         Leave-level makefile to build the subcomponent of Middleware library.
+#
+#         Specify the source files to be compile in SRC.
+#############################################################################
+
+
+THIS_COMPONENT = dlm
+
+ifeq "$(UBOOT_LIBRARY)" "y"
+
+include $(TOPDIR)/config.mk
+
+CPPFLAGS += -I$(TOPDIR)/board/$(BOARDDIR)/drv_lib/drv_inc -I$(TOPDIR)/board/$(BOARDDIR)/drv_lib/inc
+CFLAGS += -I$(TOPDIR)/board/$(BOARDDIR)/drv_lib/drv_inc -I$(TOPDIR)/board/$(BOARDDIR)/drv_lib/inc
+CPPFLAGS += -I$(TOPDIR)/board/$(BOARDDIR)/include -I$(OSAI_INC) -DNO_MIDDLEWARE
+CFLAGS += -I$(TOPDIR)/board/$(BOARDDIR)/include -I$(OSAI_INC) -DNO_MIDDLEWARE
+
+LIB	= lib$(THIS_COMPONENT).a
+
+
+OBJS	:= dlm_api.o dlm_fm.o dlm_digest.o md5_slim.o efuse.o dlm_util.o dlm_gentool.o dlm_aes.o
+
+SOBJS	:= 
+
+$(LIB):	$(OBJS) $(SOBJS)
+	$(AR) crv $@ $^
+
+clean:
+	rm -f $(SOBJS) $(OBJS)
+
+distclean:	clean
+	rm -f $(LIB) core *.bak .depend
+
+#########################################################################
+
+.depend:	Makefile $(SOBJS:.o=.S) $(OBJS:.o=.c)
+		$(CC) -M $(CPPFLAGS) $(SOBJS:.o=.S) $(OBJS:.o=.c) > $@
+
+-include .depend
+
+else # UBOOT_LIBRARY
+
+ifndef PROJECT_ROOT
+PROJECT_ROOT := $(word 1, $(subst /project_x/,/project_x /, $(shell pwd)))
+endif
+
+ifeq "$(LOADER_LIBRARY)" "y"
+
+THIS_COMPONENT = dlm
+
+DRV_BUILD := $(word 1, $(subst /drv_build/,/drv_build /, $(shell pwd)))
+
+ifeq ($(DRV_BUILD), '')
+DRV_ROOT = $(PROJECT_ROOT)/target/$(subst mt,,$(TARGET))
+else
+ifdef CC_5360B_LOADER
+DRV_ROOT = $(DRV_BUILD)/mt5360b/driver
+else
+ifdef CC_5392B_LOADER
+DRV_ROOT = $(DRV_BUILD)/mt5392b/driver
+else
+ifdef CC_5360_LOADER
+DRV_ROOT = $(DRV_BUILD)/mt5360/driver
+else
+ifdef CC_5391_LOADER
+DRV_ROOT = $(DRV_BUILD)/mt5391/driver
+endif
+endif
+endif
+endif
+endif
+
+export DRV_ROOT
+
+SRC = dlm_api.c \
+      dlm_fm.c \
+      dlm_digest.c\
+      dlm_util.c \
+      efuse.c\
+      md5_slim.c\
+      dlm_aes.c
+
+OBJ =
+
+SUB_COMPONENTS =
+
+DEFINES += -DNO_MIDDLEWARE -DCC_MTK_LOADER
+
+CC_INC += -I..
+
+include $(DRV_ROOT)/driver.mak
+
+else
+
+include $(PROJECT_ROOT)/path.mak
+
+# Cowork with Brian for dlm to share with openssl source code
+ifneq ($(strip $(findstring -DINET_SUPPORT, $(DEFINES))),)
+    SRC = dlm_api.c dlm_cli.c dlm_fm.c dlm_digest.c dlm_util.c efuse.c c_dlm_api.c dlm_aes.c
+    DEFINES += -DDLM_USE_OPENSSL
+    CC_INC += -I$(MW_ROOT)/inet/openssl/include
+ifeq "$(LINUX_SOLUTION)" "true"
+    SRC += md5_slim.c sha256_slim.c
+endif
+else
+    #CI Plus use openssl source
+    ifneq ($(strip $(findstring -DCI_PLUS_SUPPORT, $(DEFINES))),)
+        SRC = dlm_api.c dlm_cli.c dlm_fm.c dlm_digest.c dlm_util.c efuse.c c_dlm_api.c dlm_aes.c
+        DEFINES += -DDLM_USE_OPENSSL
+        CC_INC += -I$(MW_ROOT)/inet/openssl/include
+        ifeq "$(LINUX_SOLUTION)" "true"
+        SRC += md5_slim.c sha256_slim.c
+        endif
+    else
+        SRC = dlm_api.c dlm_cli.c dlm_fm.c dlm_digest.c dlm_util.c efuse.c c_dlm_api.c md5_slim.c sha256_slim.c dlm_aes.c   
+    endif
+endif
+
+OBJ =
+
+SUB_COMPONENTS = 
+
+OPTIONAL_SUB_COMPONENTS = 
+
+DEFINES +=
+
+CC_INC += -I$(MW_ROOT)/os/inc -I$(MW_ROOT)/dbg
+
+#############################################################################
+#
+# Include the makefile common to all components
+# 
+include $(MW_ROOT)/common.mak
+
+endif # LOADER_LIBRARY
+
+endif # UBOOT_LIBRARY
+

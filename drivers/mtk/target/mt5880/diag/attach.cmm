@@ -1,0 +1,23 @@
+SYS.RESET
+
+;====select configuration according to your enviroment====
+;=========================================================
+; CVD, dual core
+SYSTEM.CPU CortexA9MPCoreSMP2
+SYS.JC 3.0MHz
+
+; CVD, single core
+;SYSTEM.CPU CortexA9
+;SYS.JC 3.0MHz
+
+;T32 single&dual core
+;SYSTEM.CPU CortexA9MPCore
+;SYS.JC 3.0MHz
+;SYSTEM.MULTICORE COREBASE APB:0x80110000
+;=========================================================
+
+sys.mode attach
+
+
+
+

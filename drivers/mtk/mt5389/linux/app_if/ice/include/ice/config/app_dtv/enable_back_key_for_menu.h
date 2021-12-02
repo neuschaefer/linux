@@ -1,0 +1,3 @@
+#ifndef ENABLE_BACK_KEY_FOR_MENU
+    #define ENABLE_BACK_KEY_FOR_MENU 1
+#endif

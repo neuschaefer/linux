@@ -1,4 +1,4 @@
-/* $Id: hfcscard.c,v 1.10.2.4 2004/01/14 16:04:48 keil Exp $
+/* $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/isdn/hisax/hfcscard.c#1 $
  *
  * low level stuff for hfcs based cards (Teles3c, ACER P10)
  *
@@ -16,7 +16,7 @@
 #include "hfc_2bds0.h"
 #include "isdnl1.h"
 
-static const char *hfcs_revision = "$Revision: 1.10.2.4 $";
+static const char *hfcs_revision = "$Revision: #1 $";
 
 static irqreturn_t
 hfcs_interrupt(int intno, void *dev_id)

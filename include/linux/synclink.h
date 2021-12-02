@@ -1,7 +1,7 @@
 /*
  * SyncLink Multiprotocol Serial Adapter Driver
  *
- * $Id: synclink.h,v 3.14 2006/07/17 20:15:43 paulkf Exp $
+ * $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/include/linux/synclink.h#1 $
  *
  * Copyright (C) 1998-2000 by Microgate Corporation
  *

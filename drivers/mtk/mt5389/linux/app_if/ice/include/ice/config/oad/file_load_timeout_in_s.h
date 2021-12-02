@@ -1,0 +1,3 @@
+#ifndef FILE_LOAD_TIMEOUT_IN_S
+    #define FILE_LOAD_TIMEOUT_IN_S 36000
+#endif

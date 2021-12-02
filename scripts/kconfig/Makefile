@@ -3,7 +3,7 @@
 # These targets are used from top-level makefile
 
 PHONY += oldconfig xconfig gconfig menuconfig config silentoldconfig update-po-config \
-	localmodconfig localyesconfig
+	localmodconfig localyesconfig defoldconfig
 
 ifdef KBUILD_KCONFIG
 Kconfig := $(KBUILD_KCONFIG)
@@ -32,6 +32,10 @@ oldconfig: $(obj)/conf
 silentoldconfig: $(obj)/conf
 	$(Q)mkdir -p include/generated
 	$< -s $(Kconfig)
+
+defoldconfig: $(obj)/conf
+	$(Q)$< -D .config $(Kconfig)
+
 
 # if no path is given, then use src directory to find file
 ifdef LSMOD
@@ -118,7 +122,13 @@ else
 endif
 
 %_defconfig: $(obj)/conf
-	$(Q)$< -D arch/$(SRCARCH)/configs/$@ $(Kconfig)
+	$(Q)if [ -e $(O)/arch/$(SRCARCH)/configs/$@ ]; then \
+		$< -D $(O)/arch/$(SRCARCH)/configs/$@ $(Kconfig); \
+	else \
+		$< -D arch/$(SRCARCH)/configs/$@ $(Kconfig); \
+	fi
+
+
 
 # Help text used by make help
 help:
@@ -131,6 +141,7 @@ help:
 	@echo  '  localmodconfig  - Update current config disabling modules not loaded'
 	@echo  '  localyesconfig  - Update current config converting local mods to core'
 	@echo  '  silentoldconfig - Same as oldconfig, but quietly, additionally update deps'
+	@echo  '  defoldconfig    - Same as oldconfig, with default answer to new options'
 	@echo  '  randconfig	  - New config with random answer to all options'
 	@echo  '  defconfig	  - New config with default answer to all options'
 	@echo  '  allmodconfig	  - New config selecting modules when possible'

@@ -1,0 +1,3 @@
+#ifndef TELETEXT_CACHE_SIZE
+    #define TELETEXT_CACHE_SIZE 1000
+#endif

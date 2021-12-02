@@ -1,0 +1,43 @@
+
+store "breakpts.cmm" Break
+; store "windowps.cmm" Win
+
+sys.reset
+SYS.CPU ARM926ej
+
+; In General, you can use rtck to select clock automatically.
+SYS.JC 8.0MHz
+SYS.M ATTACH
+wait 10.ms
+
+; This is the program name that you want to load
+D.LOAD .\mt5301a_china_atv_verf_dbg /nocode
+
+do "breakpts.cmm"
+; do "windowps.cmm"
+
+setup.imaskhll on
+setup.imaskasm on
+; You need to set the path of source code, otherwise you could not
+; see the source when debugging.
+y.spath . 
+y.spath.srd ../5301a_loader
+y.spath.srd ../../../../middleware
+data.list
+m
+V %HEX
+task.config C:\T32\demo\arm\KERNEL\NUCLEUS\nucleus
+menu.reprogram C:\T32\demo\arm\KERNEL\NUCLEUS\nucleus
+; go
+
+
+
+
+
+
+
+
+
+
+
+

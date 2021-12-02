@@ -512,6 +512,10 @@ static inline int scsi_is_wlun(unsigned int lun)
 /* Used to obtain the PCI location of a device */
 #define SCSI_IOCTL_GET_PCI		0x5387
 
+#define SCSI_IOCTL_GET_DEV_SIZE   0x5388
+#define SCSI_IOCTL_GET_SECTOR_SIZE 0x5389
+#define SCSI_IOCTL_GET_SECTOR_NUMBER 0x5390
+
 /* Pull a u32 out of a SCSI message (using BE SCSI conventions) */
 static inline __u32 scsi_to_u32(__u8 *ptr)
 {

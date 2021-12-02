@@ -114,6 +114,16 @@ int usb_choose_configuration(struct usb_device *udev)
 #endif
 		}
 
+        // Lawrance.liu@mediatek.com (Feb 18, 2011)
+		// For Max camera
+		else if ( i == 0 && udev->descriptor.idVendor == 0x0B6A && udev->descriptor.idProduct == 0x4D51 )
+		{
+		    continue;
+		}
+		else if ( i == 0 && udev->descriptor.idVendor == 0x1460 && udev->descriptor.idProduct == 0x7190 )
+		{
+		    continue;
+		}
 		/* From the remaining configs, choose the first one whose
 		 * first interface is for a non-vendor-specific class.
 		 * Reason: Linux is more likely to have a class driver

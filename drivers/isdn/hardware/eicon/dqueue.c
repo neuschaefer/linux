@@ -1,4 +1,4 @@
-/* $Id: dqueue.c,v 1.5 2003/04/12 21:40:49 schindler Exp $
+/* $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/isdn/hardware/eicon/dqueue.c#1 $
  *
  * Driver for Eicon DIVA Server ISDN cards.
  * User Mode IDI Interface

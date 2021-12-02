@@ -1,4 +1,4 @@
-/* $Id: hysdn_if.h,v 1.1.8.3 2001/09/23 22:25:05 kai Exp $
+/* $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/include/linux/hysdn_if.h#1 $
  *
  * Linux driver for HYSDN cards
  * ioctl definitions shared by hynetmgr and driver.

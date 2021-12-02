@@ -1,6 +1,6 @@
 /* drivers/char/ser_a2232.h */
 
-/* $Id: ser_a2232.h,v 0.4 2000/01/25 12:00:00 ehaase Exp $ */
+/* $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/char/ser_a2232.h#1 $ */
 
 /* Linux serial driver for the Amiga A2232 board */
 

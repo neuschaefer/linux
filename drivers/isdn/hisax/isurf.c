@@ -1,4 +1,4 @@
-/* $Id: isurf.c,v 1.12.2.4 2004/01/13 21:46:03 keil Exp $
+/* $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/isdn/hisax/isurf.c#1 $
  *
  * low level stuff for Siemens I-Surf/I-Talk cards
  *
@@ -17,7 +17,7 @@
 #include "isdnl1.h"
 #include <linux/isapnp.h>
 
-static const char *ISurf_revision = "$Revision: 1.12.2.4 $";
+static const char *ISurf_revision = "$Revision: #1 $";
 
 #define byteout(addr,val) outb(val,addr)
 #define bytein(addr) inb(addr)

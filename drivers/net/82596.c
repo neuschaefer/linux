@@ -60,7 +60,7 @@
 #include <asm/cacheflush.h>
 
 static char version[] __initdata =
-	"82596.c $Revision: 1.5 $\n";
+	"82596.c $Revision: #1 $\n";
 
 #define DRV_NAME	"82596"
 

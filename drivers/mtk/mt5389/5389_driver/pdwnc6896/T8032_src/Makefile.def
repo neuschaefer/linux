@@ -1,0 +1,283 @@
+###############################################################################
+# Copyright Statement:                                                        #
+#                                                                             #
+#   This software/firmware and related documentation ("MediaTek Software")    #
+# are protected under international and related jurisdictions'copyright laws  #
+# as unpublished works. The information contained herein is confidential and  #
+# proprietary to MediaTek Inc. Without the prior written permission of        #
+# MediaTek Inc., any reproduction, modification, use or disclosure of         #
+# MediaTek Software, and information contained herein, in whole or in part,   #
+# shall be strictly prohibited.                                               #
+# MediaTek Inc. Copyright (C) 2010. All rights reserved.                      #
+#                                                                             #
+#   BY OPENING THIS FILE, RECEIVER HEREBY UNEQUIVOCALLY ACKNOWLEDGES AND      #
+# AGREES TO THE FOLLOWING:                                                    #
+#                                                                             #
+#   1)Any and all intellectual property rights (including without             #
+# limitation, patent, copyright, and trade secrets) in and to this            #
+# Software/firmware and related documentation ("MediaTek Software") shall     #
+# remain the exclusive property of MediaTek Inc. Any and all intellectual     #
+# property rights (including without limitation, patent, copyright, and       #
+# trade secrets) in and to any modifications and derivatives to MediaTek      #
+# Software, whoever made, shall also remain the exclusive property of         #
+# MediaTek Inc.  Nothing herein shall be construed as any transfer of any     #
+# title to any intellectual property right in MediaTek Software to Receiver.  #
+#                                                                             #
+#   2)This MediaTek Software Receiver received from MediaTek Inc. and/or its  #
+# representatives is provided to Receiver on an "AS IS" basis only.           #
+# MediaTek Inc. expressly disclaims all warranties, expressed or implied,     #
+# including but not limited to any implied warranties of merchantability,     #
+# non-infringement and fitness for a particular purpose and any warranties    #
+# arising out of course of performance, course of dealing or usage of trade.  #
+# MediaTek Inc. does not provide any warranty whatsoever with respect to the  #
+# software of any third party which may be used by, incorporated in, or       #
+# supplied with the MediaTek Software, and Receiver agrees to look only to    #
+# such third parties for any warranty claim relating thereto.  Receiver       #
+# expressly acknowledges that it is Receiver's sole responsibility to obtain  #
+# from any third party all proper licenses contained in or delivered with     #
+# MediaTek Software.  MediaTek is not responsible for any MediaTek Software   #
+# releases made to Receiver's specifications or to conform to a particular    #
+# standard or open forum.                                                     #
+#                                                                             #
+#   3)Receiver further acknowledge that Receiver may, either presently        #
+# and/or in the future, instruct MediaTek Inc. to assist it in the            #
+# development and the implementation, in accordance with Receiver's designs,  #
+# of certain softwares relating to Receiver's product(s) (the "Services").    #
+# Except as may be otherwise agreed to in writing, no warranties of any       #
+# kind, whether express or implied, are given by MediaTek Inc. with respect   #
+# to the Services provided, and the Services are provided on an "AS IS"       #
+# basis. Receiver further acknowledges that the Services may contain errors   #
+# that testing is important and it is solely responsible for fully testing    #
+# the Services and/or derivatives thereof before they are used, sublicensed   #
+# or distributed. Should there be any third party action brought against      #
+# MediaTek Inc. arising out of or relating to the Services, Receiver agree    #
+# to fully indemnify and hold MediaTek Inc. harmless.  If the parties         #
+# mutually agree to enter into or continue a business relationship or other   #
+# arrangement, the terms and conditions set forth herein shall remain         #
+# effective and, unless explicitly stated otherwise, shall prevail in the     #
+# event of a conflict in the terms in any agreements entered into between     #
+# the parties.                                                                #
+#                                                                             #
+#   4)Receiver's sole and exclusive remedy and MediaTek Inc.'s entire and     #
+# cumulative liability with respect to MediaTek Software released hereunder   #
+# will be, at MediaTek Inc.'s sole discretion, to replace or revise the       #
+# MediaTek Software at issue.                                                 #
+#                                                                             #
+#   5)The transaction contemplated hereunder shall be construed in            #
+# accordance with the laws of Singapore, excluding its conflict of laws       #
+# principles.  Any disputes, controversies or claims arising thereof and      #
+# related thereto shall be settled via arbitration in Singapore, under the    #
+# then current rules of the International Chamber of Commerce (ICC).  The     #
+# arbitration shall be conducted in English. The awards of the arbitration    #
+# shall be final and binding upon both parties and shall be entered and       #
+# enforceable in any court of competent jurisdiction.                         #
+###############################################################################
+
+# some variables are global
+export TOPDIR
+export SRCDIR
+export OBJDIR
+export LIBDIR
+export BINDIR
+export LINTDIR
+export BANK_NO
+export FLASH_SZ
+export G_INCPATH
+export CUST_INCPATH
+export LINT_PROCESS
+
+include $(TOPDIR)\makefile.inc
+include $(TOPDIR)\makefile.cus
+###########################
+# DEFINE COMPILER OPTIONS #
+###########################
+A51 := $(MT8205_C51PATH)/BIN/A51
+C51 := $(MT8205_C51PATH)/BIN/C51
+BL51 := $(MT8205_C51PATH)/BIN/BL51
+OH51 := $(MT8205_C51PATH)/BIN/OH51
+LIB51 := $(MT8205_C51PATH)/BIN/LIB51
+A51FLAGS := DB NOPR
+C51FLAGS := DB OE NOPR WL\(2\) OPTIMIZE\(8,SIZE\) NOAM LARGE NOAREGS
+BL51FLAGS := DS DL NOSY NOLI RS\(256\) OL
+
+# define c51 include directory
+ALL_INCPATH := $(CUST_INCPATH) $(G_INCPATH) $(INCPATH)
+C51_INCPATH := $(strip ${addsuffix \;,$(ALL_INCPATH)})
+C51FLAGS := $(C51FLAGS) INCDIR\($(C51_INCPATH)
+
+# lint include directory
+LINT_INCPATH := $(addprefix -i,$(ALL_INCPATH))
+LINT_INCPATH += -i$(MT8205_C51PATH)/inc
+LINT_INCPATH := $(subst \,/,$(LINT_INCPATH))
+
+###########################
+# DEFINE RELATED TOOLS    #
+###########################
+SHELL := $(BINDIR)/sh.exe
+RM := $(BINDIR)/rm.exe -f
+MKDIR := $(BINDIR)/mkdir.exe -p
+RMDIR := $(BINDIR)/rmdir.exe
+MAKEDEP := $(BINDIR)/makedepend.exe
+TOUCH := $(BINDIR)/touch.exe
+
+# define depend file 
+DEPFILE := .depend
+
+# include depend file
+ifeq ($(DEPFILE),$(wildcard $(DEPFILE)))
+include $(DEPFILE)
+endif
+
+ifndef OBJ
+OBJ := $(patsubst %.c, %.obj, $(filter %.c %.a51 %.c51, $(SRC)))
+OBJ := $(patsubst %.a51, %.obj, $(OBJ))
+OBJ := $(patsubst %.c51, %.obj, $(OBJ))
+endif
+
+ifndef EXTRA_OBJ 
+ifdef EXTRA_OBJ_DIR
+EXTRA_OBJ = $(patsubst %.c,%.obj,$(wildcard $(addsuffix /*.c, $(addprefix $(CURDIR)/, $(EXTRA_OBJ_DIR)))))
+EXTRA_OBJ := $(notdir $(EXTRA_OBJ))
+EXTRA_OBJ := $(addprefix $(OBJDIR)/, $(EXTRA_OBJ))
+endif
+endif
+
+ifndef ALL_OBJ
+ALL_OBJ = $(OBJ) $(EXTRA_OBJ)
+endif
+
+LOB := $(addprefix $(LINTDIR)/m_lob/,$(addsuffix .lob, $(basename $(OBJ))))
+
+# define output directory
+OUTDIR := $(OBJDIR)
+
+# let temporary objects in other directory
+OBJ := $(addprefix $(OUTDIR)/,$(OBJ))
+
+ifndef LNT
+LNT := $(patsubst %.c, %.lnt, $(filter %.c, $(SRC)))
+LNT := $(addprefix $(OUTDIR)/,$(LNT))
+endif
+
+
+# define makedepend search directory
+MAKEDEP_INCPATH := $(addprefix -I,$(ALL_INCPATH))
+
+#.PHONY : clean all depend subdirs $(SUBDIRS)
+.PHONY : clean all depend
+
+#################################################################
+# Customize rule: ex. want to create libname by src in different directory
+#################################################################
+
+
+#################################################################
+# Target
+#################################################################
+#all:: $(OBJ) $(SUBDIRS) $(LIBDIR)/$(LIBNAME)
+all:: $(OUTDIR) $(MYOBJS) $(ALLLIBS)
+
+include $(TOPDIR)\makefile.rule
+
+#lint:: $(LNT) $(SUBDIRS)
+
+#depend::
+#	@for i in $(SUBDIRS); \
+#	do \
+#	  if [ -d $$i ]; then \
+#	    if [ -e $$i/Makefile ]; then \
+#	      echo making depend in "$(CURDIR)/$$i..."; \
+#	      $(MAKE) -C $$i depend; \
+#	    fi \
+#	  fi \
+#	done
+#ifneq (,$(filter %.c %.c51,$(SRC)))
+#	$(MAKEDEP) -Y$(MT8205_C51PATH)/INC -o.obj -f- -p$(OUTDIR)/ $(MAKEDEP_INCPATH) $(filter %.c %.c51,$(SRC)) > $(DEPFILE)
+#endif
+
+clean::
+	$(RM) $(MYOBJS) $(ALLLIBS)
+#	@for i in $(MYOBJS); \
+#	do \
+#	  $(RM) $$i; \
+#	done
+#	@for i in $(ALLLIBS); \
+#	do \
+#	  $(RM) $$i; \
+#	done
+#clean::
+#	@for i in $(SUBDIRS); \
+#        do \
+#          if [ -d $$i ]; then \
+#            if [ -e $$i/Makefile ]; then \
+#              echo making clean "in $(CURDIR)/$$i..."; \
+#              $(MAKE) -i -C $$i $@; \
+#            fi \
+#          fi \
+#        done
+#ifneq ($(findstring $(SRCDIR),$(CURDIR)),)
+#	$(RM) $(OBJ) $(CURDIR)/*.lst $(CURDIR)/*.src
+#	$(RMDIR) $(OUTDIR)
+#	$(RM) $(LOB)
+#	$(RM) *.lnt
+#endif   
+#ifneq (,$(LIBNAME))	
+#	$(RM) $(LIBDIR)/$(LIBNAME)
+#endif
+        
+
+#$(SUBDIRS): NONE
+#ifdef LINT_PROCESS
+#	@if [ -d $@ ]; then \
+#          if [ -e $@/Makefile ]; then \
+#	    echo $(MAKE) -C $@ lint; \
+#            $(MAKE) -C $@ cobjdir; \
+#	    $(MAKE) -C $@ lint; \
+#          fi \
+#        fi
+#else
+#	@if [ -d $@ ]; then \
+#          if [ -e $@/Makefile ]; then \
+#            echo $(MAKE) -C $@ all; \
+#            $(MAKE) -C $@ cobjdir; \
+#            $(MAKE) -C $@ all; \
+#          fi \
+#        fi
+#endif
+
+#$(LIBDIR)/$(LIBNAME): $(OBJ) $(SUBDIRS) NONE
+#ifeq (.lib,$(suffix $(LIBNAME)))
+#	@if [ -e $(LIBDIR)/$(LIBNAME) ]; then \
+#  	  $(RM) $(LIBDIR)/$(LIBNAME); \
+#	fi
+#	@echo "$(LIB51) create $(LIBNAME)" >> $(LIBDIR)/create_lib.bat
+#	@for i in $(notdir $(ALL_OBJ)); \
+#        do \
+#          echo "$(LIB51) add ../obj/$$i to $(LIBNAME)" >> $(LIBDIR)/create_lib.bat; \
+#          echo "$(LIBNAME)  $$i" >> $(LIBDIR)/lib.log; \
+#        done
+#endif
+
+#cobjdir: NONE
+#ifneq ( ,$(OBJ))
+#	-$(MKDIR) $(OUTDIR)
+#endif	
+
+NONE:
+
+
+$(OUTDIR):
+	$(MKDIR) $@
+
+#$(OUTDIR)/%.obj: %.c
+#	$(C51) $< $(C51FLAGS) OBJECT\($@\)
+
+#$(OUTDIR)/%.lnt: %.c NONE
+#	-lint-nt -i$(LINTDIR) std.lnt -u -zero -oo[$(LINTDIR)/m_lob/$*.lob] -v +fpm $(LINT_INCPATH) $< >$*.lnt
+
+#$(OUTDIR)/%.obj: %.a51
+#	$(A51) $< $(A51FLAGS) OBJECT\($@\)
+	
+#$(OUTDIR)/%.obj: %.c51
+#	$(C51) $< $(C51FLAGS) SRC\($(patsubst %.obj,%.src,$@)\) OT\(6\)
+#	$(A51) $(patsubst %.obj,%.src,$@) $(A51FLAGS) OBJECT\($@\)

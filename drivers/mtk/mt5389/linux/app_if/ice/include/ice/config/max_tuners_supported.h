@@ -1,0 +1,3 @@
+#ifndef MAX_TUNERS_SUPPORTED
+    #define MAX_TUNERS_SUPPORTED 2
+#endif

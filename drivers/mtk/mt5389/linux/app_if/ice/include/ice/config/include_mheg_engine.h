@@ -1,0 +1,3 @@
+#ifndef INCLUDE_MHEG_ENGINE
+    #define INCLUDE_MHEG_ENGINE 1
+#endif

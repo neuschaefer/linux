@@ -3,7 +3,16 @@
 # ==========================================================================
 
 src := $(obj)
-
+ifeq "$(BUILTIN)" "true"
+src := $(if $(findstring drivers/mtk,$(src)),$(KERNEL_DRV_ROOT)/$(src),$(src))
+endif
+ifdef ORIG_SRC
+src := $(ORIG_SRC)
+orig_basename = $(notdir $(src))
+#obj_module = $(word 2, $(subst /$(orig_basename)/,/$(orig_basename)/ , $(obj)))
+obj_module = $(word 2, $(shell sed 's,/$(orig_basename)/,/$(orig_basename)/ ,' <<< $(obj)))
+src := $(ORIG_SRC)/$(obj_module)
+endif
 PHONY := __build
 __build:
 
@@ -205,6 +214,7 @@ cmd_modversions =							\
 	fi;
 endif
 
+
 ifdef CONFIG_FTRACE_MCOUNT_RECORD
 cmd_record_mcount = set -e ; perl $(srctree)/scripts/recordmcount.pl "$(ARCH)" \
 	"$(if $(CONFIG_CPU_BIG_ENDIAN),big,little)" \
@@ -213,7 +223,37 @@ cmd_record_mcount = set -e ; perl $(srctree)/scripts/recordmcount.pl "$(ARCH)" \
 	"$(if $(part-of-module),1,0)" "$(@)";
 endif
 
+ifndef LIB_CONTENT
+ifdef BUILD_MOUDLE_TYPE
+	LIB_CONTENT= $(BUILD_MOUDLE_TYPE).content
+else
+	LIB_CONTENT= lib.content
+endif
+endif
+
+ifeq ($(ODB),true)
 define rule_cc_o_c
+	lockfile -1 -l 10 $(LIB_CONTENT).lock;                \
+	echo  $@ >> $(LIB_CONTENT);                           \
+	rm -rf $(LIB_CONTENT).lock;                           \
+	$(call echo-cmd,checksrc) $(cmd_checksrc)			  \
+	$(call echo-cmd,cc_o_c) $(cmd_cc_o_c);				  \
+	touch $@; \
+	$(cmd_modversions)						  \
+	$(call echo-cmd,record_mcount)					  \
+	$(cmd_record_mcount)						  \
+	if [ -e $< ]  ; then \
+		scripts/basic/fixdep $(depfile) $@ '$(call make-cmd,cc_o_c)' >    \
+		                                              $(dot-target).tmp;  \
+		rm -f $(depfile);						  \
+		mv -f $(dot-target).tmp $(dot-target).cmd	 ; \
+	fi
+endef
+else
+define rule_cc_o_c
+	lockfile -1 -l 10 $(LIB_CONTENT).lock;                \
+	echo  $@ >> $(LIB_CONTENT);                           \
+	rm -rf $(LIB_CONTENT).lock;                           \
 	$(call echo-cmd,checksrc) $(cmd_checksrc)			  \
 	$(call echo-cmd,cc_o_c) $(cmd_cc_o_c);				  \
 	$(cmd_modversions)						  \
@@ -223,6 +263,15 @@ define rule_cc_o_c
 	                                              $(dot-target).tmp;  \
 	rm -f $(depfile);						  \
 	mv -f $(dot-target).tmp $(dot-target).cmd
+endef
+endif
+
+define rule_as_o_S
+	lockfile -1 -l 10 $(LIB_CONTENT).lock;                \
+	echo  $@ >> $(LIB_CONTENT);                           \
+	rm -rf $(LIB_CONTENT).lock;                           \
+	$(call echo-cmd,checksrc) $(cmd_checksrc)             \
+	$(call echo-cmd,as_o_S) $(cmd_as_o_S)
 endef
 
 # Built-in and composite module parts
@@ -264,6 +313,8 @@ cmd_as_o_S       = $(CC) $(a_flags) -c -o $@ $<
 
 $(obj)/%.o: $(src)/%.S FORCE
 	$(call if_changed_dep,as_o_S)
+	$(call if_changed_rule,as_o_S)
+
 
 targets += $(real-objs-y) $(real-objs-m) $(lib-y)
 targets += $(extra-y) $(MAKECMDGOALS) $(always)

@@ -1,0 +1,3 @@
+#ifndef MAXIMUM_SECTION_FILTERS
+    #define MAXIMUM_SECTION_FILTERS 32
+#endif

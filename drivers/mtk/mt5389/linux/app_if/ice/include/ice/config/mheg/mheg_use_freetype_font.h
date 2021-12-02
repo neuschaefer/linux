@@ -1,0 +1,3 @@
+#ifndef MHEG_USE_FREETYPE_FONT
+    #define MHEG_USE_FREETYPE_FONT 1
+#endif

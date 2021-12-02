@@ -53,8 +53,9 @@ extern int nand_unlock(struct mtd_info *mtd, loff_t ofs, uint64_t len);
  * is supported now. If you add a chip with bigger oobsize/page
  * adjust this accordingly.
  */
-#define NAND_MAX_OOBSIZE	256
-#define NAND_MAX_PAGESIZE	4096
+#define NAND_MAX_OOBSIZE	(28*16)
+#define NAND_MAX_PAGESIZE	(512*16)
+#define NAND_NEW_MTD_READ       (0)
 
 /*
  * Constants for hardware specific CLE/ALE/NCE function
@@ -200,8 +201,10 @@ typedef enum {
 #define NAND_HAS_CACHEPROG(chip) ((chip->options & NAND_CACHEPRG))
 #define NAND_HAS_COPYBACK(chip) ((chip->options & NAND_COPYBACK))
 /* Large page NAND with SOFT_ECC should support subpage reads */
-#define NAND_SUBPAGE_READ(chip) ((chip->ecc.mode == NAND_ECC_SOFT) \
-					&& (chip->page_shift > 9))
+/*#define NAND_SUBPAGE_READ(chip) ((chip->ecc.mode == NAND_ECC_SOFT) \
+					&& (chip->page_shift > 9))*/
+/* Disable subpage read  mtk40109 2011-11-21 */
+#define NAND_SUBPAGE_READ(chip) (0)
 
 /* Mask to zero out the chip options, which come from the id table */
 #define NAND_CHIPOPTIONS_MSK	(0x0000ffff & ~NAND_NO_AUTOINCR)
@@ -446,7 +449,7 @@ struct nand_chip {
 #define NAND_MFR_HYNIX		0xad
 #define NAND_MFR_MICRON		0x2c
 #define NAND_MFR_AMD		0x01
-
+#define NAND_MFR_MACRONIX   0xc2
 /**
  * struct nand_flash_dev - NAND Flash Device ID Structure
  * @name:	Identify the device type
@@ -467,7 +470,18 @@ struct nand_flash_dev {
 	unsigned long erasesize;
 	unsigned long options;
 };
-
+struct nand_flash_dev_ext{
+	char *name;
+  int maf_id;
+  int dev_id;
+	int id3;
+  int id4;
+	unsigned long pagesize;
+	unsigned long chipsize;
+	unsigned long erasesize;
+	unsigned long oobsize;    
+  int buswidth;
+};
 /**
  * struct nand_manufacturers - NAND Flash Manufacturer ID Structure
  * @name:	Manufacturer name
@@ -480,7 +494,7 @@ struct nand_manufacturers {
 
 extern struct nand_flash_dev nand_flash_ids[];
 extern struct nand_manufacturers nand_manuf_ids[];
-
+extern struct nand_flash_dev_ext nand_flash_ids_ext[];
 extern int nand_scan_bbt(struct mtd_info *mtd, struct nand_bbt_descr *bd);
 extern int nand_update_bbt(struct mtd_info *mtd, loff_t offs);
 extern int nand_default_bbt(struct mtd_info *mtd);

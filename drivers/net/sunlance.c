@@ -1,4 +1,4 @@
-/* $Id: sunlance.c,v 1.112 2002/01/15 06:48:55 davem Exp $
+/* $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/net/sunlance.c#1 $
  * lance.c: Linux/Sparc/Lance driver
  *
  *	Written 1995, 1996 by Miguel de Icaza

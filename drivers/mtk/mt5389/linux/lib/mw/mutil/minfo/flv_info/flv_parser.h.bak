@@ -1,0 +1,259 @@
+/*----------------------------------------------------------------------------*
+ * No Warranty                                                                *
+ * Except as may be otherwise agreed to in writing, no warranties of any      *
+ * kind, whether express or implied, are given by MTK with respect to any MTK *
+ * Deliverables or any use thereof, and MTK Deliverables are provided on an   *
+ * "AS IS" basis.  MTK hereby expressly disclaims all such warranties,        *
+ * including any implied warranties of merchantability, non-infringement and  *
+ * fitness for a particular purpose and any warranties arising out of course  *
+ * of performance, course of dealing or usage of trade.  Parties further      *
+ * acknowledge that Company may, either presently and/or in the future,       *
+ * instruct MTK to assist it in the development and the implementation, in    *
+ * accordance with Company's designs, of certain softwares relating to        *
+ * Company's product(s) (the "Services").  Except as may be otherwise agreed  *
+ * to in writing, no warranties of any kind, whether express or implied, are  *
+ * given by MTK with respect to the Services provided, and the Services are   *
+ * provided on an "AS IS" basis.  Company further acknowledges that the       *
+ * Services may contain errors, that testing is important and Company is      *
+ * solely responsible for fully testing the Services and/or derivatives       *
+ * thereof before they are used, sublicensed or distributed.  Should there be *
+ * any third party action brought against MTK, arising out of or relating to  *
+ * the Services, Company agree to fully indemnify and hold MTK harmless.      *
+ * If the parties mutually agree to enter into or continue a business         *
+ * relationship or other arrangement, the terms and conditions set forth      *
+ * hereunder shall remain effective and, unless explicitly stated otherwise,  *
+ * shall prevail in the event of a conflict in the terms in any agreements    *
+ * entered into between the parties.                                          *
+ *---------------------------------------------------------------------------*/
+/*-----------------------------------------------------------------------------
+ * Copyright (c) 2004, CrystalMedia Technology, Inc.
+ * All rights reserved.
+ * 
+ * Unauthorized use, practice, perform, copy, distribution, reproduction,
+ * or disclosure of this information in whole or in part is prohibited.  
+ *-----------------------------------------------------------------------------
+ * $RCSfile: flv_parser.h,v $
+ * $Revision: #15 $ 1.0
+ * $Date: 2009/07/01 $ 2004/11/26
+ * $Author: guanghui.wang $
+ * $CCRevision: /main/DTV_X_HQ_int/2 $
+ * $SWAuthor: Asa Wang $
+ * $MD5HEX: 0916b8010fb2d9ebf453b3d4efdbc5e9 $ Asa
+ *
+ * Description: 
+ *         This file exports public API of the flv parser function
+ *---------------------------------------------------------------------------*/
+
+#ifndef _FLV_PARSER_H_
+#define _FLV_PARSER_H_
+
+/*-----------------------------------------------------------------------------
+                    include files
+ ----------------------------------------------------------------------------*/
+#ifndef __KERNEL__
+
+#include "inc/u_common.h"
+#include "handle/u_handle.h"
+#include "mutil/minfo/minfo.h"
+#include "mutil/minfo/minfo_dbg.h"
+#include "mutil/mfmtrecg/u_mfmtrecg.h"
+#include "flv_menu_parser.h"
+#else
+
+#include "u_common.h"
+#include "u_handle.h"
+#include "../minfo.h"
+#include "../minfo_dbg.h"
+#include "../../mfmtrecg/u_mfmtrecg.h"
+#include "flv_menu_parser.h"
+
+#endif
+/*-----------------------------------------------------------------------------
+                    macros, defines, typedefs, enums
+----------------------------------------------------------------------------*/
+
+#define MAX_NS_FLV_AUD 8
+#define MAX_NS_FLV_VID 1
+#define MAX_NS_FLV_SP  8
+
+#define FLV_HEADER_BUF_LENGTH     102400
+
+typedef enum
+{
+    MINFO_FLV_PARSER_STATE_IDLE,
+
+#ifdef MM_FLV_DIVX6
+    /* The parser state for searching menu */
+    MINFO_FLV_PARSER_STATE_DMC_SHOW_MENU,
+    
+    /* The parser state for parsing menu */
+    MINFO_FLV_PARSER_STATE_DMC_PARSE_MENU,
+    
+    /* The parser state for getting sub-picture data */
+    MINFO_FLV_PARSER_STATE_DMC_GET_SP,
+    
+    /* The parser state for getting audio/video/sub-picture data */
+    MINFO_FLV_PARSER_STATE_DMC_GET_DATA,
+#endif /* MM_FLV_DIVX6 */
+
+    MINFO_FLV_PARSER_STATE_CHECK_CHUNK_HEADER,    
+    MINFO_FLV_PARSER_STATE_CHECK_CHUNK_TYPE,    
+    MINFO_FLV_PARSER_STATE_LOAD_INF,
+    MINFO_FLV_PARSER_STATE_LOAD_INDEX_INF
+}MINFO_FLV_PARSER_STATE_T;
+
+typedef enum 
+{
+    MINFO_FLV_CHUNK_ID_NONE,
+    MINFO_FLV_CHUNK_ID_RIFF,
+    MINFO_FLV_CHUNK_ID_LIST,
+    MINFO_FLV_CHUNK_ID_FLV,
+    MINFO_FLV_CHUNK_ID_HDRL,
+    MINFO_FLV_CHUNK_ID_FLVH,
+    MINFO_FLV_CHUNK_ID_STRL,
+    MINFO_FLV_CHUNK_ID_STRH,
+    MINFO_FLV_CHUNK_ID_STRF,
+    MINFO_FLV_CHUNK_ID_STRD,
+    MINFO_FLV_CHUNK_ID_AUDS,
+    MINFO_FLV_CHUNK_ID_MIDS,
+    MINFO_FLV_CHUNK_ID_VIDS,
+    MINFO_FLV_CHUNK_ID_TXTS,
+    MINFO_FLV_CHUNK_ID_JUNK,
+    MINFO_FLV_CHUNK_ID_RES1,
+    MINFO_FLV_CHUNK_ID_PRMI,
+    MINFO_FLV_CHUNK_ID_MTDA,
+    MINFO_FLV_CHUNK_ID_MOV,
+    MINFO_FLV_CHUNK_ID_IDX1,
+    MINFO_FLV_CHUNK_ID_INDX,
+    MINFO_FLV_CHUNK_ID_STRN,
+    MINFO_FLV_CHUNK_ID_INFO,
+    MINFO_FLV_CHUNK_ID_IART,
+    MINFO_FLV_CHUNK_ID_ICOP,
+    MINFO_FLV_CHUNK_ID_IGNR,
+    MINFO_FLV_CHUNK_ID_INAM,
+   /* MINFO_FLV_CHUNK_ID_ODML,
+    MINFO_FLV_CHUNK_ID_IDIT,
+    MINFO_FLV_CHUNK_ID_DMLH,*/
+#ifdef MM_FLV_DIVX6
+    MINFO_FLV_CHUNK_ID_MENU,
+    MINFO_FLV_CHUNK_ID_MRIF,
+    MINFO_FLV_CHUNK_ID_1IDX,
+#endif    
+    MINFO_FLV_CHUNK_ID_FMT,    /*add for wave support*/
+    MINFO_FLV_CHUNK_ID_DATA,  /*add for wave support*/
+    MINFO_FLV_CHUNK_ID_WAVE, /*add for wave support*/
+    MINFO_FLV_CHUNK_ID_FACT,  /*add for wave support*/
+    MINFO_FLV_CHUNK_ID_MAX
+}MINFO_FLV_CHUNK_ID_ENUM_T;
+
+typedef struct _MINFO_FLV_CHUNK_ID_T
+{
+    CHAR s_four_cc[5];
+    MINFO_FLV_CHUNK_ID_ENUM_T e_chunk_id;
+}MINFO_FLV_CHUNK_ID_T;
+
+typedef enum
+{
+    MINFO_FLV_STRM_TYPE_VID,
+    MINFO_FLV_STRM_TYPE_AUD,
+    MINFO_FLV_STRM_TYPE_SP,
+    MINFO_FLV_STRM_TYPE_MAX
+}MINFO_FLV_STRM_TYPE_ENUM_T;
+
+
+typedef struct _MINFO_FLV_CHUNK_T
+{
+    MINFO_FLV_CHUNK_ID_ENUM_T   e_chunk_id;
+    MINFO_FLV_STRM_TYPE_ENUM_T  e_strm_type;
+    UINT32                      ui4_offset;
+    UINT32                      ui4_size; 
+    struct _MINFO_FLV_CHUNK_T*  pt_first_sub_chunk;
+    struct _MINFO_FLV_CHUNK_T*  pt_par_chunk;
+    struct _MINFO_FLV_CHUNK_T*  pt_next_chunk;
+}MINFO_FLV_CHUNK_T;    
+
+
+
+typedef struct _MINFO_FLV_STRM_INF_T 
+{
+    MINFO_FLV_VIDEO_STM_ATRBT_T t_vid_inf_strh;
+    MINFO_FLV_VIDEO_STM_ATRBT_T t_vid_strm_inf[MAX_NS_FLV_VID];
+    MINFO_FLV_AUDIO_STM_ATRBT_T t_aud_strm_inf[MAX_NS_FLV_AUD];
+    MINFO_FLV_DIVX_SUBTITLE_STM_ATRBT_T t_sp_strm_inf[MAX_NS_FLV_SP];
+    UINT8 ui1_aud_strm_id_list[MAX_NS_FLV_AUD];
+    UINT8 ui1_vid_strm_id_list[MAX_NS_FLV_VID];
+    UINT8 ui1_sp_strm_id_list[MAX_NS_FLV_SP];
+    UINT8 ui1_audio_strm_num;
+    UINT8 ui1_video_strm_num;
+    UINT8 ui1_sp_strm_num;
+}MINFO_FLV_STRM_INF_T;
+
+
+typedef struct _MINFO_FLV_RIFF_INF_T
+{
+    /*store current parsed chunk header*/
+    UINT8* pui1_header_buf;
+    /*header buffer size*/
+    UINT32 ui4_buf_length;
+    /* The pointer to the chunk list */
+    MINFO_FLV_CHUNK_T*  pt_head_chunk;
+    UINT32 ui4_malloc_count;
+
+    /* Divx Menu */
+    /* store parsed menu data */
+    UINT8*                      pui1_menu_buf;
+    /* pointer of menu object tree */
+    DIVX_MENU_OBJECT_T*         pt_menu_object;
+    /* buffer to store menu object tree data */
+    DIVX_MENU_OBJ_BUF_LIST_T*   pt_menu_obj_buf_list;
+
+    /* Base offset for RIFF focc, if it is Avi1.0 file, the value is zero */
+    UINT64 ui8_base_offset;
+    /* Riff size, if file is Avi1.0, the value is file size */
+    UINT64 ui8_riff_size;
+    /* The parser state, it is only useful in build riff tree */
+    MINFO_FLV_PARSER_STATE_T e_parser_state;
+    /* Current parser offset, file base */
+    UINT32 ui4_cur_parser_offset;
+    /*index tbl file offset , provide for index builder*/
+    /*Start offset include idxl 4cc code*/ 
+    UINT32 ui4_indxtbl_offset;
+    /*  idx table size */
+    /*size doesn't include idxl 4cc code*/
+    UINT32 ui4_indxtbl_sz;
+
+    /* Stream information */
+    MINFO_FLV_STRM_INF_T t_strm_inf;
+    /* video stream id (fourCC) */
+    UINT32 ui4_video_strm_id;
+    /* meta data infomation */
+    MINFO_TYPE_META_DATA_T t_meta_data_info;
+    /* MPC2 struct */
+    /*MPCCmdConfigCFAParm m_rMPCCmdConfigCfaParm;*/
+    /* MPC2 struct */
+    /*CfaAviConfigInfo m_rAviConfigInf;*/
+    
+    UINT8 ui1_cur_strm_num;
+    /* File length base on frame */
+    UINT64 ui8_duration;
+    /* Movi offset base ,start from 4cc code */
+    UINT32 ui4_mov_start_base;
+    /* Movi chunk size, include 4cc code  */
+    UINT64 ui8_mov_sz;
+
+    /* File length base on PTS */
+    UINT32 ui4_total_pts;
+    /* If audio stream is not interleave with video stream, the value is FALSE */
+    BOOL b_is_bad_interleaved;
+    BOOL b_is_menu_riff;    
+
+}MINFO_FLV_RIFF_INF_T;
+
+
+/*-----------------------------------------------------------------------------
+                    functions declarations
+ ----------------------------------------------------------------------------*/
+extern INT32 i4_flv_minfo_chunk_parse (MINFO_OBJ_T*    pt_minfo_obj);
+
+#endif /* _FLV_PARSER_H_ */
+

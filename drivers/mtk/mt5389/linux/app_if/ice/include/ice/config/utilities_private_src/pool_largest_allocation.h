@@ -1,0 +1,3 @@
+#ifndef POOL_LARGEST_ALLOCATION
+    #define POOL_LARGEST_ALLOCATION 64
+#endif

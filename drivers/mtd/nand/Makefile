@@ -47,4 +47,29 @@ obj-$(CONFIG_MTD_NAND_BCM_UMI)		+= bcm_umi_nand.o nand_bcm_umi.o
 obj-$(CONFIG_MTD_NAND_MPC5121_NFC)	+= mpc5121_nfc.o
 obj-$(CONFIG_MTD_NAND_RICOH)		+= r852.o
 
+ifeq ($(CONFIG_MTD_NAND_MT5365),y)
+CPPFLAGS += -DCC_NAND_MT5365
+obj-$(CONFIG_MTD_NAND_MT5365)		+= mt5396nand_hw.o
+endif
+
+ifeq ($(CONFIG_MTD_NAND_MT5395),y)
+CPPFLAGS += -DCC_NAND_MT5395
+obj-$(CONFIG_MTD_NAND_MT5395)		+= mt5396nand_hw.o
+endif
+
+ifeq ($(CONFIG_MTD_NAND_MT5368),y)
+CPPFLAGS += -DCC_NAND_MT5368
+obj-$(CONFIG_MTD_NAND_MT5368)		+= mt5396nand_hw.o
+endif
+
+ifeq ($(CONFIG_MTD_NAND_MT5389),y)
+CPPFLAGS += -DCC_NAND_MT5389
+obj-$(CONFIG_MTD_NAND_MT5389)		+= mt5396nand_hw.o
+endif
+
+ifeq ($(CONFIG_MTD_NAND_MT5396),y)
+CPPFLAGS += -DCC_NAND_MT5396
+obj-$(CONFIG_MTD_NAND_MT5396)		+= mt5396nand_hw.o
+endif
+
 nand-objs := nand_base.o nand_bbt.o

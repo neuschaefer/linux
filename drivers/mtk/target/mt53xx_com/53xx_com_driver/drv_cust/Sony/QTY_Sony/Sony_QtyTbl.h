@@ -1,0 +1,943 @@
+/*----------------------------------------------------------------------------*
+ * Copyright Statement:                                                       *
+ *                                                                            *
+ *   This software/firmware and related documentation ("MediaTek Software")   *
+ * are protected under international and related jurisdictions'copyright laws *
+ * as unpublished works. The information contained herein is confidential and *
+ * proprietary to MediaTek Inc. Without the prior written permission of       *
+ * MediaTek Inc., any reproduction, modification, use or disclosure of        *
+ * MediaTek Software, and information contained herein, in whole or in part,  *
+ * shall be strictly prohibited.                                              *
+ * MediaTek Inc. Copyright (C) 2010. All rights reserved.                     *
+ *                                                                            *
+ *   BY OPENING THIS FILE, RECEIVER HEREBY UNEQUIVOCALLY ACKNOWLEDGES AND     *
+ * AGREES TO THE FOLLOWING:                                                   *
+ *                                                                            *
+ *   1)Any and all intellectual property rights (including without            *
+ * limitation, patent, copyright, and trade secrets) in and to this           *
+ * Software/firmware and related documentation ("MediaTek Software") shall    *
+ * remain the exclusive property of MediaTek Inc. Any and all intellectual    *
+ * property rights (including without limitation, patent, copyright, and      *
+ * trade secrets) in and to any modifications and derivatives to MediaTek     *
+ * Software, whoever made, shall also remain the exclusive property of        *
+ * MediaTek Inc.  Nothing herein shall be construed as any transfer of any    *
+ * title to any intellectual property right in MediaTek Software to Receiver. *
+ *                                                                            *
+ *   2)This MediaTek Software Receiver received from MediaTek Inc. and/or its *
+ * representatives is provided to Receiver on an "AS IS" basis only.          *
+ * MediaTek Inc. expressly disclaims all warranties, expressed or implied,    *
+ * including but not limited to any implied warranties of merchantability,    *
+ * non-infringement and fitness for a particular purpose and any warranties   *
+ * arising out of course of performance, course of dealing or usage of trade. *
+ * MediaTek Inc. does not provide any warranty whatsoever with respect to the *
+ * software of any third party which may be used by, incorporated in, or      *
+ * supplied with the MediaTek Software, and Receiver agrees to look only to   *
+ * such third parties for any warranty claim relating thereto.  Receiver      *
+ * expressly acknowledges that it is Receiver's sole responsibility to obtain *
+ * from any third party all proper licenses contained in or delivered with    *
+ * MediaTek Software.  MediaTek is not responsible for any MediaTek Software  *
+ * releases made to Receiver's specifications or to conform to a particular   *
+ * standard or open forum.                                                    *
+ *                                                                            *
+ *   3)Receiver further acknowledge that Receiver may, either presently       *
+ * and/or in the future, instruct MediaTek Inc. to assist it in the           *
+ * development and the implementation, in accordance with Receiver's designs, *
+ * of certain softwares relating to Receiver's product(s) (the "Services").   *
+ * Except as may be otherwise agreed to in writing, no warranties of any      *
+ * kind, whether express or implied, are given by MediaTek Inc. with respect  *
+ * to the Services provided, and the Services are provided on an "AS IS"      *
+ * basis. Receiver further acknowledges that the Services may contain errors  *
+ * that testing is important and it is solely responsible for fully testing   *
+ * the Services and/or derivatives thereof before they are used, sublicensed  *
+ * or distributed. Should there be any third party action brought against     *
+ * MediaTek Inc. arising out of or relating to the Services, Receiver agree   *
+ * to fully indemnify and hold MediaTek Inc. harmless.  If the parties        *
+ * mutually agree to enter into or continue a business relationship or other  *
+ * arrangement, the terms and conditions set forth herein shall remain        *
+ * effective and, unless explicitly stated otherwise, shall prevail in the    *
+ * event of a conflict in the terms in any agreements entered into between    *
+ * the parties.                                                               *
+ *                                                                            *
+ *   4)Receiver's sole and exclusive remedy and MediaTek Inc.'s entire and    *
+ * cumulative liability with respect to MediaTek Software released hereunder  *
+ * will be, at MediaTek Inc.'s sole discretion, to replace or revise the      *
+ * MediaTek Software at issue.                                                *
+ *                                                                            *
+ *   5)The transaction contemplated hereunder shall be construed in           *
+ * accordance with the laws of Singapore, excluding its conflict of laws      *
+ * principles.  Any disputes, controversies or claims arising thereof and     *
+ * related thereto shall be settled via arbitration in Singapore, under the   *
+ * then current rules of the International Chamber of Commerce (ICC).  The    *
+ * arbitration shall be conducted in English. The awards of the arbitration   *
+ * shall be final and binding upon both parties and shall be entered and      *
+ * enforceable in any court of competent jurisdiction.                        *
+ *---------------------------------------------------------------------------*/
+/*-----------------------------------------------------------------------------
+ *
+ * $Author: dtvbm11 $
+ * $Date: 2012/04/27 $
+ * $RCSfile: mtk_QtyTbl.h,v $
+ * $Revision: #1 $
+ *
+ *---------------------------------------------------------------------------*/
+
+#ifndef _QTY_TBL_H_
+#define _QTY_TBL_H_
+
+#include "general.h"
+#include "typedef.h"
+
+////////////////////////////////////////////////////////////////////////////////
+
+UINT16 const CODE DEMO_MODE_BEFORE_SCALER_ARG[][DEMO_MODE_BEFORE_SCALER_END] =
+{
+//   TDC    HS1    NR    DI   MJC
+    {385,   358,  367,  366,  340},     // 480
+    {378,   358,  367,  366,    0},     // 576
+    {  0,   634,  648,    0,  702},     // 720
+    {  0,   714,  726,  974,    0}      // 1080
+};
+
+UINT16 const CODE DEMO_MODE_AFTER_SCALER_ARG[][DEMO_MODE_AFTER_SCALER_END] =
+{
+//  VS   MLC
+    {678,  678},  // 768
+    {964,  964}  // 1080
+};
+
+
+tagDFT_QTY aDefaultQtyTbl[QUALITY_MAX] =
+{
+    {0x20, 0xFF, 0x80, FROM_DFT}, // QUALITY_CONTRAST},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_CONTRAST_HIBYTE},
+    {0x00, 0xFF, 0x80, FROM_DFT}, // QUALITY_BRIGHTNESS},
+    {0x00, 0xFF, 0x80, FROM_DFT}, // QUALITY_SATURATION},
+    {0x00, 0x01, 0x00, FROM_DFT}, // QUALITY_SATURATION_HIBYTE},
+    {0x00, 0xFF, 0x80, FROM_DFT}, // QUALITY_HUE},
+    {0x80, 0x80, 0x80, FROM_DFT}, // QUALITY_BACKLIGHT},
+    {0x3D, 0x60, 0x40, FROM_DFT}, // QUALITY_SHARP1_LOW},
+    {0x3D, 0x60, 0x40, FROM_DFT}, // QUALITY_SHARP1_LOW_NEG},
+    {0x3D, 0x55, 0x43, FROM_DFT}, // QUALITY_SHARP1_MID},
+    {0x3D, 0x55, 0x43, FROM_DFT}, // QUALITY_SHARP1_MID_NEG},
+    {0x3D, 0x55, 0x45, FROM_DFT}, // QUALITY_SHARP1_HIGH},
+    {0x3D, 0x55, 0x45, FROM_DFT}, // QUALITY_SHARP1_HIGH_NEG},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_SHARP1_HIGH_BAND_SEL},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_SHARP1_LOW_BAND_SEL},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_SHARP1_LOW_CORING},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_SHARP1_MID_CORING},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_SHARP1_HIGH_CORING},
+    {0x00, 0x00, 0xFF, FROM_DFT}, // QUALITY_SHARP1_LOW_LIMIT_POS},
+    {0x00, 0x00, 0xFF, FROM_DFT}, // QUALITY_SHARP1_LOW_LIMIT_NEG},
+    {0x00, 0x00, 0xFF, FROM_DFT}, // QUALITY_SHARP1_MID_LIMIT_POS},
+    {0x00, 0x00, 0xFF, FROM_DFT}, // QUALITY_SHARP1_MID_LIMIT_NEG},
+    {0x00, 0x00, 0xFF, FROM_DFT}, // QUALITY_SHARP1_HIGH_LIMIT_POS},
+    {0x00, 0x00, 0xFF, FROM_DFT}, // QUALITY_SHARP1_HIGH_LIMIT_NEG},
+    {0x00, 0x00, 0x01, FROM_DFT}, // QUALITY_SHARP1_CLIP_POS_EN},
+    {0x00, 0x00, 0x01, FROM_DFT}, // QUALITY_SHARP1_CLIP_NEG_EN},
+    {0x00, 0x00, 0x01, FROM_DFT}, // QUALITY_SHARP1_GB_CLIP_POS_EN_L},
+    {0x00, 0x00, 0x01, FROM_DFT}, // QUALITY_SHARP1_GB_CLIP_NEG_EN_L},
+    {0x00, 0x00, 0x01, FROM_DFT}, // QUALITY_SHARP1_GB_CLIP_POS_EN_M},
+    {0x00, 0x00, 0x01, FROM_DFT}, // QUALITY_SHARP1_GB_CLIP_NEG_EN_M},
+    {0x00, 0x00, 0x01, FROM_DFT}, // QUALITY_SHARP1_GB_CLIP_POS_EN_H},
+    {0x00, 0x00, 0x01, FROM_DFT}, // QUALITY_SHARP1_GB_CLIP_NEG_EN_H},
+    {0x00, 0x00, 0x20, FROM_DFT}, // QUALITY_SHARP1_CLIP_FRONT_THR_LOW},
+    {0x00, 0x00, 0x20, FROM_DFT}, // QUALITY_SHARP1_CLIP_FRONT_THR_HIGH},
+    {0x00, 0x00, 0x20, FROM_DFT}, // QUALITY_SHARP1_CLIP_POS},
+    {0x00, 0x00, 0x20, FROM_DFT}, // QUALITY_SHARP1_CLIP_NEG},
+    {0x00, 0x00, 0x40, FROM_DFT}, // QUALITY_SHARP1_LC_LOW},
+    {0x00, 0x00, 0x40, FROM_DFT}, // QUALITY_SHARP1_LC_LOW_NEG},
+    {0x00, 0x00, 0x40, FROM_DFT}, // QUALITY_SHARP1_LC_MID},
+    {0x00, 0x00, 0x40, FROM_DFT}, // QUALITY_SHARP1_LC_MID_NEG},
+    {0x00, 0x00, 0x40, FROM_DFT}, // QUALITY_SHARP1_LC_HIGH},
+    {0x00, 0x00, 0x40, FROM_DFT}, // QUALITY_SHARP1_LC_HIGH_NEG},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_SHARP1_LC_LOW_CORING},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_SHARP1_LC_MID_CORING},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_SHARP1_LC_HIGH_CORING},
+    {0x00, 0x00, 0x10, FROM_DFT}, // QUALITY_SHARP1_LC_LOW_LIMIT_POS},
+    {0x00, 0x00, 0x10, FROM_DFT}, // QUALITY_SHARP1_LC_LOW_LIMIT_NEG},
+    {0x00, 0x00, 0x10, FROM_DFT}, // QUALITY_SHARP1_LC_MID_LIMIT_POS},
+    {0x00, 0x00, 0x10, FROM_DFT}, // QUALITY_SHARP1_LC_MID_LIMIT_NEG},
+    {0x00, 0x00, 0x10, FROM_DFT}, // QUALITY_SHARP1_LC_HIGH_LIMIT_POS},
+    {0x00, 0x00, 0x10, FROM_DFT}, // QUALITY_SHARP1_LC_HIGH_LIMIT_NEG},
+    {0x00, 0x00, 0x01, FROM_DFT}, // QUALITY_SHARP1_LC_CLIP_POS_EN},
+    {0x00, 0x00, 0x01, FROM_DFT}, // QUALITY_SHARP1_LC_CLIP_NEG_EN},
+    {0x00, 0x00, 0x03, FROM_DFT}, // QUALITY_SHARP1_LC_TABLE_SEL},
+    {0x00, 0x00, 0x04, FROM_DFT}, // QUALITY_SHARP1_LC_TABLE_GAIN},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_SHARP1_LC_TABLE_OFFSET},
+    {0x40, 0x90, 0x40, FROM_DFT}, // QUALITY_TDS_H1_GAIN},
+    {0x40, 0x90, 0x40, FROM_DFT}, // QUALITY_TDS_H1_GAIN_NEG},
+    {0x40, 0x90, 0x40, FROM_DFT}, // QUALITY_TDS_H2_GAIN},
+    {0x40, 0x90, 0x40, FROM_DFT}, // QUALITY_TDS_H2_GAIN_NEG},
+    {0x40, 0x70, 0x40, FROM_DFT}, // QUALITY_TDS_V1_GAIN},
+    {0x40, 0x70, 0x40, FROM_DFT}, // QUALITY_TDS_V1_GAIN_NEG},
+    {0x40, 0x80, 0x40, FROM_DFT}, // QUALITY_TDS_V2_GAIN},
+    {0x40, 0x80, 0x40, FROM_DFT}, // QUALITY_TDS_V2_GAIN_NEG},
+    {0x00, 0x00, 0x40, FROM_DFT}, // QUALITY_TDS_X1_GAIN},
+    {0x00, 0x00, 0x40, FROM_DFT}, // QUALITY_TDS_X1_GAIN_NEG},
+    {0x00, 0x00, 0x40, FROM_DFT}, // QUALITY_TDS_X2_GAIN},
+    {0x00, 0x00, 0x40, FROM_DFT}, // QUALITY_TDS_X2_GAIN_NEG},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_TDS_H2_SEL},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_TDS_V4_SEL},  
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_TDS_H1_CORING},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_TDS_H2_CORING},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_TDS_V1_CORING},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_TDS_V2_CORING},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_TDS_X1_CORING},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_TDS_X2_CORING},
+    {0x00, 0x00, 0xFF, FROM_DFT}, // QUALITY_TDS_H1_LIMIT_POS},
+    {0x00, 0x00, 0xFF, FROM_DFT}, // QUALITY_TDS_H1_LIMIT_NEG},
+    {0x00, 0x00, 0xFF, FROM_DFT}, // QUALITY_TDS_H2_LIMIT_POS},
+    {0x00, 0x00, 0xFF, FROM_DFT}, // QUALITY_TDS_H2_LIMIT_NEG},
+    {0x00, 0x00, 0xFF, FROM_DFT}, // QUALITY_TDS_V1_LIMIT_POS},
+    {0x00, 0x00, 0xFF, FROM_DFT}, // QUALITY_TDS_V1_LIMIT_NEG},
+    {0x00, 0x00, 0xFF, FROM_DFT}, // QUALITY_TDS_V2_LIMIT_POS},
+    {0x00, 0x00, 0xFF, FROM_DFT}, // QUALITY_TDS_V2_LIMIT_NEG},
+    {0x00, 0x00, 0xFF, FROM_DFT}, // QUALITY_TDS_X1_LIMIT_POS},
+    {0x00, 0x00, 0xFF, FROM_DFT}, // QUALITY_TDS_X1_LIMIT_NEG},
+    {0x00, 0x00, 0xFF, FROM_DFT}, // QUALITY_TDS_X2_LIMIT_POS},
+    {0x00, 0x00, 0xFF, FROM_DFT}, // QUALITY_TDS_X2_LIMIT_NEG},
+    {0x00, 0x00, 0xFF, FROM_DFT}, // QUALITY_TDS_LIMIT_POS_ALL},
+    {0x00, 0x00, 0xFF, FROM_DFT}, // QUALITY_TDS_LIMIT_NEG_ALL},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_TDS_H1_CLIP_THPOS},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_TDS_H1_CLIP_THNEG},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_TDS_H1_SOFT_CLIP_GAIN},
+    {0x00, 0x00, 0x18, FROM_DFT}, // QUALITY_TDS_H2_CLIP_THPOS},
+    {0x00, 0x00, 0x18, FROM_DFT}, // QUALITY_TDS_H2_CLIP_THNEG},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_TDS_H2_SOFT_CLIP_GAIN},
+    {0x00, 0x00, 0x18, FROM_DFT}, // QUALITY_TDS_V1_CLIP_THPOS},
+    {0x00, 0x00, 0x18, FROM_DFT}, // QUALITY_TDS_V1_CLIP_THNEG},
+    {0x00, 0x00, 0x80, FROM_DFT}, // QUALITY_TDS_V1_SOFT_CLIP_GAIN},
+    {0x00, 0x00, 0x18, FROM_DFT}, // QUALITY_TDS_V2_CLIP_THPOS},
+    {0x00, 0x00, 0x18, FROM_DFT}, // QUALITY_TDS_V2_CLIP_THNEG},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_TDS_V2_SOFT_CLIP_GAIN},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_TDS_X1_CLIP_THPOS},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_TDS_X1_CLIP_THNEG},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_TDS_X1_SOFT_CLIP_GAIN},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_TDS_X2_CLIP_THPOS},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_TDS_X2_CLIP_THNEG},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_TDS_X2_SOFT_CLIP_GAIN},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_TDS_POS_CLIP},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_TDS_NEG_CLIP},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_TDS_CLIP_GAIN},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_TDS_AC_LPF_EN},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_TDS_AC_LPF_COE},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_TDS_H1_LPF_SEL},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_TDS_H2_LPF_SEL},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_TDS_ADSHP_LC_EN},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_TDS_ADSHP_YLEV_EN},    
+    {0x00, 0x00, 0x28, FROM_DFT}, // QUALITY_TDS_ADSHP_P1},
+    {0x00, 0x00, 0x50, FROM_DFT}, // QUALITY_TDS_ADSHP_P2},
+    {0x00, 0x00, 0x78, FROM_DFT}, // QUALITY_TDS_ADSHP_P3},
+    {0x00, 0x00, 0x80, FROM_DFT}, // QUALITY_TDS_ADSHP_G1},
+    {0x00, 0x00, 0x80, FROM_DFT}, // QUALITY_TDS_ADSHP_G2},
+    {0x00, 0x00, 0x80, FROM_DFT}, // QUALITY_TDS_ADSHP_G3},
+    {0x00, 0x00, 0x80, FROM_DFT}, // QUALITY_TDS_ADSHP_OFFSET},
+    {0x00, 0x00, 0x18, FROM_DFT}, // QUALITY_TDS_YLEV_P1},
+    {0x00, 0x00, 0x20, FROM_DFT}, // QUALITY_TDS_YLEV_P2},
+    {0x00, 0x00, 0x28, FROM_DFT}, // QUALITY_TDS_YLEV_P3},
+    {0x00, 0x00, 0x30, FROM_DFT}, // QUALITY_TDS_YLEV_P4},
+    {0x00, 0x00, 0x80, FROM_DFT}, // QUALITY_TDS_YLEV_G1},
+    {0x00, 0x00, 0x80, FROM_DFT}, // QUALITY_TDS_YLEV_G2},
+    {0x00, 0x00, 0x80, FROM_DFT}, // QUALITY_TDS_YLEV_G3},
+    {0x00, 0x00, 0x80, FROM_DFT}, // QUALITY_TDS_YLEV_G4},
+    {0x00, 0x00, 0x80, FROM_DFT}, // QUALITY_TDS_YLEV_ADAP_GAIN},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_PBC_EN_1},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_PBC_BAND_SEL_1},
+    {0x00, 0x00, 0x01, FROM_DFT}, // QUALITY_PBC_GAIN_SIGN_1},
+    {0x00, 0x00, 0x40, FROM_DFT}, // QUALITY_PBC_GAIN_1},
+    {0x00, 0x00, 0x03, FROM_DFT}, // QUALITY_PBC_CORING_1},
+    {0x00, 0x00, 0x5C, FROM_DFT}, // QUALITY_PBC_THETA_C_1},
+    {0x00, 0x00, 0x16, FROM_DFT}, // QUALITY_PBC_RADIUS_C_1},
+    {0x00, 0x00, 0x50, FROM_DFT}, // QUALITY_PBC_THETA_RANGE_1},
+    {0x00, 0x00, 0x50, FROM_DFT}, // QUALITY_PBC_RADIUS_RANGE_1},
+    {0x00, 0x00, 0xFF, FROM_DFT}, // QUALITY_PBC_LOWER_BOUND_1},
+    {0x00, 0x00, 0xFF, FROM_DFT}, // QUALITY_PBC_UPPER_BOUND_1},  
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_PBC_EN_2},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_PBC_BAND_SEL_2},
+    {0x00, 0x00, 0x01, FROM_DFT}, // QUALITY_PBC_GAIN_SIGN_2},
+    {0x00, 0x00, 0x60, FROM_DFT}, // QUALITY_PBC_GAIN_2},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_PBC_CORING_2},
+    {0x00, 0x00, 0xE0, FROM_DFT}, // QUALITY_PBC_THETA_C_2},
+    {0x00, 0x00, 0x20, FROM_DFT}, // QUALITY_PBC_RADIUS_C_2},
+    {0x00, 0x00, 0x80, FROM_DFT}, // QUALITY_PBC_THETA_RANGE_2},
+    {0x00, 0x00, 0x80, FROM_DFT}, // QUALITY_PBC_RADIUS_RANGE_2},
+    {0x00, 0x00, 0xFF, FROM_DFT}, // QUALITY_PBC_LOWER_BOUND_2},
+    {0x00, 0x00, 0xFF, FROM_DFT}, // QUALITY_PBC_UPPER_BOUND_2},  
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_PBC_EN_3},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_PBC_BAND_SEL_3},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_PBC_GAIN_SIGN_3},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_PBC_GAIN_3},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_PBC_CORING_3},
+    {0x00, 0x00, 0xE0, FROM_DFT}, // QUALITY_PBC_THETA_C_3},
+    {0x00, 0x00, 0x20, FROM_DFT}, // QUALITY_PBC_RADIUS_C_3},
+    {0x00, 0x00, 0x80, FROM_DFT}, // QUALITY_PBC_THETA_RANGE_3},
+    {0x00, 0x00, 0x80, FROM_DFT}, // QUALITY_PBC_RADIUS_RANGE_3},
+    {0x00, 0x00, 0xFF, FROM_DFT}, // QUALITY_PBC_LOWER_BOUND_3},
+    {0x00, 0x00, 0xFF, FROM_DFT}, // QUALITY_PBC_UPPER_BOUND_3},    
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_PBC_EN_4},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_PBC_BAND_SEL_4},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_PBC_GAIN_SIGN_4},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_PBC_GAIN_4},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_PBC_CORING_4},
+    {0x00, 0x00, 0xE0, FROM_DFT}, // QUALITY_PBC_THETA_C_4},
+    {0x00, 0x00, 0x20, FROM_DFT}, // QUALITY_PBC_RADIUS_C_4},
+    {0x00, 0x00, 0x80, FROM_DFT}, // QUALITY_PBC_THETA_RANGE_4},
+    {0x00, 0x00, 0x80, FROM_DFT}, // QUALITY_PBC_RADIUS_RANGE_4},
+    {0x00, 0x00, 0xFF, FROM_DFT}, // QUALITY_PBC_LOWER_BOUND_4},
+    {0x00, 0x00, 0xFF, FROM_DFT}, // QUALITY_PBC_UPPER_BOUND_4},    
+    {0x40, 0x90, 0x40, FROM_DFT}, // QUALITY_LTI_GAIN1},
+    {0x40, 0x90, 0x40, FROM_DFT}, // QUALITY_LTI_GAIN_NEG1},
+    {0x00, 0x00, 0xFF, FROM_DFT}, // QUALITY_LTI_LIMIT_POS1},
+    {0x00, 0x00, 0xFF, FROM_DFT}, // QUALITY_LTI_LIMIT_NEG1},
+    {0x00, 0x00, 0x04, FROM_DFT}, // QUALITY_LTI_CORING1},
+    {0x00, 0x00, 0x80, FROM_DFT}, // QUALITY_LTI_SOFT_CLIP_GAIN1},
+    {0x00, 0x80, 0x40, FROM_DFT}, // QUALITY_LTI_GAIN2},
+    {0x00, 0x80, 0x40, FROM_DFT}, // QUALITY_LTI_GAIN_NEG2},
+    {0x00, 0x00, 0xFF, FROM_DFT}, // QUALITY_LTI_LIMIT_POS2},
+    {0x00, 0x00, 0xFF, FROM_DFT}, // QUALITY_LTI_LIMIT_NEG2},
+    {0x00, 0x00, 0x04, FROM_DFT}, // QUALITY_LTI_CORING2},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_LTI_SOFT_CLIP_GAIN2},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_HLTI_HDEG_GAIN},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_HLTI_HDIFF_OFFSET},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_HLTI_VDEG_GAIN},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_HLTI_VDIFF_OFFSET},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_CDS_ENA},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_CDS_CORING},
+    {0x00, 0x00, 0x0A, FROM_DFT}, // QUALITY_CDS_GAIN},
+    {0x00, 0x00, 0x0A, FROM_DFT}, // QUALITY_CDS_SLOPE},
+    {0x00, 0x00, 0x01, FROM_DFT}, // QUALITY_CDS_AREA},
+    {0x00, 0x00, 0x01, FROM_DFT}, // QUALITY_CDS_AREASHAPE},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_CDS_WIDEFORMAT},
+    {0x00, 0x00, 0x01, FROM_DFT}, // QUALITY_ECTIF_ENA},
+    {0x00, 0x00, 0x01, FROM_DFT}, // QUALITY_ECTIF_HD},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_ECTIF_LPF1},
+    {0x00, 0x00, 0x03, FROM_DFT}, // QUALITY_ECTIF_LPF1_SEL},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_ECTIF_FLPF},
+    {0x00, 0x00, 0x03, FROM_DFT}, // QUALITY_ECTIF_FLPF_SEL},
+    {0x00, 0x03, 0x00, FROM_DFT}, // QUALITY_ECTIF_U_WND_SZ},
+    {0x00, 0x03, 0x00, FROM_DFT}, // QUALITY_ECTIF_V_WND_SZ},
+    {0x00, 0x00, 0x20, FROM_DFT}, // QUALITY_ECTIF_U_STB_GAIN},
+    {0x00, 0x00, 0x20, FROM_DFT}, // QUALITY_ECTIF_V_STB_GAIN},
+    {0x00, 0x00, 0x10, FROM_DFT}, // QUALITY_ECTIF_U_STB_OFST1},
+    {0x00, 0x00, 0x10, FROM_DFT}, // QUALITY_ECTIF_V_STB_OFST1},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_ECTIF_U_STB_OFST2},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_ECTIF_V_STB_OFST2},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_ECTIF_FLAT_GAIN},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_ECTIF_FLAT_OFST1},
+    {0x00, 0x00, 0x60, FROM_DFT}, // QUALITY_ECTIF_FLAT_OFST2},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_ECTIF_COR},
+    {0x00, 0x00, 0x01, FROM_DFT}, // QUALITY_ECTI_ENA},
+    {0x00, 0x00, 0x01, FROM_DFT}, // QUALITY_ECTI_HD},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_ECTI_LPF1},
+    {0x00, 0x00, 0x03, FROM_DFT}, // QUALITY_ECTI_LPF1_SEL},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_ECTI_FLPF},
+    {0x00, 0x00, 0x03, FROM_DFT}, // QUALITY_ECTI_FLPF_SEL},
+    {0x00, 0x00, 0x05, FROM_DFT}, // QUALITY_ECTI_U_WND_SZ},
+    {0x00, 0x00, 0x05, FROM_DFT}, // QUALITY_ECTI_V_WND_SZ},
+    {0x00, 0x00, 0x20, FROM_DFT}, // QUALITY_ECTI_U_STB_GAIN},
+    {0x00, 0x00, 0x20, FROM_DFT}, // QUALITY_ECTI_V_STB_GAIN},
+    {0x00, 0x00, 0x10, FROM_DFT}, // QUALITY_ECTI_U_STB_OFST1},
+    {0x00, 0x00, 0x10, FROM_DFT}, // QUALITY_ECTI_V_STB_OFST1},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_ECTI_U_STB_OFST2},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_ECTI_V_STB_OFST2},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_ECTI_FLAT_GAIN},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_ECTI_FLAT_OFST1},
+    {0x00, 0x00, 0x60, FROM_DFT}, // QUALITY_ECTI_FLAT_OFST2},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_ECTI_COR},
+    //2DNR
+    {0x00,0x00,0x03,FROM_DFT}, // QUALITY_2DNR_MESSSFT_SM_CO1MO
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_2DNR_MESSTHL_SM_CO1MO
+    {0x00,0x00,0x03,FROM_DFT}, // QUALITY_2DNR_MESSSFT_MESS_CO1MO
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_2DNR_MESSTHL_MESS_CO1MO
+    {0x00,0x00,0x03,FROM_DFT}, // QUALITY_2DNR_MESSSFT_EDGE_CO1MO
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_2DNR_MESSTHL_EDGE_CO1MO
+    {0x00,0x00,0x03,FROM_DFT}, // QUALITY_2DNR_MESSSFT_SM_CO1ST
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_2DNR_MESSTHL_SM_CO1ST
+    {0x00,0x00,0x03,FROM_DFT}, // QUALITY_2DNR_MESSSFT_MESS_CO1ST
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_2DNR_MESSTHL_MESS_CO1ST
+    {0x00,0x00,0x03,FROM_DFT}, // QUALITY_2DNR_MESSSFT_EDGE_CO1ST
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_2DNR_MESSTHL_EDGE_CO1ST
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_2DNR_BLDLV_SM_CO1
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_2DNR_BLDLV_MESS_CO1
+    {0x00,0x00,0x04,FROM_DFT}, // QUALITY_2DNR_BLDLV_EDGE_CO1
+    {0x00,0x00,0x03,FROM_DFT}, // QUALITY_2DNR_MESSSFT_SM_CO2MO
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_2DNR_MESSTHL_SM_CO2MO
+    {0x00,0x00,0x03,FROM_DFT}, // QUALITY_2DNR_MESSSFT_MESS_CO2MO
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_2DNR_MESSTHL_MESS_CO2MO
+    {0x00,0x00,0x03,FROM_DFT}, // QUALITY_2DNR_MESSSFT_EDGE_CO2MO
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_2DNR_MESSTHL_EDGE_CO2MO
+    {0x00,0x00,0x03,FROM_DFT}, // QUALITY_2DNR_MESSSFT_SM_CO2ST
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_2DNR_MESSTHL_SM_CO2ST
+    {0x00,0x00,0x03,FROM_DFT}, // QUALITY_2DNR_MESSSFT_MESS_CO2ST
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_2DNR_MESSTHL_MESS_CO2ST
+    {0x00,0x00,0x03,FROM_DFT}, // QUALITY_2DNR_MESSSFT_EDGE_CO2ST
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_2DNR_MESSTHL_EDGE_CO2ST
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_2DNR_BLDLV_SM_CO2
+    {0x00,0x00,0x01,FROM_DFT}, // QUALITY_2DNR_BLDLV_MESS_CO2
+    {0x00,0x00,0x03,FROM_DFT}, // QUALITY_2DNR_BLDLV_EDGE_CO2
+    {0x00,0x00,0x03,FROM_DFT}, // QUALITY_2DNR_MESSSFT_SM_CO3MO
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_2DNR_MESSTHL_SM_CO3MO
+    {0x00,0x00,0x03,FROM_DFT}, // QUALITY_2DNR_MESSSFT_MESS_CO3MO
+    {0x00,0x00,0x04,FROM_DFT}, // QUALITY_2DNR_MESSTHL_MESS_CO3MO
+    {0x00,0x00,0x03,FROM_DFT}, // QUALITY_2DNR_MESSSFT_EDGE_CO3MO
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_2DNR_MESSTHL_EDGE_CO3MO
+    {0x00,0x00,0x03,FROM_DFT}, // QUALITY_2DNR_MESSSFT_SM_CO3ST
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_2DNR_MESSTHL_SM_CO3ST
+    {0x00,0x00,0x03,FROM_DFT}, // QUALITY_2DNR_MESSSFT_MESS_CO3ST
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_2DNR_MESSTHL_MESS_CO3ST
+    {0x00,0x00,0x03,FROM_DFT}, // QUALITY_2DNR_MESSSFT_EDGE_CO3ST
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_2DNR_MESSTHL_EDGE_CO3ST
+    {0x00,0x00,0x04,FROM_DFT}, // QUALITY_2DNR_BLDLV_SM_CO3
+    {0x00,0x00,0x04,FROM_DFT}, // QUALITY_2DNR_BLDLV_MESS_CO3
+    {0x00,0x00,0x06,FROM_DFT}, // QUALITY_2DNR_BLDLV_EDGE_CO3
+    {0x00,0x00,0x03,FROM_DFT}, // QUALITY_2DNR_MESSSFT_SM_FRST
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_2DNR_MESSTHL_SM_FRST
+    {0x00,0x00,0x03,FROM_DFT}, // QUALITY_2DNR_MESSSFT_MESS_FRST
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_2DNR_MESSTHL_MESS_FRST
+    {0x00,0x00,0x03,FROM_DFT}, // QUALITY_2DNR_MESSSFT_EDGE_FRST
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_2DNR_MESSTHL_EDGE_FRST
+    {0x00,0x00,0x01,FROM_DFT}, // QUALITY_2DNR_BLDLV_SM_FRST
+    {0x00,0x00,0x01,FROM_DFT}, // QUALITY_2DNR_BLDLV_MESS_FRST
+    {0x00,0x00,0x01,FROM_DFT}, // QUALITY_2DNR_BLDLV_EDGE_FRST
+    {0x00,0x00,0x03,FROM_DFT}, // QUALITY_2DNR_MESSSFT_SM_MO
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_2DNR_MESSTHL_SM_MO
+    {0x00,0x00,0x03,FROM_DFT}, // QUALITY_2DNR_MESSSFT_MESS_MO
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_2DNR_MESSTHL_MESS_MO
+    {0x00,0x00,0x03,FROM_DFT}, // QUALITY_2DNR_MESSSFT_EDGE_MO
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_2DNR_MESSTHL_EDGE_MO
+    {0x00,0x00,0x08,FROM_DFT}, // QUALITY_2DNR_BLDLV_SM_MO
+    {0x00,0x00,0x08,FROM_DFT}, // QUALITY_2DNR_BLDLV_MESS_MO
+    {0x00,0x00,0x08,FROM_DFT}, // QUALITY_2DNR_BLDLV_EDGE_MO
+    {0x00,0x00,0x03,FROM_DFT}, // QUALITY_2DNR_MESSSFT_SM_ST
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_2DNR_MESSTHL_SM_ST
+    {0x00,0x00,0x03,FROM_DFT}, // QUALITY_2DNR_MESSSFT_MESS_ST
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_2DNR_MESSTHL_MESS_ST
+    {0x00,0x00,0x03,FROM_DFT}, // QUALITY_2DNR_MESSSFT_EDGE_ST
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_2DNR_MESSTHL_EDGE_ST
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_2DNR_BLDLV_SM_ST
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_2DNR_BLDLV_MESS_ST
+    {0x00,0x00,0x08,FROM_DFT}, // QUALITY_2DNR_BLDLV_EDGE_ST
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_2DNR_MESSSFT_SM_BK
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_2DNR_MESSTHL_SM_BK
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_2DNR_MESSSFT_MESS_BK
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_2DNR_MESSTHL_MESS_BK
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_2DNR_MESSSFT_EDGE_BK
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_2DNR_MESSTHL_EDGE_BK
+    {0x00,0x00,0x03,FROM_DFT}, // QUALITY_2DNR_BLDLV_SM_BK
+    {0x00,0x00,0x03,FROM_DFT}, // QUALITY_2DNR_BLDLV_MESS_BK
+    {0x00,0x00,0x03,FROM_DFT}, // QUALITY_2DNR_BLDLV_EDGE_BK
+    {0x00,0x00,0x03,FROM_DFT}, // QUALITY_2DNR_MESSSFT_SM_DEF
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_2DNR_MESSTHL_SM_DEF
+    {0x00,0x00,0x03,FROM_DFT}, // QUALITY_2DNR_MESSSFT_MESS_DEF
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_2DNR_MESSTHL_MESS_DEF
+    {0x00,0x00,0x03,FROM_DFT}, // QUALITY_2DNR_MESSSFT_EDGE_DEF
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_2DNR_MESSTHL_EDGE_DEF
+    {0x00,0x00,0x04,FROM_DFT}, // QUALITY_2DNR_BLDLV_SM_DEF
+    {0x00,0x00,0x05,FROM_DFT}, // QUALITY_2DNR_BLDLV_MESS_DEF
+    {0x00,0x00,0x05,FROM_DFT}, // QUALITY_2DNR_BLDLV_EDGE_DEF
+    {0x00,0x00,0x03,FROM_DFT}, // QUALITY_2DNR_GLOBAL_BLEND
+    //END OF 2DNR
+    //MPEG NR
+    {0x00,0x00,0x08,FROM_DFT}, // QUALITY_2DNR_MESSSFT_MOS_CO1MO
+    {0x00,0x00,0x08,FROM_DFT}, // QUALITY_2DNR_MESSTHL_MOS_CO1MO    
+    {0x00,0x00,0x08,FROM_DFT}, // QUALITY_2DNR_MESSSFT_MOS_CO1ST
+    {0x00,0x00,0x08,FROM_DFT}, // QUALITY_2DNR_MESSTHL_MOS_CO1ST    
+    {0x00,0x00,0x08,FROM_DFT}, // QUALITY_2DNR_BLDLV_BK_CO1
+    {0x03,0x08,0x06,FROM_DFT}, // QUALITY_2DNR_BLDLV_MOS_CO1
+    {0x00,0x00,0x08,FROM_DFT}, // QUALITY_2DNR_MESSSFT_MOS_CO2MO
+    {0x00,0x00,0x08,FROM_DFT}, // QUALITY_2DNR_MESSTHL_MOS_CO2MO
+    {0x00,0x00,0x08,FROM_DFT}, // QUALITY_2DNR_MESSSFT_MOS_CO2ST
+    {0x00,0x00,0x08,FROM_DFT}, // QUALITY_2DNR_MESSTHL_MOS_CO2ST  
+    {0x00,0x00,0x08,FROM_DFT}, // QUALITY_2DNR_BLDLV_BK_CO2
+    {0x02,0x04,0x02,FROM_DFT}, // QUALITY_2DNR_BLDLV_MOS_CO2  
+    {0x00,0x00,0x08,FROM_DFT}, // QUALITY_2DNR_MESSSFT_MOS_CO3MO
+    {0x00,0x00,0x08,FROM_DFT}, // QUALITY_2DNR_MESSTHL_MOS_CO3MO    
+    {0x00,0x00,0x08,FROM_DFT}, // QUALITY_2DNR_MESSSFT_MOS_CO3ST
+    {0x00,0x00,0x08,FROM_DFT}, // QUALITY_2DNR_MESSTHL_MOS_CO3ST    
+    {0x00,0x00,0x08,FROM_DFT}, // QUALITY_2DNR_BLDLV_BK_CO3
+    {0x03,0x08,0x06,FROM_DFT}, // QUALITY_2DNR_BLDLV_MOS_CO3
+    {0x00,0x00,0x08,FROM_DFT}, // QUALITY_2DNR_MESSSFT_MOS_FRST
+    {0x00,0x00,0x08,FROM_DFT}, // QUALITY_2DNR_MESSTHL_MOS_FRST    
+    {0x00,0x00,0x08,FROM_DFT}, // QUALITY_2DNR_BLDLV_BK_FRST
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_2DNR_BLDLV_MOS_FRST
+    {0x00,0x00,0x08,FROM_DFT}, // QUALITY_2DNR_MESSSFT_MOS_MO
+    {0x00,0x00,0x08,FROM_DFT}, // QUALITY_2DNR_MESSTHL_MOS_MO    
+    {0x00,0x00,0x08,FROM_DFT}, // QUALITY_2DNR_BLDLV_BK_MO
+    {0x03,0x08,0x06,FROM_DFT}, // QUALITY_2DNR_BLDLV_MOS_MO
+    {0x00,0x00,0x08,FROM_DFT}, // QUALITY_2DNR_MESSSFT_MOS_ST
+    {0x00,0x00,0x08,FROM_DFT}, // QUALITY_2DNR_MESSTHL_MOS_ST    
+    {0x00,0x00,0x08,FROM_DFT}, // QUALITY_2DNR_BLDLV_BK_ST
+    {0x03,0x08,0x06,FROM_DFT}, // QUALITY_2DNR_BLDLV_MOS_ST
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_2DNR_MESSSFT_MOS_BK
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_2DNR_MESSTHL_MOS_BK    
+    {0x00,0x00,0x08,FROM_DFT}, // QUALITY_2DNR_BLDLV_BK_BK     
+    {0x03,0x08,0x06,FROM_DFT}, // QUALITY_2DNR_BLDLV_MOS_BK  
+    {0x00,0x00,0x08,FROM_DFT}, // QUALITY_2DNR_MESSSFT_MOS_DEF
+    {0x00,0x00,0x08,FROM_DFT}, // QUALITY_2DNR_MESSTHL_MOS_DEF    
+    {0x03,0x08,0x06,FROM_DFT}, // QUALITY_2DNR_BLDLV_MOS_DEF
+    {0x00,0x00,0x05,FROM_DFT}, // QUALITY_2DNR_CUR_SM_NUM
+    {0x00,0x00,0x09,FROM_DFT}, // QUALITY_2DNR_CUR_SM_THR
+    {0x00,0x00,0x09,FROM_DFT}, // QUALITY_2DNR_NEAREDGE_SELWIDTH
+    {0x00,0x00,0x28,FROM_DFT}, // QUALITY_2DNR_NEAREDGE_EDGE_THR
+    //END OF MPEG NR
+    //3DNR
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_3DNR_C_USE_YTBL
+    {0x00,0x00,0x05,FROM_DFT}, // QUALITY_3DNR_C_MOTH
+    {0x00,0x00,0x01,FROM_DFT}, // QUALITY_3DNR_CIIR_TBL7
+    {0x00,0x00,0x01,FROM_DFT}, // QUALITY_3DNR_CIIR_TBL6
+    {0x00,0x00,0x01,FROM_DFT}, // QUALITY_3DNR_CIIR_TBL5
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_3DNR_CIIR_TBL4
+    {0x00,0x00,0x04,FROM_DFT}, // QUALITY_3DNR_CIIR_TBL3
+    {0x00,0x00,0x05,FROM_DFT}, // QUALITY_3DNR_CIIR_TBL2
+    {0x00,0x00,0x08,FROM_DFT}, // QUALITY_3DNR_CIIR_TBL1
+    {0x00,0x00,0x06,FROM_DFT}, // QUALITY_3DNR_CIIR_TBL0
+    {0x02,0x0A,0x05,FROM_DFT}, // QUALITY_3DNR_DEFTBTH
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_3DNR_DEF_TBL7
+    {0x00,0x00,0x01,FROM_DFT}, // QUALITY_3DNR_DEF_TBL6
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_3DNR_DEF_TBL5
+    {0x00,0x00,0x03,FROM_DFT}, // QUALITY_3DNR_DEF_TBL4
+    {0x00,0x00,0x06,FROM_DFT}, // QUALITY_3DNR_DEF_TBL3
+    {0x00,0x00,0x08,FROM_DFT}, // QUALITY_3DNR_DEF_TBL2
+    {0x00,0x00,0x09,FROM_DFT}, // QUALITY_3DNR_DEF_TBL1
+    {0x00,0x00,0x09,FROM_DFT}, // QUALITY_3DNR_DEF_TBL0
+    {0x00,0x00,0x01,FROM_DFT}, // QUALITY_3DNR_ENCOLOR
+    {0x02,0x09,0x05,FROM_DFT}, // QUALITY_3DNR_COLOR_TH
+    {0x00,0x00,0x01,FROM_DFT}, // QUALITY_3DNR_COLOR_TBL7
+    {0x00,0x00,0x01,FROM_DFT}, // QUALITY_3DNR_COLOR_TBL6
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_3DNR_COLOR_TBL5
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_3DNR_COLOR_TBL4
+    {0x00,0x00,0x04,FROM_DFT}, // QUALITY_3DNR_COLOR_TBL3
+    {0x00,0x00,0x05,FROM_DFT}, // QUALITY_3DNR_COLOR_TBL2
+    {0x00,0x00,0x08,FROM_DFT}, // QUALITY_3DNR_COLOR_TBL1
+    {0x00,0x00,0x06,FROM_DFT}, // QUALITY_3DNR_COLOR_TBL0
+    {0x00,0x00,0x01,FROM_DFT}, // QUALITY_3DNR_BDYEDGEDETEN_ALL
+    {0x02,0x0A,0x05,FROM_DFT}, // QUALITY_3DNR_MOEDGE_TH
+    {0x01,0x01,0x01,FROM_DFT}, // QUALITY_3DNR_MOEDGE_TBL7
+    {0x01,0x01,0x01,FROM_DFT}, // QUALITY_3DNR_MOEDGE_TBL6
+    {0x01,0x02,0x01,FROM_DFT}, // QUALITY_3DNR_MOEDGE_TBL5
+    {0x01,0x02,0x01,FROM_DFT}, // QUALITY_3DNR_MOEDGE_TBL4
+    {0x01,0x04,0x01,FROM_DFT}, // QUALITY_3DNR_MOEDGE_TBL3
+    {0x01,0x05,0x01,FROM_DFT}, // QUALITY_3DNR_MOEDGE_TBL2
+    {0x01,0x08,0x01,FROM_DFT}, // QUALITY_3DNR_MOEDGE_TBL1
+    {0x01,0x06,0x01,FROM_DFT}, // QUALITY_3DNR_MOEDGE_TBL0
+    {0x02,0x0A,0x05,FROM_DFT}, // QUALITY_3DNR_STEDGE_TH
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_3DNR_STEDGE_TBL7
+    {0x00,0x00,0x03,FROM_DFT}, // QUALITY_3DNR_STEDGE_TBL6
+    {0x00,0x00,0x06,FROM_DFT}, // QUALITY_3DNR_STEDGE_TBL5
+    {0x00,0x00,0x08,FROM_DFT}, // QUALITY_3DNR_STEDGE_TBL4
+    {0x00,0x00,0x0A,FROM_DFT}, // QUALITY_3DNR_STEDGE_TBL3
+    {0x00,0x00,0x0A,FROM_DFT}, // QUALITY_3DNR_STEDGE_TBL2
+    {0x00,0x00,0x0C,FROM_DFT}, // QUALITY_3DNR_STEDGE_TBL1
+    {0x00,0x00,0x0C,FROM_DFT}, // QUALITY_3DNR_STEDGE_TBL0
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_3DNR_ENFBCH
+    {0x00,0x00,0x08,FROM_DFT}, // QUALITY_3DNR_FSTILLTB
+    {0x00,0x00,0x01,FROM_DFT}, // QUALITY_3DNR_FSTILL_TBL7
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_3DNR_FSTILL_TBL6
+    {0x00,0x00,0x03,FROM_DFT}, // QUALITY_3DNR_FSTILL_TBL5
+    {0x00,0x00,0x04,FROM_DFT}, // QUALITY_3DNR_FSTILL_TBL4
+    {0x00,0x00,0x05,FROM_DFT}, // QUALITY_3DNR_FSTILL_TBL3
+    {0x00,0x00,0x06,FROM_DFT}, // QUALITY_3DNR_FSTILL_TBL2
+    {0x00,0x00,0x07,FROM_DFT}, // QUALITY_3DNR_FSTILL_TBL1
+    {0x00,0x00,0x08,FROM_DFT}, // QUALITY_3DNR_FSTILL_TBL0
+    {0x00,0x00,0x04,FROM_DFT}, // QUALITY_3DNR_FSMLMOTBTH
+    {0x00,0x00,0x01,FROM_DFT}, // QUALITY_3DNR_FSMLMO_TBL7
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_3DNR_FSMLMO_TBL6
+    {0x00,0x00,0x04,FROM_DFT}, // QUALITY_3DNR_FSMLMO_TBL5
+    {0x00,0x00,0x06,FROM_DFT}, // QUALITY_3DNR_FSMLMO_TBL4
+    {0x00,0x00,0x08,FROM_DFT}, // QUALITY_3DNR_FSMLMO_TBL3
+    {0x00,0x00,0x0A,FROM_DFT}, // QUALITY_3DNR_FSMLMO_TBL2
+    {0x00,0x00,0x0B,FROM_DFT}, // QUALITY_3DNR_FSMLMO_TBL1
+    {0x00,0x00,0x0C,FROM_DFT}, // QUALITY_3DNR_FSMLMO_TBL0
+    {0x00,0x00,0x04,FROM_DFT}, // QUALITY_3DNR_BGMOTBTH
+    {0x00,0x00,0x01,FROM_DFT}, // QUALITY_3DNR_FBIGMO_TBL7
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_3DNR_FBIGMO_TBL6
+    {0x00,0x00,0x03,FROM_DFT}, // QUALITY_3DNR_FBIGMO_TBL5
+    {0x00,0x00,0x04,FROM_DFT}, // QUALITY_3DNR_FBIGMO_TBL4
+    {0x00,0x00,0x05,FROM_DFT}, // QUALITY_3DNR_FBIGMO_TBL3
+    {0x00,0x00,0x06,FROM_DFT}, // QUALITY_3DNR_FBIGMO_TBL2
+    {0x00,0x00,0x07,FROM_DFT}, // QUALITY_3DNR_FBIGMO_TBL1
+    {0x00,0x00,0x08,FROM_DFT}, // QUALITY_3DNR_FBIGMO_TBL0
+    //END OF 3DNR
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_SAT_LV0,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_H_CORING_LV0,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_LCSHARP_MID_LV0,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_LCSHARP_HIGH_LV0,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_DEF_TH_LV0,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_DEF_TBL7_LV0,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_DEF_TBL6_LV0,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_DEF_TBL5_LV0,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_DEF_TBL4_LV0,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_DEF_TBL3_LV0,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_DEF_TBL2_LV0,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_DEF_TBL1_LV0,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_DEF_TBL0_LV0,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_MOEGE_TH_LV0,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL7_LV0,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL6_LV0,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL5_LV0,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL4_LV0,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL3_LV0,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL2_LV0,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL1_LV0,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL0_LV0,
+    
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_SAT_LV1,
+    {0x00,0x00,0x01,FROM_DFT}, // QUALITY_ANR_H_CORING_LV1,
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_ANR_LCSHARP_MID_LV1,
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_ANR_LCSHARP_HIGH_LV1,
+    {0x00,0x00,0x01,FROM_DFT}, // QUALITY_ANR_DEF_TH_LV1,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_DEF_TBL7_LV1,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_DEF_TBL6_LV1,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_DEF_TBL5_LV1,
+    {0x00,0x00,0x01,FROM_DFT}, // QUALITY_ANR_DEF_TBL4_LV1,
+    {0x00,0x00,0x01,FROM_DFT}, // QUALITY_ANR_DEF_TBL3_LV1,
+    {0x00,0x00,0x01,FROM_DFT}, // QUALITY_ANR_DEF_TBL2_LV1,
+    {0x00,0x00,0x01,FROM_DFT}, // QUALITY_ANR_DEF_TBL1_LV1,
+    {0x00,0x00,0x01,FROM_DFT}, // QUALITY_ANR_DEF_TBL0_LV1,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_MOEGE_TH_LV1,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL7_LV1,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL6_LV1,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL5_LV1,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL4_LV1,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL3_LV1,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL2_LV1,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL1_LV1,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL0_LV1,
+
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_SAT_LV2,
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_ANR_H_CORING_LV2,
+    {0x00,0x00,0x04,FROM_DFT}, // QUALITY_ANR_LCSHARP_MID_LV2,
+    {0x00,0x00,0x04,FROM_DFT}, // QUALITY_ANR_LCSHARP_HIGH_LV2,
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_ANR_DEF_TH_LV2,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_DEF_TBL7_LV2,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_DEF_TBL6_LV2,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_DEF_TBL5_LV2,
+    {0x00,0x00,0x01,FROM_DFT}, // QUALITY_ANR_DEF_TBL4_LV2,
+    {0x00,0x00,0x01,FROM_DFT}, // QUALITY_ANR_DEF_TBL3_LV2,
+    {0x00,0x00,0x01,FROM_DFT}, // QUALITY_ANR_DEF_TBL2_LV2,
+    {0x00,0x00,0x01,FROM_DFT}, // QUALITY_ANR_DEF_TBL1_LV2,
+    {0x00,0x00,0x01,FROM_DFT}, // QUALITY_ANR_DEF_TBL0_LV2,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_MOEGE_TH_LV2,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL7_LV2,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL6_LV2,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL5_LV2,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL4_LV2,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL3_LV2,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL2_LV2,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL1_LV2,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL0_LV2,
+
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_SAT_LV3,
+    {0x00,0x00,0x03,FROM_DFT}, // QUALITY_ANR_H_CORING_LV3,
+    {0x00,0x00,0x06,FROM_DFT}, // QUALITY_ANR_LCSHARP_MID_LV3,
+    {0x00,0x00,0x06,FROM_DFT}, // QUALITY_ANR_LCSHARP_HIGH_LV3,
+    {0x00,0x00,0x03,FROM_DFT}, // QUALITY_ANR_DEF_TH_LV3,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_DEF_TBL7_LV3,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_DEF_TBL6_LV3,
+    {0x00,0x00,0x01,FROM_DFT}, // QUALITY_ANR_DEF_TBL5_LV3,
+    {0x00,0x00,0x01,FROM_DFT}, // QUALITY_ANR_DEF_TBL4_LV3,
+    {0x00,0x00,0x01,FROM_DFT}, // QUALITY_ANR_DEF_TBL3_LV3,
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_ANR_DEF_TBL2_LV3,
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_ANR_DEF_TBL1_LV3,
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_ANR_DEF_TBL0_LV3,
+    {0x00,0x00,0x01,FROM_DFT}, // QUALITY_ANR_MOEGE_TH_LV3,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL7_LV3,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL6_LV3,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL5_LV3,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL4_LV3,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL3_LV3,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL2_LV3,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL1_LV3,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL0_LV3,
+
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_SAT_LV4,
+    {0x00,0x00,0x04,FROM_DFT}, // QUALITY_ANR_H_CORING_LV4,
+    {0x00,0x00,0x08,FROM_DFT}, // QUALITY_ANR_LCSHARP_MID_LV4,
+    {0x00,0x00,0x08,FROM_DFT}, // QUALITY_ANR_LCSHARP_HIGH_LV4,
+    {0x00,0x00,0x04,FROM_DFT}, // QUALITY_ANR_DEF_TH_LV4,
+    {0x00,0x00,0x01,FROM_DFT}, // QUALITY_ANR_DEF_TBL7_LV4,
+    {0x00,0x00,0x01,FROM_DFT}, // QUALITY_ANR_DEF_TBL6_LV4,
+    {0x00,0x00,0x01,FROM_DFT}, // QUALITY_ANR_DEF_TBL5_LV4,
+    {0x00,0x00,0x01,FROM_DFT}, // QUALITY_ANR_DEF_TBL4_LV4,
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_ANR_DEF_TBL3_LV4,
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_ANR_DEF_TBL2_LV4,
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_ANR_DEF_TBL1_LV4,
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_ANR_DEF_TBL0_LV4,
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_ANR_MOEGE_TH_LV4,
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL7_LV4,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL6_LV4,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL5_LV4,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL4_LV4,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL3_LV4,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL2_LV4,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL1_LV4,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL0_LV4,   
+
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_SAT_LV5,
+    {0x00,0x00,0x04,FROM_DFT}, // QUALITY_ANR_H_CORING_LV5,
+    {0x00,0x00,0x08,FROM_DFT}, // QUALITY_ANR_LCSHARP_MID_LV5,
+    {0x00,0x00,0x08,FROM_DFT}, // QUALITY_ANR_LCSHARP_HIGH_LV5,
+    {0x00,0x00,0x05,FROM_DFT}, // QUALITY_ANR_DEF_TH_LV5,
+    {0x00,0x00,0x01,FROM_DFT}, // QUALITY_ANR_DEF_TBL7_LV5,
+    {0x00,0x00,0x01,FROM_DFT}, // QUALITY_ANR_DEF_TBL6_LV5,
+    {0x00,0x00,0x01,FROM_DFT}, // QUALITY_ANR_DEF_TBL5_LV5,
+    {0x00,0x00,0x01,FROM_DFT}, // QUALITY_ANR_DEF_TBL4_LV5,
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_ANR_DEF_TBL3_LV5,
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_ANR_DEF_TBL2_LV5,
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_ANR_DEF_TBL1_LV5,
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_ANR_DEF_TBL0_LV5,
+    {0x00,0x00,0x03,FROM_DFT}, // QUALITY_ANR_MOEGE_TH_LV5,
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL7_LV5,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL6_LV5,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL5_LV5,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL4_LV5,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL3_LV5,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL2_LV5,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL1_LV5,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL0_LV5,  
+
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_SAT_LV6,
+    {0x00,0x00,0x04,FROM_DFT}, // QUALITY_ANR_H_CORING_LV6,
+    {0x00,0x00,0x08,FROM_DFT}, // QUALITY_ANR_LCSHARP_MID_LV6,
+    {0x00,0x00,0x08,FROM_DFT}, // QUALITY_ANR_LCSHARP_HIGH_LV6,
+    {0x00,0x00,0x06,FROM_DFT}, // QUALITY_ANR_DEF_TH_LV6,
+    {0x00,0x00,0x01,FROM_DFT}, // QUALITY_ANR_DEF_TBL7_LV6,
+    {0x00,0x00,0x01,FROM_DFT}, // QUALITY_ANR_DEF_TBL6_LV6,
+    {0x00,0x00,0x01,FROM_DFT}, // QUALITY_ANR_DEF_TBL5_LV6,
+    {0x00,0x00,0x01,FROM_DFT}, // QUALITY_ANR_DEF_TBL4_LV6,
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_ANR_DEF_TBL3_LV6,
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_ANR_DEF_TBL2_LV6,
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_ANR_DEF_TBL1_LV6,
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_ANR_DEF_TBL0_LV6,
+    {0x00,0x00,0x04,FROM_DFT}, // QUALITY_ANR_MOEGE_TH_LV6,
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL7_LV6,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL6_LV6,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL5_LV6,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL4_LV6,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL3_LV6,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL2_LV6,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL1_LV6,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL0_LV6,  
+
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_SAT_LV7,
+    {0x00,0x00,0x04,FROM_DFT}, // QUALITY_ANR_H_CORING_LV7,
+    {0x00,0x00,0x08,FROM_DFT}, // QUALITY_ANR_LCSHARP_MID_LV7,
+    {0x00,0x00,0x08,FROM_DFT}, // QUALITY_ANR_LCSHARP_HIGH_LV7,
+    {0x00,0x00,0x07,FROM_DFT}, // QUALITY_ANR_DEF_TH_LV7,
+    {0x00,0x00,0x01,FROM_DFT}, // QUALITY_ANR_DEF_TBL7_LV7,
+    {0x00,0x00,0x01,FROM_DFT}, // QUALITY_ANR_DEF_TBL6_LV7,
+    {0x00,0x00,0x01,FROM_DFT}, // QUALITY_ANR_DEF_TBL5_LV7,
+    {0x00,0x00,0x01,FROM_DFT}, // QUALITY_ANR_DEF_TBL4_LV7,
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_ANR_DEF_TBL3_LV7,
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_ANR_DEF_TBL2_LV7,
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_ANR_DEF_TBL1_LV7,
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_ANR_DEF_TBL0_LV7,
+    {0x00,0x00,0x04,FROM_DFT}, // QUALITY_ANR_MOEGE_TH_LV7,
+    {0x00,0x00,0x02,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL7_LV7,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL6_LV7,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL5_LV7,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL4_LV7,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL3_LV7,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL2_LV7,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL1_LV7,
+    {0x00,0x00,0x00,FROM_DFT}, // QUALITY_ANR_MOEDGE_TBL0_LV7,  
+    //END OF ANR
+    {0x00, 0x00, 0x01, FROM_DFT}, // QUALITY_AL_ON_1_OFF_0},  
+
+    {0x00, 0x00, 0x01, FROM_DFT}, // QUALITY_CBOOST_ONOFF},    
+    {0x00, 0x00, 0x01, FROM_DFT}, // QUALITY_CBOOST_MINUS_EN}, 
+    {0x00, 0x00, 0x80, FROM_DFT}, // QUALITY_CBOOST_GAIN},     
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_CBOOST_RNG_SEL},     
+        
+    {0x80, 0x40, 0x50, FROM_DFT}, // QUALITY_AL_GAIN},
+    {0x00, 0x00, 0x08, FROM_DFT}, // QUALITY_AL_OFFSET},
+    {0x00, 0x00, 0xEB, FROM_DFT}, // QUALITY_AL_LIMIT},
+    {0x00, 0x00, 0x01, FROM_DFT}, // QUALITY_AL_METHOD},
+    {0x00, 0x00, 0x0A, FROM_DFT}, // QUALITY_AL_SCENE_CHANGE_MAX_THD},
+    {0x00, 0x00, 0x30, FROM_DFT}, // QUALITY_AL_SCENE_CHANGE_TOTAL_THD},
+    {0x00, 0x00, 0x10, FROM_DFT}, // QUALITY_AL_NOISE_THRESHOLD},
+    {0x00, 0x00, 0x01, FROM_DFT}, // QUALITY_BWS_ON_1_OFF_0},
+    {0x00, 0x00, 0x01, FROM_DFT}, // QUALITY_BWS_BLACK_ON_1_OFF_0},
+    {0x00, 0x00, 0x04, FROM_DFT}, // QUALITY_BWS_BLACK_LEVEL},
+    {0x50, 0x30, 0x40, FROM_DFT}, // QUALITY_BWS_BLACK_GAIN},
+    {0x00, 0x00, 0x08, FROM_DFT}, // QUALITY_BWS_BLACK_OFFSET},
+    {0x00, 0x00, 0x40, FROM_DFT}, // QUALITY_BWS_BLACK_RATIO},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_BWS_BLACK_LIMIT},
+    {0x00, 0x00, 0x08, FROM_DFT}, // QUALITY_DYNBS_RANGE},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_DYNBS_ONOFF},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_DYNBS_DBG},
+    {0x00, 0x00, 0x7D, FROM_DFT}, // QUALITY_DYNBS_PXL_THD1},      // 250 >> 1
+    {0x00, 0x00, 0xC8, FROM_DFT}, // QUALITY_DYNBS_PXL_THD2},      // 400 >> 1
+    {0x00, 0x00, 0xC8, FROM_DFT}, // QUALITY_DYNBS_DIST_THDH},     // 200
+    {0x00, 0x00, 0x8C, FROM_DFT}, // QUALITY_DYNBS_DIST_THDM},     // 150
+    {0x00, 0x00, 0x64, FROM_DFT}, // QUALITY_DYNBS_DIST_THDL},     // 100   
+    {0x00, 0x00, 0x74, FROM_DFT}, // QUALITY_DYNBS_LIMIT_BTM},     // 116;   // -12
+    {0x00, 0x00, 0xA4, FROM_DFT}, // QUALITY_DYNBS_LIMIT_TOP},     // 164;   // +36
+    {0x00, 0x00, 0x60, FROM_DFT}, // QUALITY_DYNBS_GAIN_BTM},     // 96;   // -32
+    {0x00, 0x00, 0x98, FROM_DFT}, // QUALITY_DYNBS_GAIN_TOP},     // 152;  // +24
+    {0x00, 0x00, 0x80, FROM_DFT}, // QUALITY_DYNBS_OFFSET_BTM},     // 128;  // 0
+    {0x00, 0x00, 0x98, FROM_DFT}, // QUALITY_DYNBS_OFFSET_TOP},     // 152;  // +24
+    
+    {0x00, 0x00, 0x01, FROM_DFT}, // QUALITY_TONE_PROT_ON_1_OFF_0},         
+    {0x00, 0x00, 0x80, FROM_DFT}, // QUALITY_TONE_PROT_COLOR_KR},         
+    {0x00, 0x00, 0x80, FROM_DFT}, // QUALITY_TONE_PROT_COLOR_KG},         
+    {0x00, 0x00, 0x80, FROM_DFT}, // QUALITY_TONE_PROT_COLOR_KB},         
+    {0x00, 0x00, 0x80, FROM_DFT}, // QUALITY_TONE_PROT_ASL_REMAP_R_LO},         
+    {0x00, 0x00, 0x80, FROM_DFT}, // QUALITY_TONE_PROT_ASL_REMAP_R_HI},         
+    {0x00, 0x00, 0x80, FROM_DFT}, // QUALITY_TONE_PROT_ASL_REMAP_G_LO},         
+    {0x00, 0x00, 0x80, FROM_DFT}, // QUALITY_TONE_PROT_ASL_REMAP_G_HI},         
+    {0x00, 0x00, 0x80, FROM_DFT}, // QUALITY_TONE_PROT_ASL_REMAP_B_LO},         
+    {0x00, 0x00, 0x80, FROM_DFT}, // QUALITY_TONE_PROT_ASL_REMAP_B_HI}, 
+    {0x00, 0x00, 0x40, FROM_DFT}, // QUALITY_TONE_PROT_ASL_REMAP_W_DECAY}, 
+       
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_YGAMMA_DECAY_BRIGHT},         
+    {0x00, 0x00, 0x20, FROM_DFT}, // QUALITY_YGAMMA_DECAY_LO},         
+    {0x00, 0x00, 0x60, FROM_DFT}, // QUALITY_YGAMMA_DECAY_HI},               
+    
+    {0x00, 0x00, 0x01, FROM_DFT}, // QUALITY_BWS_KEEP_MID_ONOFF},
+    {0x00, 0x00, 0x0D, FROM_DFT}, // QUALITY_BWS_KEEP_MID_X_LVL},  // add 2 to represent real level
+    {0x00, 0x00, 0x78, FROM_DFT}, // QUALITY_BWS_KEEP_MID_Y_POS},  // 8 bit to represent 10 bit resolution, shift 2 bit
+    {0x00, 0x00, 0x01, FROM_DFT}, // QUALITY_BWS_WHITE_ON_1_OFF_0},
+    {0x00, 0x00, 0x04, FROM_DFT}, // QUALITY_BWS_WHITE_LEVEL},
+    {0x80, 0x40, 0x60, FROM_DFT}, // QUALITY_BWS_WHITE_GAIN},
+    {0x00, 0x00, 0x10, FROM_DFT}, // QUALITY_BWS_WHITE_OFFSET},
+    {0x00, 0x00, 0x40, FROM_DFT}, // QUALITY_BWS_WHITE_RATIO},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_BWS_WHITE_LIMIT},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_R_GAIN},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_G_GAIN},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_B_GAIN},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_R_GAIN_LSB},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_G_GAIN_LSB},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_B_GAIN_LSB},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_R_OFFSET},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_G_OFFSET},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_B_OFFSET},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_R_OFFSET_LSB},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_G_OFFSET_LSB},
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_B_OFFSET_LSB},
+
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_BLUE_STRETCH_ENABLE},
+    {0x00, 0x00, 0x80, FROM_DFT}, // QUALITY_BLUE_STRETCH_GAIN_R},
+    {0x00, 0x00, 0x80, FROM_DFT}, // QUALITY_BLUE_STRETCH_GAIN_G},
+    {0x00, 0x00, 0x80, FROM_DFT}, // QUALITY_BLUE_STRETCH_GAIN_B},
+    {0x00, 0x00, 0xC0, FROM_DFT}, // QUALITY_BLUE_STRETCH_LUMA_THD},
+    {0x00, 0x00, 0x10, FROM_DFT}, // QUALITY_BLUE_STRETCH_SAT_THD},    
+
+//GAMMA
+    {0x00, 0x00, 0x00, FROM_DFT}, // QUALITY_GAMMA_CURVE_SEL,
+
+//SCE
+    {0x00, 0x00, 0x70, FROM_DFT}, // QUALITY_SCE_LUMA_GAIN_OFF,
+    {0x00, 0x00, 0x70, FROM_DFT}, // QUALITY_SCE_SAT_GAIN_OFF,
+    {0x00, 0x00, 0x70, FROM_DFT}, // QUALITY_SCE_HUE_GAIN_OFF,
+    {0x00, 0x00, 0x80, FROM_DFT}, // QUALITY_SCE_LUMA_GAIN_LOW,
+    {0x00, 0x00, 0x80, FROM_DFT}, // QUALITY_SCE_SAT_GAIN_LOW,
+    {0x00, 0x00, 0x80, FROM_DFT}, // QUALITY_SCE_HUE_GAIN_LOW,
+    {0x00, 0x00, 0xA0, FROM_DFT}, // QUALITY_SCE_LUMA_GAIN_MID,
+    {0x00, 0x00, 0xA0, FROM_DFT}, // QUALITY_SCE_SAT_GAIN_MID,
+    {0x00, 0x00, 0xA0, FROM_DFT}, // QUALITY_SCE_HUE_GAIN_MID,
+    {0x00, 0x00, 0xC0, FROM_DFT}, // QUALITY_SCE_LUMA_GAIN_HIGH,
+    {0x00, 0x00, 0xC0, FROM_DFT}, // QUALITY_SCE_SAT_GAIN_HIGH,
+    {0x00, 0x00, 0xC0, FROM_DFT}, // QUALITY_SCE_HUE_GAIN_HIGH,    
+};
+
+
+/* bCustomQtyItem[]
+ * This array describe the detail PQ item that can be fine tuned by NCSTool.
+ * The other PQ items that is not included in this array will be referd to bDefaultQtyTbl[].
+ */
+UINT16 const CODE wCustomQtyItem[CUSTOM_QTY_TBL_DIM + TBL_HEAD_HASH] =
+{
+    #include "QTY_ITEM.h"
+};
+
+/* bCustomSourceGroup[][QTY_IDX_RANGE_DIM]
+ * Customer re-define the input source timing index groups.
+ * The 1st column is the begin timing index.
+ * The 2nd column is the end timing index.
+ * The 2nd column should be larger than or equal to 1st column.
+ * The last row should be fix to {SOURCE_TYPE_TIMING_MAX, SOURCE_TYPE_TIMING_MAX}
+ */
+
+UINT8 bCustomSourceGroup[][QTY_IDX_RANGE_DIM] =
+{
+    {SOURCE_TYPE_TIMING_RFTV_NTSC_358,      SOURCE_TYPE_TIMING_RFTV_PAL_60},        // [0]
+    {SOURCE_TYPE_TIMING_RFTV_NTSC_443,      SOURCE_TYPE_TIMING_RFTV_PAL_N},        // [1]    
+    {SOURCE_TYPE_TIMING_SECAM_RFTV,      SOURCE_TYPE_TIMING_SECAM_RFTV},            // [2]  
+    {SOURCE_TYPE_TIMING_CVBS_NTSC_358,      SOURCE_TYPE_TIMING_SV_PAL_60_OS},          // [3]
+    {SOURCE_TYPE_TIMING_CVBS_NTSC_443,      SOURCE_TYPE_TIMING_SV_PAL_N_OS},        // [4]     
+    {SOURCE_TYPE_TIMING_SECAM_CVBS,      SOURCE_TYPE_TIMING_SECAM_SV},            // [5]      
+    {SOURCE_TYPE_TIMING_YPBPR_SD_I_60,   SOURCE_TYPE_TIMING_YPBPR_SD_I_60_OS},       // [6]
+    {SOURCE_TYPE_TIMING_YPBPR_SD_P_60,   SOURCE_TYPE_TIMING_YPBPR_SD_P_60_OS},    // [7]
+    {SOURCE_TYPE_TIMING_YPBPR_SD_I_50,   SOURCE_TYPE_TIMING_YPBPR_SD_I_50_OS},       // [8] 
+    {SOURCE_TYPE_TIMING_YPBPR_SD_P_50,   SOURCE_TYPE_TIMING_YPBPR_SD_P_50_OS},    // [9]   
+    {SOURCE_TYPE_TIMING_YPBPR_720P_50,   SOURCE_TYPE_TIMING_YPBPR_720P_50},          // [10]  
+    {SOURCE_TYPE_TIMING_YPBPR_1080I_50,         SOURCE_TYPE_TIMING_YPBPR_1080P_50},   // [11]     
+    {SOURCE_TYPE_TIMING_YPBPR_720P_60,         SOURCE_TYPE_TIMING_YPBPR_720P_60},      // [12]          
+    {SOURCE_TYPE_TIMING_YPBPR_1080I_60,          SOURCE_TYPE_TIMING_YPBPR_1080P_60},     // [13]       
+    {SOURCE_TYPE_TIMING_DIGI_SD_I_60,      SOURCE_TYPE_TIMING_DIGI_SD_I_60},     // 14]  
+    {SOURCE_TYPE_TIMING_DIGI_SD_P_60,      SOURCE_TYPE_TIMING_DIGI_SD_P_60},     // [15]   
+    {SOURCE_TYPE_TIMING_DIGI_SD_I_50,      SOURCE_TYPE_TIMING_DIGI_SD_I_50},      // [16]    
+    {SOURCE_TYPE_TIMING_DIGI_SD_P_50,      SOURCE_TYPE_TIMING_DIGI_SD_P_50},    // [17]  
+    {SOURCE_TYPE_TIMING_DIGI_720P_50,      SOURCE_TYPE_TIMING_DIGI_720P_50},       // [18]
+    {SOURCE_TYPE_TIMING_DIGI_1080I_50,     SOURCE_TYPE_TIMING_DIGI_1080P_50},        // [19]      
+    {SOURCE_TYPE_TIMING_DIGI_720P_60,       SOURCE_TYPE_TIMING_DIGI_720P_60},          // [20]
+    {SOURCE_TYPE_TIMING_DIGI_1080I_60,       SOURCE_TYPE_TIMING_DIGI_1080P_60},        // [21]
+    {SOURCE_TYPE_TIMING_DIGI_1080P_24,       SOURCE_TYPE_TIMING_DIGI_1080P_24},     // [22]
+    {SOURCE_TYPE_TIMING_DIGI_PC,       SOURCE_TYPE_TIMING_DIGI_PC},       // [23]
+    {SOURCE_TYPE_TIMING_PC_YCBCR,        SOURCE_TYPE_TIMING_PC_RGB},       // [24] 
+    {SOURCE_TYPE_TIMING_DTV_SD_I_60,     SOURCE_TYPE_TIMING_DTV_SD_I_60},  // [25]
+    {SOURCE_TYPE_TIMING_DTV_SD_P_60,     SOURCE_TYPE_TIMING_DTV_SD_P_60},   // [26]
+    {SOURCE_TYPE_TIMING_DTV_720P_60,   SOURCE_TYPE_TIMING_DTV_720P_60},    // [27]
+    {SOURCE_TYPE_TIMING_DTV_1080I_60,      SOURCE_TYPE_TIMING_DTV_1080P_60},      // [28]
+    {SOURCE_TYPE_TIMING_MM_SD_I,        SOURCE_TYPE_TIMING_MM_SD_P},       // [29]
+    {SOURCE_TYPE_TIMING_MM_720P,        SOURCE_TYPE_TIMING_MM_1080IP},        // [30]
+    {SOURCE_TYPE_TIMING_MAX,                SOURCE_TYPE_TIMING_MAX}    // Don't change this row.
+};
+
+/* bCustomQtyTbl[][MDY_QTY_DIM]
+ * This table store the fine tuned PQ date generated by NCSTool.
+ * The dimension of bCustomQtyTbl[] should be exactly the same as (bCustomSourceGroup[]-1)
+ */
+
+#ifdef CC_UP8032_ATV
+UINT8 CODE bCustomQtyTbl[][CUSTOM_QTY_TBL_DIM] =
+#else
+UINT8 bCustomQtyTbl[][CUSTOM_QTY_TBL_DIM] =
+#endif
+{
+    #include "QTY_TBL_RFTV_358.h"           //     {SOURCE_TYPE_TIMING_RFTV_NTSC_358,      SOURCE_TYPE_TIMING_RFTV_PAL_60},        // [0]
+    #include "QTY_TBL_RFTV_443.h"               // {SOURCE_TYPE_TIMING_RFTV_NTSC_443,      SOURCE_TYPE_TIMING_RFTV_PAL_N},        // [1]    
+    #include "QTY_TBL_SECAM_RFTV.h"       //        {SOURCE_TYPE_TIMING_SECAM_RFTV,      SOURCE_TYPE_TIMING_SECAM_RFTV},            // [2]  
+    #include "QTY_TBL_CVBS_358.h"           //     {SOURCE_TYPE_TIMING_CVBS_NTSC_358,      SOURCE_TYPE_TIMING_SV_PAL_60_OS},          // [3]
+    #include "QTY_TBL_CVBS_443.h"           //     {SOURCE_TYPE_TIMING_CVBS_NTSC_443,      SOURCE_TYPE_TIMING_SV_PAL_N_OS},        // [4]     
+    #include "QTY_TBL_SECAM_CVBS.h"           //     {SOURCE_TYPE_TIMING_SECAM_CVBS,      SOURCE_TYPE_TIMING_SECAM_SV},            // [5]      
+    #include "QTY_TBL_YPBPR_SD_I_60.h"           //     {SOURCE_TYPE_TIMING_YPBPR_SD_I_60,   SOURCE_TYPE_TIMING_YPBPR_SD_I_60_OS},       // [6]
+    #include "QTY_TBL_YPBPR_SD_P_60.h"           //     {SOURCE_TYPE_TIMING_YPBPR_SD_P_60,   SOURCE_TYPE_TIMING_YPBPR_SD_P_60_OS},    // [7]
+    #include "QTY_TBL_YPBPR_SD_I_50.h"           //     {SOURCE_TYPE_TIMING_YPBPR_SD_I_50,   SOURCE_TYPE_TIMING_YPBPR_SD_I_50_OS},       // [8] 
+    #include "QTY_TBL_YPBPR_SD_P_50.h"           //     {SOURCE_TYPE_TIMING_YPBPR_SD_P_50,   SOURCE_TYPE_TIMING_YPBPR_SD_P_50_OS},    // [9]   
+    #include "QTY_TBL_YPBPR_720P_50.h"           //     {SOURCE_TYPE_TIMING_YPBPR_720P_50,   SOURCE_TYPE_TIMING_YPBPR_720P_50},          // [10]  
+    #include "QTY_TBL_YPBPR_1080IP_50.h"           //     {SOURCE_TYPE_TIMING_YPBPR_1080I_50,         SOURCE_TYPE_TIMING_YPBPR_1080P_50},   // [11]     
+    #include "QTY_TBL_YPBPR_720P_60.h"           //     {SOURCE_TYPE_TIMING_YPBPR_720P_60,         SOURCE_TYPE_TIMING_YPBPR_720P_60},      // [12]          
+    #include "QTY_TBL_YPBPR_1080IP_60.h"           //     {SOURCE_TYPE_TIMING_YPBPR_1080I_60,          SOURCE_TYPE_TIMING_YPBPR_1080P_60},     // [13]       
+    #include "QTY_TBL_DIGI_SD_60I.h"           //         {SOURCE_TYPE_TIMING_DIGI_SD_I_60,      SOURCE_TYPE_TIMING_DIGI_SD_I_60},     // 14]  
+    #include "QTY_TBL_DIGI_SD_60P.h"           //     {SOURCE_TYPE_TIMING_DIGI_SD_P_60,      SOURCE_TYPE_TIMING_DIGI_SD_P_60},     // [15]   
+    #include "QTY_TBL_DIGI_SD_50I.h"           //     {SOURCE_TYPE_TIMING_DIGI_SD_I_50,      SOURCE_TYPE_TIMING_DIGI_SD_I_50},      // [16]    
+    #include "QTY_TBL_DIGI_SD_50P.h"           //         {SOURCE_TYPE_TIMING_DIGI_SD_P_50,      SOURCE_TYPE_TIMING_DIGI_SD_P_50},    // [17]  
+    #include "QTY_TBL_DIGI_720P_50.h"           // {SOURCE_TYPE_TIMING_DIGI_720P_50,      SOURCE_TYPE_TIMING_DIGI_720P_50},       // [18]
+    #include "QTY_TBL_DIGI_1080IP_50.h"           //  {SOURCE_TYPE_TIMING_DIGI_1080I_50,     SOURCE_TYPE_TIMING_DIGI_1080P_50},        // [19]    
+    #include "QTY_TBL_DIGI_720P_60.h"           // {SOURCE_TYPE_TIMING_DIGI_720P_60,       SOURCE_TYPE_TIMING_DIGI_720P_60},          // [20]
+    #include "QTY_TBL_DIGI_1080IP_60.h"           // {SOURCE_TYPE_TIMING_DIGI_1080I_60,       SOURCE_TYPE_TIMING_DIGI_1080P_60},        // [21]
+    #include "QTY_TBL_DIGI_1080P_24.h"           //     {SOURCE_TYPE_TIMING_DIGI_1080P_24,       SOURCE_TYPE_TIMING_DIGI_1080P_24},     // [22]
+    #include "QTY_TBL_DIGI_PC.h"           //     {SOURCE_TYPE_TIMING_DIGI_PC,       SOURCE_TYPE_TIMING_DIGI_PC},       // [23] 
+    #include "QTY_TBL_PC.h"           //     {SOURCE_TYPE_TIMING_PC_YCBCR,        SOURCE_TYPE_TIMING_PC_RGB},       // [24] 
+    #include "QTY_TBL_DTV_SD_60I.h"           //     {SOURCE_TYPE_TIMING_DTV_SD_I_60,     SOURCE_TYPE_TIMING_DTV_SD_I_60},  // [25]
+    #include "QTY_TBL_DTV_SD_60P.h"           //      {SOURCE_TYPE_TIMING_DTV_SD_P_60,     SOURCE_TYPE_TIMING_DTV_SD_P_60},   // [26]
+    #include "QTY_TBL_DTV_720P_60.h"           //     {SOURCE_TYPE_TIMING_DTV_720P_60,   SOURCE_TYPE_TIMING_DTV_720P_60},    // [27]
+    #include "QTY_TBL_DTV_1080IP_60.h"           //     {SOURCE_TYPE_TIMING_DTV_1080I_60,      SOURCE_TYPE_TIMING_DTV_1080P_60},      // [28]
+    #include "QTY_TBL_MM_SD.h"           //     {SOURCE_TYPE_TIMING_MM_SD_I,        SOURCE_TYPE_TIMING_MM_SD_P},       // [29]
+    #include "QTY_TBL_MM_HD.h"
+};
+
+#endif // #ifndef _QTY_TBL_H_
+

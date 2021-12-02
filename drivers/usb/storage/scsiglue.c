@@ -127,6 +127,9 @@ static int slave_configure(struct scsi_device *sdev)
 	 * while others have trouble with more than 64K. At this time we
 	 * are limiting both to 32K (64 sectores).
 	 */
+        //  lawrance.liu@mediatek.com : 20100517    
+        //  Always use 32KB as a boundary check condition.	 	 
+#if 1
 	if (us->fflags & (US_FL_MAX_SECTORS_64 | US_FL_MAX_SECTORS_MIN)) {
 		unsigned int max_sectors = 64;
 
@@ -142,6 +145,15 @@ static int slave_configure(struct scsi_device *sdev)
 		 */
 		blk_queue_max_hw_sectors(sdev->request_queue, 0x7FFFFF);
 	}
+#else
+	unsigned int max_sectors = 64;
+
+	if (us->fflags & US_FL_MAX_SECTORS_MIN)
+		max_sectors = PAGE_CACHE_SIZE >> 9;
+	if (queue_max_hw_sectors(sdev->request_queue) > max_sectors)
+		blk_queue_max_hw_sectors(sdev->request_queue,
+				      max_sectors);
+#endif
 
 	/* Some USB host controllers can't do DMA; they have to use PIO.
 	 * They indicate this by setting their dma_mask to NULL.  For

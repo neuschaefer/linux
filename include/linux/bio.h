@@ -175,7 +175,10 @@ enum bio_rw_flags {
 	BIO_RW_META,
 	BIO_RW_DISCARD,
 	BIO_RW_NOIDLE,
+	BIO_RW_TUXONICE,
 };
+
+extern int trap_non_toi_io;
 
 /*
  * First four bits must match between bio->bi_rw and rq->cmd_flags, make

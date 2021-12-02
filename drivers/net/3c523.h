@@ -15,7 +15,7 @@
  *
  * See 3c523.c for details.
  *
- * $Header: /home/chrisb/linux-1.2.13-3c523/drivers/net/RCS/3c523.h,v 1.6 1996/01/20 05:09:00 chrisb Exp chrisb $
+ * $Header: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/net/3c523.h#1 $
  */
 
 /*

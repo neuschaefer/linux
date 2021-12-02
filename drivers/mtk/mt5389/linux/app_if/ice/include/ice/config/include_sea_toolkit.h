@@ -1,0 +1,3 @@
+#ifndef INCLUDE_SEA_TOOLKIT
+    #define INCLUDE_SEA_TOOLKIT 1
+#endif

@@ -13,6 +13,7 @@
 #include <linux/slab.h>
 #include <linux/sched.h>
 #include <linux/smp_lock.h>
+#include <linux/semaphore.h>
 #include <linux/backing-dev.h>
 #include <linux/compat.h>
 #include <linux/mount.h>
@@ -153,7 +154,9 @@ static int mtd_close(struct inode *inode, struct file *file)
 /* FIXME: This _really_ needs to die. In 2.5, we should lock the
    userspace buffer down and use it directly with readv/writev.
 */
-#define MAX_KMALLOC_SIZE 0x20000
+
+char *mtdchar_buf = NULL;
+struct semaphore mtdchar_share;
 
 static ssize_t mtd_read(struct file *file, char __user *buf, size_t count,loff_t *ppos)
 {
@@ -173,21 +176,21 @@ static ssize_t mtd_read(struct file *file, char __user *buf, size_t count,loff_t
 	if (!count)
 		return 0;
 
-	/* FIXME: Use kiovec in 2.5 to lock down the user's buffers
-	   and pass them directly to the MTD functions */
+	if (mtdchar_buf == NULL)
+	{
+		BUG();
+	}
 
-	if (count > MAX_KMALLOC_SIZE)
-		kbuf=kmalloc(MAX_KMALLOC_SIZE, GFP_KERNEL);
-	else
-		kbuf=kmalloc(count, GFP_KERNEL);
-
+	kbuf = mtdchar_buf;
 	if (!kbuf)
 		return -ENOMEM;
+	
+	down(&mtdchar_share);
 
 	while (count) {
 
-		if (count > MAX_KMALLOC_SIZE)
-			len = MAX_KMALLOC_SIZE;
+		if (count > mtd->erasesize)
+			len = mtd->erasesize;
 		else
 			len = count;
 
@@ -226,7 +229,7 @@ static ssize_t mtd_read(struct file *file, char __user *buf, size_t count,loff_t
 		if (!ret || (ret == -EUCLEAN) || (ret == -EBADMSG)) {
 			*ppos += retlen;
 			if (copy_to_user(buf, kbuf, retlen)) {
-				kfree(kbuf);
+				up(&mtdchar_share);
 				return -EFAULT;
 			}
 			else
@@ -237,14 +240,15 @@ static ssize_t mtd_read(struct file *file, char __user *buf, size_t count,loff_t
 			if (retlen == 0)
 				count = 0;
 		}
-		else {
-			kfree(kbuf);
+		else 
+		{
+			up(&mtdchar_share);
 			return ret;
 		}
 
 	}
 
-	kfree(kbuf);
+	up(&mtdchar_share);
 	return total_retlen;
 } /* mtd_read */
 
@@ -269,23 +273,26 @@ static ssize_t mtd_write(struct file *file, const char __user *buf, size_t count
 	if (!count)
 		return 0;
 
-	if (count > MAX_KMALLOC_SIZE)
-		kbuf=kmalloc(MAX_KMALLOC_SIZE, GFP_KERNEL);
-	else
-		kbuf=kmalloc(count, GFP_KERNEL);
 
+	if (mtdchar_buf == NULL)
+	{
+		BUG();
+	}
+
+	kbuf = mtdchar_buf;
 	if (!kbuf)
 		return -ENOMEM;
 
-	while (count) {
+	down(&mtdchar_share);
 
-		if (count > MAX_KMALLOC_SIZE)
-			len = MAX_KMALLOC_SIZE;
+	while (count) {
+		if (count > mtd->erasesize)
+			len = mtd->erasesize;
 		else
 			len = count;
 
 		if (copy_from_user(kbuf, buf, len)) {
-			kfree(kbuf);
+			up(&mtdchar_share);
 			return -EFAULT;
 		}
 
@@ -324,13 +331,14 @@ static ssize_t mtd_write(struct file *file, const char __user *buf, size_t count
 			count -= retlen;
 			buf += retlen;
 		}
-		else {
-			kfree(kbuf);
+		else 
+		{
+			up(&mtdchar_share);
 			return ret;
 		}
 	}
 
-	kfree(kbuf);
+	up(&mtdchar_share);
 	return total_retlen;
 } /* mtd_write */
 
@@ -1035,7 +1043,6 @@ static int __init init_mtdchar(void)
 		goto err_unregister_filesystem;
 	}
 	register_mtd_user(&mtdchar_notifier);
-
 	return ret;
 
 err_unregister_filesystem:

@@ -345,7 +345,7 @@ static struct mtd_part *add_one_partition(struct mtd_info *master,
 
 	/* set up the MTD object for this partition */
 	slave->mtd.type = master->type;
-	slave->mtd.flags = master->flags & ~part->mask_flags;
+	slave->mtd.flags = master->flags | part->mask_flags;
 	slave->mtd.size = part->size;
 	slave->mtd.writesize = master->writesize;
 	slave->mtd.oobsize = master->oobsize;

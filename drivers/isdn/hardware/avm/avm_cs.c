@@ -1,4 +1,4 @@
-/* $Id: avm_cs.c,v 1.4.6.3 2001/09/23 22:24:33 kai Exp $
+/* $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/isdn/hardware/avm/avm_cs.c#1 $
  *
  * A PCMCIA client driver for AVM B1/M1/M2
  *

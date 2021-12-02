@@ -25,6 +25,8 @@
 #include <linux/scatterlist.h>
 #include <linux/sched.h>
 
+//this define will be change kmap_atomic/kunmap_atomic to kmap/kunmap
+#define HW_SHA256
 static inline enum km_type crypto_kmap_type(int out)
 {
 	enum km_type type;
@@ -37,6 +39,15 @@ static inline enum km_type crypto_kmap_type(int out)
 	return type;
 }
 
+static inline void *crypto_kmap_sha256(struct page *page)
+{
+	return kmap(page);
+}
+
+static inline void crypto_kunmap_sha256(struct page *page)
+{
+	kunmap(page);
+}
 static inline void *crypto_kmap(struct page *page, int out)
 {
 	return kmap_atomic(page, crypto_kmap_type(out));

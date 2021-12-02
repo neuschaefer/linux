@@ -1,5 +1,5 @@
 /*
- *  acpi_bus.h - ACPI Bus Driver ($Revision: 22 $)
+ *  acpi_bus.h - ACPI Bus Driver ($Revision: #1 $)
  *
  *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>

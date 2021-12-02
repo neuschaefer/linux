@@ -1,0 +1,132 @@
+<!-- <?xml version="1.0" encoding="UTF-8"?> -->
+<!-- edited with XMLSpy v2006 sp2 U (http://www.altova.com) by Cosh (MX) -->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified">
+	<!-- definition of index -->
+	<xs:simpleType name="indextype">
+		<xs:restriction base="xs:integer">
+			<xs:minInclusive value="0"/>
+			<xs:maxInclusive value="31"/>
+		</xs:restriction>
+	</xs:simpleType>
+	<!-- definition of address -->
+	<xs:simpleType name="valuetype">
+		<xs:restriction base="xs:string">
+			<xs:minLength value="1"/>
+			<xs:maxLength value="8"/>
+			<xs:pattern value="[0-9a-fA-F]*"/>
+		</xs:restriction>
+	</xs:simpleType>
+	<!-- definition of access -->
+	<xs:simpleType name="accesstype">
+		<xs:restriction base="xs:string">
+			<xs:enumeration value="82_xdata"/>
+			<xs:enumeration value="82_vdoin1"/>
+			<xs:enumeration value="82_tve"/>
+			<xs:enumeration value="82_vdoin2"/>
+			<xs:enumeration value="82_vdoin3"/>
+			<xs:enumeration value="82_i2c"/>
+			<xs:enumeration value="82_dsp"/>
+			<xs:enumeration value="82_dspdec"/>
+			<xs:enumeration value="82_dspenc"/>
+			<xs:enumeration value="82_dsptxc"/>
+			<xs:enumeration value="82_dspcomm"/>  
+			<xs:enumeration value="8226_dir"/>
+			<xs:enumeration value="8226_risc"/>
+			<xs:enumeration value="8226_riscdram"/>  
+			<xs:enumeration value="82_idata"/>
+			<xs:enumeration value="82_drambyte"/>
+			<xs:enumeration value="82_dramdword"/>
+			<xs:enumeration value="82_i2c_extend"/>
+			<xs:enumeration value="53_direct"/>
+			<xs:enumeration value="53_82_xdata"/>
+			<xs:enumeration value="53_82_vdoin1"/>
+			<xs:enumeration value="53_82_vdoin2"/>
+			<xs:enumeration value="53_82_vdoin3"/>
+		</xs:restriction>
+	</xs:simpleType>
+	<!-- definition of sign -->
+	<xs:simpleType name="signtype">
+		<xs:restriction base="xs:string">
+			<xs:enumeration value="signed"/>
+			<xs:enumeration value="unsigned"/>
+		</xs:restriction>
+	</xs:simpleType>
+	<!-- definition of base -->
+	<xs:simpleType name="basetype">
+		<xs:restriction base="xs:string">
+			<xs:enumeration value="bin"/>
+			<xs:enumeration value="dec"/>
+			<xs:enumeration value="hex"/>
+		</xs:restriction>
+	</xs:simpleType>
+	<!-- definition of Pair -->
+	<xs:complexType name="pairtype">
+		<xs:sequence>
+			<xs:element name="desc" type="xs:string"/>
+			<xs:element name="value" type="valuetype"/>
+		</xs:sequence>
+	</xs:complexType>
+	<!-- definition of Data -->
+	<xs:complexType name="datatype">
+		<xs:sequence>
+			<xs:element name="type" type="accesstype"/>
+			<xs:element name="addr1" type="valuetype" default="0"/>
+			<xs:element name="addr2" type="valuetype"/>
+			<xs:element name="upper" type="indextype"/>
+			<xs:element name="lower" type="indextype"/>
+		</xs:sequence>
+	</xs:complexType>
+	<!-- definition of Field -->
+	<xs:complexType name="fieldtype">
+		<xs:sequence>
+			<xs:element name="name" type="xs:string" default="noname"/>
+			<xs:element name="sign" type="signtype" default="unsigned"/>
+			<xs:element name="base" type="basetype" default="hex"/>
+			<xs:element name="value" type="valuetype" default="0"/>
+			<xs:element name="pair" type="pairtype" minOccurs="0" maxOccurs="unbounded"/>
+			<xs:element name="data" type="datatype" maxOccurs="unbounded"/>
+			<xs:element name="description" type="xs:string" default="" minOccurs="0" maxOccurs="1"/>
+			<xs:element name="ro" type="valuetype" default="0" minOccurs="0" maxOccurs="1"/>
+		</xs:sequence>
+	</xs:complexType>
+	<!-- definition of Group -->
+	<xs:complexType name="grouptype">
+		<xs:sequence>
+			<xs:element name="name" type="xs:string" default="noname"/>
+			<xs:element name="field" type="fieldtype" maxOccurs="unbounded"/>
+		</xs:sequence>
+	</xs:complexType>
+	<!-- definition of Page -->
+	<xs:complexType name="pagetype">
+		<xs:sequence>
+			<xs:element name="name" type="xs:string" default="noname"/>
+			<xs:element name="group" type="grouptype" maxOccurs="unbounded"/>
+		</xs:sequence>
+	</xs:complexType>
+	<!-- definition of Area-->
+	<xs:complexType name="areatype">
+		<xs:sequence>
+			<xs:element name="alt" type="xs:string"/>
+			<xs:element name="coords" type="xs:string"/>
+			<xs:element name="href" type="xs:string"/>
+		</xs:sequence>
+	</xs:complexType>
+	<!-- definition of Diagram -->
+	<xs:complexType name="diagramtype">
+		<xs:sequence>
+			<xs:element name="name" type="xs:string" default="noname"/>
+			<xs:element name="src" type="xs:string"/>
+			<xs:element name="area" type="areatype" minOccurs="0" maxOccurs="unbounded"/>
+		</xs:sequence>
+	</xs:complexType>
+	<!-- definition of Root -->
+	<xs:complexType name="roottype">
+		<xs:sequence>
+			<xs:element name="version" type="xs:integer"/>
+			<xs:element name="diagram" type="diagramtype" minOccurs="0" maxOccurs="unbounded"/>
+			<xs:element name="page" type="pagetype" maxOccurs="unbounded"/>
+		</xs:sequence>
+	</xs:complexType>
+	<!-- document root -->
+	<xs:element name="root" type="roottype"/>
+</xs:schema>

@@ -927,6 +927,118 @@ config SMC91X
 	  The module will be called smc91x.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/kbuild/modules.txt>.
 
+config MAC539X
+	tristate "MT539X Internal MAC support"
+	select MII
+	depends on NET_ETHERNET
+	help
+	  This is a driver for MT539X's internal Ethernet mac,
+	  Say Y if you want it compiled into the kernel.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called mmac.  If you want to compile it as a
+	  module, say M here and read <file:Documentation/modules.txt> as well
+	  as <file:Documentation/networking/net-modules.txt>.
+
+config MAC5363
+	tristate "MT5363 Internal MAC support"
+	select MII
+	depends on NET_ETHERNET
+	help
+	  This is a driver for MT5363's internal Ethernet mac,
+	  Say Y if you want it compiled into the kernel.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called mmac.  If you want to compile it as a
+	  module, say M here and read <file:Documentation/modules.txt> as well
+	  as <file:Documentation/networking/net-modules.txt>.
+	  
+config MAC5365_RMII
+	tristate "MT5365 Internal MAC support"
+	select MII
+	depends on NET_ETHERNET
+	help
+	  This is a driver for MT5365's internal Ethernet mac,
+	  Say Y if you want it compiled into the kernel.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called mmac.  If you want to compile it as a
+	  module, say M here and read <file:Documentation/modules.txt> as well
+	  as <file:Documentation/networking/net-modules.txt>.	 
+
+config MAC5366_MII
+	tristate "MT5366 Internal MAC support"
+	select MII
+	depends on NET_ETHERNET
+	help
+	  This is a driver for MT5365's internal Ethernet mac,
+	  Say Y if you want it compiled into the kernel.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called mmac.  If you want to compile it as a
+	  module, say M here and read <file:Documentation/modules.txt> as well
+	  as <file:Documentation/networking/net-modules.txt>.		 
+	  
+config MAC5395_MII
+	tristate "MT5395 Internal MAC support"
+	select MII
+	depends on NET_ETHERNET
+	help
+	  This is a driver for MT5395's internal Ethernet mac,
+	  Say Y if you want it compiled into the kernel.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called mmac.  If you want to compile it as a
+	  module, say M here and read <file:Documentation/modules.txt> as well
+	  as <file:Documentation/networking/net-modules.txt>.		 
+	  
+config MAC5396_MII
+	tristate "MT5396 Internal MAC support"
+	select MII
+	depends on NET_ETHERNET
+	help
+	  This is a driver for MT5396's internal Ethernet mac,
+	  Say Y if you want it compiled into the kernel.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called mmac.  If you want to compile it as a
+	  module, say M here and read <file:Documentation/modules.txt> as well
+	  as <file:Documentation/networking/net-modules.txt>.		 
+
+config MAC5368_MII
+	tristate "MT5368 Internal MAC support"
+	select MII
+	depends on NET_ETHERNET
+	help
+	  This is a driver for MT5368's internal Ethernet mac,
+	  Say Y if you want it compiled into the kernel.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called mmac.  If you want to compile it as a
+	  module, say M here and read <file:Documentation/modules.txt> as well
+	  as <file:Documentation/networking/net-modules.txt>.
+
+config MAC5389_MII
+	tristate "MT5389 Internal MAC support"
+	select MII
+	depends on NET_ETHERNET
+	help
+	  This is a driver for MT5389's internal Ethernet mac,
+	  Say Y if you want it compiled into the kernel.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called mmac.  If you want to compile it as a
+	  module, say M here and read <file:Documentation/modules.txt> as well
+	  as <file:Documentation/networking/net-modules.txt>.
+	    
 config NET_NETX
 	tristate "NetX Ethernet support"
 	select MII
@@ -2086,6 +2198,17 @@ config E1000E
 	  To compile this driver as a module, choose M here. The module
 	  will be called e1000e.
 
+config R8168
+	tristate "RealTek PCI-Express Gigabit Ethernet"
+	depends on PCI
+	---help---
+	  This driver supports the PCI-Express RealTek gigabit
+	  ethernet family of adapters. 
+	  
+	  To compile this driver as a module, choose M here. The module
+	  will be called r8168.
+
+
 config IP1000
 	tristate "IP1000 Gigabit Ethernet support"
 	depends on PCI && EXPERIMENTAL
@@ -3183,6 +3306,23 @@ config PPPOL2TP
 	  Support for PPP-over-L2TP socket family. L2TP is a protocol
 	  used by ISPs and enterprises to tunnel PPP traffic over UDP
 	  tunnels. L2TP is replacing PPTP for VPN uses.
+
+config PPPOLAC
+	tristate "PPP on L2TP Access Concentrator"
+	depends on PPP && INET
+	help
+	  L2TP (RFC 2661) is a tunneling protocol widely used in virtual private
+	  networks. This driver handles L2TP data packets between a UDP socket
+	  and a PPP channel, but only permits one session per socket. Thus it is
+	  fairly simple and suited for clients.
+
+config PPPOPNS
+	tristate "PPP on PPTP Network Server"
+	depends on PPP && INET
+	help
+	  PPTP (RFC 2637) is a tunneling protocol widely used in virtual private
+	  networks. This driver handles PPTP data packets between a RAW socket
+	  and a PPP channel. It is fairly simple and easy to use.
 
 config SLIP
 	tristate "SLIP (serial line) support"

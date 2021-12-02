@@ -1,0 +1,3 @@
+#ifndef OPTION_PAN_EUROPEAN
+    #define OPTION_PAN_EUROPEAN 1
+#endif

@@ -1,0 +1,187 @@
+/*----------------------------------------------------------------------------*
+ * Copyright Statement:                                                       *
+ *                                                                            *
+ *   This software/firmware and related documentation ("MediaTek Software")   *
+ * are protected under international and related jurisdictions'copyright laws *
+ * as unpublished works. The information contained herein is confidential and *
+ * proprietary to MediaTek Inc. Without the prior written permission of       *
+ * MediaTek Inc., any reproduction, modification, use or disclosure of        *
+ * MediaTek Software, and information contained herein, in whole or in part,  *
+ * shall be strictly prohibited.                                              *
+ * MediaTek Inc. Copyright (C) 2010. All rights reserved.                     *
+ *                                                                            *
+ *   BY OPENING THIS FILE, RECEIVER HEREBY UNEQUIVOCALLY ACKNOWLEDGES AND     *
+ * AGREES TO THE FOLLOWING:                                                   *
+ *                                                                            *
+ *   1)Any and all intellectual property rights (including without            *
+ * limitation, patent, copyright, and trade secrets) in and to this           *
+ * Software/firmware and related documentation ("MediaTek Software") shall    *
+ * remain the exclusive property of MediaTek Inc. Any and all intellectual    *
+ * property rights (including without limitation, patent, copyright, and      *
+ * trade secrets) in and to any modifications and derivatives to MediaTek     *
+ * Software, whoever made, shall also remain the exclusive property of        *
+ * MediaTek Inc.  Nothing herein shall be construed as any transfer of any    *
+ * title to any intellectual property right in MediaTek Software to Receiver. *
+ *                                                                            *
+ *   2)This MediaTek Software Receiver received from MediaTek Inc. and/or its *
+ * representatives is provided to Receiver on an "AS IS" basis only.          *
+ * MediaTek Inc. expressly disclaims all warranties, expressed or implied,    *
+ * including but not limited to any implied warranties of merchantability,    *
+ * non-infringement and fitness for a particular purpose and any warranties   *
+ * arising out of course of performance, course of dealing or usage of trade. *
+ * MediaTek Inc. does not provide any warranty whatsoever with respect to the *
+ * software of any third party which may be used by, incorporated in, or      *
+ * supplied with the MediaTek Software, and Receiver agrees to look only to   *
+ * such third parties for any warranty claim relating thereto.  Receiver      *
+ * expressly acknowledges that it is Receiver's sole responsibility to obtain *
+ * from any third party all proper licenses contained in or delivered with    *
+ * MediaTek Software.  MediaTek is not responsible for any MediaTek Software  *
+ * releases made to Receiver's specifications or to conform to a particular   *
+ * standard or open forum.                                                    *
+ *                                                                            *
+ *   3)Receiver further acknowledge that Receiver may, either presently       *
+ * and/or in the future, instruct MediaTek Inc. to assist it in the           *
+ * development and the implementation, in accordance with Receiver's designs, *
+ * of certain softwares relating to Receiver's product(s) (the "Services").   *
+ * Except as may be otherwise agreed to in writing, no warranties of any      *
+ * kind, whether express or implied, are given by MediaTek Inc. with respect  *
+ * to the Services provided, and the Services are provided on an "AS IS"      *
+ * basis. Receiver further acknowledges that the Services may contain errors  *
+ * that testing is important and it is solely responsible for fully testing   *
+ * the Services and/or derivatives thereof before they are used, sublicensed  *
+ * or distributed. Should there be any third party action brought against     *
+ * MediaTek Inc. arising out of or relating to the Services, Receiver agree   *
+ * to fully indemnify and hold MediaTek Inc. harmless.  If the parties        *
+ * mutually agree to enter into or continue a business relationship or other  *
+ * arrangement, the terms and conditions set forth herein shall remain        *
+ * effective and, unless explicitly stated otherwise, shall prevail in the    *
+ * event of a conflict in the terms in any agreements entered into between    *
+ * the parties.                                                               *
+ *                                                                            *
+ *   4)Receiver's sole and exclusive remedy and MediaTek Inc.'s entire and    *
+ * cumulative liability with respect to MediaTek Software released hereunder  *
+ * will be, at MediaTek Inc.'s sole discretion, to replace or revise the      *
+ * MediaTek Software at issue.                                                *
+ *                                                                            *
+ *   5)The transaction contemplated hereunder shall be construed in           *
+ * accordance with the laws of Singapore, excluding its conflict of laws      *
+ * principles.  Any disputes, controversies or claims arising thereof and     *
+ * related thereto shall be settled via arbitration in Singapore, under the   *
+ * then current rules of the International Chamber of Commerce (ICC).  The    *
+ * arbitration shall be conducted in English. The awards of the arbitration   *
+ * shall be final and binding upon both parties and shall be entered and      *
+ * enforceable in any court of competent jurisdiction.                        *
+ *---------------------------------------------------------------------------*/
+/*-----------------------------------------------------------------------------
+ * $RCSfile: mm_util_memory.c,v $
+ * $Revision: #1 $ 1.0
+ * $Date: 2012/04/27 $ 2004/11/26
+ * $Author: dtvbm11 $
+ * $CCRevision: /main/DTV_X_HQ_int/9 $
+ * $SWAuthor: Asa Wang $
+ * $MD5HEX: 907020e011d0dbd7ca156869d249b742 $ Asa
+ *
+ * Description: 
+ *         This file implement all memeory glu API for media utility 
+ *---------------------------------------------------------------------------*/
+ /*-----------------------------------------------------------------------------
+                         include files
+ ----------------------------------------------------------------------------*/
+#ifndef __KERNEL__
+
+#include "os/inc/x_os.h"
+#include "mm_util_memory.h"
+
+#else
+
+#include "x_os.h"
+#include "mm_util_memory.h"
+
+#endif
+
+
+/*----------------------------------------------------------------------------
+ * Function: _mm_util_mem_alloc()
+ *
+ *---------------------------------------------------------------------------*/
+#ifdef SYS_MEM_CHK
+VOID* _mm_util_mem_dbg_alloc(SIZE_T z_size, const CHAR* s_file, UINT32 ui4_line)
+{
+    return x_mem_dbg_alloc(z_size, 
+                           s_file, 
+                           ui4_line);    
+}
+#else
+VOID* _mm_util_mem_alloc(SIZE_T z_size)
+{
+    return x_mem_alloc(z_size);    
+}
+#endif    /* #endif SYS_MEM_CHK */
+
+/*----------------------------------------------------------------------------
+ * Function: _mm_util_mem_alloc()
+ *
+ *---------------------------------------------------------------------------*/
+#ifdef SYS_MEM_CHK
+VOID _mm_util_mem_dbg_free(VOID *pv_mem, const CHAR* s_file, UINT32 ui4_line)
+{
+    x_mem_dbg_free(pv_mem, 
+                   s_file, 
+                   ui4_line);
+}
+#else
+VOID _mm_util_mem_free(VOID *pv_mem)
+{
+    x_mem_free(pv_mem);
+}
+#endif    /* #endif SYS_MEM_CHK */
+
+/*----------------------------------------------------------------------------
+ * Function: _mm_util_mem_alloc()
+ *
+ *---------------------------------------------------------------------------*/
+#ifdef SYS_MEM_CHK
+VOID* _mm_util_mem_dbg_alloc_with_tag(SIZE_T z_size, UINT32 ui4_tag, const CHAR* s_file, UINT32 ui4_line)
+{
+    MM_UNUSED(ui4_tag);
+    return x_mem_dbg_alloc(z_size, 
+                           s_file, 
+                           ui4_line);
+}
+#else
+VOID* _mm_util_mem_alloc_with_tag(SIZE_T z_size, UINT32 ui4_tag)
+{
+    MM_UNUSED(ui4_tag);
+    return x_mem_alloc(z_size);    
+}
+#endif    /* #endif SYS_MEM_CHK */
+
+/*----------------------------------------------------------------------------
+ * Function: _mm_util_mem_alloc()
+ *
+ *---------------------------------------------------------------------------*/
+#ifdef SYS_MEM_CHK
+VOID _mm_util_mem_dbg_free_with_tag(VOID *pv_mem, UINT32 ui4_tag, const CHAR* s_file, UINT32 ui4_line)
+{
+    MM_UNUSED(ui4_tag);
+    x_mem_dbg_free(pv_mem, 
+                   s_file, 
+                   ui4_line);
+}
+#else
+VOID _mm_util_mem_free_with_tag(VOID *pv_mem, UINT32 ui4_tag)
+{
+    MM_UNUSED(ui4_tag);
+    x_mem_free(pv_mem);
+}
+#endif    /* #endif SYS_MEM_CHK */
+
+/*----------------------------------------------------------------------------
+ * Function: _mm_util_memcpy()
+ *
+ *---------------------------------------------------------------------------*/
+VOID* _mm_util_mem_copy(VOID *pv_to, const VOID *pv_from, SIZE_T z_l)
+{
+    return x_memcpy(pv_to, pv_from, z_l);
+}
+

@@ -1,0 +1,3 @@
+#ifndef INCLUDE_PROJECT_PHOENIX
+    #define INCLUDE_PROJECT_PHOENIX 1
+#endif

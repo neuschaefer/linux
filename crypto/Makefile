@@ -3,6 +3,7 @@
 #
 
 obj-$(CONFIG_CRYPTO) += crypto.o
+obj-$(CONFIG_CRYPTO) += mtk_crypto.o
 crypto-objs := api.o cipher.o compress.o
 
 obj-$(CONFIG_CRYPTO_WORKQUEUE) += crypto_wq.o
@@ -78,6 +79,7 @@ obj-$(CONFIG_CRYPTO_DEFLATE) += deflate.o
 obj-$(CONFIG_CRYPTO_ZLIB) += zlib.o
 obj-$(CONFIG_CRYPTO_MICHAEL_MIC) += michael_mic.o
 obj-$(CONFIG_CRYPTO_CRC32C) += crc32c.o
+obj-$(CONFIG_CRYPTO_LZF) += lzf.o
 obj-$(CONFIG_CRYPTO_AUTHENC) += authenc.o
 obj-$(CONFIG_CRYPTO_LZO) += lzo.o
 obj-$(CONFIG_CRYPTO_RNG2) += rng.o
@@ -85,6 +87,9 @@ obj-$(CONFIG_CRYPTO_RNG2) += krng.o
 obj-$(CONFIG_CRYPTO_ANSI_CPRNG) += ansi_cprng.o
 obj-$(CONFIG_CRYPTO_TEST) += tcrypt.o
 obj-$(CONFIG_CRYPTO_GHASH) += ghash-generic.o
+obj-$(CONFIG_CRYPTO_MPUINT) += mpuint.o
+obj-$(CONFIG_CRYPTO_MPURSA) += mpursa.o
+obj-$(CONFIG_CRYPTO_MPUSHA) += mpusha.o
 
 #
 # generic algorithms and the async_tx api

@@ -149,3 +149,13 @@ obj-$(CONFIG_FB_VIRTUAL)          += vfb.o
 
 #video output switch sysfs driver
 obj-$(CONFIG_VIDEO_OUTPUT_CONTROL) += output.o
+
+#obj-$(CONFIG_FB_MT53XX)		  += mt53xx/ cfbcopyarea.o cfbfillrect.o cfbimgblt.o
+ifeq ($(CONFIG_FB_MT53XX),m)
+DEFINES += -DMT53XX_FB_MODULE
+obj-y		  += cfbcopyarea.o cfbfillrect.o cfbimgblt.o
+endif
+ifeq ($(CONFIG_FB_MT53XX),y)
+#obj-y		  += mt53xx/ cfbcopyarea.o cfbfillrect.o cfbimgblt.o
+obj-y		  += cfbcopyarea.o cfbfillrect.o cfbimgblt.o
+endif

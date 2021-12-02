@@ -1,7 +1,7 @@
 #ifndef A2091_H
 #define A2091_H
 
-/* $Id: a2091.h,v 1.4 1997/01/19 23:07:09 davem Exp $
+/* $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/scsi/a2091.h#1 $
  *
  * Header file for the Commodore A2091 Zorro II SCSI controller for Linux
  *

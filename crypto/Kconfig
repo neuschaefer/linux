@@ -82,6 +82,12 @@ config CRYPTO_PCOMP
 	tristate
 	select CRYPTO_ALGAPI2
 
+config CRYPTO_MPUINT
+	tristate "Multi-precision integer support"
+	help
+	  This option enables the multiple precision unsigned integer
+	  functions required for MPU computations.
+
 config CRYPTO_MANAGER
 	tristate "Cryptographic algorithm manager"
 	select CRYPTO_MANAGER2
@@ -298,6 +304,13 @@ config CRYPTO_VMAC
 
 	  See also:
 	  <http://fastcrypto.org/vmac>
+ 
+config CRYPTO_MPUSHA
+	tristate "Multi-precision integer SHA support"
+	select CRYPTO_MPUINT
+	help
+	  Adds support for Multiple-precision unsigned integer SHA
+	  algorithms.
 
 comment "Digest"
 
@@ -756,6 +769,12 @@ config CRYPTO_TWOFISH
 	  See also:
 	  <http://www.schneier.com/twofish.html>
 
+config CRYPTO_MPURSA
+	tristate "Multi-precision integer RSA support"
+	select CRYPTO_MPUINT
+	help
+	  Multiple-precision unsigned integer RSA algorithm.
+
 config CRYPTO_TWOFISH_COMMON
 	tristate
 	help
@@ -823,6 +842,13 @@ config CRYPTO_LZO
 	select LZO_DECOMPRESS
 	help
 	  This is the LZO algorithm.
+
+config CRYPTO_LZF
+	tristate "LZF compression algorithm"
+	select CRYPTO_ALGAPI
+	help
+	  This is the LZF algorithm. It is especially useful for TuxOnIce,
+	  because it achieves good compression quickly.
 
 comment "Random Number Generation"
 

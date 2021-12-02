@@ -1,0 +1,1 @@
+/* MAXIMUM_FREESAT_MHEG_NVM_SIZE is undefined */

@@ -375,6 +375,29 @@ config USB_SL811_CS
 	  To compile this driver as a module, choose M here: the
 	  module will be called "sl811_cs".
 
+config USB_MTK53xx_HCD
+	tristate "MTK53xx HCD support"
+	depends on USB
+	default N
+	help
+	  The MTK53xx is a single-port USB host controller that support either
+	  host side or peripheral side roles.  Enable this option if your
+	  board has this chip, and you want to use it as a host controller. 
+	  If unsure, say N.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called mtk5381hcd.
+
+config USB_MTK5395_HCD
+	tristate "MTK5395 HCD support"
+	depends on USB
+	default N
+	help
+	  The MTK5395 is a single-port USB host controller that support either
+	  host side or peripheral side roles.  Enable this option if your
+	  board has this chip, and you want to use it as a host controller. 
+	  If unsure, say N.
+
 config USB_R8A66597_HCD
 	tristate "R8A66597 HCD support"
 	depends on USB

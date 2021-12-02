@@ -1,4 +1,4 @@
-/* $Id: isdn_x25iface.h,v 1.1.2.2 2004/01/12 22:37:19 keil Exp $
+/* $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/isdn/i4l/isdn_x25iface.h#1 $
  *
  * header for Linux ISDN subsystem, x.25 related functions
  *

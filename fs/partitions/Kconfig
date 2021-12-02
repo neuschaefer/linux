@@ -249,3 +249,9 @@ config SYSV68_PARTITION
 	  partition table format used by Motorola Delta machines (using
 	  sysv68).
 	  Otherwise, say N.
+
+config MTKEMMC_PARTITION
+	bool "MTK DTV EMMC partition table support" if PARTITION_ADVANCED
+	default n
+	help
+	  Say N here.

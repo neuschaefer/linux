@@ -1,0 +1,1 @@
+/* INCLUDE_TARA_TELETEXT_DECODER is undefined */

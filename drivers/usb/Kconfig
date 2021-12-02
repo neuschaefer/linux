@@ -111,7 +111,8 @@ source "drivers/usb/wusbcore/Kconfig"
 
 source "drivers/usb/host/Kconfig"
 
-source "drivers/usb/musb/Kconfig"
+#source "drivers/usb/musb/Kconfig"
+source "drivers/usb/mod-musb_qmu/Kconfig"
 
 source "drivers/usb/class/Kconfig"
 

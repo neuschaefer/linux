@@ -1,0 +1,497 @@
+/******************************************************************************
+ *	 DTV LABORATORY, LG ELECTRONICS INC., SEOUL, KOREA
+ *	 Copyright(c) 1999 by LG Electronics Inc.
+ *
+ *	 All rights reserved. No part of this work may be reproduced, stored in a
+ *	 retrieval system, or transmitted by any means without prior written
+ *	 permission of LG Electronics Inc.
+ *****************************************************************************/
+
+/** @file common.h
+ *
+ *	Common Used Type Definitions.
+ *
+ *	@author 	cskim
+ *	@version	1.0
+ *	@date		2005. 6. 1
+ *	@note
+ *	@see
+ */
+
+/******************************************************************************
+	Header File Guarder
+******************************************************************************/
+
+#ifndef _COMMON_H_
+// DOM-IGNORE-BEGIN
+#define _COMMON_H_
+// DOM-IGNORE-END
+
+#ifdef _EMUL_WIN
+//#define __FUNCTION__		"(N/A in VC6.0)"
+/*#define COMPILE_USER		"sw_center"
+#define COMPILE_DATE		"20081001"
+#define COMPILE_TIME		"16:16:08"
+#define FIRMWARE_VERSION	0x000100
+#define EPK_VERSION			0x000100
+#define BOOT_VERSION		0x0001
+#define ROOTFS_VERSION		0x0001
+#define KERNEL_VERSION		0x0001
+#define RESOURCE_VERSION	0x0001
+#define EMANUAL_VERSION		0x0001
+#define EZCAL_VERSION		0x0001
+#define EDBMS_VERSION		0x0001
+#define MICOM_VERSION		0x0001*/
+#endif /* _EMUL_WIN */
+
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+// DOM-IGNORE-BEGIN
+// Common type definitions
+// DOM-IGNORE-END
+#ifndef UINT8
+typedef	unsigned char			__UINT8;
+#define UINT8 __UINT8
+#endif
+
+#ifndef UINT08
+typedef	unsigned char			__UINT08;
+#define UINT08 __UINT08
+#endif
+
+#ifndef SINT8
+typedef	signed char				__SINT8;
+#define SINT8 __SINT8
+#endif
+
+#ifndef SINT08
+typedef	signed char				__SINT08;
+#define SINT08 __SINT08
+#endif
+
+#ifndef CHAR
+typedef	char					__CHAR;
+#define CHAR __CHAR
+#endif
+
+#ifndef UINT16
+typedef	unsigned short			__UINT16;
+#define UINT16 __UINT16
+#endif
+
+#ifndef SINT16
+typedef	signed short			__SINT16;
+#define SINT16 __SINT16
+#endif
+
+#ifndef UINT32
+typedef	unsigned int			__UINT32;
+#define UINT32 __UINT32
+#endif
+
+#ifndef SINT32
+typedef signed int				__SINT32;
+#define SINT32 __SINT32
+#endif
+
+#ifndef BOOLEAN
+#ifndef _EMUL_WIN
+typedef	unsigned int			__BOOLEAN;
+#define BOOLEAN __BOOLEAN
+#else
+typedef	unsigned char		__BOOLEAN;
+#define BOOLEAN __BOOLEAN
+#endif
+#endif
+
+#ifndef ULONG
+typedef unsigned long			__ULONG;
+#define ULONG __ULONG
+#endif
+
+#ifndef SLONG
+typedef signed long				__SLONG;
+#define SLONG __SLONG
+#endif
+
+#ifndef UINT64
+#ifndef _EMUL_WIN
+typedef	unsigned long long		__UINT64;
+#else
+typedef	unsigned _int64			__UINT64;
+#endif
+#define UINT64 __UINT64
+#endif
+
+#ifndef SINT64
+#ifndef _EMUL_WIN
+typedef	signed long long		__SINT64;
+#else
+typedef	signed _int64			__SINT64;
+#endif
+#define SINT64 __SINT64
+#endif
+
+// DOM-IGNORE-BEGIN
+// Common constant definitions
+// DOM-IGNORE-END
+#ifndef TRUE
+#define TRUE					(1)
+#endif
+
+#ifndef FALSE
+#define FALSE					(0)
+#endif
+
+#ifndef ON_STATE
+#define ON_STATE				(1)
+#endif
+
+#ifndef OFF_STATE
+#define OFF_STATE				(0)
+#endif
+
+#ifndef ON
+#define ON						(1)
+#endif
+
+#ifndef OFF
+#define OFF						(0)
+#endif
+
+#ifndef NULL
+#define NULL					((void *)0)
+#endif
+
+#ifndef OFFSET
+#define OFFSET(structure, member)		/* byte offset of member in structure*/\
+		((int) &(((structure *) 0) -> member))
+#endif
+
+#ifndef MEMBER_SIZE
+#define MEMBER_SIZE(structure, member)	/* size of a member of a structure */\
+		(sizeof (((structure *) 0) -> member))
+#endif
+
+#ifndef NELEMENTS
+#define NELEMENTS(array)				/* number of elements in an array */ \
+		(sizeof (array) / sizeof ((array) [0]))
+#endif
+
+#define CM_SAT_ERROR_CODE_COMMON_OFFSET		0
+#define CM_SAT_ERROR_CODE_SAT_OFFSET		30
+#define CM_SAT_ERROR_CODE_TP_OFFSET			30
+#define CM_SAT_ERROR_CODE_SERVICE_OFFSET	30
+#define CM_SAT_ERROR_CODE_SETTINGID_OFFSET	30
+#define CM_SAT_ERROR_CODE_DBVERSION_OFFSET		30
+#define CM_SAT_ERROR_CODE_INDEXTABLE_OFFSET	30
+
+
+#define CM_SAT_ERROR_CODE_BASE				(-500)//( -120 )
+#define CM_SAT_ERROR_CODE_COMMON_BASE		( CM_SAT_ERROR_CODE_BASE 					\
+												+ CM_SAT_ERROR_CODE_COMMON_OFFSET )
+#define CM_SAT_ERROR_CODE_SAT_BASE			( CM_SAT_ERROR_CODE_COMMON_BASE				\
+												+ CM_SAT_ERROR_CODE_SAT_OFFSET )
+#define CM_SAT_ERROR_CODE_TP_BASE			( CM_SAT_ERROR_CODE_SAT_BASE 				\
+												+ CM_SAT_ERROR_CODE_TP_OFFSET )
+#define CM_SAT_ERROR_CODE_SERVICE_BASE		( CM_SAT_ERROR_CODE_TP_BASE 				\
+												+ CM_SAT_ERROR_CODE_SERVICE_OFFSET )
+#define CM_SAT_ERROR_CODE_SETTINGID_BASE	( CM_SAT_ERROR_CODE_SERVICE_BASE 			\
+												+ CM_SAT_ERROR_CODE_SETTINGID_OFFSET )
+#define CM_SAT_ERROR_CODE_DBVERSION_BASE	( CM_SAT_ERROR_CODE_SETTINGID_BASE 			\
+												+ CM_SAT_ERROR_CODE_DBVERSION_OFFSET )
+
+#define CM_SAT_ERROR_CODE_INDEXTABLE_BASE	( CM_SAT_ERROR_CODE_DBVERSION_BASE 			\
+												+ CM_SAT_ERROR_CODE_INDEXTABLE_OFFSET )
+
+
+#define CM_SAT_SUCCESS_CODE_COMMON_OFFSET		0
+#define CM_SAT_SUCCESS_CODE_SAT_OFFSET			20
+#define CM_SAT_SUCCESS_CODE_TP_OFFSET			20
+#define CM_SAT_SUCCESS_CODE_SERVICE_OFFSET		20
+#define CM_SAT_SUCCESS_CODE_SETTINGID_OFFSET	20
+#define CM_SAT_SUCCESS_CODE_LNB_OFFSET			20
+
+#define CM_SAT_SUCCESS_CODE_BASE				0x00000001
+#define CM_SAT_SUCCESS_CODE_COMMON_BASE			( CM_SAT_SUCCESS_CODE_BASE 					\
+													+ CM_SAT_SUCCESS_CODE_COMMON_OFFSET )
+#define CM_SAT_SUCCESS_CODE_SAT_BASE			( CM_SAT_SUCCESS_CODE_COMMON_BASE			\
+													+ CM_SAT_SUCCESS_CODE_SAT_OFFSET )
+#define CM_SAT_SUCCESS_CODE_TP_BASE				( CM_SAT_SUCCESS_CODE_SAT_BASE 				\
+													+ CM_SAT_SUCCESS_CODE_TP_OFFSET )
+#define CM_SAT_SUCCESS_CODE_SERVICE_BASE		( CM_SAT_SUCCESS_CODE_TP_BASE 				\
+													+ CM_SAT_SUCCESS_CODE_SERVICE_OFFSET )
+#define CM_SAT_SUCCESS_CODE_SETTINGID_BASE		( CM_SAT_SUCCESS_CODE_SERVICE_BASE 			\
+													+ CM_SAT_SUCCESS_CODE_SETTINGID_OFFSET )
+#define CM_SAT_SUCCESS_CODE_LNB_BASE			( CM_SAT_SUCCESS_CODE_SETTINGID_BASE 		\
+													+ CM_SAT_SUCCESS_CODE_LNB_OFFSET )
+#ifndef API_STATE_T
+
+/**
+ *	API return type definitions
+ *
+ *  \- API_OK				: success (no error) <P>
+ *	\- API_ERROR			: generic error <P>
+ *	\- API_INVALID_PARAMS	: input parameter error <P>
+ *	\- API_NOT_SUPPORTED	: not supported <P>
+ *	\- API_NOT_PERMITTED	: no permission <P>
+ *	\- API_TIMEOUT			: time-out <P>
+ */
+typedef enum
+{
+	E_DBVERSION_WRITE_ERROR 	= ( CM_SAT_ERROR_CODE_DBVERSION_BASE + 0 ),
+	E_DB_VERSION_DB_INIT_ERROR  = ( CM_SAT_ERROR_CODE_DBVERSION_BASE + 1 ),
+	E_DBVERSION_READ_ERROR		= ( CM_SAT_ERROR_CODE_DBVERSION_BASE + 2 ),
+	E_DBVERSION_CORRUPTED		= ( CM_SAT_ERROR_CODE_DBVERSION_BASE + 3 ),
+	E_DBVERSION_INVALID_ARG		= ( CM_SAT_ERROR_CODE_DBVERSION_BASE + 4 ),
+	E_DBVERSION_CRC_CALC_ERROR	= ( CM_SAT_ERROR_CODE_DBVERSION_BASE + 5 ),
+
+	E_SAT_DB_NOT_INITIALIZED	= ( CM_SAT_ERROR_CODE_SAT_BASE + 0 ),
+	E_SAT_NO_FREE_SLOT 			= ( CM_SAT_ERROR_CODE_SAT_BASE + 1 ),
+	E_SAT_INVALID_ARG  			= ( CM_SAT_ERROR_CODE_SAT_BASE + 2 ),
+	E_SAT_ERROR		  			= ( CM_SAT_ERROR_CODE_SAT_BASE + 3 ),
+	E_SAT_INVALID_SLOT			= ( CM_SAT_ERROR_CODE_SAT_BASE + 4 ),
+	E_SAT_WRITE_ERROR			= ( CM_SAT_ERROR_CODE_SAT_BASE + 5 ),
+	E_SAT_READ_ERROR			= ( CM_SAT_ERROR_CODE_SAT_BASE + 6 ),
+	E_SAT_INVALID_HANDLE		= ( CM_SAT_ERROR_CODE_SAT_BASE + 7 ),
+	E_SAT_LIST_EMPTY			= ( CM_SAT_ERROR_CODE_SAT_BASE + 8 ),
+	E_SAT_PRESET_DELETE			= ( CM_SAT_ERROR_CODE_SAT_BASE + 9 ),
+	E_SAT_NO_RECORDS			= ( CM_SAT_ERROR_CODE_SAT_BASE + 10 ),
+	E_SAT_INVALID_SLOT_VAL_INDEX= ( CM_SAT_ERROR_CODE_SAT_BASE + 11 ),
+	E_SAT_INVALID_SLOT_INDEX	= ( CM_SAT_ERROR_CODE_SAT_BASE + 12 ),
+	E_SAT_INVALID_REC_ACCESS	= ( CM_SAT_ERROR_CODE_SAT_BASE + 13 ),
+	E_SAT_IDXTBLE_MEM_ALLOC_ERROR	= ( CM_SAT_ERROR_CODE_SAT_BASE + 14 ),
+	E_SAT_INVALID_CURR_INDEX	= ( CM_SAT_ERROR_CODE_SAT_BASE + 15 ),
+	E_SAT_UPDATE_NAV_INDX_ERROR	= ( CM_SAT_ERROR_CODE_SAT_BASE + 16 ),
+	E_SAT_IDXTBLE_DEL_ERROR		= ( CM_SAT_ERROR_CODE_SAT_BASE + 17 ),
+	E_SAT_SLOT_ALREADY_USED		= ( CM_SAT_ERROR_CODE_SAT_BASE + 18 ),
+	E_SAT_SLOT_ALREADY_FREE		= ( CM_SAT_ERROR_CODE_SAT_BASE + 19 ),
+	E_SAT_ITEM_NOT_FOUND		= ( CM_SAT_ERROR_CODE_SAT_BASE + 20 ),
+	E_SAT_IDX_INSERT_FAILURE	= ( CM_SAT_ERROR_CODE_SAT_BASE + 21 ),
+	E_SAT_IDXTBLE_SEARCH_ERROR	= ( CM_SAT_ERROR_CODE_SAT_BASE + 22 ),
+	E_SAT_IDX_GET_FIRST_ERROR	= ( CM_SAT_ERROR_CODE_SAT_BASE + 23 ),
+	E_SAT_IDX_GET_NEXT_ERROR	= ( CM_SAT_ERROR_CODE_SAT_BASE + 24 ),
+	E_SAT_IDX_GET_PREV_ERROR	= ( CM_SAT_ERROR_CODE_SAT_BASE + 25 ),
+	E_SAT_IDX_GET_LAST_ERROR	= ( CM_SAT_ERROR_CODE_SAT_BASE + 26 ),
+
+	E_TP_NO_FREE_SLOT 			= ( CM_SAT_ERROR_CODE_TP_BASE + 0 ),
+	E_TP_INVALID_ARG  			= ( CM_SAT_ERROR_CODE_TP_BASE + 1 ),
+	E_TP_ERROR		  			= ( CM_SAT_ERROR_CODE_TP_BASE + 2 ),
+	E_TP_INVALID_SLOT			= ( CM_SAT_ERROR_CODE_TP_BASE + 3 ),
+	E_TP_WRITE_ERROR			= ( CM_SAT_ERROR_CODE_TP_BASE + 4 ),
+	E_TP_READ_ERROR				= ( CM_SAT_ERROR_CODE_TP_BASE + 5 ),
+	E_TP_INVALID_HANDLE			= ( CM_SAT_ERROR_CODE_TP_BASE + 6 ),
+	E_TP_DB_NOT_INITIALIZED		= ( CM_SAT_ERROR_CODE_TP_BASE + 7 ),
+	E_TP_PRESET_DELETE			= ( CM_SAT_ERROR_CODE_TP_BASE + 8 ),
+	E_TP_NO_RECORDS				= ( CM_SAT_ERROR_CODE_TP_BASE + 9 ),
+	E_TP_ITEM_NOT_FOUND			= ( CM_SAT_ERROR_CODE_TP_BASE + 10 ),
+	E_TP_INVALID_REC_ACCESS		= ( CM_SAT_ERROR_CODE_TP_BASE + 11 ),
+	E_TP_INVALID_SLOT_VAL_INDEX	= ( CM_SAT_ERROR_CODE_TP_BASE + 12 ),
+	E_TP_INVALID_SLOT_INDEX		= ( CM_SAT_ERROR_CODE_TP_BASE + 13 ),
+	E_TP_SLOT_ALREADY_USED		= ( CM_SAT_ERROR_CODE_TP_BASE + 14 ),
+	E_TP_SLOT_ALREADY_FREE		= ( CM_SAT_ERROR_CODE_TP_BASE + 15 ),
+	E_TP_IDXTBLE_MEM_ALLOC_ERROR= ( CM_SAT_ERROR_CODE_TP_BASE + 16 ),
+	E_TP_IDX_INSERT_FAILURE		= ( CM_SAT_ERROR_CODE_TP_BASE + 17 ),
+	E_TP_IDXTBLE_DEL_ERROR		= ( CM_SAT_ERROR_CODE_TP_BASE + 18 ),
+	E_TP_IDXTBLE_SEARCH_ERROR	= ( CM_SAT_ERROR_CODE_TP_BASE + 19 ),
+	E_TP_NOT_MATCHING_SETTINGID_CRITERIA = ( CM_SAT_ERROR_CODE_TP_BASE + 20 ),
+
+	E_SERVICE_NO_FREE_SLOT 		= ( CM_SAT_ERROR_CODE_SERVICE_BASE + 0 ),
+	E_SERVICE_INVALID_ARG  		= ( CM_SAT_ERROR_CODE_SERVICE_BASE + 1 ),
+	E_SERVICE_ERROR		  		= ( CM_SAT_ERROR_CODE_SERVICE_BASE + 2 ),
+	E_SERVICE_INVALID_SLOT		= ( CM_SAT_ERROR_CODE_SERVICE_BASE + 3 ),
+	E_SERVICE_WRITE_ERROR		= ( CM_SAT_ERROR_CODE_SERVICE_BASE + 4 ),
+	E_SERVICE_READ_ERROR		= ( CM_SAT_ERROR_CODE_SERVICE_BASE + 5 ),
+	E_SERVICE_INVALID_HANDLE	= ( CM_SAT_ERROR_CODE_SERVICE_BASE + 6 ),
+	E_SERVICE_DB_NOT_INITIALIZED 		= ( CM_SAT_ERROR_CODE_SERVICE_BASE + 7 ),
+	E_SERVICE_NO_RECORDS				= ( CM_SAT_ERROR_CODE_SERVICE_BASE + 8 ),
+	E_SERVICE_INVALID_SLOT_INDEX		= ( CM_SAT_ERROR_CODE_SERVICE_BASE + 9 ),
+	E_SERVICE_INVALID_SLOT_VAL_INDEX	= ( CM_SAT_ERROR_CODE_SERVICE_BASE + 10 ),
+	E_SERVICE_INVALID_ACCESS			= ( CM_SAT_ERROR_CODE_SERVICE_BASE + 11 ),
+	E_SERVICE_SLOT_ALREADY_USED			= ( CM_SAT_ERROR_CODE_SERVICE_BASE + 12 ),
+	E_SERVICE_SLOT_ALREADY_FREE			= ( CM_SAT_ERROR_CODE_SERVICE_BASE + 13 ),
+	E_SERVICE_IDXTBLE_MEM_ALLOC_ERROR	= ( CM_SAT_ERROR_CODE_SERVICE_BASE + 14 ),
+	E_SERVICE_IDX_INSERT_FAILURE		= ( CM_SAT_ERROR_CODE_SERVICE_BASE + 15 ),
+	E_SERVICE_IDXTBLE_DEL_ERROR			= ( CM_SAT_ERROR_CODE_SERVICE_BASE + 16 ),
+	E_SERVICE_IDXTBLE_SEARCH_ERROR		= ( CM_SAT_ERROR_CODE_SERVICE_BASE + 17 ),
+	E_SERVICE_ITEM_NOT_FOUND			= ( CM_SAT_ERROR_CODE_SERVICE_BASE + 18 ),
+	E_SERVICE_IDX_GET_FIRST_ERROR	= ( CM_SAT_ERROR_CODE_SERVICE_BASE + 19 ),
+	E_SERVICE_IDX_GET_NEXT_ERROR	= ( CM_SAT_ERROR_CODE_SERVICE_BASE + 20 ),
+	E_SERVICE_IDX_GET_PREV_ERROR	= ( CM_SAT_ERROR_CODE_SERVICE_BASE + 21 ),
+	E_SERVICE_IDX_GET_LAST_ERROR	= ( CM_SAT_ERROR_CODE_SERVICE_BASE + 22 ),
+
+	E_SETTINGID_NO_FREE_SLOT 			= ( CM_SAT_ERROR_CODE_SETTINGID_BASE + 0 ),
+	E_SETTINGID_INVALID_ARG  			= ( CM_SAT_ERROR_CODE_SETTINGID_BASE + 1 ),	
+	E_SETTINGID_ERROR		  			= ( CM_SAT_ERROR_CODE_SETTINGID_BASE + 2 ),	
+	E_SETTINGID_INVALID_SLOT			= ( CM_SAT_ERROR_CODE_SETTINGID_BASE + 3 ),
+	E_SETTINGID_WRITE_ERROR				= ( CM_SAT_ERROR_CODE_SETTINGID_BASE + 4 ),
+	E_SETTINGID_READ_ERROR				= ( CM_SAT_ERROR_CODE_SETTINGID_BASE + 5 ),
+	E_SETTINGID_INVALID_HANDLE			= ( CM_SAT_ERROR_CODE_SETTINGID_BASE + 6 ),	
+	E_SETTINGID_DB_NOT_INITIALIZED		= ( CM_SAT_ERROR_CODE_SETTINGID_BASE + 7 ),
+	E_SETTINGID_NO_RECORDS				= ( CM_SAT_ERROR_CODE_SETTINGID_BASE + 8 ),	
+	E_SETTINGID_INVALID_ACCESS			= ( CM_SAT_ERROR_CODE_SETTINGID_BASE + 9 ),		
+	E_SETTINGID_INVALID_SLOT_INDEX		= ( CM_SAT_ERROR_CODE_SETTINGID_BASE + 10 ),	
+	E_SETTINGID_INVALID_SLOT_VAL_INDEX	= ( CM_SAT_ERROR_CODE_SETTINGID_BASE + 11 ),	
+	E_SETTINGID_SLOT_ALREADY_USED		= ( CM_SAT_ERROR_CODE_SETTINGID_BASE + 12 ),
+	E_SETTINGID_SLOT_ALREADY_FREE		= ( CM_SAT_ERROR_CODE_SETTINGID_BASE + 13 ),
+
+	E_RBTREE_INIT_ERROR 		= ( CM_SAT_ERROR_CODE_INDEXTABLE_BASE + 0 ),
+	E_RBTREE_HELPERINIT_ERROR	= ( CM_SAT_ERROR_CODE_INDEXTABLE_BASE + 1 ),
+	E_IDXTBLE_CALLBKREG_ERROR	= ( CM_SAT_ERROR_CODE_INDEXTABLE_BASE + 2 ),
+	E_IDXTBLE_INIT_ERROR		= ( CM_SAT_ERROR_CODE_INDEXTABLE_BASE + 3 ),
+
+
+	ERR_CRC32_INVALIDARG        = ( CM_SAT_ERROR_CODE_COMMON_BASE + 0 ),
+	E_CRC32_ERROR		        = ( CM_SAT_ERROR_CODE_COMMON_BASE + 1 ),
+    E_INVALID_CD_NETWORK_ID		= ( CM_SAT_ERROR_CODE_COMMON_BASE + 2 ),
+	E_INVALID_NETWORK_ID		= ( CM_SAT_ERROR_CODE_COMMON_BASE + 3 ),
+	
+	S_LNB_OK					= 0,
+	S_SAT_OK					= 0,
+	S_TP_OK						= 0,
+	S_SERVICE_OK				= 0,
+	S_SETTINGID_OK				= 0,
+	S_CRC32_SUCCESS             = 0,
+	S_DBVERSION_OK				= 0,
+
+	S_LNB_FOUND_SLOT			= ( CM_SAT_SUCCESS_CODE_LNB_BASE + 0 ),
+	S_LNB_SLOT_FREE				= ( CM_SAT_SUCCESS_CODE_LNB_BASE + 1 ),
+	S_LNB_SLOT_USED           	= ( CM_SAT_SUCCESS_CODE_LNB_BASE + 2 ),
+	LNB_END_OF_RECORD			= ( CM_SAT_SUCCESS_CODE_LNB_BASE + 3 ),
+	LNB_START_OF_RECORD 		= ( CM_SAT_SUCCESS_CODE_LNB_BASE + 4 ),
+
+	S_SAT_FOUND_SLOT			= ( CM_SAT_SUCCESS_CODE_SAT_BASE + 0 ),
+	S_SAT_SLOT_FREE				= ( CM_SAT_SUCCESS_CODE_SAT_BASE + 1 ),
+	S_SAT_SLOT_USED             = ( CM_SAT_SUCCESS_CODE_SAT_BASE + 2 ),
+	SAT_END_OF_RECORD			= ( CM_SAT_SUCCESS_CODE_SAT_BASE + 3 ),
+	SAT_START_OF_RECORD 		= ( CM_SAT_SUCCESS_CODE_SAT_BASE + 4 ),
+
+	S_TP_FOUND_SLOT				= ( CM_SAT_SUCCESS_CODE_TP_BASE + 0 ),
+	S_TP_SLOT_FREE				= ( CM_SAT_SUCCESS_CODE_TP_BASE + 1 ),
+	S_TP_SLOT_USED             	= ( CM_SAT_SUCCESS_CODE_TP_BASE + 2 ),
+	TP_END_OF_RECORD			= ( CM_SAT_SUCCESS_CODE_TP_BASE + 3 ),
+	TP_START_OF_RECORD 			= ( CM_SAT_SUCCESS_CODE_TP_BASE + 4 ),
+
+	S_SERVICE_FOUND_SLOT		= ( CM_SAT_SUCCESS_CODE_SERVICE_BASE + 0 ),
+	S_SERVICE_SLOT_FREE			= ( CM_SAT_SUCCESS_CODE_SERVICE_BASE + 1 ),
+	S_SERVICE_SLOT_USED         = ( CM_SAT_SUCCESS_CODE_SERVICE_BASE + 2 ),
+	SERVICE_END_OF_RECORD		= ( CM_SAT_SUCCESS_CODE_SERVICE_BASE + 3 ),
+	SERVICE_START_OF_RECORD 	= ( CM_SAT_SUCCESS_CODE_SERVICE_BASE + 4 ),
+	SERVICE_LIST_EMPTY			= ( CM_SAT_SUCCESS_CODE_SERVICE_BASE + 5 ),
+
+	S_SETTINGID_SLOT_FREE		= ( CM_SAT_SUCCESS_CODE_SETTINGID_BASE + 0 ),
+	S_SETTINGID_SLOT_USED       = ( CM_SAT_SUCCESS_CODE_SETTINGID_BASE + 1 ),
+	S_SETTINGID_NO_USED_SLOTS	= ( CM_SAT_SUCCESS_CODE_SETTINGID_BASE + 2 ),
+	SETTINGID_END_OF_RECORD		= ( CM_SAT_SUCCESS_CODE_SETTINGID_BASE + 3 ),
+	SETTINGID_START_OF_RECORD 	= ( CM_SAT_SUCCESS_CODE_SETTINGID_BASE + 4 ),
+
+	API_OK   					=	0,
+	OK							=	0,
+	API_ERROR     				=	-1,
+	API_NOT_OK					= 	-1,
+	NOT_OK						=	-1,
+	PARAMETER_ERROR				=   -2,
+	API_INVALID_PARAMS			=	-2,
+	INVALID_PARAMS				=	-2,
+	API_NOT_ENOUGH_RESOURCE		=	-3,
+	NOT_ENOUGH_RESOURCE			=	-3,
+	API_NOT_SUPPORTED			=	-4,
+	NOT_SUPPORTED				=	-4,
+	API_NOT_PERMITTED			=	-5,
+	NOT_PERMITTED				=	-5,
+	API_TIMEOUT					=	-6,
+	TIMEOUT						=	-6,
+	NO_DATA_RECEIVED			=	-7,
+	DN_BUF_OVERFLOW				=	-8,
+	DLNA_NOT_CONNECTED			=	-9,  		/**< DLNA 접속 에러 발생시*/
+	IPM_OK              		=	API_OK,		/**< 네트워크 설정을 완료했습니다. */
+	IPM_FAIL          			=	API_NOT_OK,	/**< 네트워크 설정 오류(에러코드:102) */
+	IPM_ERR_ARG					=	-1,			/**< 네트워크 설정 오류(에러코드:103) */
+	IPM_ERR_INTERFACE_DOWN		=	-2,			/**< 네트워크 설정 오류(에러코드:104) */
+	IPM_ERR_INVALID_GATEWAY		=	-3,			/**< 네트워크 설정 오류(에러코드:105) */
+	IPM_ERR_EXISTENT_IP			=	-4,			/**< 현재 설정한 IP는 사용중입니다. */
+	IPM_ERR_NO_DHCP_RESPONSE	=	-5			/**< No response from DHCP server */
+}	_API_STATE_T;
+
+#define API_STATE_T	_API_STATE_T
+#endif
+
+typedef API_STATE_T		DTV_STATUS;
+typedef API_STATE_T		DTV_STATUS_T;
+
+#ifndef TIME_T
+/**
+ *	Time structure type definitions
+ *
+ *	\- year		: 1970 ~ 65535 <P>
+ *	\- month	: 1 ~ 12 <P>
+ *	\- day		: 1 ~ 31 <P>
+ *	\- hour		: 0 ~ 23 <P>
+ *	\- minute	: 0 ~ 59 <P>
+ *	\- second	: 0 ~ 59 <P>
+ */
+
+#define TIME_T xlibc_time_t
+#endif //TIME_T
+
+#define	DTV_MAIN_TIME		0x0
+#define	PSIP_TIME_PORT_0	0x1
+#define	PSIP_TIME_PORT_1	0x2
+#define	SI_TIME_PORT_0		0x3
+#define	SI_TIME_PORT_1		0x4
+
+
+#ifndef MSG_TYPE_T
+/**
+ *	Common message type definitions <P>
+ *	This message type is used between DTV modules
+ *
+ *	\- msgID : message ID <P>
+ *	\- data  : data payload <P>
+ */
+typedef struct
+{
+	UINT32			msgID;
+	UINT32			data[3];
+
+}	_MSG_TYPE_T;
+
+#define MSG_TYPE_T _MSG_TYPE_T
+#endif
+#include "osa/xlibc.h"
+#include "cmnio_type.h"
+#include "sysres.h"
+
+
+/****************************************************************************/
+/* Function lists : Channel Change Time										*/
+/****************************************************************************/
+#define	MARK_FN_START				"FN_START"
+#define	MARK_FN_END					"FN_END"
+#define	MARK_CHFN_START				"CHFN_START"
+#define	MARK_CHFN_END				"CHFN_END"
+#define	MARK_PT						"PT"
+#define	MARK_CHPT					"CHPT"
+
+extern	void TIMELOG(const char *mark, const char *desc);
+extern	void SHOWLOG(void);
+extern	void RESET_TIMELOG(void);
+
+extern	void CHCHTASKLOG(const char * str);
+extern	void SHOW_CHCHTASKLOG(void);
+extern	void RESET_CHCHTASKLOG(void);
+
+extern	void INPUTTASKLOG(const char * str);
+extern	void SHOW_INPUTTASKLOG(void);
+extern	unsigned int GET_INPUTTASKLOG(void);
+extern	void RESET_INPUTTASKLOG(void);
+
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif  /* _COMMON_H_ */

@@ -1,4 +1,4 @@
-/* $Id: sedlbauer.c,v 1.34.2.6 2004/01/24 20:47:24 keil Exp $
+/* $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/isdn/hisax/sedlbauer.c#1 $
  *
  * low level stuff for Sedlbauer cards
  * includes support for the Sedlbauer speed star (speed star II),
@@ -48,7 +48,7 @@
 #include <linux/pci.h>
 #include <linux/isapnp.h>
 
-static const char *Sedlbauer_revision = "$Revision: 1.34.2.6 $";
+static const char *Sedlbauer_revision = "$Revision: #1 $";
 
 static const char *Sedlbauer_Types[] =
 	{"None", "speed card/win", "speed star", "speed fax+",

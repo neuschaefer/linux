@@ -1,0 +1,3 @@
+#ifndef UI_OSD_RESOLUTION_HEIGHT
+    #define UI_OSD_RESOLUTION_HEIGHT 540
+#endif

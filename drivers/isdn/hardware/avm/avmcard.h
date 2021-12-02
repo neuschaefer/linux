@@ -1,4 +1,4 @@
-/* $Id: avmcard.h,v 1.1.4.1.2.1 2001/12/21 15:00:17 kai Exp $
+/* $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/isdn/hardware/avm/avmcard.h#1 $
  *
  * Copyright 1999 by Carsten Paeth <calle@calle.de>
  *

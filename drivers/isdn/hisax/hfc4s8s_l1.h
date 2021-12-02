@@ -1,5 +1,5 @@
 /***************************************************************/
-/*  $Id: hfc4s8s_l1.h,v 1.1 2005/02/02 17:28:55 martinb1 Exp $ */
+/*  $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/isdn/hisax/hfc4s8s_l1.h#1 $ */
 /*                                                             */
 /*  This file is a minimal required extraction of hfc48scu.h   */
 /*  (Genero 3.2, HFC XML 1.7a for HFC-E1, HFC-4S and HFC-8S)   */

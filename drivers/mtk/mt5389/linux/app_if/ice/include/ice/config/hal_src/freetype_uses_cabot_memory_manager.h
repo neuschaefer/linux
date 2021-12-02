@@ -1,0 +1,1 @@
+/* FREETYPE_USES_CABOT_MEMORY_MANAGER is undefined */

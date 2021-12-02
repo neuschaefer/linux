@@ -279,10 +279,21 @@ int shash_ahash_digest(struct ahash_request *req, struct shash_desc *desc)
 	if (nbytes < min(sg->length, ((unsigned int)(PAGE_SIZE)) - offset)) {
 		void *data;
 
+		#ifdef HW_SHA256
+		data = crypto_kmap_sha256(sg_page(sg));
+		#else
 		data = crypto_kmap(sg_page(sg), 0);
+		#endif
+		
 		err = crypto_shash_digest(desc, data + offset, nbytes,
 					  req->result);
+		#ifdef HW_SHA256
+		crypto_kunmap_sha256(sg_page(sg));
+		#else
 		crypto_kunmap(data, 0);
+		#endif
+		
+		
 		crypto_yield(desc->flags);
 	} else
 		err = crypto_shash_init(desc) ?:
@@ -412,9 +423,21 @@ static int shash_compat_digest(struct hash_desc *hdesc, struct scatterlist *sg,
 
 		desc->flags = hdesc->flags;
 
+		#ifdef HW_SHA256
+		data = crypto_kmap_sha256(sg_page(sg));
+		#else
 		data = crypto_kmap(sg_page(sg), 0);
+		#endif
+		
 		err = crypto_shash_digest(desc, data + offset, nbytes, out);
+
+		#ifdef HW_SHA256
+		crypto_kunmap_sha256(sg_page(sg));
+		#else
 		crypto_kunmap(data, 0);
+		#endif
+		
+		
 		crypto_yield(desc->flags);
 		goto out;
 	}

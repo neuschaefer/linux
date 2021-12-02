@@ -3,7 +3,7 @@
 *
 * FILE   :	HCF.C
 *
-* DATE    :	$Date: 2004/08/05 11:47:10 $   $Revision: 1.10 $
+* DATE    :	$Date: 2012/04/27 $   $Revision: #1 $
 * Original:	2004/06/02 10:22:22    Revision: 1.85      Tag: hcf7_t20040602_01
 * Original:	2004/04/15 09:24:41    Revision: 1.63      Tag: hcf7_t7_20040415_01
 * Original:	2004/04/13 14:22:44    Revision: 1.62      Tag: t7_20040413_01
@@ -416,7 +416,7 @@ CFG_RANGE4_STRCT BASED cfg_drv_act_ranges_apf = {
 #endif // HCF_APF_VAR_4
 	}
 } ;
-#define HCF_VERSION  TEXT( "HCF$Revision: 1.10 $" )
+#define HCF_VERSION  TEXT( "HCF$Revision: #1 $" )
 
 static struct /*CFG_HCF_OPT_STRCT*/ {
 	hcf_16	len;					//length of cfg_hcf_opt struct

@@ -2064,7 +2064,7 @@ static int __init wl_module_init( void )
 	DBG_ENTER( DbgInfo );
 	printk(KERN_INFO "%s\n", VERSION_INFO);
     	printk(KERN_INFO "*** Modified for kernel 2.6 by Henk de Groot <pe1dnn@amsat.org>\n");
-        printk(KERN_INFO "*** Based on 7.18 version by Andrey Borzenkov <arvidjaar@mail.ru> $Revision: 39 $\n");
+        printk(KERN_INFO "*** Based on 7.18 version by Andrey Borzenkov <arvidjaar@mail.ru> $Revision: #1 $\n");
 
 
 // ;?#if (HCF_TYPE) & HCF_TYPE_AP

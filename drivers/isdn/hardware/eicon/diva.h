@@ -1,4 +1,4 @@
-/* $Id: diva.h,v 1.1.2.2 2001/02/08 12:25:43 armin Exp $ */
+/* $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/isdn/hardware/eicon/diva.h#1 $ */
 
 #ifndef __DIVA_XDI_OS_PART_H__
 #define __DIVA_XDI_OS_PART_H__

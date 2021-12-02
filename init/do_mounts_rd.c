@@ -12,6 +12,10 @@
 #include "do_mounts.h"
 #include "../fs/squashfs/squashfs_fs.h"
 
+#if defined(CONFIG_DM_NFSB)
+#include <linux/nfsb.h>
+#endif
+
 #include <linux/decompress/generic.h>
 
 
@@ -53,6 +57,11 @@ static int __init
 identify_ramdisk_image(int fd, int start_block, decompress_fn *decompressor)
 {
 	const int size = 512;
+#if defined(CONFIG_DM_NFSB)
+	struct nfsb_header *nfsbhdr;
+	int nfsb_nblocks = -1;
+	int original_start_block = start_block;
+#endif
 	struct minix_super_block *minixsb;
 	struct ext2_super_block *ext2sb;
 	struct romfs_super_block *romfsb;
@@ -65,7 +74,14 @@ identify_ramdisk_image(int fd, int start_block, decompress_fn *decompressor)
 	buf = kmalloc(size, GFP_KERNEL);
 	if (!buf)
 		return -1;
-
+ 
+#if defined(CONFIG_DM_NFSB)
+	nfsbhdr = kmalloc(sizeof(struct nfsb_header), GFP_KERNEL);
+	if (!nfsbhdr)
+		return -1;
+	memset(nfsbhdr, 0xe5, sizeof(struct nfsb_header));
+#endif
+    
 	minixsb = (struct minix_super_block *) buf;
 	ext2sb = (struct ext2_super_block *) buf;
 	romfsb = (struct romfs_super_block *) buf;
@@ -90,7 +106,24 @@ identify_ramdisk_image(int fd, int start_block, decompress_fn *decompressor)
 		nblocks = 0;
 		goto done;
 	}
+ 
+#if defined(CONFIG_DM_NFSB)
+	/* nfsb is at block zero too--we must have an NFSB image */
+	sys_lseek(fd, start_block * BLOCK_SIZE, 0);
+	if (nfsb_read(fd, nfsbhdr) != -1) {
+		printk(KERN_NOTICE
+			   "RAMDISK: nfsb image found at block %d\n",
+			   start_block);
+		nfsb_nblocks = (nfsb_fs_offset(nfsbhdr) + nfsb_fs_size(nfsbhdr) + nfsb_hash_size(nfsbhdr)) >> BLOCK_SIZE_BITS;
 
+		/* Adjust the start block and read it again. We do this just to
+		 * check for supported filesystems and print out the information. */
+		start_block = nfsb_fs_offset(nfsbhdr) >> BLOCK_SIZE_BITS;
+		sys_lseek(fd, start_block * BLOCK_SIZE, 0);
+		sys_read(fd, buf, size);
+	}
+#endif
+    
 	/* romfs is at block zero too */
 	if (romfsb->word0 == ROMSB_WORD0 &&
 	    romfsb->word1 == ROMSB_WORD1) {
@@ -150,6 +183,12 @@ identify_ramdisk_image(int fd, int start_block, decompress_fn *decompressor)
 	       start_block);
 
 done:
+#if defined(CONFIG_DM_NFSB)
+	start_block = original_start_block;
+	if (nfsb_nblocks >= 0)
+		nblocks = nfsb_nblocks;
+	kfree(nfsbhdr);
+#endif
 	sys_lseek(fd, start_block * BLOCK_SIZE, 0);
 	kfree(buf);
 	return nblocks;

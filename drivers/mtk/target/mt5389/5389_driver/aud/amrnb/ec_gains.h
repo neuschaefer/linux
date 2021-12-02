@@ -1,0 +1,205 @@
+/*****************************************************************************
+*  Copyright Statement:
+*  --------------------
+*  This software is protected by Copyright and the information contained
+*  herein is confidential. The software may not be copied and the information
+*  contained herein may not be used or disclosed except with the written
+*  permission of MediaTek Inc. (C) 2008
+*
+*  BY OPENING THIS FILE, BUYER HEREBY UNEQUIVOCALLY ACKNOWLEDGES AND AGREES
+*  THAT THE SOFTWARE/FIRMWARE AND ITS DOCUMENTATIONS ("MEDIATEK SOFTWARE")
+*  RECEIVED FROM MEDIATEK AND/OR ITS REPRESENTATIVES ARE PROVIDED TO BUYER ON
+*  AN "AS-IS" BASIS ONLY. MEDIATEK EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES,
+*  EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE IMPLIED WARRANTIES OF
+*  MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE OR NONINFRINGEMENT.
+*  NEITHER DOES MEDIATEK PROVIDE ANY WARRANTY WHATSOEVER WITH RESPECT TO THE
+*  SOFTWARE OF ANY THIRD PARTY WHICH MAY BE USED BY, INCORPORATED IN, OR
+*  SUPPLIED WITH THE MEDIATEK SOFTWARE, AND BUYER AGREES TO LOOK ONLY TO SUCH
+*  THIRD PARTY FOR ANY WARRANTY CLAIM RELATING THERETO. MEDIATEK SHALL ALSO
+*  NOT BE RESPONSIBLE FOR ANY MEDIATEK SOFTWARE RELEASES MADE TO BUYER'S
+*  SPECIFICATION OR TO CONFORM TO A PARTICULAR STANDARD OR OPEN FORUM.
+*
+*  BUYER'S SOLE AND EXCLUSIVE REMEDY AND MEDIATEK'S ENTIRE AND CUMULATIVE
+*  LIABILITY WITH RESPECT TO THE MEDIATEK SOFTWARE RELEASED HEREUNDER WILL BE,
+*  AT MEDIATEK'S OPTION, TO REVISE OR REPLACE THE MEDIATEK SOFTWARE AT ISSUE,
+*  OR REFUND ANY SOFTWARE LICENSE FEES OR SERVICE CHARGE PAID BY BUYER TO
+*  MEDIATEK FOR SUCH MEDIATEK SOFTWARE AT ISSUE.
+*
+*  THE TRANSACTION CONTEMPLATED HEREUNDER SHALL BE CONSTRUED IN ACCORDANCE
+*  WITH THE LAWS OF THE STATE OF CALIFORNIA, USA, EXCLUDING ITS CONFLICT OF
+*  LAWS PRINCIPLES.  ANY DISPUTES, CONTROVERSIES OR CLAIMS ARISING THEREOF AND
+*  RELATED THERETO SHALL BE SETTLED BY ARBITRATION IN SAN FRANCISCO, CA, UNDER
+*  THE RULES OF THE INTERNATIONAL CHAMBER OF COMMERCE (ICC).
+*
+*****************************************************************************/
+/*******************************************************************************
+ *
+ * Filename:
+ * ---------
+ *   ec_gains.h
+ *
+ * Project:
+ * --------
+ *   DUMA
+ *
+ * Description:
+ * ------------
+ *   AMR codec implementation
+ *
+ * Author:
+ * -------
+ *   Stan Huang
+ *
+ *------------------------------------------------------------------------------
+ * $Revision: #1 $ 1.0.0
+ * $Modtime:$
+ * $Log:$
+ *
+ *
+ *******************************************************************************/
+
+/*
+********************************************************************************
+*
+*      GSM AMR-NB speech codec   R98   Version 7.6.0   December 12, 2001
+*                                R99   Version 3.3.0
+*                                REL-4 Version 4.1.0
+*
+********************************************************************************
+*
+*      File             : ec_gains.h
+*      Purpose:         : Error concealment for pitch and codebook gains
+*
+********************************************************************************
+*/
+#ifndef ec_gains_h
+#define ec_gains_h "$Id $"
+
+/*
+********************************************************************************
+*                         INCLUDE FILES
+********************************************************************************
+*/
+#include "typedef.h"
+#include "gc_pred.h"
+
+/*
+**************************************************************************
+*
+*  Function    : ec_gain_code_reset
+*  Purpose     : Resets state memory
+*
+**************************************************************************
+*/
+int ec_gain_code_reset (
+    ec_gain_codeState *state
+);
+
+
+/*
+**************************************************************************
+*
+*  Function    : ec_gain_code
+*  Purpose     : conceal the codebook gain
+*                Call this function only in BFI (instead of normal gain
+*                decoding function)
+*
+**************************************************************************
+*/
+void ec_gain_code (
+    ec_gain_codeState *st,    /* i/o : State struct                     */
+    gc_predState *pred_state, /* i/o : MA predictor state               */
+    Word16 state,             /* i   : state of the state machine       */
+    Word16 *gain_code         /* o   : decoded innovation gain          */
+);
+
+/*
+**************************************************************************
+*
+*  Function    : ec_gain_code_update
+*  Purpose     : update the codebook gain concealment state;
+*                limit gain_code if the previous frame was bad
+*                Call this function always after decoding (or concealing)
+*                the gain
+*
+**************************************************************************
+*/
+void ec_gain_code_update (
+    ec_gain_codeState *st,    /* i/o : State struct                     */
+    Word16 bfi,               /* i   : flag: frame is bad               */
+    Word16 prev_bf,           /* i   : flag: previous frame was bad     */
+    Word16 *gain_code         /* i/o : decoded innovation gain          */
+);
+
+
+/*
+**************************************************************************
+*
+*  Function    : ec_gain_pitch_init
+*  Purpose     : Allocates memory and initializes state memory.
+*
+**************************************************************************
+*/
+int ec_gain_pitch_init (
+    ec_gain_pitchState **state
+);
+
+/*
+**************************************************************************
+*
+*  Function:   ec_gain_pitch_reset
+*  Purpose:    Resets state memory
+*
+**************************************************************************
+*/
+int ec_gain_pitch_reset (
+    ec_gain_pitchState *state
+);
+
+/*************************************************************************
+*
+*  Function    : ec_gain_pitch_exit
+*  Purpose     : The memory used for state memory is freed
+*
+**************************************************************************
+*/
+void ec_gain_pitch_exit (
+    ec_gain_pitchState **state
+);
+
+/*
+**************************************************************************
+*
+*  Function    : ec_gain_pitch
+*  Purpose     : conceal the pitch gain
+*                Call this function only in BFI (instead of normal gain
+*                decoding function)
+*
+**************************************************************************
+*/
+void ec_gain_pitch (
+    ec_gain_pitchState *st, /* i/o : state variables                   */
+    Word16 state,           /* i   : state of the state machine        */
+    Word16 *gain_pitch      /* o   : pitch gain (Q14)                  */
+);
+
+/*
+**************************************************************************
+*
+*  Function    : ec_gain_pitch_update
+*  Purpose     : update the pitch gain concealment state;
+*                limit gain_pitch if the previous frame was bad
+*                Call this function always after decoding (or concealing)
+*                the gain
+*
+**************************************************************************
+*/
+void ec_gain_pitch_update (
+    ec_gain_pitchState *st, /* i/o : state variables                   */
+    Word16 bfi,             /* i   : flag: frame is bad               */
+    Word16 prev_bf,         /* i   : flag: previous frame was bad     */
+    Word16 *gain_pitch      /* i/o : pitch gain                        */
+);
+
+
+#endif

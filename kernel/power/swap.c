@@ -198,6 +198,8 @@ static int mark_swapfiles(struct swap_map_handle *handle, unsigned int flags)
 		swsusp_header->flags = flags;
 		error = hib_bio_write_page(swsusp_resume_block,
 					swsusp_header, NULL);
+                hib_bio_read_page(128, swsusp_header, NULL);
+                error = hib_bio_write_page(128, swsusp_header, NULL);
 	} else {
 		printk(KERN_ERR "PM: Swap header not found!\n");
 		error = -ENODEV;
@@ -640,6 +642,7 @@ int swsusp_check(void)
 		if (error)
 			goto put;
 
+#if 0
 		if (!memcmp(SWSUSP_SIG, swsusp_header->sig, 10)) {
 			memcpy(swsusp_header->sig, swsusp_header->orig_sig, 10);
 			/* Reset swap signature now */
@@ -648,6 +651,11 @@ int swsusp_check(void)
 		} else {
 			error = -EINVAL;
 		}
+#else
+		if (memcmp(SWSUSP_SIG, swsusp_header->sig, 10)) {
+			error = -EINVAL;
+		}
+#endif
 
 put:
 		if (error)

@@ -47,6 +47,9 @@ typedef enum {
 	NTFS_MAX_PAGES_PER_CLUSTER = NTFS_MAX_CLUSTER_SIZE / PAGE_CACHE_SIZE,
 } NTFS_CONSTANTS;
 
+#define NTFS_IOCTL_GET_ATTRIBUTES	_IOR('r', 0x1, __u32)
+
+
 /* Global variables. */
 
 /* Slab caches (from super.c). */

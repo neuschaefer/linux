@@ -1,0 +1,3 @@
+#ifndef USE_CABOT_SUBTITLES
+    #define USE_CABOT_SUBTITLES 1
+#endif

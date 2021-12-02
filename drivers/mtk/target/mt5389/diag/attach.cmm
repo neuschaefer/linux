@@ -1,0 +1,24 @@
+sys.cpu ARM1176jz
+sys.jc 8mhz
+sys.mode attach
+
+;sys.jc rtck
+;wait 10.ms
+
+d.load.elf ./slt5389_debug_diag.axf /nocode
+setup.imaskhll on
+setup.imaskasm on
+y.spath . 
+y.spath.srd ../5389_driver
+;y.spath.srd ../demo
+;y.spath.srd ../drv_if
+;y.spath.srd ../diag
+data.list
+m
+V %HEX
+task.config c:\T32\demo\arm\KERNEL\NUCLEUS\nucleus
+menu.reprogram c:\T32\demo\arm\KERNEL\NUCLEUS\nucleus
+
+
+
+

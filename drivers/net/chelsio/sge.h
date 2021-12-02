@@ -1,8 +1,8 @@
 /*****************************************************************************
  *                                                                           *
  * File: sge.h                                                               *
- * $Revision: 1.11 $                                                          *
- * $Date: 2005/06/21 22:10:55 $                                              *
+ * $Revision: #1 $                                                          *
+ * $Date: 2012/04/27 $                                              *
  * Description:                                                              *
  *  part of the Chelsio 10Gb Ethernet Driver.                                *
  *                                                                           *

@@ -1,5 +1,5 @@
 /*
- *  pci_irq.c - ACPI PCI Interrupt Routing ($Revision: 11 $)
+ *  pci_irq.c - ACPI PCI Interrupt Routing ($Revision: #1 $)
  *
  *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>

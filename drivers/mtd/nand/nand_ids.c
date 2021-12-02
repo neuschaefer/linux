@@ -76,6 +76,7 @@ struct nand_flash_dev nand_flash_ids[] = {
 	/*512 Megabit */
 	{"NAND 64MiB 1,8V 8-bit",	0xA2, 0,  64, 0, LP_OPTIONS},
 	{"NAND 64MiB 3,3V 8-bit",	0xF2, 0,  64, 0, LP_OPTIONS},
+    {"NAND 64MiB 3,3V 8-bit",	0xF0, 0,  64, 0, LP_OPTIONS},
 	{"NAND 64MiB 1,8V 16-bit",	0xB2, 0,  64, 0, LP_OPTIONS16},
 	{"NAND 64MiB 3,3V 16-bit",	0xC2, 0,  64, 0, LP_OPTIONS16},
 
@@ -99,14 +100,17 @@ struct nand_flash_dev nand_flash_ids[] = {
 	{"NAND 512MiB 3,3V 16-bit",	0xCC, 0, 512, 0, LP_OPTIONS16},
 
 	/* 8 Gigabit */
+	{"NAND 1GiB 3,3V 8-bit",	0x38, 0, 1024, 0, LP_OPTIONS},
 	{"NAND 1GiB 1,8V 8-bit",	0xA3, 0, 1024, 0, LP_OPTIONS},
 	{"NAND 1GiB 3,3V 8-bit",	0xD3, 0, 1024, 0, LP_OPTIONS},
+ //       {"NAND 1GiB 3,3V 8-bit",	0xD5, 0, 1024, 0, LP_OPTIONS},
 	{"NAND 1GiB 1,8V 16-bit",	0xB3, 0, 1024, 0, LP_OPTIONS16},
 	{"NAND 1GiB 3,3V 16-bit",	0xC3, 0, 1024, 0, LP_OPTIONS16},
 
 	/* 16 Gigabit */
 	{"NAND 2GiB 1,8V 8-bit",	0xA5, 0, 2048, 0, LP_OPTIONS},
 	{"NAND 2GiB 3,3V 8-bit",	0xD5, 0, 2048, 0, LP_OPTIONS},
+	{"NAND 2GiB 3,3V 8-bit",	0x48, 0, 2048, 0, LP_OPTIONS},
 	{"NAND 2GiB 1,8V 16-bit",	0xB5, 0, 2048, 0, LP_OPTIONS16},
 	{"NAND 2GiB 3,3V 16-bit",	0xC5, 0, 2048, 0, LP_OPTIONS16},
 
@@ -128,6 +132,24 @@ struct nand_flash_dev nand_flash_ids[] = {
 	{NULL,}
 };
 
+struct nand_flash_dev_ext nand_flash_ids_ext[] = {
+      /* name,                maf_id,dev_id, id3, id4, pagesize,chipsize,erasesize, oobsize, buswidth*/
+      {"NAND_K9GAG08U0E" ,     0xEC,  0xD5,  0x84, 0x72,   8192,   2048,   0x100000,   436,    0 },
+      {"NAND_K9GAG08U0F" ,     0xEC,  0xD5,  0x94, 0x76,   8192,   2048,   0x100000,   512,    0 },
+ //     {"NAND_H27U8G8T2BTR" ,   0xAD,  0xD5,  0x14, 0xB6,   4096,   1024,    0x80000,   128,    0 },
+      {"NAND_H27UAG8T2MTR" ,   0xAD,  0xD5,  0x14, 0xB6,   4096,   2048,    0x80000,   128,    0 },
+      {"NAND_H27UAG8T2ATR" ,   0xAD,  0xD5,  0x94, 0x25,   4096,   2048,    0x80000,   224,    0 },
+      {"NAND_H27UAG8T2BTR" ,   0xAD,  0xD5,  0x94, 0x9A,   8192,   2048,   0x200000,   448,    0 },
+   
+      {"NAND_TC58NVG4D1DTG",   0x98,  0xD5,  0x94, 0xBA,   4096,   2048,    0x80000,   208,    0 },
+      {"NAND_TC58NVG4D2FTA00", 0x98,  0xD5,  0x94, 0x32,   8192,   2048,    0x100000,  448,    0 },
+        
+      {"NAND_MT29F8G08ABA",	   0x2C,  0x38,  0x00, 0x26,   4096,   1024,    0x80000,   224,  0 },
+      {"NAND_MT29F16G08CBABA", 0x2C,  0x48,  0x04, 0x46,   4096,   2048,	0x100000,  224,  0 },
+      {"NAND_MT29F16G08CBACA", 0x2C,  0x48,  0x04, 0x4A,   4096,   2048,	0x100000,  224,  0 },
+      {NULL,}
+};
+
 /*
 *	Manufacturer ID list
 */
@@ -141,11 +163,14 @@ struct nand_manufacturers nand_manuf_ids[] = {
 	{NAND_MFR_HYNIX, "Hynix"},
 	{NAND_MFR_MICRON, "Micron"},
 	{NAND_MFR_AMD, "AMD"},
+    {NAND_MFR_MACRONIX, "Macronix"},
 	{0x0, "Unknown"}
 };
 
 EXPORT_SYMBOL(nand_manuf_ids);
 EXPORT_SYMBOL(nand_flash_ids);
+EXPORT_SYMBOL(nand_flash_ids_ext);
+
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Thomas Gleixner <tglx@linutronix.de>");

@@ -1,4 +1,4 @@
-/* $Id: teleint.c,v 1.16.2.5 2004/01/19 15:31:50 keil Exp $
+/* $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/isdn/hisax/teleint.c#1 $
  *
  * low level stuff for TeleInt isdn cards
  *
@@ -16,7 +16,7 @@
 #include "hfc_2bs0.h"
 #include "isdnl1.h"
 
-static const char *TeleInt_revision = "$Revision: 1.16.2.5 $";
+static const char *TeleInt_revision = "$Revision: #1 $";
 
 #define byteout(addr,val) outb(val,addr)
 #define bytein(addr) inb(addr)

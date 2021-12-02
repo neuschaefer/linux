@@ -1,0 +1,3 @@
+#ifndef USE_PROFILE_MANAGER
+    #define USE_PROFILE_MANAGER 1
+#endif

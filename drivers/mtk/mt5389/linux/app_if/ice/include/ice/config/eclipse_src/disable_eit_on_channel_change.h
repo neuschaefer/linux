@@ -1,0 +1,1 @@
+/* DISABLE_EIT_ON_CHANNEL_CHANGE is undefined */

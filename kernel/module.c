@@ -1619,6 +1619,9 @@ static int verify_export_symbols(struct module *mod)
 #endif
 	};
 
+	// Do not check, temporary solution to make it insmod faster.
+	return 0;
+
 	for (i = 0; i < ARRAY_SIZE(arr); i++) {
 		for (s = arr[i].sym; s < arr[i].sym + arr[i].num; s++) {
 			if (find_symbol(s->name, &owner, NULL, true, false)) {
@@ -1915,93 +1918,13 @@ static char elf_type(const Elf_Sym *sym,
 	return '?';
 }
 
-static bool is_core_symbol(const Elf_Sym *src, const Elf_Shdr *sechdrs,
-                           unsigned int shnum)
-{
-	const Elf_Shdr *sec;
-
-	if (src->st_shndx == SHN_UNDEF
-	    || src->st_shndx >= shnum
-	    || !src->st_name)
-		return false;
-
-	sec = sechdrs + src->st_shndx;
-	if (!(sec->sh_flags & SHF_ALLOC)
-#ifndef CONFIG_KALLSYMS_ALL
-	    || !(sec->sh_flags & SHF_EXECINSTR)
-#endif
-	    || (sec->sh_entsize & INIT_OFFSET_MASK))
-		return false;
-
-	return true;
-}
-
-static unsigned long layout_symtab(struct module *mod,
-				   Elf_Shdr *sechdrs,
-				   unsigned int symindex,
-				   unsigned int strindex,
-				   const Elf_Ehdr *hdr,
-				   const char *secstrings,
-				   unsigned long *pstroffs,
-				   unsigned long *strmap)
-{
-	unsigned long symoffs;
-	Elf_Shdr *symsect = sechdrs + symindex;
-	Elf_Shdr *strsect = sechdrs + strindex;
-	const Elf_Sym *src;
-	const char *strtab;
-	unsigned int i, nsrc, ndst;
-
-	/* Put symbol section at end of init part of module. */
-	symsect->sh_flags |= SHF_ALLOC;
-	symsect->sh_entsize = get_offset(mod, &mod->init_size, symsect,
-					 symindex) | INIT_OFFSET_MASK;
-	DEBUGP("\t%s\n", secstrings + symsect->sh_name);
-
-	src = (void *)hdr + symsect->sh_offset;
-	nsrc = symsect->sh_size / sizeof(*src);
-	strtab = (void *)hdr + strsect->sh_offset;
-	for (ndst = i = 1; i < nsrc; ++i, ++src)
-		if (is_core_symbol(src, sechdrs, hdr->e_shnum)) {
-			unsigned int j = src->st_name;
-
-			while(!__test_and_set_bit(j, strmap) && strtab[j])
-				++j;
-			++ndst;
-		}
-
-	/* Append room for core symbols at end of core part. */
-	symoffs = ALIGN(mod->core_size, symsect->sh_addralign ?: 1);
-	mod->core_size = symoffs + ndst * sizeof(Elf_Sym);
-
-	/* Put string table section at end of init part of module. */
-	strsect->sh_flags |= SHF_ALLOC;
-	strsect->sh_entsize = get_offset(mod, &mod->init_size, strsect,
-					 strindex) | INIT_OFFSET_MASK;
-	DEBUGP("\t%s\n", secstrings + strsect->sh_name);
-
-	/* Append room for core symbols' strings at end of core part. */
-	*pstroffs = mod->core_size;
-	__set_bit(0, strmap);
-	mod->core_size += bitmap_weight(strmap, strsect->sh_size);
-
-	return symoffs;
-}
-
 static void add_kallsyms(struct module *mod,
 			 Elf_Shdr *sechdrs,
-			 unsigned int shnum,
 			 unsigned int symindex,
 			 unsigned int strindex,
-			 unsigned long symoffs,
-			 unsigned long stroffs,
-			 const char *secstrings,
-			 unsigned long *strmap)
+			 const char *secstrings)
 {
-	unsigned int i, ndst;
-	const Elf_Sym *src;
-	Elf_Sym *dst;
-	char *s;
+	unsigned int i;
 
 	mod->symtab = (void *)sechdrs[symindex].sh_addr;
 	mod->num_symtab = sechdrs[symindex].sh_size / sizeof(Elf_Sym);
@@ -2011,46 +1934,13 @@ static void add_kallsyms(struct module *mod,
 	for (i = 0; i < mod->num_symtab; i++)
 		mod->symtab[i].st_info
 			= elf_type(&mod->symtab[i], sechdrs, secstrings, mod);
-
-	mod->core_symtab = dst = mod->module_core + symoffs;
-	src = mod->symtab;
-	*dst = *src;
-	for (ndst = i = 1; i < mod->num_symtab; ++i, ++src) {
-		if (!is_core_symbol(src, sechdrs, shnum))
-			continue;
-		dst[ndst] = *src;
-		dst[ndst].st_name = bitmap_weight(strmap, dst[ndst].st_name);
-		++ndst;
-	}
-	mod->core_num_syms = ndst;
-
-	mod->core_strtab = s = mod->module_core + stroffs;
-	for (*s = 0, i = 1; i < sechdrs[strindex].sh_size; ++i)
-		if (test_bit(i, strmap))
-			*++s = mod->strtab[i];
 }
 #else
-static inline unsigned long layout_symtab(struct module *mod,
-					  Elf_Shdr *sechdrs,
-					  unsigned int symindex,
-					  unsigned int strindex,
-					  const Elf_Ehdr *hdr,
-					  const char *secstrings,
-					  unsigned long *pstroffs,
-					  unsigned long *strmap)
-{
-	return 0;
-}
-
 static inline void add_kallsyms(struct module *mod,
 				Elf_Shdr *sechdrs,
-				unsigned int shnum,
 				unsigned int symindex,
 				unsigned int strindex,
-				unsigned long symoffs,
-				unsigned long stroffs,
-				const char *secstrings,
-				const unsigned long *strmap)
+				const char *secstrings)
 {
 }
 #endif /* CONFIG_KALLSYMS */
@@ -2130,7 +2020,6 @@ static noinline struct module *load_module(void __user *umod,
 	struct module *mod;
 	long err = 0;
 	void *ptr = NULL; /* Stops spurious gcc warning */
-	unsigned long symoffs, stroffs, *strmap;
 	void __percpu *percpu;
 	struct _ddebug *debug = NULL;
 	unsigned int num_debug = 0;
@@ -2216,6 +2105,11 @@ static noinline struct module *load_module(void __user *umod,
 	/* Don't keep modinfo and version sections. */
 	sechdrs[infoindex].sh_flags &= ~(unsigned long)SHF_ALLOC;
 	sechdrs[versindex].sh_flags &= ~(unsigned long)SHF_ALLOC;
+#ifdef CONFIG_KALLSYMS
+	/* Keep symbol and string tables for decoding later. */
+	sechdrs[symindex].sh_flags |= SHF_ALLOC;
+	sechdrs[strindex].sh_flags |= SHF_ALLOC;
+#endif
 
 	/* Check module struct version now, before we try to use module. */
 	if (!check_modstruct_version(sechdrs, versindex, mod)) {
@@ -2251,13 +2145,6 @@ static noinline struct module *load_module(void __user *umod,
 		goto free_hdr;
 	}
 
-	strmap = kzalloc(BITS_TO_LONGS(sechdrs[strindex].sh_size)
-			 * sizeof(long), GFP_KERNEL);
-	if (!strmap) {
-		err = -ENOMEM;
-		goto free_mod;
-	}
-
 	mod->state = MODULE_STATE_COMING;
 
 	/* Allow arches to frob section contents and sizes.  */
@@ -2280,8 +2167,6 @@ static noinline struct module *load_module(void __user *umod,
 	   this is done generically; there doesn't appear to be any
 	   special cases for the architectures. */
 	layout_sections(mod, hdr, sechdrs, secstrings);
-	symoffs = layout_symtab(mod, sechdrs, symindex, strindex, hdr,
-				secstrings, &stroffs, strmap);
 
 	/* Do the allocs. */
 	ptr = module_alloc_update_bounds(mod->core_size);
@@ -2481,10 +2366,7 @@ static noinline struct module *load_module(void __user *umod,
 	percpu_modcopy(mod, (void *)sechdrs[pcpuindex].sh_addr,
 		       sechdrs[pcpuindex].sh_size);
 
-	add_kallsyms(mod, sechdrs, hdr->e_shnum, symindex, strindex,
-		     symoffs, stroffs, secstrings, strmap);
-	kfree(strmap);
-	strmap = NULL;
+	add_kallsyms(mod, sechdrs, symindex, strindex, secstrings);
 
 	if (!mod->taints)
 		debug = section_objs(hdr, sechdrs, secstrings, "__verbose",
@@ -2585,7 +2467,6 @@ static noinline struct module *load_module(void __user *umod,
 	free_percpu(percpu);
  free_mod:
 	kfree(args);
-	kfree(strmap);
  free_hdr:
 	vfree(hdr);
 	return ERR_PTR(err);
@@ -2664,11 +2545,6 @@ SYSCALL_DEFINE3(init_module, void __user *, umod,
 	/* Drop initial reference. */
 	module_put(mod);
 	trim_init_extable(mod);
-#ifdef CONFIG_KALLSYMS
-	mod->num_symtab = mod->core_num_syms;
-	mod->symtab = mod->core_symtab;
-	mod->strtab = mod->core_strtab;
-#endif
 	module_free(mod, mod->module_init);
 	mod->module_init = NULL;
 	mod->init_size = 0;

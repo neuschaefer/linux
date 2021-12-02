@@ -1,0 +1,41 @@
+
+store "breakpts.cmm" Break
+; store "windowps.cmm" Win
+
+SYS.RESET
+
+;=========================================================
+SYSTEM.OPTION ENRESET OFF
+SYSTEM.CPU CortexA9MPCore
+SYS.JC 10MHz
+SYSTEM.MULTICORE DEBUGACCESSPORT 0
+SYSTEM.MULTICORE COREBASE APB:0x80010000
+;=========================================================
+
+SYS.M attach
+wait 10.ms
+
+
+D.LOAD .\common_debug_preloader.axf /nocode
+
+do "breakpts.cmm"
+; do "windowps.cmm"
+
+setup.imaskhll on
+setup.imaskasm on
+; You need to set the path of source code, otherwise you could not
+; see the source when debugging.
+y.spath . 
+y.spath.srd ../5368_preloader
+data.list
+m
+V %HEX
+task.config c:\T32\demo\arm\KERNEL\NUCLEUS\nucleus
+menu.reprogram c:\T32\demo\arm\KERNEL\NUCLEUS\nucleus
+; go
+
+
+
+
+
+

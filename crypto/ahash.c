@@ -44,7 +44,12 @@ static int hash_walk_next(struct crypto_hash_walk *walk)
 	unsigned int nbytes = min(walk->entrylen,
 				  ((unsigned int)(PAGE_SIZE)) - offset);
 
+	#ifdef HW_SHA256
+	walk->data = crypto_kmap_sha256(walk->pg);
+	#else
 	walk->data = crypto_kmap(walk->pg, 0);
+	#endif
+	
 	walk->data += offset;
 
 	if (offset & alignmask)
@@ -88,7 +93,12 @@ int crypto_hash_walk_done(struct crypto_hash_walk *walk, int err)
 		return nbytes;
 	}
 
+	#ifdef HW_SHA256
+	crypto_kunmap_sha256(walk->pg);
+	#else
 	crypto_kunmap(walk->data, 0);
+	#endif
+	
 	crypto_yield(walk->flags);
 
 	if (err)

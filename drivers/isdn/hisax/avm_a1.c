@@ -1,4 +1,4 @@
-/* $Id: avm_a1.c,v 2.15.2.4 2004/01/13 21:46:03 keil Exp $
+/* $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/isdn/hisax/avm_a1.c#1 $
  *
  * low level stuff for AVM A1 (Fritz) isdn cards
  *
@@ -16,7 +16,7 @@
 #include "hscx.h"
 #include "isdnl1.h"
 
-static const char *avm_revision = "$Revision: 2.15.2.4 $";
+static const char *avm_revision = "$Revision: #1 $";
 
 #define	 AVM_A1_STAT_ISAC	0x01
 #define	 AVM_A1_STAT_HSCX	0x02

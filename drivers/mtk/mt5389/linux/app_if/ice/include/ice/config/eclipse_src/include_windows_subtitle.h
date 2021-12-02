@@ -1,0 +1,3 @@
+#ifndef INCLUDE_WINDOWS_SUBTITLE
+    #define INCLUDE_WINDOWS_SUBTITLE 1
+#endif

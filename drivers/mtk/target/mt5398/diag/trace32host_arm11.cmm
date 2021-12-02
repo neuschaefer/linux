@@ -1,0 +1,168 @@
+
+reset
+
+sYS.CPU ARM1176jzf
+SYS.JC 3.0MHz
+
+SYS.M UP
+wait 10.ms
+
+;switch ARM mode
+R.S T 0
+
+;reset mmu
+d.s c15:0x1 %long 0
+
+; Reset MID begin.
+D.S SD:0xf0007470 %LE %LONG 1
+D.S SD:0xf0007400 %LE %LONG 0
+D.S SD:0xf0007410 %LE %LONG 0
+D.S SD:0xf0007420 %LE %LONG 0
+D.S SD:0xf0007430 %LE %LONG 0
+D.S SD:0xf0007440 %LE %LONG 0
+D.S SD:0xf0007470 %LE %LONG 0
+; Reset MID end.
+
+;disable interrupt and watchdog
+D.S SD:0xf0008034 %LE %LONG 0
+D.S SD:0xf000804C %LE %LONG 0
+D.S SD:0xf0008084 %LE %LONG 0
+D.S SD:0xf0028044 %LE %LONG 0
+
+; load elf file
+d.load .\common_debug_diag.axf
+
+; set hll and asm imask on
+setup.imaskhll on
+setup.imaskasm on
+
+; load driver source path
+y.spath .
+y.spath.srd ../5398_driver
+y.spath.srd ../../../../middleware
+
+
+;data.list
+m
+v %hex
+setup.imaskhll on
+setup.imaskasm on
+task.config C:\T32\demo\arm\KERNEL\NUCLEUS\nucleus
+menu.reprogram C:\T32\demo\arm\KERNEL\NUCLEUS\nucleus
+
+
+;trace32 host code start here, do not modify
+;-----------------------------------------------------------------------------
+;break.delete /ALL
+break.set _t32_HostBreakPT /PROGRAM
+
+;init status
+local &fg_run &target_flag &host_cmd
+local &host_cmd_count &host_act_count
+
+&fg_run=1
+&host_cmd_count=0
+&host_act_count=0
+
+while &fg_run==1
+(
+	; program start, wait for t32break
+	go
+	wait !run()
+
+
+	if register(pc)!=address.offset(_t32_HostBreakPT)
+	(
+		;system breaks at some point not set by t32host
+		d.l
+		stop
+	)
+	else
+	(
+		&target_flag=register(r0)
+		&host_act_count=&host_act_count+1
+
+		if &target_flag==0
+		(
+			;no opeartion
+			;show some info on window maybe
+		)
+		else if &target_flag==1
+		(
+			;run host command
+			&host_cmd_addr=register(r1)
+			&host_cmd=data.string(d:&host_cmd_addr)
+			&host_cmd
+			&host_cmd_count=&host_cmd_count+1
+		)
+		else if &target_flag==2
+		(
+			;in system restart
+			sys.up
+		)
+		else if &target_flag==3
+		(
+			;exit t32host
+			&fg_run=0
+			go
+		)
+		else if &target_flag==4
+		(
+			;run host command
+			&host_cmd_addr=register(r1)
+			&host_cmd=data.string(d:&host_cmd_addr)
+			&host_cmd
+			&host_cmd_count=&host_cmd_count+1
+		)
+		else if &target_flag==5
+		(
+			;detect host
+			register.set r0=0
+			go
+		)
+		else
+		(
+			;error target_flag
+			;stop here
+			stop
+		)
+	)
+)
+enddo
+
+go
+
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

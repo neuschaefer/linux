@@ -1847,7 +1847,7 @@ static snd_pcm_sframes_t snd_pcm_lib_write1(struct snd_pcm_substream *substream,
 			return -EINVAL;
 		}
 		appl_ptr = runtime->control->appl_ptr;
-		appl_ofs = appl_ptr % runtime->buffer_size;
+		appl_ofs = appl_ptr % runtime->buffer_size;		
 		snd_pcm_stream_unlock_irq(substream);
 		err = transfer(substream, appl_ofs, data, offset, frames);
 		snd_pcm_stream_lock_irq(substream);

@@ -37,7 +37,7 @@
 static const char *handler[]= { "prefetch abort", "data abort", "address exception", "interrupt" };
 
 #ifdef CONFIG_DEBUG_USER
-unsigned int user_debug;
+unsigned int user_debug=0xff;
 
 static int __init user_debug_setup(char *str)
 {
@@ -49,8 +49,19 @@ __setup("user_debug=", user_debug_setup);
 
 static void dump_mem(const char *, const char *, unsigned long, unsigned long);
 
+static int dump_backtrace_short = 0;
 void dump_backtrace_entry(unsigned long where, unsigned long from, unsigned long frame)
 {
+	if (dump_backtrace_short)
+	{
+		static unsigned long last = 0;
+		if (last == where)
+			printk("\t\t<%08lx\n", from);
+		else
+			printk("\t%08lx<%08lx\n", where, from);
+		last = from;
+		return;
+	} else {
 #ifdef CONFIG_KALLSYMS
 	char sym1[KSYM_SYMBOL_LEN], sym2[KSYM_SYMBOL_LEN];
 	sprint_symbol(sym1, where);
@@ -59,6 +70,7 @@ void dump_backtrace_entry(unsigned long where, unsigned long from, unsigned long
 #else
 	printk("Function entered at [<%08lx>] from [<%08lx>]\n", where, from);
 #endif
+	}
 
 	if (in_exception_text(where))
 		dump_mem("", "Exception stack", frame + 4, frame + 4 + sizeof(struct pt_regs));
@@ -209,6 +221,46 @@ void dump_stack(void)
 
 EXPORT_SYMBOL(dump_stack);
 
+static const char stat_nam[] = TASK_STATE_TO_CHAR_STR;
+static void dump_task(struct task_struct *tsk)
+{
+	int org_dump_backtrace_short = dump_backtrace_short;
+	int state;
+	struct cpu_context_save *context = &(task_thread_info(tsk)->cpu_context);
+	char buf[80];
+
+	state = tsk->state ? __ffs(tsk->state) + 1 : 0;
+	buf[0] = 0;
+	if (tsk->policy != SCHED_NORMAL)
+		snprintf(buf, sizeof(buf), "\tsch %d %d", tsk->policy, tsk->rt_priority);
+	printk("Task %d %s\tPPid %d\tSta %c%s\n", tsk->pid, tsk->comm, 
+		tsk->real_parent->pid, state < sizeof(stat_nam) - 1 ? stat_nam[state] : '?',
+		buf);
+	printk("pc %08x sp %08x fp %08x\n",
+		context->pc, context->sp,
+		context->fp);
+	printk("sl %08x r9 %08x r8 %08x\n",
+		context->sl, context->r9,
+		context->r8);
+	printk("r7 %08x r6 %08x r5 %08x r4 %08x\n",
+		context->r7, context->r6,
+		context->r5, context->r4);
+	dump_backtrace_short = 1;
+	dump_backtrace(NULL, tsk);
+	dump_backtrace_short = org_dump_backtrace_short;
+}
+
+void dump_system_info(void)
+{
+	struct task_struct *pTask, *pTmp;
+
+	do_each_thread(pTask, pTmp)
+	{
+		dump_task(pTmp);
+	} while_each_thread(pTask, pTmp);
+}
+EXPORT_SYMBOL(dump_system_info);
+
 void show_stack(struct task_struct *tsk, unsigned long *sp)
 {
 	dump_backtrace(NULL, tsk);
@@ -247,12 +299,28 @@ static int __die(const char *str, int err, struct thread_info *thread, struct pt
 		TASK_COMM_LEN, tsk->comm, task_pid_nr(tsk), thread + 1);
 
 	if (!user_mode(regs) || in_interrupt()) {
-		dump_mem(KERN_EMERG, "Stack: ", regs->ARM_sp,
-			 THREAD_SIZE + (unsigned long)task_stack_page(tsk));
+		if (regs->ARM_sp < (unsigned long)task_stack_page(tsk) - THREAD_SIZE)
+		{
+			// Strange SP, don't dump all.
+			dump_mem(KERN_EMERG, "Partial stack: ",
+				 (unsigned long)task_stack_page(tsk) - THREAD_SIZE,
+				 THREAD_SIZE + (unsigned long)task_stack_page(tsk));
+		}
+		else dump_mem(KERN_EMERG, "Stack: ", regs->ARM_sp,
+			      THREAD_SIZE + (unsigned long)task_stack_page(tsk));
 		dump_backtrace(regs, tsk);
 		dump_instr(KERN_EMERG, regs);
 	}
 
+#ifdef CONFIG_DEBUG_INFO
+	printk("Disable IRQ, CPU loops forever.\n");
+	local_irq_disable();
+        #if defined(CC_BUG_ON_ENABLE)
+        __pdwnc_reboot_in_kernel();  
+        #endif
+	while (1)
+		;
+#endif
 	return ret;
 }
 
@@ -453,7 +521,9 @@ do_cache_op(unsigned long start, unsigned long end, int flags)
 		if (end > vma->vm_end)
 			end = vma->vm_end;
 
-		flush_cache_user_range(vma, start, end);
+		up_read(&mm->mmap_sem);
+		flush_cache_user_range(start, end);
+		return;
 	}
 	up_read(&mm->mmap_sem);
 }

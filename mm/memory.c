@@ -526,6 +526,10 @@ static void print_bad_pte(struct vm_area_struct *vma, unsigned long addr,
 				(unsigned long)vma->vm_file->f_op->mmap);
 	dump_stack();
 	add_taint(TAINT_BAD_PAGE);
+
+#ifdef CONFIG_PERF_EVENTS
+	while(1);
+#endif
 }
 
 static inline int is_cow_mapping(unsigned int flags)
@@ -1340,6 +1344,7 @@ no_page_table:
 		return ERR_PTR(-EFAULT);
 	return page;
 }
+EXPORT_SYMBOL_GPL(follow_page);
 
 int __get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 		     unsigned long start, int nr_pages, unsigned int gup_flags,

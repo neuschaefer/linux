@@ -1,0 +1,1 @@
+/* INCLUDE_SCAN_MEDIA_FILES_ON_USB_CONNECTED is undefined */

@@ -298,7 +298,7 @@ static const u8 ss_rh_config_descriptor[] = {
 	/* one configuration */
 	0x09,       /*  __u8  bLength; */
 	0x02,       /*  __u8  bDescriptorType; Configuration */
-	0x19, 0x00, /*  __le16 wTotalLength; FIXME */
+	0x1f, 0x00, /*  __le16 wTotalLength; */
 	0x01,       /*  __u8  bNumInterfaces; (1) */
 	0x01,       /*  __u8  bConfigurationValue; */
 	0x00,       /*  __u8  iConfiguration; */
@@ -328,11 +328,14 @@ static const u8 ss_rh_config_descriptor[] = {
 		    /* __le16 ep_wMaxPacketSize; 1 + (MAX_ROOT_PORTS / 8)
 		     * see hub.c:hub_configure() for details. */
 	(USB_MAXCHILDREN + 1 + 7) / 8, 0x00,
-	0x0c        /*  __u8  ep_bInterval; (256ms -- usb 2.0 spec) */
-	/*
-	 * All 3.0 hubs should have an endpoint companion descriptor,
-	 * but we're ignoring that for now.  FIXME?
-	 */
+	0x0c,       /*  __u8  ep_bInterval; (256ms -- usb 2.0 spec) */
+
+	/* one SuperSpeed endpoint companion descriptor */
+	0x06,        /* __u8 ss_bLength */
+	0x30,        /* __u8 ss_bDescriptorType; SuperSpeed EP Companion */
+	0x00,        /* __u8 ss_bMaxBurst; allows 1 TX between ACKs */
+	0x00,        /* __u8 ss_bmAttributes; 1 packet per service interval */
+	0x02, 0x00   /* __le16 ss_wBytesPerInterval; 15 bits for max 15 ports */
 };
 
 /*-------------------------------------------------------------------------*/
@@ -1874,7 +1877,7 @@ void usb_free_streams(struct usb_interface *interface,
 
 	/* Streams only apply to bulk endpoints. */
 	for (i = 0; i < num_eps; i++)
-		if (!eps[i] || !usb_endpoint_xfer_bulk(&eps[i]->desc))
+		if (!usb_endpoint_xfer_bulk(&eps[i]->desc))
 			return;
 
 	hcd->driver->free_streams(hcd, dev, eps, num_eps, mem_flags);
@@ -2079,6 +2082,7 @@ irqreturn_t usb_hcd_irq (int irq, void *__hcd)
 	local_irq_restore(flags);
 	return rc;
 }
+EXPORT_SYMBOL_GPL(usb_hcd_irq);
 
 /*-------------------------------------------------------------------------*/
 

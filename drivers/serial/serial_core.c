@@ -39,6 +39,10 @@
 #include <asm/irq.h>
 #include <asm/uaccess.h>
 
+#ifdef CONFIG_SERIAL_MT53XX_FACTORY_SUPPORT
+extern int mt53_uart_wait_magic_char(unsigned long arg);
+#endif
+
 /*
  * This is used to lock changes in serial line configuration.
  */
@@ -93,6 +97,9 @@ static void __uart_start(struct tty_struct *tty)
 {
 	struct uart_state *state = tty->driver_data;
 	struct uart_port *port = state->uart_port;
+
+	if (port->ops->wake_peer)
+		port->ops->wake_peer(port);
 
 	if (!uart_circ_empty(&state->xmit) && state->xmit.buf &&
 	    !tty->stopped && !tty->hw_stopped)
@@ -1159,6 +1166,13 @@ uart_ioctl(struct tty_struct *tty, struct file *filp, unsigned int cmd,
 	if (ret != -ENOIOCTLCMD)
 		goto out;
 
+#ifdef CONFIG_SERIAL_MT53XX_FACTORY_SUPPORT
+       if(cmd == 0xfffd)
+       {
+           ret = mt53_uart_wait_magic_char(arg);
+           goto out; 
+       }
+#endif
 	mutex_lock(&port->mutex);
 
 	if (tty_hung_up_p(filp)) {

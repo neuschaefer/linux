@@ -1,0 +1,3 @@
+#ifndef USE_STORED_COMPONENTS
+    #define USE_STORED_COMPONENTS 1
+#endif

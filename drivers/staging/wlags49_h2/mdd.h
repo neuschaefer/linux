@@ -7,7 +7,7 @@
 *
 * FILE		: mdd.h
 *
-* DATE		: $Date: 2004/08/05 11:47:10 $   $Revision: 1.6 $
+* DATE		: $Date: 2012/04/27 $   $Revision: #1 $
 * Original		: 2004/05/25 05:59:37    Revision: 1.57      Tag: hcf7_t20040602_01
 * Original		: 2004/05/13 15:31:45    Revision: 1.54      Tag: hcf7_t7_20040513_01
 * Original		: 2004/04/15 09:24:41    Revision: 1.47      Tag: hcf7_t7_20040415_01

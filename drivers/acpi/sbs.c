@@ -1,5 +1,5 @@
 /*
- *  sbs.c - ACPI Smart Battery System Driver ($Revision: 2.0 $)
+ *  sbs.c - ACPI Smart Battery System Driver ($Revision: #1 $)
  *
  *  Copyright (c) 2007 Alexey Starikovskiy <astarikovskiy@suse.de>
  *  Copyright (c) 2005-2007 Vladimir Lebedev <vladimir.p.lebedev@intel.com>

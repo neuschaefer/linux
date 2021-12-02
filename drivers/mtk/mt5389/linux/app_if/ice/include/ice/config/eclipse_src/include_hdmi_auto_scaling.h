@@ -1,0 +1,3 @@
+#ifndef INCLUDE_HDMI_AUTO_SCALING
+    #define INCLUDE_HDMI_AUTO_SCALING 1
+#endif

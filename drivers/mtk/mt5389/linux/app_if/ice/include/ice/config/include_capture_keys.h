@@ -1,0 +1,3 @@
+#ifndef INCLUDE_CAPTURE_KEYS
+    #define INCLUDE_CAPTURE_KEYS 1
+#endif

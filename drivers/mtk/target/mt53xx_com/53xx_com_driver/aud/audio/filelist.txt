@@ -1,0 +1,17 @@
+###########################################################
+#              files to make
+###########################################################
+#		there are 3 for you can use
+#		all without filename
+#		C_SOURCE_FILES		+= xxx ...
+#		S_SOURCE_FILES		+= xxx ...
+#		or
+#		OBJ_FILES		+= xxx ...
+#		
+#		if this file (filelist) didnt exists
+#		main makefile will include all .c .cpp .s
+#		in module directory
+###########################################################
+
+C_SOURCE_FILES	+= aud_if aud_drv aud_cfg aud_dsp_cfg aud_query aud_slt
+

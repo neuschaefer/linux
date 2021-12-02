@@ -16,6 +16,7 @@
 #define SHA256_DIGEST_SIZE      32
 #define SHA256_BLOCK_SIZE       64
 
+
 #define SHA384_DIGEST_SIZE      48
 #define SHA384_BLOCK_SIZE       128
 
@@ -74,6 +75,7 @@ struct sha256_state {
 	u64 count;
 	u32 state[SHA256_DIGEST_SIZE / 4];
 	u8 buf[SHA256_BLOCK_SIZE];
+	u8 fgFirstPacket;
 };
 
 struct sha512_state {

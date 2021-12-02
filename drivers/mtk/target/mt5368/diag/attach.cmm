@@ -1,0 +1,18 @@
+sys.reset
+;====select configuration according to your enviroment====
+;=========================================================
+SYSTEM.OPTION ENRESET OFF
+SYSTEM.CPU CortexA9MPCore
+SYS.JC 3.0MHz
+SYSTEM.MULTICORE DEBUGACCESSPORT 0
+SYSTEM.MULTICORE COREBASE APB:0x80010000
+;=========================================================
+
+sys.mode attach
+
+end
+
+
+
+
+

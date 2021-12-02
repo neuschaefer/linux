@@ -459,6 +459,116 @@ static int set_cur_mix_value(struct usb_mixer_elem_info *cval, int channel,
 	return 0;
 }
 
+// Lawrance.liu@mediatek.com (Aug 23, 2010)
+//   work around for OSS volume control
+#define MIXER_MAX_NUM 10
+static struct usb_mixer_elem_info *pcval[MIXER_MAX_NUM]={NULL};
+static signed short usMinValue=0;
+static signed short usMaxValue=0;
+static signed short usbmixer_oss_conv(int val, int omin, int omax, signed short nmin, signed short nmax)
+{
+	int orange = omax - omin;
+	signed short nrange = nmax - nmin;
+	
+	if (orange == 0)
+		return 0;
+		
+	return ((nrange * (val - omin)) + (orange / 2)) / orange + nmin;
+}
+static signed short usbmixer_oss_conv2(int val, signed short min, signed short max)
+{
+	return usbmixer_oss_conv(val, 0, 65535, min, max);
+}
+static int add_usb_mixer_elem_info(struct usb_mixer_elem_info* cval)
+{
+    int i;
+    for ( i = 0 ; i < MIXER_MAX_NUM ; i++ )
+    {
+        if ( pcval[i] == NULL )
+        {
+            pcval[i] = cval;
+            printk("add usb mixer elem info [%d]\n", i);
+            return 0;
+        }
+    }
+    return -1;
+}
+static int remove_usb_mixer_elem_info(struct usb_mixer_elem_info* cval)
+{
+    int i;
+    for ( i = 0 ; i < MIXER_MAX_NUM ; i++ )
+    {
+        if ( pcval[i] == cval )
+        {
+            printk("remove usb mixer elem info [%d]\n", i);
+            pcval[i] = NULL;
+            return 0;
+        }
+    }
+    return -1;
+}
+int set_cur_ctl_value_direct(unsigned int mixer_index, int value)
+{
+	unsigned char buf[2];
+	int timeout = 10;
+	signed short wIndex=0;
+	short wValue=0;
+	signed short wVolumeValue=0;
+	struct usb_mixer_elem_info* cval=NULL;
+	int minchn = 0;
+	
+
+    if ( mixer_index >= MIXER_MAX_NUM )
+    {
+        printk("set_cur_ctl_value_direct mixer index error : %d\n", mixer_index);
+        return 0;
+    }
+
+    cval = pcval[mixer_index];
+
+    if ( cval == NULL )
+    {
+        printk("set_cur_ctl_value_direct usb_mixer_elem_info is NULL !\n");
+        return 0;
+    }
+
+	if (cval->cmask) 
+	{
+		int i;
+		for (i = 0; i < MAX_CHANNELS; i++)
+		{
+			if (cval->cmask & (1 << i)) 
+			{
+				minchn = i + 1;
+				break;
+			}
+		}
+	}
+
+    wVolumeValue = usbmixer_oss_conv2(value, usMinValue, usMaxValue);
+    wValue = (cval->control << 8) | minchn;
+    wIndex = cval->mixer->ctrlif | (cval->id << 8);
+
+    printk("[UAC] Set gain value : 0x%x\n", wVolumeValue);
+
+	buf[0] = wVolumeValue & 0xff;
+	buf[1] = (wVolumeValue >> 8) & 0xff;
+	while (timeout -- > 0)
+		if (snd_usb_ctl_msg(cval->mixer->chip->dev,
+				    usb_sndctrlpipe(cval->mixer->chip->dev, 0),
+				    UAC_SET_CUR,
+				    USB_RECIP_INTERFACE | USB_TYPE_CLASS | USB_DIR_OUT,
+				    wValue, wIndex,
+				    buf, 2, 100) >= 0)
+			return 0;
+			
+	snd_printdd(KERN_ERR "cannot set ctl value: req = %#x, wValue = %#x, wIndex = %#x, type = %d, data = %#x/%#x\n",
+		    UAC_SET_CUR, wValue, wIndex, cval->val_type, buf[0], buf[1]);
+		    
+	return -EINVAL;
+}
+EXPORT_SYMBOL(set_cur_ctl_value_direct);
+
 /*
  * TLV callback for mixer volume controls
  */
@@ -731,6 +841,7 @@ static struct usb_feature_control_info audio_feature_info[] = {
 /* private_free callback */
 static void usb_mixer_elem_free(struct snd_kcontrol *kctl)
 {
+    remove_usb_mixer_elem_info((struct usb_mixer_elem_info*)kctl->private_data);
 	kfree(kctl->private_data);
 	kctl->private_data = NULL;
 }
@@ -756,64 +867,84 @@ static int get_min_max(struct usb_mixer_elem_info *cval, int default_min)
 		cval->initialized = 1;
 	} else {
 		int minchn = 0;
+		int i;
+
+        // lawrance.liu@mediatek.com (20110818)
+        int i4ChNum = 0;
+		
 		if (cval->cmask) {
-			int i;
 			for (i = 0; i < MAX_CHANNELS; i++)
 				if (cval->cmask & (1 << i)) {
-					minchn = i + 1;
-					break;
+//					minchn = i + 1;
+//					break;
+					i4ChNum++;
 				}
 		}
-		if (get_ctl_value(cval, UAC_GET_MAX, (cval->control << 8) | minchn, &cval->max) < 0 ||
-		    get_ctl_value(cval, UAC_GET_MIN, (cval->control << 8) | minchn, &cval->min) < 0) {
-			snd_printd(KERN_ERR "%d:%d: cannot get min/max values for control %d (id %d)\n",
-				   cval->id, cval->mixer->ctrlif, cval->control, cval->id);
-			return -EINVAL;
-		}
-		if (get_ctl_value(cval, UAC_GET_RES, (cval->control << 8) | minchn, &cval->res) < 0) {
-			cval->res = 1;
-		} else {
-			int last_valid_res = cval->res;
 
-			while (cval->res > 1) {
-				if (snd_usb_mixer_set_ctl_value(cval, UAC_SET_RES,
-								(cval->control << 8) | minchn, cval->res / 2) < 0)
-					break;
-				cval->res /= 2;
-			}
-			if (get_ctl_value(cval, UAC_GET_RES, (cval->control << 8) | minchn, &cval->res) < 0)
-				cval->res = last_valid_res;
-		}
-		if (cval->res == 0)
-			cval->res = 1;
+		for ( i = 1 ; i <= i4ChNum ; i++ )
+		{
+		    minchn = i;
+		    
+    		if (get_ctl_value(cval, UAC_GET_MAX, (cval->control << 8) | minchn, &cval->max) < 0 ||
+    		    get_ctl_value(cval, UAC_GET_MIN, (cval->control << 8) | minchn, &cval->min) < 0) {
+    			snd_printd(KERN_ERR "%d:%d: cannot get min/max values for control %d (id %d)\n",
+    				   cval->id, cval->mixer->ctrlif, cval->control, cval->id);
+    			return -EINVAL;
+    		}
 
-		/* Additional checks for the proper resolution
-		 *
-		 * Some devices report smaller resolutions than actually
-		 * reacting.  They don't return errors but simply clip
-		 * to the lower aligned value.
-		 */
-		if (cval->min + cval->res < cval->max) {
-			int last_valid_res = cval->res;
-			int saved, test, check;
-			get_cur_mix_raw(cval, minchn, &saved);
-			for (;;) {
-				test = saved;
-				if (test < cval->max)
-					test += cval->res;
-				else
-					test -= cval->res;
-				if (test < cval->min || test > cval->max ||
-				    set_cur_mix_value(cval, minchn, 0, test) ||
-				    get_cur_mix_raw(cval, minchn, &check)) {
-					cval->res = last_valid_res;
-					break;
-				}
-				if (test == check)
-					break;
-				cval->res *= 2;
-			}
-			set_cur_mix_value(cval, minchn, 0, saved);
+    		usMinValue = cval->min;
+    		usMaxValue = cval->max;
+    		printk("UAC Volume : Min=0x%x, Max=0x%x\n", usMinValue&0xffff, usMaxValue&0xffff);
+
+    		if (get_ctl_value(cval, UAC_GET_RES, (cval->control << 8) | minchn, &cval->res) < 0) {
+    			cval->res = 1;
+    		} else {
+    			int last_valid_res = cval->res;
+
+    			while (cval->res > 1) {
+    				if (snd_usb_mixer_set_ctl_value(cval, UAC_SET_RES,
+    								(cval->control << 8) | minchn, cval->res / 2) < 0)
+    					break;
+    				cval->res /= 2;
+    			}
+    			if (get_ctl_value(cval, UAC_GET_RES, (cval->control << 8) | minchn, &cval->res) < 0)
+    				cval->res = last_valid_res;
+    		}
+    		if (cval->res == 0)
+    			cval->res = 1;
+
+    		/* Additional checks for the proper resolution
+    		 *
+    		 * Some devices report smaller resolutions than actually
+    		 * reacting.  They don't return errors but simply clip
+    		 * to the lower aligned value.
+    		 */
+    		if (cval->min + cval->res < cval->max) {
+    			int last_valid_res = cval->res;
+    			int saved, test, check;
+    			get_cur_mix_raw(cval, minchn, &saved);
+    			for (;;) {
+    				test = saved;
+    				if (test < cval->max)
+    					test += cval->res;
+    				else
+    					test -= cval->res;
+    				if (test < cval->min || test > cval->max ||
+    				    set_cur_mix_value(cval, minchn, 0, test) ||
+    				    get_cur_mix_raw(cval, minchn, &check)) {
+    					cval->res = last_valid_res;
+    					break;
+    				}
+    				if (test == check)
+    					break;
+    				cval->res *= 2;
+    			}
+    			
+    			// lawrance.liu@mediatek.com : set volume to 50%
+    			saved = usbmixer_oss_conv2(32768, usMinValue, usMaxValue);
+    			
+    			set_cur_mix_value(cval, minchn, 0, saved);
+    		}
 		}
 
 		cval->initialized = 1;
@@ -1125,6 +1256,11 @@ static void build_feature_ctl(struct mixer_build *state, void *raw_desc,
 	snd_printdd(KERN_INFO "[%d] FU [%s] ch = %d, val = %d/%d/%d\n",
 		    cval->id, kctl->id.name, cval->channels, cval->min, cval->max, cval->res);
 	add_control_to_empty(state, kctl);
+
+	if ( cval->control == UAC_CONTROL_BIT(UAC_FU_VOLUME) )
+	{
+    	add_usb_mixer_elem_info(cval);
+	}
 }
 
 
@@ -1171,6 +1307,7 @@ static int parse_audio_feature_unit(struct mixer_build *state, int unitid, void 
 	/* master configuration quirks */
 	switch (state->chip->usb_id) {
 	case USB_ID(0x08bb, 0x2702):
+	case USB_ID(0x08bb, 0x2900):
 		snd_printk(KERN_INFO
 			   "usbmixer: master volume quirk for PCM2702 chip\n");
 		/* disable non-functional volume control */

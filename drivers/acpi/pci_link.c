@@ -1,5 +1,5 @@
 /*
- *  pci_link.c - ACPI PCI Interrupt Link Device Driver ($Revision: 34 $)
+ *  pci_link.c - ACPI PCI Interrupt Link Device Driver ($Revision: #1 $)
  *
  *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>

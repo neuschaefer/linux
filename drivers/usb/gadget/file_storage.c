@@ -324,9 +324,9 @@ static struct {
 } mod_data = {					// Default values
 	.transport_parm		= "BBB",
 	.protocol_parm		= "SCSI",
-	.removable		= 0,
-	.can_stall		= 1,
-	.cdrom			= 0,
+	.removable		= 1,
+	.can_stall		= 0,
+	.cdrom			= 1,
 	.vendor			= FSG_VENDOR_ID,
 	.product		= FSG_PRODUCT_ID,
 	.release		= 0xffff,	// Use controller chip type

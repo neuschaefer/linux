@@ -353,6 +353,14 @@ config SLUB_STATS
 	  out which slabs are relevant to a particular load.
 	  Try running: slabinfo -DA
 
+config DEBUG_MAX_STACK_USAGE
+	default n
+	bool "Debug max stack usage by filling stack with fix value"
+	depends on DEBUG_KERNEL
+	help
+	  Say Y here will fill all kernel stack with fixed value. So user
+	  can see max stack usage by checking the fix value.
+
 config DEBUG_KMEMLEAK
 	bool "Kernel memory leak detector"
 	depends on DEBUG_KERNEL && EXPERIMENTAL && !MEMORY_HOTPLUG && \
@@ -399,6 +407,13 @@ config DEBUG_KMEMLEAK_TEST
 	  memory.
 
 	  If unsure, say N.
+
+config DEBUG_KMEMLEAK_DEFAULT_OFF
+	bool "Default kmemleak to off"
+	depends on DEBUG_KMEMLEAK
+	help
+	  Say Y here to disable kmemleak by default. It can then be enabled
+	  on the command line via kmemleak=on.
 
 config DEBUG_PREEMPT
 	bool "Debug preemptible kernel"
@@ -587,8 +602,9 @@ config DEBUG_LOCKING_API_SELFTESTS
 	  mutexes and rwsems.
 
 config STACKTRACE
-	bool
+	bool "Stacktrace"
 	depends on STACKTRACE_SUPPORT
+	default y
 
 config DEBUG_KOBJECT
 	bool "kobject debugging"
@@ -739,6 +755,14 @@ config FRAME_POINTER
 	  If you say Y here the resulting kernel image will be slightly
 	  larger and slower, but it gives very useful debugging information
 	  in case of kernel bugs. (precise oopses/stacktraces/warnings)
+
+config KERNEL_NO_INLINE
+	bool "Compile the kernel with -fno-inline"
+	depends on DEBUG_KERNEL
+	default n
+	help
+	  If you say Y here the resulting kernel image will be larger
+	  and slower, but it will be easier to trace.
 
 config BOOT_PRINTK_DELAY
 	bool "Delay each boot printk message by N milliseconds"

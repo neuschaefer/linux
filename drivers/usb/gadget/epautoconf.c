@@ -294,6 +294,7 @@ struct usb_ep *usb_ep_autoconfig (
 	/* Fail */
 	return NULL;
 }
+EXPORT_SYMBOL(usb_ep_autoconfig);
 
 /**
  * usb_ep_autoconfig_reset - reset endpoint autoconfig state

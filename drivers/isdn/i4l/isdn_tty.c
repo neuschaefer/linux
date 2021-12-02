@@ -1,4 +1,4 @@
-/* $Id: isdn_tty.c,v 1.1.2.3 2004/02/10 01:07:13 keil Exp $
+/* $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/isdn/i4l/isdn_tty.c#1 $
  *
  * Linux ISDN subsystem, tty functions and AT-command emulator (linklevel).
  *
@@ -47,7 +47,7 @@ static int bit2si[8] =
 static int si2bit[8] =
 {4, 1, 4, 4, 4, 4, 4, 4};
 
-char *isdn_tty_revision = "$Revision: 1.1.2.3 $";
+char *isdn_tty_revision = "$Revision: #1 $";
 
 
 /* isdn_tty_try_read() is called from within isdn_tty_rcv_skb()

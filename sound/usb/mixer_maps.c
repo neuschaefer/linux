@@ -355,6 +355,11 @@ static struct usbmix_ctl_map usbmix_ctl_maps[] = {
 		.ignore_ctl_error = 1,
 	},
 	{
+		.id = USB_ID(0x08bb, 0x2900),
+		.map = linex_map,
+		.ignore_ctl_error = 1,
+	},
+	{
 		.id = USB_ID(0x0a92, 0x0091),
 		.map = maya44_map,
 	},

@@ -1,0 +1,3 @@
+#ifndef POOL_SMALLEST_ALLOCATION
+    #define POOL_SMALLEST_ALLOCATION 1
+#endif

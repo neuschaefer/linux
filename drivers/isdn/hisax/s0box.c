@@ -1,4 +1,4 @@
-/* $Id: s0box.c,v 2.6.2.4 2004/01/13 23:48:39 keil Exp $
+/* $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/isdn/hisax/s0box.c#1 $
  *
  * low level stuff for Creatix S0BOX
  *
@@ -16,7 +16,7 @@
 #include "hscx.h"
 #include "isdnl1.h"
 
-static const char *s0box_revision = "$Revision: 2.6.2.4 $";
+static const char *s0box_revision = "$Revision: #1 $";
 
 static inline void
 writereg(unsigned int padr, signed int addr, u_char off, u_char val) {

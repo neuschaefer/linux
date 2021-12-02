@@ -1,0 +1,3 @@
+#ifndef INCLUDE_THUMBNAIL_DIALOG
+    #define INCLUDE_THUMBNAIL_DIALOG 1
+#endif

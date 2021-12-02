@@ -2780,6 +2780,9 @@ and is between 256 and 4096 characters. It is defined in the file
 					HIGHMEM regardless of setting
 					of CONFIG_HIGHPTE.
 
+	uuid_debug=	(Boolean) whether to enable debugging of TuxOnIce's
+			uuid support.
+
 	vdso=		[X86,SH]
 			vdso=2: enable compat VDSO (default with COMPAT_VDSO)
 			vdso=1: enable VDSO (default)

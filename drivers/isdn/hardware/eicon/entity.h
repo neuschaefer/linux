@@ -1,4 +1,4 @@
-/* $Id: entity.h,v 1.4 2004/03/21 17:26:01 armin Exp $ */
+/* $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/isdn/hardware/eicon/entity.h#1 $ */
 
 #ifndef __DIVAS_USER_MODE_IDI_ENTITY__
 #define __DIVAS_USER_MODE_IDI_ENTITY__

@@ -1475,6 +1475,26 @@ iput_err_out:
 	return err;
 }
 
+static long ntfs_dir_ioctl(struct file *filp, unsigned int cmd,
+			  unsigned long arg)
+{
+    struct inode *inode = filp->f_path.dentry->d_inode;
+    u32 __user *user_attr = (u32 __user *)arg;
+    u32 attr = 0;
+    
+    switch (cmd) {
+    case NTFS_IOCTL_GET_ATTRIBUTES:
+        attr = inode->i_mode;
+        return put_user(attr, user_attr);
+        
+    default:
+        printk(KERN_ERR "[%s]can not support the command\n", __func__);
+        return -ENOIOCTLCMD;
+    }
+}
+
+
+
 /**
  * ntfs_dir_open - called when an inode is about to be opened
  * @vi:		inode to be opened
@@ -1564,6 +1584,7 @@ const struct file_operations ntfs_dir_ops = {
 	.llseek		= generic_file_llseek,	/* Seek inside directory. */
 	.read		= generic_read_dir,	/* Return -EISDIR. */
 	.readdir	= ntfs_readdir,		/* Read directory contents. */
+	.unlocked_ioctl	= ntfs_dir_ioctl,
 #ifdef NTFS_RW
 	.fsync		= ntfs_dir_fsync,	/* Sync a directory to disk. */
 	/*.aio_fsync	= ,*/			/* Sync all outstanding async

@@ -26,6 +26,9 @@
 #include "power.h"
 
 const char *const pm_states[PM_SUSPEND_MAX] = {
+#ifdef CONFIG_EARLYSUSPEND
+	[PM_SUSPEND_ON]		= "on",
+#endif
 	[PM_SUSPEND_STANDBY]	= "standby",
 	[PM_SUSPEND_MEM]	= "mem",
 };
@@ -235,6 +238,7 @@ int suspend_devices_and_enter(suspend_state_t state)
 		suspend_ops->recover();
 	goto Resume_devices;
 }
+EXPORT_SYMBOL_GPL(suspend_devices_and_enter);
 
 /**
  *	suspend_finish - Do final work before exiting suspend sequence.

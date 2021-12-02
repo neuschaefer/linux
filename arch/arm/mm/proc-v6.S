@@ -42,14 +42,11 @@ ENTRY(cpu_v6_proc_init)
 	mov	pc, lr
 
 ENTRY(cpu_v6_proc_fin)
-	stmfd	sp!, {lr}
-	cpsid	if				@ disable interrupts
-	bl	v6_flush_kern_cache_all
 	mrc	p15, 0, r0, c1, c0, 0		@ ctrl register
 	bic	r0, r0, #0x1000			@ ...i............
 	bic	r0, r0, #0x0006			@ .............ca.
 	mcr	p15, 0, r0, c1, c0, 0		@ disable caches
-	ldmfd	sp!, {pc}
+	mov	pc, lr
 
 /*
  *	cpu_v6_reset(loc)
@@ -72,10 +69,15 @@ ENTRY(cpu_v6_reset)
  *	IRQs are already disabled.
  */
 ENTRY(cpu_v6_do_idle)
+#ifndef CONFIG_MT53_FPGA
+#ifndef CONFIG_CACHE_L2X0
 	mov	r1, #0
 	mcr	p15, 0, r1, c7, c10, 4		@ DWB - WFI may enter a low-power mode
 	mcr	p15, 0, r1, c7, c0, 4		@ wait for interrupt
+#endif
+#endif
 	mov	pc, lr
+ENDPROC(cpu_v6_do_idle)
 
 ENTRY(cpu_v6_dcache_clean_area)
 #ifndef TLB_CAN_READ_FROM_L1_CACHE

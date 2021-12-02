@@ -1,4 +1,4 @@
-/* $Id: b1lli.h,v 1.8.8.3 2001/09/23 22:25:05 kai Exp $
+/* $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/include/linux/b1lli.h#1 $
  *
  * ISDN lowlevel-module for AVM B1-card.
  *

@@ -1,0 +1,149 @@
+/*****************************************************************************
+*  Copyright Statement:
+*  --------------------
+*  This software is protected by Copyright and the information contained
+*  herein is confidential. The software may not be copied and the information
+*  contained herein may not be used or disclosed except with the written
+*  permission of MediaTek Inc. (C) 2008
+*
+*  BY OPENING THIS FILE, BUYER HEREBY UNEQUIVOCALLY ACKNOWLEDGES AND AGREES
+*  THAT THE SOFTWARE/FIRMWARE AND ITS DOCUMENTATIONS ("MEDIATEK SOFTWARE")
+*  RECEIVED FROM MEDIATEK AND/OR ITS REPRESENTATIVES ARE PROVIDED TO BUYER ON
+*  AN "AS-IS" BASIS ONLY. MEDIATEK EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES,
+*  EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE IMPLIED WARRANTIES OF
+*  MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE OR NONINFRINGEMENT.
+*  NEITHER DOES MEDIATEK PROVIDE ANY WARRANTY WHATSOEVER WITH RESPECT TO THE
+*  SOFTWARE OF ANY THIRD PARTY WHICH MAY BE USED BY, INCORPORATED IN, OR
+*  SUPPLIED WITH THE MEDIATEK SOFTWARE, AND BUYER AGREES TO LOOK ONLY TO SUCH
+*  THIRD PARTY FOR ANY WARRANTY CLAIM RELATING THERETO. MEDIATEK SHALL ALSO
+*  NOT BE RESPONSIBLE FOR ANY MEDIATEK SOFTWARE RELEASES MADE TO BUYER'S
+*  SPECIFICATION OR TO CONFORM TO A PARTICULAR STANDARD OR OPEN FORUM.
+*
+*  BUYER'S SOLE AND EXCLUSIVE REMEDY AND MEDIATEK'S ENTIRE AND CUMULATIVE
+*  LIABILITY WITH RESPECT TO THE MEDIATEK SOFTWARE RELEASED HEREUNDER WILL BE,
+*  AT MEDIATEK'S OPTION, TO REVISE OR REPLACE THE MEDIATEK SOFTWARE AT ISSUE,
+*  OR REFUND ANY SOFTWARE LICENSE FEES OR SERVICE CHARGE PAID BY BUYER TO
+*  MEDIATEK FOR SUCH MEDIATEK SOFTWARE AT ISSUE.
+*
+*  THE TRANSACTION CONTEMPLATED HEREUNDER SHALL BE CONSTRUED IN ACCORDANCE
+*  WITH THE LAWS OF THE STATE OF CALIFORNIA, USA, EXCLUDING ITS CONFLICT OF
+*  LAWS PRINCIPLES.  ANY DISPUTES, CONTROVERSIES OR CLAIMS ARISING THEREOF AND
+*  RELATED THERETO SHALL BE SETTLED BY ARBITRATION IN SAN FRANCISCO, CA, UNDER
+*  THE RULES OF THE INTERNATIONAL CHAMBER OF COMMERCE (ICC).
+*
+*****************************************************************************/
+/*******************************************************************************
+ *
+ * Filename:
+ * ---------
+ *   d_plsf.c
+ *
+ * Project:
+ * --------
+ *   DUMA
+ *
+ * Description:
+ * ------------
+ *   AMR codec implementation
+ *
+ * Author:
+ * -------
+ *   Stan Huang
+ *
+ *------------------------------------------------------------------------------
+ * $Revision: #1 $ 1.0.0
+ * $Modtime:$
+ * $Log:$
+ *
+ *
+ *******************************************************************************/
+
+#ifdef LINUX_TURNKEY_SOLUTION
+
+/*
+*****************************************************************************
+*
+*      GSM AMR-NB speech codec   R98   Version 7.6.0   December 12, 2001
+*                                R99   Version 3.3.0
+*                                REL-4 Version 4.1.0
+*
+*****************************************************************************
+*
+*      File             : d_plsf.c
+*      Purpose          : common part (init, exit, reset) of LSF decoder
+*                         module (rest in d_plsf_3.c and d_plsf_5.c)
+*
+*****************************************************************************
+*/
+
+
+/*
+*****************************************************************************
+*                         MODULE INCLUDE FILE AND VERSION ID
+*****************************************************************************
+*/
+#include "d_plsf.h"
+
+ 
+/*
+*****************************************************************************
+*                         INCLUDE FILES
+*****************************************************************************
+*/
+
+#include "typedef.h"
+#include "basic_op.h"
+#include "copy.h"
+
+
+#include "tab_lsf_5.h"
+
+/*
+*--------------------------------------------------*
+* Constants (defined in cnst.h)                    *
+*--------------------------------------------------*
+*  M                    : LPC order
+*--------------------------------------------------*
+*/
+
+/*
+*****************************************************************************
+*                         PUBLIC PROGRAM CODE
+*****************************************************************************
+*/
+
+/*
+**************************************************************************
+*
+*  Function    : D_plsf_reset
+*  Purpose     : Resets state memory
+*
+**************************************************************************
+*/
+int D_plsf_reset (D_plsfState *state)
+{
+//  Word16 i;
+
+//  for (i = 0; i < M; i++){
+//      state->past_r_q[i] = 0;             /* Past quantized prediction error */
+//  }
+
+	state->past_r_q[0] = 0;             /* Past quantized prediction error */
+	state->past_r_q[1] = 0;
+	state->past_r_q[2] = 0;
+	state->past_r_q[3] = 0;
+	state->past_r_q[4] = 0;
+	state->past_r_q[5] = 0;
+	state->past_r_q[6] = 0;
+	state->past_r_q[7] = 0;
+	state->past_r_q[8] = 0;
+	state->past_r_q[9] = 0;
+
+	/* Past dequantized lsfs */
+	Copy(mean_lsf, &state->past_lsf_q[0], M);
+
+	return 0;
+}
+
+#endif
+

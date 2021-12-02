@@ -1,7 +1,11 @@
 #
 # Makefile for the kernel serial device drivers.
 #
-
+obj-$(CONFIG_SERIAL_MT5391) += mt5391_uart.o
+obj-$(CONFIG_SERIAL_MT5363) += mt5363_uart.o
+obj-$(CONFIG_SERIAL_MT5365) += mt5365_uart.o
+obj-$(CONFIG_SERIAL_MT5395) += mt5395_uart.o
+obj-$(CONFIG_SERIAL_MT53XX) += mt53xx_uart.o
 obj-$(CONFIG_SERIAL_CORE) += serial_core.o
 obj-$(CONFIG_SERIAL_21285) += 21285.o
 

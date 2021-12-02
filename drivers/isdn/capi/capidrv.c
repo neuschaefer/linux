@@ -1,4 +1,4 @@
-/* $Id: capidrv.c,v 1.1.2.2 2004/01/12 23:17:24 keil Exp $
+/* $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/isdn/capi/capidrv.c#1 $
  *
  * ISDN4Linux Driver, using capi20 interface (kernelcapi)
  *

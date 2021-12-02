@@ -1,0 +1,3 @@
+#ifndef INCLUDE_PARSER_MPEG2PS
+    #define INCLUDE_PARSER_MPEG2PS 1
+#endif

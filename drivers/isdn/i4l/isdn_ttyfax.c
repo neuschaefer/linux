@@ -1,4 +1,4 @@
-/* $Id: isdn_ttyfax.c,v 1.1.2.2 2004/01/12 22:37:19 keil Exp $
+/* $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/isdn/i4l/isdn_ttyfax.c#1 $
  *
  * Linux ISDN subsystem, tty_fax AT-command emulator (linklevel).
  *
@@ -20,7 +20,7 @@
 #include "isdn_ttyfax.h"
 
 
-static char *isdn_tty_fax_revision = "$Revision: 1.1.2.2 $";
+static char *isdn_tty_fax_revision = "$Revision: #1 $";
 
 #define PARSE_ERROR1 { isdn_tty_fax_modem_result(1, info); return 1; }
 

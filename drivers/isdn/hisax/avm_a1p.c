@@ -1,4 +1,4 @@
-/* $Id: avm_a1p.c,v 2.9.2.5 2004/01/24 20:47:19 keil Exp $
+/* $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/isdn/hisax/avm_a1p.c#1 $
  *
  * low level stuff for the following AVM cards:
  * A1 PCMCIA
@@ -56,7 +56,7 @@
 #define byteout(addr,val) outb(val,addr)
 #define bytein(addr) inb(addr)
 
-static const char *avm_revision = "$Revision: 2.9.2.5 $";
+static const char *avm_revision = "$Revision: #1 $";
 
 static inline u_char
 ReadISAC(struct IsdnCardState *cs, u_char offset)

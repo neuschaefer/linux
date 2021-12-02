@@ -1481,8 +1481,9 @@ static void ubifs_umount(struct ubifs_info *c)
 {
 	dbg_gen("un-mounting UBI device %d, volume %d", c->vi.ubi_num,
 		c->vi.vol_id);
-
+#ifdef CONFIG_UBIFS_FS_DEBUG
 	dbg_debugfs_exit_fs(c);
+#endif
 	spin_lock(&ubifs_infos_lock);
 	list_del(&c->infos_list);
 	spin_unlock(&ubifs_infos_lock);

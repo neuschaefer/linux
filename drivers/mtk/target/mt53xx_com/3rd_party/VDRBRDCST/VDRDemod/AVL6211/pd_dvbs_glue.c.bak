@@ -1,0 +1,2198 @@
+/*----------------------------------------------------------------------------*
+ * No Warranty                                                                *
+ * Except as may be otherwise agreed to in writing, no warranties of any      *
+ * kind, whether express or implied, are given by MTK with respect to any MTK *
+ * Deliverables or any use thereof, and MTK Deliverables are provided on an   *
+ * "AS IS" basis.  MTK hereby expressly disclaims all such warranties,        *
+ * including any implied warranties of merchantability, non-infringement and  *
+ * fitness for a particular purpose and any warranties arising out of course  *
+ * of performance, course of dealing or usage of trade.  Parties further      *
+ * acknowledge that Company may, either presently and/or in the future,       *
+ * instruct MTK to assist it in the development and the implementation, in    *
+ * accordance with Company's designs, of certain softwares relating to        *
+ * Company's product(s) (the "Services").  Except as may be otherwise agreed  *
+ * to in writing, no warranties of any kind, whether express or implied, are  *
+ * given by MTK with respect to the Services provided, and the Services are   *
+ * provided on an "AS IS" basis.  Company further acknowledges that the       *
+ * Services may contain errors, that testing is important and Company is      *
+ * solely responsible for fully testing the Services and/or derivatives       *
+ * thereof before they are used, sublicensed or distributed.  Should there be *
+ * any third party action brought against MTK, arising out of or relating to  *
+ * the Services, Company agree to fully indemnify and hold MTK harmless.      *
+ * If the parties mutually agree to enter into or continue a business         *
+ * relationship or other arrangement, the terms and conditions set forth      *
+ * hereunder shall remain effective and, unless explicitly stated otherwise,  *
+ * shall prevail in the event of a conflict in the terms in any agreements    *
+ * entered into between the parties.                                          *
+ *---------------------------------------------------------------------------*/
+/*-----------------------------------------------------------------------------
+ * Copyright (c) 2008, MediaTek, Inc.
+ * All rights reserved.
+ *
+ * Unauthorized use, practice, perform, copy, distribution, reproduction,
+ * or disclosure of this information in whole or in part is prohibited.
+ *-----------------------------------------------------------------------------
+ *
+ * $Author: yuan.liu $
+ * $Date: 2010/08/18 $
+ * $RCSfile: pd_DVBS_glue.c,v $
+ * $Revision: #1 $
+ *
+ *---------------------------------------------------------------------------*/
+/** @file pd_DVBS_glue.c
+ *  DVBS glue layer
+ */
+//-----------------------------------------------------------------------------
+// Include files
+//-----------------------------------------------------------------------------
+#include "u_tuner.h"
+#include "x_os.h"
+#include "x_stl_lib.h"//StrToInt function
+#include "tuner_if.h"
+#include "TDIS_header.h"
+#include "pd_dvbs_glue.h"
+#include "tunerDebug.h"
+#include "i2c_api.h"
+#include "tuner_interface_if.h"
+#include "pd_dvbs_if.h"
+#include "x_gpio.h"
+#include "vdr_PD_Def.h"
+#include "x_rm.h"
+//----------------------Availink added
+//#include "stdio.h"
+#include "IBSP.h"
+#include "avl_dvbsx.h"
+#include "IBase.h"
+#include "IRx.h"
+#include "ITuner.h"
+#include "ExtSharpBS2S7VZ7801.h"
+#include "II2C.h"
+#include "IDiseqc.h"
+#include "IBlindScan.h"
+#include "pd_dvbs_glue.h"
+
+
+
+//-----------------------------------------------------------------------------
+// Constant definitions
+//-----------------------------------------------------------------------------
+//Import extern variable
+
+extern AVL_uchar ucPatchData [];			 //Defined in AVL6211_patch.dat.cpp.
+//-----------------------------------------------------------------------------
+// Configurations
+//-----------------------------------------------------------------------------
+					   
+//-----------------------------------------------------------------------------
+// Export definitions
+//-----------------------------------------------------------------------------
+
+//-----------------------------------------------------------------------------
+// Macro definitions
+//-----------------------------------------------------------------------------
+#define IX2610VA_slave_address     0xC0            //The Tuner slave address. It is the write address of the tuner device. i.e. it is 8 bits address and the last bit is the R/W flag which is zero. Although this data structure support 10 bits I2C address. The AVL chip not supports it. 
+#define IX2610VA_I2Cbus_clock      200             //The clock speed of the tuner dedicated I2C bus, in a unit of kHz.
+#define IX2610VA_LPF               340             //The LPF of the tuner,in a unit of 100kHz.
+#define Diseqc_Tone_Frequency   22              // The Diseqc bus speed in the unit of kHz. Normally, it should be 22kHz. 
+
+#define mcSEMA_LOCK_MTFE(sema)                                       \
+{                                                                    \
+    mcDBG_MSG_L4((" [ _Lock_%s-%d ]\r\n", __FUNCTION__, __LINE__)); \
+    x_sema_lock(sema, X_SEMA_OPTION_WAIT);                           \
+    mcDBG_MSG_L4((" [ _Excape_%s-%d ]\r\n", __FUNCTION__, __LINE__));     \
+}
+#define mcSEMA_UNLOCK_MTFE(sema)                                     \
+{                                                                    \
+    mcDBG_MSG_L4((" [ _Unlock_%s-%d ]\r\n", __FUNCTION__, __LINE__));     \
+    x_sema_unlock(sema);                                             \
+}
+
+//-----------------------------------------------------------------------------
+// static variables
+//-----------------------------------------------------------------------------
+static DVBS_PD_CTX_T *pPdCtxDVBS;
+static TUNER_DEVICE_CTX_T*    pDVBSTunerDeviceCtx = NULL;
+static UINT8 do_blindscan=0;
+static UINT8 dvbs2_ts_outputflag=0;
+//-----------------------------------------------------------------------------
+// global variables
+//-----------------------------------------------------------------------------
+
+struct Signal_Level
+{	
+	AVL_uint16 SignalLevel;	
+	AVL_int16 SignalDBM;
+};
+struct AVL_DVBSx_Chip  AVL_DVBSxChip;
+struct AVL_Tuner Tuner;		
+struct Signal_Level  SignalLevel [47]=
+{
+	{8285,	-922},{10224,	-902},{12538,	-882},{14890,	-862},{17343,	-842},{19767,	-822},{22178,	-802},{24618,	-782},{27006,	-762},{29106,	-742},
+	{30853,	-722},{32289,	-702},{33577,	-682},{34625,	-662},{35632,	-642},{36552,	-622},{37467,	-602},{38520,	-582},{39643,	-562},{40972,	-542},
+	{42351,	-522},{43659,	-502},{44812,	-482},{45811,	-462},{46703,	-442},{47501,	-422},{48331,	-402},{49116,	-382},{49894,	-362},{50684,	-342},
+	{51543,	-322},{52442,	-302},{53407,	-282},{54314,	-262},{55208,	-242},{56000,	-222},{56789,	-202},{57544,	-182},{58253,	-162},{58959,	-142},
+	{59657,	-122},{60404,	-102},{61181,	-82},{62008,	-62},{63032,	-42},{65483,	-22},{65535,	-12}
+};
+static HANDLE_T  AutoScan_callback;
+typedef struct CurrnetChannel
+{
+		AVL_uint32 m_uiFrequency_kHz;		///< The channel carrier frequency in units of kHz. 
+		AVL_uint32 m_uiSymbolRate_Hz;
+		TUNER_FEC_INNER_T m_fec;
+}DVBS2_CHANNEL_T;
+static DVBS2_CHANNEL_T Last_program_channel;/*record the last program channel ,so it is just channged in DVBS_TunerAcq function.*/
+//static DVBS2_CHANNEL_T BlindScan_channel[20];
+static DVBS2_CHANNEL_T Current_channel;/*during blindscan process,record the currnet try_lock channel freq_info,or record the start_freq*/
+#define tuner_LPF               340         //The LPF of the tuner,in a unit of 100kHz.
+#define bs_stop_freq			2150		//The stop rf frequency, 2100M
+#define bs_start_freq			965			//The start rf frequency, 965M
+#define bs_min_symbolrate		1			//The minimum symbol rate, 1M
+#define bs_max_symbolrate		45			//The maximum symbol rate, 45M
+//-----------------------------------------------------------------------------
+// static functions
+//-----------------------------------------------------------------------------
+static  INT32 DVBS_AutoScanCallback(UINT8 signal,UINT8 polar,UINT32 freq,UINT32 sym,UINT8 fec);
+EXTERN INT32 Tuner_Notify(DRV_COND_T e_nfy_cond,UINT32 u4Msg);
+#ifndef DEFAULT_DEMOD_RESET_GPIO
+#define DEFAULT_DEMOD_RESET_GPIO (35) //The GPIO Pin must be changed to correct no.
+#endif
+
+static void Demod_GPIO_Reset(void)
+{	
+#if 0
+	//int 6211 has benn reseted during T/C Reset.
+	UINT32 u4ResetGpionum;
+	INT32 fgSet = 0;
+
+
+	
+	if(DRVCUST_OptQuery(eDemodResetGpio,&u4ResetGpionum)==0)
+	{
+		GPIO_Output(DEFAULT_DEMOD_RESET_GPIO, &fgSet);
+		AVL_DVBSx_IBSP_Delay(50);
+		fgSet = 1;
+		GPIO_Output(DEFAULT_DEMOD_RESET_GPIO, &fgSet);
+		//AVL_DVBSx_IBSP_Delay(100);
+	}
+#endif
+}
+AVL_DVBSx_ErrorCode CPU_Halt(struct AVL_DVBSx_Chip * pAVLChip)
+{
+     AVL_DVBSx_ErrorCode r;
+     AVL_uint16 i= 0;
+	 
+     r = AVL_DVBSx_IBase_SendRxOP(OP_RX_HALT, pAVLChip );
+
+     if(AVL_DVBSx_EC_OK == r)
+     {
+          while(i++<20)
+          {
+              r = AVL_DVBSx_IBase_GetRxOPStatus(pAVLChip);
+              if(AVL_DVBSx_EC_OK == r)
+              {
+                   break;
+              }
+              else
+              {
+                   AVL_DVBSx_IBSP_Delay(10);
+              }
+          }
+     }
+	 return (r);
+}
+#if 0
+static void AVL6211_SetFunctionMode(enum AVL_DVBSx_FunctionalMode enumFunctionalMode)
+{
+	struct AVL_DVBSx_Chip * pAVLChip = &AVL_DVBSxChip;
+	mcSEMA_LOCK_MTFE(pPdCtxDVBS->hHalLock);
+	mcSEMA_UNLOCK_MTFE(pPdCtxDVBS->hHalLock);
+}
+static void A8293_Control(AVL_uchar Temp)
+{
+	 UINT8 uiData = 0x10;
+	 UINT8 A9293_addr=0x10;
+	 //ucI2cRead(A9293_addr,uiData,0,0);
+ 	 ucI2cReadOnly(A9293_addr,&uiData,1);
+	 if(1==Temp)	//Horizontal
+	 {
+		uiData = 0x3A;
+	 }
+	 else if(2==Temp)	//Vertical
+	 {
+		uiData = 0x34;
+	 }
+	 else if(3==Temp)  //LNB supply off
+	 {
+		uiData = 0x10;
+	 }
+	 else
+ 	{
+	 	mcDBG_MSG_ERR(("A8293_Control Err:%d !\n",Temp));
+		return;
+ 	}
+	 //ucI2cWrite(A9293_addr,uiData,0,0);
+	 ucI2cWriteOnly(A9293_addr,&uiData,1);
+
+	 uiData = 0x82;
+//	 ucI2cWrite(A9293_addr,uiData,0,0); //Open Ruby 22K to LNB supply
+ucI2cWriteOnly(A9293_addr,&uiData,1);
+
+}
+#endif	
+static BOOL AVL6211_MD_Break(void)
+{
+	return pPdCtxDVBS->fgBreakMonitor;
+}
+static AVL_DVBSx_ErrorCode ReInit_RX_Parameters(struct AVL_DVBSx_Chip * pAVLChip, enum AVL_DVBSx_RfagcPola enumAGCPola)
+{
+	AVL_DVBSx_ErrorCode r=AVL_DVBSx_EC_OK;
+	AVL_uint32 i=0;
+	
+	r = AVL_DVBSx_IBase_SendRxOP(OP_RX_LD_DEFAULT, pAVLChip );
+    if(AVL_DVBSx_EC_OK == r)
+    {
+         while(i++<20)
+         {
+             r = AVL_DVBSx_IBase_GetRxOPStatus(pAVLChip);
+             if(AVL_DVBSx_EC_OK == r)
+                  break;
+             else
+                  AVL_DVBSx_IBSP_Delay(10);
+         }
+    }
+	r |= AVL_DVBSx_II2C_Write16(pAVLChip, rc_int_dmd_clk_MHz_addr,  pAVLChip->m_DemodFrequency_10kHz);
+	r |= AVL_DVBSx_II2C_Write32(pAVLChip, rc_format_addr, 1);
+	r |= AVL_DVBSx_II2C_Write16(pAVLChip, rc_tuner_LPF_margin_100kHz_addr, 0);
+	r |= AVL_DVBSx_II2C_Write32(pAVLChip, rc_rfagc_pol_addr, (AVL_uint32)enumAGCPola);
+	return (r);
+}
+
+static void AVL6211_EnableLNBVoltage(void)
+{
+	AVL_DVBSx_ErrorCode r=AVL_DVBSx_EC_OK;
+	AVL_uchar gpio_bit=0;
+	struct AVL_DVBSx_Chip * pAVLChip = &AVL_DVBSxChip;
+	gpio_bit |=0x1;//CS_0 config as input;
+	gpio_bit |=0x0<<1;//LNB_CNTRL_1  config as output;
+	gpio_bit |=0x1<<2;//GPIO_CLK  config as input;
+	r=AVL_DVBSx_IBase_SetGPIODir(gpio_bit, pAVLChip);
+	if( AVL_DVBSx_EC_OK !=r )
+	{
+		mcDBG_MSG_INFO(("AVL_DVBSx_IBase_SetGPIODir failed !\n"));
+	}
+	else
+	{
+		gpio_bit =0;/*Just config the output GPIO PIN,others are ingored....*/
+		gpio_bit |=0x1<<1;//LNB_CNTRL_1  config as HIGH;
+	       AVL_DVBSx_IBase_SetGPIOVal(gpio_bit, pAVLChip);
+	}
+
+}
+static void AVL6211_DisableLNBVoltage(void)
+{
+	AVL_DVBSx_ErrorCode r=AVL_DVBSx_EC_OK;
+	AVL_uchar gpio_bit=0;
+	struct AVL_DVBSx_Chip * pAVLChip = &AVL_DVBSxChip;
+	gpio_bit |=0x1;//CS_0 config as input;
+	gpio_bit |=0x0<<1;//LNB_CNTRL_1  config as output;
+	gpio_bit |=0x1<<2;//GPIO_CLK  config as input;
+	r=AVL_DVBSx_IBase_SetGPIODir(gpio_bit, pAVLChip);
+	if( AVL_DVBSx_EC_OK !=r )
+	{
+		mcDBG_MSG_INFO(("AVL_DVBSx_IBase_SetGPIODir failed !\n"));
+	}
+	else
+	{
+		gpio_bit =0;/*Just config the output GPIO PIN,others are ingored....*/
+		gpio_bit |=0x0<<1;//LNB_CNTRL_1  config as LOW;
+	       AVL_DVBSx_IBase_SetGPIOVal(gpio_bit, pAVLChip);
+	}
+
+}
+static void AVL6211_SetToneOut(AVL_uchar ucTone)
+{
+	AVL_DVBSx_ErrorCode r=AVL_DVBSx_EC_OK;
+	struct AVL_DVBSx_Diseqc_TxStatus TxStatus;
+	struct AVL_DVBSx_Chip * pAVLChip = &AVL_DVBSxChip;
+	AVL_DVBSx_IDiseqc_SendTone( ucTone, 8, pAVLChip);
+	if(r != AVL_DVBSx_EC_OK)
+	{
+		mcDBG_MSG_INFO(("AVL_DVBSx_IDiseqc_SendTone failed !\n"));
+	}
+	else
+	{
+		do
+		{
+			r= AVL_DVBSx_IDiseqc_GetTxStatus(&TxStatus, pAVLChip);
+		}while(TxStatus.m_TxDone != 1);
+		if(r ==AVL_DVBSx_EC_OK )
+		{
+
+		}
+		else
+		{
+			mcDBG_MSG_ERR(("AVL_DVBSx_IDiseqc_SendTone Err. !\n"));
+		}
+	}
+	
+}
+static void AVL6211_DiseqcSendCmd(AVL_puchar pCmd,AVL_uchar CmdSize)
+{
+	AVL_DVBSx_ErrorCode r=AVL_DVBSx_EC_OK;
+	struct AVL_DVBSx_Diseqc_TxStatus TxStatus;
+	struct AVL_DVBSx_Chip * pAVLChip = &AVL_DVBSxChip;
+	
+	r=AVL_DVBSx_IDiseqc_SendModulationData(pCmd, CmdSize, pAVLChip);
+	if(r != AVL_DVBSx_EC_OK)
+	{
+		mcDBG_MSG_INFO(("AVL_DVBSx_IDiseqc_SendModulationData failed !\n"));
+	}
+	else
+	{
+		do
+		{
+			r= AVL_DVBSx_IDiseqc_GetTxStatus(&TxStatus, pAVLChip);
+		}while(TxStatus.m_TxDone != 1);
+		if(r ==AVL_DVBSx_EC_OK )
+		{
+
+		}
+		else
+		{
+			mcDBG_MSG_ERR(("AVL_DVBSx_IDiseqc_SendModulationData Err. !\n"));
+		}		
+	}
+}
+static AVL_DVBSx_ErrorCode AVL6211_LockChannel(UINT32 freq_100kHZ,UINT32 symbolrate_HZ)
+{
+	AVL_DVBSx_ErrorCode r=AVL_DVBSx_EC_OK;
+	struct AVL_DVBSx_Chip * pAVLChip = &AVL_DVBSxChip;		
+	struct AVL_Tuner * pTuner =&Tuner;	
+	struct AVL_DVBSx_Channel Channel;  
+	
+	mcDBG_MSG_INFO(("[AVL6211_LockChannel]  freq_100kHZ:%d ,symbolrate_HZ:%d!\n",freq_100kHZ,symbolrate_HZ));
+
+	CPU_Halt(pAVLChip);
+	
+	pTuner->m_uiFrequency_100kHz = freq_100kHZ;      
+	pTuner->m_uiLPF_100kHz = IX2610VA_LPF;
+	//This function should be called after initialization to lock the tuner.
+	r = pTuner->m_pLockFunc(pTuner);
+	if(AVL_DVBSx_EC_OK != r)
+	{
+		mcDBG_MSG_ERR(("Tuner lock failed !\n"));
+		return (r);
+	}
+	AVL_DVBSx_IBSP_Delay(100);		//Wait a while for tuner to lock in certain frequency.
+
+	//This function should be called to check the lock status of the tuner.
+	r = pTuner->m_pGetLockStatusFunc(pTuner);
+	if (AVL_DVBSx_EC_OK != r)
+	{
+		mcDBG_MSG_ERR(("Tuner test failed !\n"));
+		return (r);
+	}
+
+	Channel.m_uiSymbolRate_Hz = symbolrate_HZ;      //Change the value defined by macro when we want to lock a new channel.
+	Channel.m_Flags = (CI_FLAG_IQ_NO_SWAPPED) << CI_FLAG_IQ_BIT;	//Normal IQ
+	Channel.m_Flags |= (CI_FLAG_IQ_AUTO_BIT_AUTO) << CI_FLAG_IQ_AUTO_BIT;	//Enable automatic IQ swap detection
+	Channel.m_Flags |= (CI_FLAG_DVBS2_UNDEF) << CI_FLAG_DVBS2_BIT;			//Enable automatic standard detection
+
+	//This function should be called after tuner locked to lock the channel.
+	r = AVL_DVBSx_IRx_LockChannel(&Channel, pAVLChip);  
+	if (AVL_DVBSx_EC_OK != r)
+	{
+		mcDBG_MSG_ERR(("Lock channel failed !\n"));
+		return (r);
+	}
+	return (r);
+}
+static UINT8 AVL6211_GetSignalLevel(void)
+{
+	AVL_DVBSx_ErrorCode r=AVL_DVBSx_EC_OK;
+	struct AVL_DVBSx_Chip * pAVLChip = &AVL_DVBSxChip;	
+	AVL_uint16 uiRFSignalLevel;
+	UINT8 u1Ret=0;
+	r =AVL_DVBSx_IRx_GetSignalLevel(&uiRFSignalLevel, pAVLChip);
+	if (AVL_DVBSx_EC_OK != r)
+	{
+		mcDBG_MSG_ERR(("[DVBS_TunerGetSignalLevel] Get SignalLevel --- Fail !\n"));
+	}
+	else
+	{
+		if (uiRFSignalLevel >= 56000)	///56000 signal level is big than -22.2dbm
+		{
+			u1Ret = 98;
+		}
+		else
+		{
+			u1Ret = (uiRFSignalLevel * 100) / 56000;
+		}
+	}
+	return u1Ret;
+}
+/*
+AVL6211_SendCmd: switch Diseqc 1.0.
+port_num:LNB num.
+Dis:This function just for debug in DVBS_TunerDtdCommand.
+
+*/
+static void AVL6211_SendCmd(AVL_uchar port_num)
+{
+AVL_uchar port_bit=0;
+AVL_uchar u8Cmd[]={0xe0,0x10,0x38,0xf0};
+mcDBG_MSG_INFO(("[AVL6211_SendCmd] port_num:%d\n",port_num));
+    switch(port_num)
+    	{
+    	case 1:
+			port_bit=0;
+			break;
+		case 2:
+			port_bit=0x04;
+			break;
+			case 3:
+				port_bit=0x08;
+				break;
+			case 4:
+				port_bit=0x0c;
+				break;
+    	}
+	u8Cmd[3]=0xf0+port_bit;
+	
+	AVL6211_DiseqcSendCmd(u8Cmd, 4);
+}
+
+static BOOL  AVL6211_BlindScan_TryToLock(struct AVL_DVBSx_Channel *pChannel)
+{
+	struct AVL_DVBSx_Chip * pAVLChip = &AVL_DVBSxChip;
+	AVL_DVBSx_ErrorCode r=AVL_DVBSx_EC_OK;
+	AVL_uint16 uiLockStatus=0;
+	AVL_uint32 uiTimeth; 
+	AVL_uint16 uiCounter;
+	
+	r=AVL_DVBSx_IBase_SetFunctionalMode( pAVLChip, AVL_DVBSx_FunctMode_Demod);
+
+	
+	r=AVL6211_LockChannel(pChannel->m_uiFrequency_kHz/100, pChannel->m_uiSymbolRate_Hz);
+	if(r == AVL_DVBSx_EC_OK)
+	{
+		//Channel lock time increase while symbol rate decrease.Give the max waiting time for different symbolrates.
+		if(pChannel->m_uiSymbolRate_Hz<5000000)
+		{
+			uiTimeth=5000*2;       //The max waiting time is 5000ms,considering the IQ swapped status the time should be doubled.
+		}
+		else if(pChannel->m_uiSymbolRate_Hz<10000000)
+		{
+			uiTimeth=600*2;        //The max waiting time is 600ms,considering the IQ swapped status the time should be doubled.
+		}
+		else
+		{
+			uiTimeth=250*2;        //The max waiting time is 250ms,considering the IQ swapped status the time should be doubled.
+		} 
+		uiCounter=uiTimeth/10;
+		do
+		{
+			//This function should be called to check the lock status of the demod.
+			r = AVL_DVBSx_IRx_GetLockStatus(&uiLockStatus, pAVLChip);
+			if( ((AVL_DVBSx_EC_OK == r)&&(1 == uiLockStatus)))
+			{
+				break;
+			}
+			if(AVL6211_MD_Break())
+			{
+				uiLockStatus=0;
+				mcDBG_MSG_L2(("Media Soft Break!\n"));
+				break;
+			}
+			
+			AVL_DVBSx_IBSP_Delay(10);    //Wait 10ms for demod to lock the channel.
+		}while(--uiCounter);
+
+		if(uiLockStatus==1)
+		{
+			mcDBG_MSG_L2(("Channel locked !\n"));
+			
+		}
+		else if(uiCounter==0)
+		{
+			mcDBG_MSG_L2(("Channel unlock !\n"));
+		}
+	}
+	
+	return (BOOL)uiLockStatus;
+}
+static AVL_DVBSx_ErrorCode AVL6211_BlindScan(void)
+{
+	struct AVL_DVBSx_Channel channels[256];
+	struct AVL_DVBSx_BlindScanPara bsPara;
+	struct AVL_DVBSx_BlindScanInfo bsInfo;
+	AVL_uint16 uiNextStartFreq_100kHz;
+	AVL_uint16 uiMaxLPF;
+	AVL_char ScanFlag;
+	AVL_DVBSx_ErrorCode r = AVL_DVBSx_EC_OK;
+	BOOL Lockflag=0;
+	UINT8 i;
+	struct AVL_DVBSx_Chip * pAVLChip = &AVL_DVBSxChip;		
+	struct AVL_Tuner * pTuner =&Tuner;
+	AVL_uint16  PreTP_Total=0;
+	AVL_uint16 CurTP_Num=0;
+	//Setup blind scan parameters and start to perform blind scan.	
+	bsPara.m_uiMaxSymRate_kHz = 1000*bs_max_symbolrate;
+	bsPara.m_uiMinSymRate_kHz = 1000*bs_min_symbolrate;
+	r = AVL_DVBSx_II2C_Read16(pAVLChip, rc_tuner_max_LPF_100kHz_addr, &uiMaxLPF);     //Get the right LPF for blind scan to regulate the freq_step.
+    if(AVL_DVBSx_EC_OK != r || uiMaxLPF==0)
+	{
+		mcDBG_MSG_INFO(("Read blindscan LPF failed:%d!\n",r));
+		return (r);
+	}
+	mcDBG_MSG_INFO(("[AVL6211_BlindScan] is call\n"));
+	uiNextStartFreq_100kHz = 10*bs_start_freq;
+	ScanFlag = 1;                   
+
+	// The Sharp tuner does not invert the spectrum.  For other tuners, this may have to be set to AVL_DVBSx_BS_INVERT.	
+	r = AVL_DVBSx_IBlindScan_SetSpectrumInversion(pAVLChip, AVL_DVBSx_BS_NORMAL); 
+    if(AVL_DVBSx_EC_OK != r)
+	{
+		mcDBG_MSG_INFO(("Set blindscan spectrum inversion failed:%d!\n",r));
+		return (r);
+	}
+    
+	//Halt CPU to improve the tuner locking speed. It's the optional operation.
+    r=CPU_Halt(pAVLChip);
+	if(AVL_DVBSx_EC_OK != r)
+	{
+		mcDBG_MSG_INFO(("CPU halt failed :%d!\n",r));
+		return (r);
+	}
+
+	r = AVL_DVBSx_IBlindScan_Reset(pAVLChip);
+	if(AVL_DVBSx_EC_OK != r)
+	{
+		mcDBG_MSG_INFO(("IBlindScan_Reset  failed :%d!\n",r));
+		return (r);
+	}	
+	
+	while(ScanFlag)
+	{
+		bsPara.m_uiStartFreq_100kHz = uiNextStartFreq_100kHz;    // Give the start scan frequency.
+		if(bsPara.m_uiStartFreq_100kHz >= bs_stop_freq*10)
+		{
+			break;			//Do not need to do scan
+		}
+		//Sharp tuner has a maximum 34 MHz LPF, but only 32MHz is flat.
+		//The scan frequency range is 640(32MHz*2*10),unit is 100KHz.
+		bsPara.m_uiStopFreq_100kHz = bsPara.m_uiStartFreq_100kHz + uiMaxLPF*2; 
+
+		if(bsPara.m_uiStopFreq_100kHz > bs_stop_freq*10)
+		{
+			bsPara.m_uiStopFreq_100kHz = bs_stop_freq*10;
+			ScanFlag = 0;			//This is the last scan.
+		}
+	 	mcDBG_MSG_INFO(("Scan from:%d  ..to :%d!\n",bsPara.m_uiStartFreq_100kHz,bsPara.m_uiStopFreq_100kHz));
+		//Setup the tuner before scan
+		pTuner->m_uiFrequency_100kHz = (bsPara.m_uiStartFreq_100kHz + bsPara.m_uiStopFreq_100kHz)/2;  //Calculate the center frequency.
+		pTuner->m_uiLPF_100kHz = tuner_LPF; 
+		r = pTuner->m_pLockFunc(pTuner);   //Lock the tuner.
+		if(AVL_DVBSx_EC_OK != r)
+	    {
+		    mcDBG_MSG_INFO(("Tuner lock failed:%d !\n",r));
+		    goto BlindScan_Exit;
+	     }
+		
+		AVL_DVBSx_IBSP_Delay(150);		//wait a while for tuner to lock in certain frequency.
+		r = pTuner->m_pGetLockStatusFunc(pTuner);    //Check the lock status of the tuner.
+	    if (AVL_DVBSx_EC_OK != r)		 
+		{
+			mcDBG_MSG_INFO(("Tuner can not lock to %f MHz !!!\n", pTuner->m_uiFrequency_100kHz/10));
+			goto BlindScan_Exit;
+		}
+
+		ReInit_RX_Parameters(pAVLChip, AVL_DVBSx_RA_Invert);
+		
+		//This function should be called after tuner lock to perform a blind scan.	
+		r=AVL_DVBSx_IBase_SetFunctionalMode(pAVLChip, AVL_DVBSx_FunctMode_BlindScan);
+		if(AVL_DVBSx_EC_OK != r)
+		{
+		    mcDBG_MSG_INFO(("SetFunctionalMode AVL_DVBSx_FunctMode_BlindScan  failed:%d !\n",r));
+		}		
+		r = AVL_DVBSx_IBlindScan_Scan(&bsPara,pTuner->m_uiLPF_100kHz, pAVLChip);
+		if(AVL_DVBSx_EC_OK != r)
+		{
+		    mcDBG_MSG_INFO(("Blind Scan failed:%d !\n",r));
+			goto BlindScan_Exit;
+		}
+	
+	    //Monitor the blind scan progress.
+		do 
+		{
+			if(AVL6211_MD_Break())
+			{
+				mcDBG_MSG_INFO(("MD Break currnet blindscan process...!\n"));
+				goto BlindScan_Exit;
+			}
+			mcDBG_MSG_INFO(("Scaning..500ms delay..!\n"));
+			AVL_DVBSx_IBSP_Delay(500);		//wait 1 second
+			r = AVL_DVBSx_IBlindScan_GetScanStatus(&bsInfo, pAVLChip);  //Query the internal blind scan procedure information.
+			if(AVL_DVBSx_EC_OK != r)
+			{
+				mcDBG_MSG_INFO(("Get scan status failed !\n"));
+				goto BlindScan_Exit;
+			}
+		}while(100 != bsInfo.m_uiProgress);	//100 indicates the blind scan is finished.	
+///////////just for debug
+#if 0
+		mcDBG_MSG_INFO(("Total channel:%d!\n",bsInfo.m_uiChannelCount));
+		AVL_DVBSx_IBSP_Delay(10);		
+		if(bsInfo.m_uiChannelCount>0)
+		{
+			AVL_DVBSx_IBlindScan_ReadChannelInfo(0, &(bsInfo.m_uiChannelCount), channels,pAVLChip);	
+			for(i=0;i<bsInfo.m_uiChannelCount;i++)
+			{
+				mcDBG_MSG_INFO(("[%d] channel freq:%d,symbol:%d!\n",i,channels[i].m_uiFrequency_kHz,channels[i].m_uiSymbolRate_Hz));
+			}
+		}
+#endif
+/////////////////end		
+	    	uiNextStartFreq_100kHz = bsInfo.m_uiNextStartFreq_100kHz;
+		PreTP_Total=0;
+		AVL_DVBSx_IBlindScan_ReadChannelInfo(PreTP_Total, &(bsInfo.m_uiChannelCount), channels,pAVLChip);
+		
+		CurTP_Num=0;
+		if((bsInfo.m_uiChannelCount<=120) && (bsInfo.m_uiChannelCount > PreTP_Total )&&( r== AVL_DVBSx_EC_OK))//  The Availink device can store up to 120 detected channels. ,other value is Error
+		{
+			CurTP_Num=bsInfo.m_uiChannelCount-PreTP_Total;
+		}
+		mcDBG_MSG_INFO(("Detech Channel CurTP_Num:%d............!\n",CurTP_Num));
+		if(CurTP_Num>0)
+		{
+			for(i=0;i<CurTP_Num;i++)
+			{
+			        Lockflag = AVL6211_BlindScan_TryToLock(&channels[i]);
+		              if(AVL6211_MD_Break())
+		       	{
+		           		 goto BlindScan_Exit;
+		           	}
+				Current_channel.m_uiFrequency_kHz=channels[i].m_uiFrequency_kHz;
+				Current_channel.m_uiSymbolRate_Hz=channels[i].m_uiSymbolRate_Hz;
+				Current_channel.m_fec=FEC_I_UNKNOWN;  
+				if(Lockflag)
+				{
+					DVBS_AutoScanCallback(1, 0, 0,0,0);
+				}
+				else
+				{
+					DVBS_AutoScanCallback(0, 0, 0,0,0);
+				}
+				PreTP_Total++;
+			}
+		}
+		else
+		{
+			mcDBG_MSG_INFO(("No Detech Channel.............!\n"));
+			
+			//mcSEMA_LOCK_MTFE(pPdCtxDVBS->hHalLock);
+			Current_channel.m_uiFrequency_kHz=bsPara.m_uiStartFreq_100kHz*100;
+			Current_channel.m_uiSymbolRate_Hz=0;
+			Current_channel.m_fec=FEC_I_UNKNOWN;	
+			//mcSEMA_UNLOCK_MTFE(pPdCtxDVBS->hHalLock);
+			
+			DVBS_AutoScanCallback(0, 0, 0,0,0);
+
+		}
+		if(AVL6211_MD_Break())
+		{
+			mcDBG_MSG_INFO(("MD Break currnet blindscan process...!\n"));
+			goto BlindScan_Exit;
+		}	
+	}
+BlindScan_Exit:
+	r=AVL_DVBSx_IBase_SetFunctionalMode( pAVLChip, AVL_DVBSx_FunctMode_BlindScan);
+	if(AVL_DVBSx_EC_OK != r)
+	{
+	    mcDBG_MSG_INFO(("SetFunctionalMode 2 AVL_DVBSx_FunctMode_BlindScan  failed:%d !\n",r));
+	}	
+	r=AVL_DVBSx_IBlindScan_Cancel(pAVLChip);
+	if(AVL_DVBSx_EC_OK != r)
+	{
+	    mcDBG_MSG_INFO(("AVL_DVBSx_IBlindScan_Cancel  failed:%d !\n",r));
+	}	
+	r=AVL_DVBSx_IBase_SetFunctionalMode( pAVLChip, AVL_DVBSx_FunctMode_Demod);
+	if(AVL_DVBSx_EC_OK != r)
+	{
+	    mcDBG_MSG_INFO(("SetFunctionalMode AVL_DVBSx_FunctMode_Demod  failed:%d !\n",r));
+	}		
+	return (r);
+}
+#if 1
+//just for blindscan test.
+AVL_DVBSx_ErrorCode ExternalTuner(void)
+{
+	struct AVL_DVBSx_BlindScanPara bsPara;
+	struct AVL_DVBSx_BlindScanInfo bsInfo;
+	struct AVL_DVBSx_Channel channels[256];
+	AVL_uint16 uiNextStartFreq_100kHz;
+	AVL_uint16 uiMaxLPF;
+	AVL_char ScanFlag;
+	AVL_uint16 uiCnt;
+	AVL_DVBSx_ErrorCode r = AVL_DVBSx_EC_OK;
+
+	struct AVL_DVBSx_Chip * pAVLChip = &AVL_DVBSxChip;		
+	struct AVL_Tuner * pTuner =&Tuner;	
+
+
+	//Setup blind scan parameters and start to perform blind scan.	
+	bsPara.m_uiMaxSymRate_kHz = 1000*bs_max_symbolrate;
+	bsPara.m_uiMinSymRate_kHz = 1000*bs_min_symbolrate;
+	r = AVL_DVBSx_II2C_Read16(pAVLChip, rc_tuner_max_LPF_100kHz_addr, &uiMaxLPF);     //Get the right LPF for blind scan to regulate the freq_step.
+                     //Start to calculate time.
+	mcDBG_MSG_INFO(("Start to scan ...uiMaxLPF:%d\n",uiMaxLPF));
+	if(uiMaxLPF<10)
+		uiMaxLPF=320;
+	
+	uiNextStartFreq_100kHz = 10*bs_start_freq;
+	ScanFlag = 1;                   
+
+	// The Sharp tuner does not invert the spectrum.  For other tuners, this may have to be set to AVL_DVBSx_BS_INVERT.	
+	r = AVL_DVBSx_IBlindScan_SetSpectrumInversion(pAVLChip, AVL_DVBSx_BS_NORMAL); 
+    if(AVL_DVBSx_EC_OK != r)
+	{
+		mcDBG_MSG_INFO(("Set blindscan spectrum inversion failed !\n"));
+		return (r);
+	}
+    
+	//Halt CPU to improve the tuner locking speed. It's the optional operation.
+    r=CPU_Halt(pAVLChip);
+	if(AVL_DVBSx_EC_OK != r)
+	{
+		mcDBG_MSG_INFO(("CPU halt failed !\n"));
+		return (r);
+	}
+
+	r = AVL_DVBSx_IBlindScan_Reset(pAVLChip);
+	while(ScanFlag)
+	{
+		bsPara.m_uiStartFreq_100kHz = uiNextStartFreq_100kHz;    // Give the start scan frequency.
+		if(bsPara.m_uiStartFreq_100kHz >=bs_stop_freq*10)
+		{
+			break;			//Do not need to do scan
+		}
+		//Sharp tuner has a maximum 34 MHz LPF, but only 32MHz is flat.
+		//The scan frequency range is 640(32MHz*2*10),unit is 100KHz.
+		bsPara.m_uiStopFreq_100kHz = bsPara.m_uiStartFreq_100kHz + uiMaxLPF*2; 
+
+		if(bsPara.m_uiStopFreq_100kHz > bs_stop_freq*10)
+		{
+			bsPara.m_uiStopFreq_100kHz = bs_stop_freq*10;
+			ScanFlag = 0;			//This is the last scan.
+		}
+
+		//Setup the tuner before scan
+		pTuner->m_uiFrequency_100kHz = (bsPara.m_uiStartFreq_100kHz + bsPara.m_uiStopFreq_100kHz)/2;  //Calculate the center frequency.
+		pTuner->m_uiLPF_100kHz = tuner_LPF; 
+		r = pTuner->m_pLockFunc(pTuner);   //Lock the tuner.
+		if(AVL_DVBSx_EC_OK != r)
+	    {
+		    mcDBG_MSG_INFO(("Tuner lock failed !\n"));
+		    return (r);
+	     }
+		
+		AVL_DVBSx_IBSP_Delay(150);		//wait a while for tuner to lock in certain frequency.
+		r = pTuner->m_pGetLockStatusFunc(pTuner);    //Check the lock status of the tuner.
+	    if (AVL_DVBSx_EC_OK != r)		 
+		{
+			mcDBG_MSG_INFO(("Tuner can not lock to %f MHz !!!\n", pTuner->m_uiFrequency_100kHz/10));
+			break;
+		}
+
+		//This function should be called after tuner lock to perform a blind scan.
+		AVL_DVBSx_IBase_SetFunctionalMode(pAVLChip, AVL_DVBSx_FunctMode_BlindScan);
+	    r = AVL_DVBSx_IBlindScan_Scan(&bsPara,pTuner->m_uiLPF_100kHz, pAVLChip);
+	    if(AVL_DVBSx_EC_OK != r)
+	    {
+		    mcDBG_MSG_INFO(("Blind Scan failed !\n"));
+			goto end_exit;
+	    }
+	
+	    //Monitor the blind scan progress.
+	    do 
+	    {
+		     mcDBG_MSG_INFO((".\n"));
+			 AVL_DVBSx_IBSP_Delay(500);		//wait 1 second
+		     r = AVL_DVBSx_IBlindScan_GetScanStatus(&bsInfo, pAVLChip);  //Query the internal blind scan procedure information.
+	         if(AVL_DVBSx_EC_OK != r)
+	         {
+		         mcDBG_MSG_INFO(("Get scan status failed !\n"));
+				 goto end_exit;
+	         }
+		}	
+	    while(100 != bsInfo.m_uiProgress);	//100 indicates the blind scan is finished.	
+
+	    uiNextStartFreq_100kHz = bsInfo.m_uiNextStartFreq_100kHz;
+	}
+    
+	    //The blind scan is finished now, read out the channel information
+    r = AVL_DVBSx_IBlindScan_ReadChannelInfo(0, &(bsInfo.m_uiChannelCount), channels, pAVLChip);
+	    if(AVL_DVBSx_EC_OK != r)
+	    {
+		    mcDBG_MSG_INFO(("Read channel information failed !\n"));
+			goto end_exit;
+	    }
+   
+
+	for(uiCnt=0; uiCnt<bsInfo.m_uiChannelCount; uiCnt++)
+	{
+		mcDBG_MSG_INFO(("Ch%d:  RF: %d MHz SymbolRate: %d MHz \n", 
+			uiCnt+1, 
+			(channels[uiCnt].m_uiFrequency_kHz),
+			(channels[uiCnt].m_uiSymbolRate_Hz/1000))); 
+   						 
+	}
+	end_exit:
+		AVL_DVBSx_IBlindScan_Cancel(pAVLChip);
+	AVL_DVBSx_IBase_SetFunctionalMode( pAVLChip, AVL_DVBSx_FunctMode_Demod);
+	return (r);
+}
+#endif
+static 	AVL_DVBSx_ErrorCode AVL6211_Initialize(struct AVL_DVBSx_Chip * pAVLChip,struct AVL_Tuner * pTuner)
+{
+	struct AVL_DVBSx_Diseqc_Para sDiseqcPara;
+	struct AVL_DVBSx_MpegInfo sMpegMode;
+	AVL_DVBSx_ErrorCode r=AVL_DVBSx_EC_OK;
+	
+	mcDBG_MSG_INFO((" %s \n",__FUNCTION__));
+	
+#if 0  
+	//This function should be implemented by customer.
+	//This function should be called before all other functions to prepare everything for a BSP operation.
+	r = AVL_DVBSx_IBSP_Initialize();
+#endif
+	if( AVL_DVBSx_EC_OK !=r )
+	{
+		mcDBG_MSG_INFO(("BSP Initialization failed !\n"));
+		return (r);
+	}
+	// This function should be called after bsp initialized to initialize the chip object.
+	r = Init_AVL_DVBSx_ChipObject(pAVLChip, (AVL_DVBSx_SA_0<<1));	
+	if( AVL_DVBSx_EC_OK !=r ) 
+	{
+		mcDBG_MSG_INFO(("Chip Object Initialization failed !\n"));
+		return (r);
+	}
+	//This function should be called after chip object initialized to initialize the IBase,using reference clock as 10M. Make sure you pickup the right pll_conf since it may be modified in BSP.
+	r = AVL_DVBSx_IBase_Initialize((pll_conf+2), ucPatchData, pAVLChip); 
+	if( AVL_DVBSx_EC_OK !=r ) 
+	{
+		mcDBG_MSG_INFO(("IBase Initialization failed !\n"));
+		return (r);
+	}
+	AVL_DVBSx_IBSP_Delay(100);	  //Wait 100 ms to assure that the AVL_DVBSx chip boots up.This function should be implemented by customer.
+  
+	//This function should be called to verify the AVL_DVBSx chip has completed its initialization procedure.
+	r = AVL_DVBSx_IBase_GetStatus(pAVLChip);
+	if( AVL_DVBSx_EC_OK != r )		 
+	{
+		mcDBG_MSG_INFO(("Booted failed !\n"));
+		return (r);
+	}
+	mcDBG_MSG_INFO(("Booted !\n"));
+	//This function should be called after IBase initialized to initialize the demod.
+	r = AVL_DVBSx_IRx_Initialize(pAVLChip);
+	if(AVL_DVBSx_EC_OK != r)
+	{
+		mcDBG_MSG_INFO(("Demod Initialization failed !\n"));
+		return (r);
+	}
+	
+	//modify rx_config.aagc_ref
+	r |= AVL_DVBSx_II2C_Write16(pAVLChip, rc_aagc_ref_addr, 48);
+	r |= AVL_DVBSx_IRx_DriveRFAGC(pAVLChip);
+
+
+	//This function should be called after demod initialized to set RF AGC polar.
+	//User does not need to setup this for Sharp tuner since it is the default value. But for other tuners, user may need to do it here.
+	r = AVL_DVBSx_IRx_SetRFAGCPola(AVL_DVBSx_RA_Invert, pAVLChip);
+	if(AVL_DVBSx_EC_OK != r)
+	{
+		mcDBG_MSG_INFO(("Set RF AGC Polar failed !\n"));
+		return (r);
+	}
+
+	//Setup MPEG mode parameters.
+	sMpegMode.m_MpegFormat = AVL_DVBSx_MPF_TS;
+	sMpegMode.m_MpegMode = AVL_DVBSx_MPM_Parallel;
+	sMpegMode.m_MpegClockPolarity = AVL_DVBSx_MPCP_Falling;
+	
+	//This function should be called after demod initialized to set MPEG mode.
+	r = AVL_DVBSx_IRx_SetMpegMode(&sMpegMode,pAVLChip );
+	if(AVL_DVBSx_EC_OK != r)
+	{
+		mcDBG_MSG_INFO(("Set MPEG output mode failed !\n"));
+		return (r);
+	}
+	// don't  enable ts output when system startup,it must be tri-state.  wanghua added at 20100928
+	if(1)
+	{
+		pPdCtxDVBS->fgDisStatus = TRUE;
+		dvbs2_ts_outputflag=FALSE;
+	}
+	else
+	{
+	// Enable the MPEG output (this function call has no effect for the AVL_DVBSxLG and AVL_DVBSxLGa devices)
+		pPdCtxDVBS->fgDisStatus = FALSE;
+		dvbs2_ts_outputflag=TRUE;
+		r = AVL_DVBSx_IRx_DriveMpegOutput(pAVLChip);
+	}
+	
+	//Setup tuner parameters for tuner initialization.
+	pTuner->m_uiSlaveAddress = IX2610VA_slave_address; 	   
+	pTuner->m_uiI2CBusClock_kHz = IX2610VA_I2Cbus_clock;		
+	pTuner->m_pParameters = 0;			
+	pTuner->m_pAVLChip = pAVLChip;	  
+	pTuner->m_pInitializeFunc = &ExtSharpBS2S7VZ7801_Initialize;	 
+	pTuner->m_pLockFunc = &ExtSharpBS2S7VZ7801_Lock; 
+	pTuner->m_pGetLockStatusFunc = &ExtSharpBS2S7VZ7801_GetLockStatus;
+
+	//This function should be called after IBase initialized to initialize the tuner.
+	r = pTuner->m_pInitializeFunc(pTuner);
+	if(AVL_DVBSx_EC_OK != r)
+	{
+		mcDBG_MSG_INFO(("Tuner Initialization failed !\n"));
+		return (r);
+	}
+
+	//Setup Diseqc parameters for Diseqc initialization.
+	sDiseqcPara.m_RxTimeout = AVL_DVBSx_DRT_150ms;
+	sDiseqcPara.m_RxWaveForm = AVL_DVBSx_DWM_Normal;
+	sDiseqcPara.m_ToneFrequency_kHz = Diseqc_Tone_Frequency;		
+	sDiseqcPara.m_TXGap = AVL_DVBSx_DTXG_15ms;
+	sDiseqcPara.m_TxWaveForm = AVL_DVBSx_DWM_Normal;
+
+	//The Diseqc should be initialized if AVL_DVBSx need to supply power to LNB. This function should be called after IBase initialized to initialize the Diseqc.
+	r = AVL_DVBSx_IDiseqc_Initialize(&sDiseqcPara, pAVLChip);
+	if(AVL_DVBSx_EC_OK != r)
+	{
+		mcDBG_MSG_INFO(("Diseqc Initialization failed !\n"));
+	}
+	AVL6211_EnableLNBVoltage();
+	return (r);
+}
+
+
+
+
+//-------------------------------------------------------------------------
+/**
+ *  This API Notify MW scan status,do sema lock wait MW continue CMD
+ *  @param   UINT8 signal       signal status:0 unlock,1 lock
+ *  @param   UINT8 polar       polar type
+ *  @param   UINT32 freq	locked TP freq
+ *  @param   UINT32 sym	locked TP sym
+ *  @param   UINT8 fec        Code rate
+ */
+//-------------------------------------------------------------------------
+
+
+
+static  INT32 DVBS_AutoScanCallback(UINT8 signal,UINT8 polar,UINT32 freq,UINT32 sym,UINT8 fec)
+{
+	#if 1	
+    if (signal==1)	
+	{
+     mcDBG_MSG_INFO(("[DVBS_AutoScanCallback] GOT_SIGNAL\n"));
+	 Tuner_Notify(DRV_COND_STATUS,TUNER_COND_STATUS_GOT_SIGNAL);	
+     	mcDBG_MSG_L2(("freq = %d,sym = %d,polar = %d,fec = %d,signal = %d \n", freq,sym,polar,fec,signal));
+    }
+	else if(signal==0)
+	{
+	     mcDBG_MSG_INFO(("[DVBS_AutoScanCallback] LOST_SIGNAL\n"));
+		 Tuner_Notify(DRV_COND_STATUS,TUNER_COND_STATUS_LOST_SIGNAL);
+		 mcDBG_MSG_L2(("freq = %d,signal = %d \n",freq,signal));
+	}   
+	else if(signal==2)
+		{
+		mcDBG_MSG_INFO(("[DVBS_AutoScanCallback]  AUTOSCAN_END\n"));
+		Tuner_Notify(DRV_COND_STATUS,TUNER_COND_STATUS_AUTOSCAN_END);	//at the end of blind scan
+		}
+	#endif
+    //x_sema_lock_timeout(AutoScan_callback,8000);//liuyuan debug use
+    mcSEMA_LOCK_MTFE(AutoScan_callback);
+	return 0;
+}
+
+static BOOL SetBreakMonitor(DVBS_PD_CTX_T *psPdCtx)
+{
+    UINT8 u1Cnt=0;
+    
+    psPdCtx->fgBreakMonitor = TRUE; //set to break monitor
+
+    if(psPdCtx->fgPIMoniStatus){  //PI really doing PI Monitor
+        while(psPdCtx->fgPIMoniStatus){ 
+            //wait PI Monitor really finish break 
+            if(u1Cnt>250){  //in case of deadlock
+                break;   
+            }
+            u1Cnt++;
+            mcDBG_MSG_L2(("ANA EU PD wait break PI monitor finish. u1Cnt=%d\r\n",u1Cnt));
+          //  mcDELAY_MS(10); 
+        x_thread_delay((UINT32)(10));
+        }            
+    }
+    
+    return TRUE; 
+}
+static void ResumeMonitor(DVBS_PD_CTX_T *psPdCtx)
+{
+    psPdCtx->fgBreakMonitor = FALSE;
+   mcSEMA_UNLOCK_MTFE(psPdCtx->t_escape_mon_suspend);
+}
+/************************************************************************
+*  MonitorProcess
+*  Monitor thread process function.
+*  @param  void.
+*  @retval  void.
+************************************************************************/
+static void MonitorProcess(VOID *pvArg)
+{
+    
+	DVBS_PD_CTX_T *psPdCtx = *(DVBS_PD_CTX_T **) pvArg;
+	mcDBG_MSG_INFO(("MonitorProcess start!\n"));
+        
+    while (psPdCtx->fgMonitorThreadRunning)
+    {
+
+      //  Snr = 0;
+    	if (psPdCtx->fgBreakMonitor)
+    	{
+    		// After mcMUTEX_LOCK(t_escape_mon_suspend), monitor thread will be suspended until
+    		// TunerAcq or TunerClose invoked.
+            mcDBG_MSG_INFO(("Entering DVBS mon_suspend\n"));
+            mcSEMA_LOCK_MTFE(psPdCtx->t_escape_mon_suspend);
+    		//mcMUTEX_LOCK(psPdCtx->t_escape_mon_suspend);
+    	  	mcDBG_MSG_INFO(("Escape DVBS mon_suspend\n"));
+    	}
+    	else
+	{
+		// mutex lock for I2C access
+		//mcSEMA_LOCK_MTFE(psPdCtx->hHalLock);
+		//psPdCtx->fgPIMoniStatus = TRUE; //doing PI monitor
+		//! [TODO:PI] put your monitor process code here
+		if(do_blindscan == 1)
+		{
+			psPdCtx->fgPIMoniStatus = TRUE;
+			AVL6211_BlindScan();
+			psPdCtx->fgPIMoniStatus = FALSE;	
+			do_blindscan = 0;
+			DVBS_AutoScanCallback(2, 0, 0,0,0);
+		}
+		//psPdCtx->fgPIMoniStatus = FALSE; //finish doing PI monitor or breaked
+		//mcSEMA_UNLOCK_MTFE(psPdCtx->hHalLock); 
+
+     
+		x_thread_delay((UINT32)(500)); 
+	}
+}
+    
+    psPdCtx->t_monitor_thread = NULL;
+    mcDBG_MSG_INFO(("MonitorProcess exit!\n"));
+   x_thread_exit();
+}
+
+/************************************************************************
+*  PD_StartMonitorEngine
+*  Function which starts monitor thread engine.
+*  @param  *psAtvPdCtx : A pointer to ATV_PD_CTX_T structure.
+*  @retval  DRVAPI_TUNER_OK : Monitor thread create successfully.
+*  @retval  DRVAPI_TUNER_ERROR : Monitor thread create fail.
+************************************************************************/
+static INT32 PD_StartMonitorEngine(DVBS_PD_CTX_T *psPdCtx)
+{
+    psPdCtx->fgMonitorThreadRunning = TRUE;
+   if(x_thread_create(&psPdCtx->t_monitor_thread,
+   	          "DVBS_MonitorThread",
+   	          cTHREAD_STACK_SIZE,cTHREAD_PRIORITY,
+   	          MonitorProcess,sizeof(void*), (VOID *) &psPdCtx)!= OSR_OK)
+    {
+        mcDBG_MSG_ERR(("PD_StartMonitorEngine (mcTHREAD_CREATE): DRVAPI_TUNER_ERROR!\n"));
+        return (DRVAPI_TUNER_ERROR);
+    }
+    mcDBG_MSG_INFO(("PD_StartMonitorEngine success\n"));
+    return (DRVAPI_TUNER_OK);
+}
+
+/************************************************************************
+*  PD_StopMonitorEngine
+*  Function which stops monitor thread engine.
+*  @param  void.
+*  @retval  DRVAPI_TUNER_OK : Stop monitor thread successfully.
+************************************************************************/
+static INT32 PD_StopMonitorEngine(void)
+{
+    while (pPdCtxDVBS->t_monitor_thread){
+      x_thread_delay((UINT32)(10));
+    }
+    mcDBG_MSG_L1(("DVBS PD_StopMonitorEngine success\n"));
+    return (DRVAPI_TUNER_OK);
+}
+
+//-------------------------------------------------------------------------
+/**
+ *  This API do connect tuner
+ *  @retval  void
+ */
+//-------------------------------------------------------------------------
+VOID  DVBS_TunerConnect()
+{
+	struct AVL_DVBSx_Chip * pAVLChip = &AVL_DVBSxChip;		
+
+	mcDBG_MSG_L2(("[DVBS_TunerConnect] is call!\n"));
+	
+	if(pPdCtxDVBS->fgDisStatus == FALSE)
+	{
+		/* Has connected, return */
+		mcDBG_MSG_L2(("DVBS Has connect!\n"));
+		return;
+	}
+    //add driver implementation code here
+    mcDBG_MSG_L2(("[DVBS_TunerConnect] Enable TS Output!\n"));
+	dvbs2_ts_outputflag=TRUE;
+	AVL_DVBSx_IRx_DriveMpegOutput(pAVLChip); //Enable TS Output
+
+	/* set disconnect status */
+	pPdCtxDVBS->fgDisStatus = FALSE;
+}
+
+//-------------------------------------------------------------------------
+/**
+ *  This API implement close tuner. It should performs
+ *  1. free all allocated resource.
+ *  2. do demod/tuner initialization.
+ *  3. do LTDIS API mapping
+ *  @param   ptTDSpecificCtx   Pointer to tuner driver context.
+ *  @retval  DRVAPI_TUNER_OK    Success
+ *  @retval  DRVAPI_TUNER_ERROR Fail
+ */
+//-------------------------------------------------------------------------
+static INT32 DVBS_TunerClose(PTD_SPECIFIC_CTX ptTDSpecificCtx)
+{
+    mcSEMA_UNLOCK_MTFE(pPdCtxDVBS->hHalLock);
+     
+    mcDBG_MSG_L2((" %s \n",__FUNCTION__));
+
+    pPdCtxDVBS->fgBreakMonitor = TRUE; //disable and breadk monitor thread
+    pPdCtxDVBS->fgMonitorThreadRunning = FALSE; // must set to FALSE before unlock sema t_escape_mon_suspend
+     mcSEMA_UNLOCK_MTFE(pPdCtxDVBS->t_escape_mon_suspend);
+    PD_StopMonitorEngine();  // stop monitor engine
+    x_sema_delete(pPdCtxDVBS->t_escape_mon_suspend); 
+
+    //add driver implementation code here
+    x_sema_delete(pPdCtxDVBS->hHalLock);
+    x_mem_free(pPdCtxDVBS);
+    //x_mem_free(psDemodCtx);
+
+    //To Do If you have allocated any resource in TunerOpen(), release them here.
+
+    return (DRVAPI_TUNER_OK);
+}
+//-------------------------------------------------------------------------
+/**
+ *  This API do channel acuqusition.
+ *  @param   ptTDSpecificCtx    Pointer to tuner driver context
+ *  @param   e_conn_type        tuner connection type, refer x_tuner.h
+ *  @param   pv_conn_info       middleware tuner info structure, refer u_tuner.h
+ *  @param   z_conn_info_len    length of pv_conn_info
+ *  @param   _BreakFct          TunerHAL callback API for Vendor_TunerAcq to check whether need to break TunerAcq
+ *  @param   *pvArg             pass this parameter to _BreakFct when calling _BreakFct
+ *  @retval  1                  TPS LOCK
+ *  @retval  0                  TPS UNLOCK
+ */
+//-------------------------------------------------------------------------
+static BOOL DVBS_TunerAcq(PTD_SPECIFIC_CTX ptTDSpecificCtx, DRV_CONN_TYPE_T e_conn_type, void* pv_conn_info,
+                            SIZE_T z_conn_info_len, x_break_fct _BreakFct, void* pvArg)
+{
+	// TUNER_TER_DIG_TUNE_INFO_T *pt_tuner_info = 
+	  //              (TUNER_TER_DIG_TUNE_INFO_T *) pv_conn_info;
+	TUNER_SAT_DIG_TUNE_INFO_T *pt_tuner_info=(TUNER_SAT_DIG_TUNE_INFO_T *) pv_conn_info;
+	BOOL fgChannelScan=FALSE;	
+	BOOL fgLock=FALSE;
+	UINT32 freq=0;
+	UINT32 symbolrate=0;
+	struct AVL_DVBSx_Chip * pAVLChip = &AVL_DVBSxChip;		
+	AVL_uint16 uiLockStatus=0;
+	AVL_uint32 uiTimeth; 
+	AVL_uint16 uiCounter;
+	AVL_DVBSx_ErrorCode r=AVL_DVBSx_EC_OK;
+	
+	mcDBG_MSG_L2((" %s \n",__FUNCTION__));
+	
+//set break function
+	pPdCtxDVBS->isBreak=_BreakFct;
+//mutex lock
+	mcSEMA_LOCK_MTFE(pPdCtxDVBS->hHalLock);
+	//Pause monitor thread
+	 if(pDVBSTunerDeviceCtx->u1MWIntf != cMTAL_IF && pDVBSTunerDeviceCtx->u1MWIntf != cSDAL_IF)
+	 {
+ 	        mcDBG_MSG_L2(("Pause monitor process!!\n"));
+		SetBreakMonitor(pPdCtxDVBS);
+	 }
+	//Parse parameter from upper layer
+
+
+	//----------------------------------------------------------------Availink added
+	DVBS_TunerConnect();	
+	
+	freq=pt_tuner_info->ui4_freq;
+	symbolrate=(pt_tuner_info->ui4_sym_rate)*1000;
+	
+ //get conncetion mode
+       switch(pt_tuner_info->e_conn_mode)
+	{
+		case CONN_MODE_SCAN://this mode is for blindscan 
+			{
+				mcDBG_MSG_INFO(("Start to BlindScan  ,Set start frequency value !\n"));
+/*before AVL6211_BlindScan()function finished First runnings scan ,MD will call DVBS_TunerGetSync for blindscan start freq.*/				
+				Current_channel.m_uiFrequency_kHz=1000*bs_start_freq;
+				Current_channel.m_uiSymbolRate_Hz=0;
+				Current_channel.m_fec=FEC_I_UNKNOWN;				
+				do_blindscan=1;
+			}
+			break;
+		case CONN_MODE_UNKNOWN://channel change
+		case CONN_MODE_SURF://preset scan ,single tp scan
+		//call you channel change driver here
+			Last_program_channel.m_uiFrequency_kHz=freq*1000;
+			Last_program_channel.m_uiSymbolRate_Hz=symbolrate;
+			Last_program_channel.m_fec=FEC_I_UNKNOWN;
+			r=AVL6211_LockChannel(freq*10,symbolrate);
+			break;
+		default:
+			mcDBG_MSG_ERR(("Invalid mode to DVBS_TunerAcq!\n"));
+			break;
+	}
+	
+      uiLockStatus=0;
+     if(pt_tuner_info->e_conn_mode == CONN_MODE_SCAN)
+     	{
+	     	uiLockStatus=1;//scand mode should return LOCK Status.
+     	}
+      else if((r ==AVL_DVBSx_EC_OK )  && \
+	  	(pt_tuner_info->e_conn_mode ==CONN_MODE_UNKNOWN || pt_tuner_info->e_conn_mode == CONN_MODE_SURF))
+	{
+		//Channel lock time increase while symbol rate decrease.Give the max waiting time for different symbolrates.
+		if(symbolrate<5000000)
+		{
+			uiTimeth=5000*2;       //The max waiting time is 5000ms,considering the IQ swapped status the time should be doubled.
+		}
+		else if(symbolrate<10000000)
+		{
+			uiTimeth=600*2;        //The max waiting time is 600ms,considering the IQ swapped status the time should be doubled.
+		}
+		else
+		{
+			uiTimeth=250*2;        //The max waiting time is 250ms,considering the IQ swapped status the time should be doubled.
+		} 
+		uiCounter=uiTimeth/10;
+		do
+		{
+			//This function should be called to check the lock status of the demod.
+			r = AVL_DVBSx_IRx_GetLockStatus(&uiLockStatus, pAVLChip);
+			if( ((AVL_DVBSx_EC_OK == r)&&(1 == uiLockStatus)))
+			{
+				break;
+			}
+			if(pPdCtxDVBS->isBreak(pvArg))
+			{
+				mcDBG_MSG_L2(("Channel lock Break!\n"));
+				break;
+			}	
+			AVL_DVBSx_IBSP_Delay(10);    //Wait 10ms for demod to lock the channel.
+		}while(--uiCounter);
+
+		if(uiLockStatus==1)
+		{
+			mcDBG_MSG_L2(("Channel locked !\n"));
+		}
+		else if(uiCounter==0)
+		{
+			mcDBG_MSG_L2(("Channel unlock !\n"));
+		}
+	}
+	  
+	if(uiLockStatus)
+		fgLock=1;
+	else
+		fgLock=0;
+
+	//-------------------------------------------------------------------------------------
+
+	if(pDVBSTunerDeviceCtx->u1MWIntf != cMTAL_IF && pDVBSTunerDeviceCtx->u1MWIntf != cSDAL_IF)
+	{
+	    if (!_BreakFct(pvArg) && (!fgChannelScan))
+	    {
+    	        mcDBG_MSG_L2(("Enable monitor process!!\n"));
+	        ResumeMonitor(pPdCtxDVBS);   // Enable monitor thread and Disable break function flag,  Unlock monitor thread
+	    }
+	}
+
+	mcSEMA_UNLOCK_MTFE(pPdCtxDVBS->hHalLock);
+
+	// TODO return correct lock status
+	return (fgLock);    //if lock return 1, unlock return 0
+	}
+//-------------------------------------------------------------------------
+/**
+ *  This API check lock status
+ *  @param   ptTDSpecificCtx    Pointer to tuner driver context.
+ *  @param   e_conn_type        tuner connection type, refer x_tuner.h
+ *  @retval  1                  LOCK
+ *  @retval  0                  UNLOCK
+ */
+//-------------------------------------------------------------------------
+static BOOL DVBS_TunerGetSync(PTD_SPECIFIC_CTX ptTDSpecificCtx, DRV_CONN_TYPE_T e_conn_type)
+{
+	BOOL fgLock=FALSE;
+	
+	struct AVL_DVBSx_Chip * pAVLChip = &AVL_DVBSxChip;		
+	AVL_uint16 uiLockStatus=0;	 
+	AVL_DVBSx_ErrorCode r=AVL_DVBSx_EC_OK;
+	if(do_blindscan == 1)
+	{
+		mcDBG_MSG_L2(("[%s] doing blindscan.\n",__FUNCTION__));
+		return TRUE;
+	}	
+	mcDBG_MSG_L4((" %s \n",__FUNCTION__));
+	mcSEMA_LOCK_MTFE(pPdCtxDVBS->hHalLock);
+	
+	//TODO Get demod lock status from demod driver and update it as variable fgLock
+	r = AVL_DVBSx_IRx_GetLockStatus(&uiLockStatus, pAVLChip);
+	if ((AVL_DVBSx_EC_OK == r)&&(1 == uiLockStatus))
+	{
+		fgLock = TRUE;
+	}
+	//END
+	mcSEMA_UNLOCK_MTFE(pPdCtxDVBS->hHalLock);
+	return fgLock;
+}
+
+//-------------------------------------------------------------------------
+/**
+ *  This API do disconnect tuner
+ *  @param   ptTDSpecificCtx    Pointer to tuner driver context.
+ *  @param   e_conn_type        tuner connection type, refer x_tuner.h
+ *  @retval  void
+ */
+//-------------------------------------------------------------------------
+static VOID  DVBS_TunerDisc(PTD_SPECIFIC_CTX ptTDSpecificCtx, DRV_CONN_TYPE_T e_conn_type)
+{
+	struct AVL_DVBSx_Chip * pAVLChip = &AVL_DVBSxChip;		
+
+	mcDBG_MSG_L2((" %s \n",__FUNCTION__));  
+	mcSEMA_LOCK_MTFE(pPdCtxDVBS->hHalLock);
+
+	//TODO Should force demod enter standby mode(just need i2c active),otherwise,ATV will be interfered
+	
+	pPdCtxDVBS->fgDisStatus = TRUE;
+	dvbs2_ts_outputflag=FALSE;
+	AVL_DVBSx_IRx_ReleaseMpegOutput(pAVLChip);//Disable TS Output
+	//END
+
+	SetBreakMonitor(pPdCtxDVBS);
+	mcSEMA_UNLOCK_MTFE(pPdCtxDVBS->hHalLock);
+	
+}
+
+//-------------------------------------------------------------------------
+/**
+ *  This API get modulation information.
+ *  Inputs:
+ *  @param   ptTDSpecificCtx    Pointer to tuner driver context.
+ *  @param   e_conn_type        tuner connection type, refer x_tuner.h
+ *  Outputs:
+ *  @param   *_pSignal          Modulation info. structure to be filled.
+ *  @retval  void
+ */
+//-------------------------------------------------------------------------
+static void DVBS_TunerGetSignal(PTD_SPECIFIC_CTX ptTDSpecificCtx, DRV_CONN_TYPE_T e_conn_type, SIGNAL *_pSignal)
+{
+
+    mcSEMA_LOCK_MTFE(pPdCtxDVBS->hHalLock);
+    //apply signal code here
+	if(do_blindscan)
+	{
+		_pSignal->Frequency  = Current_channel.m_uiFrequency_kHz/1000;  	
+		_pSignal->SymbolRate = Current_channel.m_uiSymbolRate_Hz/1000;
+	}
+	else
+	{
+		 _pSignal->Frequency  = Last_program_channel.m_uiFrequency_kHz/1000;  	
+		_pSignal->SymbolRate = Last_program_channel.m_uiSymbolRate_Hz/1000;
+	}
+        mcDBG_MSG_INFO((" %s,freq:%d \n",__FUNCTION__,_pSignal->Frequency));
+    mcSEMA_UNLOCK_MTFE(pPdCtxDVBS->hHalLock);
+
+}
+
+//-------------------------------------------------------------------------
+/**
+ *  This API get signal level in terms of percentage.
+ *  @param   ptTDSpecificCtx    Pointer to tuner driver context.
+ *  @param   e_conn_type        tuner connection type, refer x_tuner.h
+ *  @retval  0~100              signal level
+ */
+//-------------------------------------------------------------------------
+static UINT8 DVBS_TunerGetSignalLevel(PTD_SPECIFIC_CTX ptTDSpecificCtx, DRV_CONN_TYPE_T e_conn_type)
+{
+
+	UINT8 u1Ret=0;
+	
+	mcDBG_MSG_L2((" %s \n",__FUNCTION__));
+	mcSEMA_LOCK_MTFE(pPdCtxDVBS->hHalLock);
+	//TODO Read If_AGC control word and mapping it to signal level(0~100)
+	u1Ret=AVL6211_GetSignalLevel();
+	//END
+	mcSEMA_UNLOCK_MTFE(pPdCtxDVBS->hHalLock);
+	//example of return
+	return (u1Ret);
+}
+
+//-------------------------------------------------------------------------
+/**
+ *  This API get signal level in multiples of (0.1dBm).
+ *  @param   ptTDSpecificCtx    Pointer to tuner driver context.
+ *  @param   e_conn_type        tuner connection type, refer x_tuner.h
+ *  @retval  0 ~ -900           signal level
+ */
+//-------------------------------------------------------------------------
+static INT16 DVBS_TunerGetSignalLeveldBm(PTD_SPECIFIC_CTX ptTDSpecificCtx, DRV_CONN_TYPE_T e_conn_type)
+{
+	INT16 i2Ret=0;
+	AVL_DVBSx_ErrorCode r=AVL_DVBSx_EC_OK;
+	struct AVL_DVBSx_Chip * pAVLChip = &AVL_DVBSxChip;	
+	AVL_uint16 uiRFSignalLevel;
+	AVL_int16 uiRFSignalDBM=0;
+	AVL_uchar i;
+
+	mcSEMA_LOCK_MTFE(pPdCtxDVBS->hHalLock);
+
+	//-----------------------------------------added by Availink
+	r=AVL_DVBSx_IRx_GetSignalLevel(&uiRFSignalLevel, pAVLChip);
+	if (AVL_DVBSx_EC_OK != r)
+	{
+		mcDBG_MSG_ERR(("Get SignalLevel --- Fail !\n"));
+	}
+	else
+	{
+		for(i=0; i<47; i++)
+		{
+			if(uiRFSignalLevel<= SignalLevel[i].SignalLevel)   
+			{
+				//Calculate the corresponding DBM value.
+				if((0==i)&&(uiRFSignalLevel< SignalLevel[i].SignalLevel))
+				{
+					mcDBG_MSG_ERR(("RFSignalLevel is too weak !"));
+				}
+				else
+				{
+					uiRFSignalDBM=SignalLevel[i].SignalDBM;
+				}
+				break;
+			} 
+		}		
+		mcDBG_MSG_L2(("RFSignalLevel::%d dbm\n",(uiRFSignalDBM/10)));
+	}  
+	i2Ret = uiRFSignalDBM;
+	//-----------------------------------------------------------------------------
+	mcSEMA_UNLOCK_MTFE(pPdCtxDVBS->hHalLock);
+	return i2Ret;
+}
+
+static UINT32 DVBS_TunerGetSignalPER(PTD_SPECIFIC_CTX ptTDSpecificCtx, DRV_CONN_TYPE_T e_conn_type)
+{
+	UINT32 u4_ret=100000;//unit is 1e-5
+	struct AVL_DVBSx_Chip * pAVLChip = &AVL_DVBSxChip;
+	AVL_DVBSx_ErrorCode r=AVL_DVBSx_EC_OK;
+	if(do_blindscan == 1)
+		{
+		mcDBG_MSG_INFO(("[%s] doing blindscan.\n",__FUNCTION__));
+	return 0;
+		}		
+	mcDBG_MSG_L2((" %s \n",__FUNCTION__));
+	
+	mcSEMA_LOCK_MTFE(pPdCtxDVBS->hHalLock);
+	//To Do Get PER(packet error ratio) from demod driver.note the unit is 1e-5
+	r=AVL_DVBSx_IRx_GetPER(&u4_ret, pAVLChip);//return unit is 1e-9;
+	if (AVL_DVBSx_EC_OK != r)
+	{
+		mcDBG_MSG_ERR(("[DVBS_TunerGetSignalPER] --- Fail !\n"));
+	}
+	else
+	{
+		u4_ret=u4_ret*10000;//change to unit is 1e-5;
+	}
+	//END
+	mcSEMA_UNLOCK_MTFE(pPdCtxDVBS->hHalLock);
+
+	return u4_ret;//modify return value
+}
+static UINT16 DVBS_TunerGetSignalSNR(PTD_SPECIFIC_CTX ptTDSpecificCtx, DRV_CONN_TYPE_T e_conn_type)
+{
+	UINT16 u2_ret=0;
+	AVL_DVBSx_ErrorCode r=AVL_DVBSx_EC_OK;
+	struct AVL_DVBSx_Chip * pAVLChip = &AVL_DVBSxChip;	
+	AVL_uint32 uiSNR;
+	if(do_blindscan == 1)
+		{
+		mcDBG_MSG_INFO(("[%s] doing blindscan.\n",__FUNCTION__));
+	return 0;
+		}	
+	mcDBG_MSG_L2((" %s \n",__FUNCTION__));	 
+	mcSEMA_LOCK_MTFE(pPdCtxDVBS->hHalLock);
+	//TODO Get SNR(signal-noise ratio) from demod driver
+
+	//-----------------------------Availink added 
+	r=AVL_DVBSx_IRx_GetSNR(&uiSNR, pAVLChip);//the unit is db*100;exp:27.58db ,uiSNR=2758;
+	if (AVL_DVBSx_EC_OK != r)
+	{
+		mcDBG_MSG_L2(("Get SNR --- Fail !\n")); 
+	}
+	else
+	{
+		mcDBG_MSG_L2(("SNR=%d db\n",(uiSNR/100)));
+	}
+	//-----------------------------------------------
+
+	mcSEMA_UNLOCK_MTFE(pPdCtxDVBS->hHalLock);
+
+	return u2_ret;//modify return value
+}
+
+static void DVBS_TunerSetMpgFmt(PTD_SPECIFIC_CTX ptTDSpecificCtx, MPEG_FMT_T  *pt_mpeg_fmt)
+{
+	AVL_DVBSx_ErrorCode r=AVL_DVBSx_EC_OK;
+	struct AVL_DVBSx_Chip * pAVLChip = &AVL_DVBSxChip;	
+	struct AVL_DVBSx_MpegInfo sMpegMode;
+
+	mcDBG_MSG_INFO((" %s \n",__FUNCTION__));	 
+	mcSEMA_LOCK_MTFE(pPdCtxDVBS->hHalLock);
+	//Not used
+	//----------------------------------------Availink added ...Maybe it is not used.
+	//Setup MPEG mode parameters.
+	sMpegMode.m_MpegFormat = AVL_DVBSx_MPF_TS;
+	sMpegMode.m_MpegMode = AVL_DVBSx_MPM_Parallel;
+	sMpegMode.m_MpegClockPolarity = AVL_DVBSx_MPCP_Falling;
+
+	//This function should be called after demod initialized to set MPEG mode.
+	r = AVL_DVBSx_IRx_SetMpegMode(&sMpegMode,pAVLChip );
+	if(AVL_DVBSx_EC_OK != r)
+	{
+		mcDBG_MSG_ERR(("Set MPEG output mode failed !\n"));
+	}
+
+	// Enable the MPEG output (this function call has no effect for the AVL_DVBSxLG and AVL_DVBSxLGa devices)
+	dvbs2_ts_outputflag=TRUE;
+	r = AVL_DVBSx_IRx_DriveMpegOutput(pAVLChip);
+	//----------------------------------------------------------------------		
+	mcSEMA_UNLOCK_MTFE(pPdCtxDVBS->hHalLock);
+}
+
+static char *DVBS_TunerGetVer(PTD_SPECIFIC_CTX ptTDSpecificCtx)
+{
+	struct AVL_DVBSx_Chip * pAVLChip = &AVL_DVBSxChip;	
+	struct AVL_DVBSx_VerInfo VerInfo;
+	mcDBG_MSG_INFO((" %s \n",__FUNCTION__));	
+	mcSEMA_LOCK_MTFE(pPdCtxDVBS->hHalLock);
+	//Not used
+	AVL_DVBSx_IBase_GetVersion(&VerInfo,pAVLChip);
+	mcDBG_MSG_INFO(("Chip  Ver:%d.%d.%d\n",VerInfo.m_Chip.m_Major, VerInfo.m_Chip.m_Minor, VerInfo.m_Chip.m_Build));
+	mcDBG_MSG_INFO(("API   Ver:%d.%d.%d\n",VerInfo.m_API.m_Major, VerInfo.m_API.m_Minor, VerInfo.m_API.m_Build));
+	mcDBG_MSG_INFO(("Patch Ver:%d.%d.%d\n",VerInfo.m_Patch.m_Major, VerInfo.m_Patch.m_Minor, VerInfo.m_Patch.m_Build));
+
+	mcSEMA_UNLOCK_MTFE(pPdCtxDVBS->hHalLock);
+	return NULL;
+}
+
+static INT32 DVBS_TunerNimTest(PTD_SPECIFIC_CTX ptTDSpecificCtx)
+{
+	AVL_DVBSx_ErrorCode r=AVL_DVBSx_EC_OK;
+	struct AVL_DVBSx_Chip * pAVLChip = &AVL_DVBSxChip;	
+	struct AVL_DVBSx_VerInfo VerInfo;
+
+	mcSEMA_LOCK_MTFE(pPdCtxDVBS->hHalLock);
+	//Not used
+	//---------------------------------Availink added
+	r = AVL_DVBSx_IBase_GetVersion(&VerInfo,pAVLChip);
+	mcDBG_MSG_L2(("Chip  Ver:%d.%d.%d\n",VerInfo.m_Chip.m_Major, VerInfo.m_Chip.m_Minor, VerInfo.m_Chip.m_Build));
+	if(r == AVL_DVBSx_EC_OK)
+	{
+		mcDBG_MSG_INFO(("Demod test successed!\n"));
+	}
+	else
+	{
+		mcDBG_MSG_INFO(("Demod test failed!\n"));
+	}
+	//-------------------------------------------------
+
+	mcSEMA_UNLOCK_MTFE(pPdCtxDVBS->hHalLock);
+	return r;
+}
+static void DVBS_TunerSetRegSetting(PTD_SPECIFIC_CTX ptTDSpecificCtx, UCHAR ucRegSet, UCHAR ucRegAddr, UCHAR ucRegValue)
+{
+    mcSEMA_LOCK_MTFE(pPdCtxDVBS->hHalLock);
+	//Not used
+
+    mcSEMA_UNLOCK_MTFE(pPdCtxDVBS->hHalLock);
+}
+
+static void DVBS_TunerShowRegSetting(PTD_SPECIFIC_CTX ptTDSpecificCtx)
+{
+    mcSEMA_LOCK_MTFE(pPdCtxDVBS->hHalLock);
+	//Not used
+
+    mcSEMA_UNLOCK_MTFE(pPdCtxDVBS->hHalLock);
+}
+
+static void DVBS_TunerTestI2C(PTD_SPECIFIC_CTX ptTDSpecificCtx)
+{
+    mcSEMA_LOCK_MTFE(pPdCtxDVBS->hHalLock);
+	//Not used
+
+    mcSEMA_UNLOCK_MTFE(pPdCtxDVBS->hHalLock);
+}
+static void DVBS_TunerCommand(PTD_SPECIFIC_CTX ptTDSpecificCtx, INT32 i4Argc, const CHAR** aszArgv)
+{
+    mcSEMA_LOCK_MTFE(pPdCtxDVBS->hHalLock);
+//Not used
+
+    mcSEMA_UNLOCK_MTFE(pPdCtxDVBS->hHalLock);
+}
+
+static void DVBS_TunerDtdCommand(PTD_SPECIFIC_CTX ptTDSpecificCtx,INT32 i4Argc, const CHAR** aszArgv)
+{
+   //TODO you can add command for debug use here
+   	struct AVL_DVBSx_Chip * pAVLChip = &AVL_DVBSxChip;	
+   //END
+    UCHAR   ucCmdId = 0;               
+    if (i4Argc < 1)
+    {
+        mcDBG_MSG_INFO(("\t s:                   show signal/ts/tps status\n"));              
+    }	
+    mcDBG_MSG_L2((" %s \n",__FUNCTION__));
+    mcSEMA_LOCK_MTFE(pPdCtxDVBS->hHalLock);
+
+    if (i4Argc > 0)
+        ucCmdId = *((CHAR *) aszArgv[0]);
+        
+    switch (ucCmdId)
+    {
+    case 'a':
+	    	mcDBG_MSG_INFO(("b_tone_burst 1 \n"));
+		AVL6211_SetToneOut(1);
+		break;
+    case 'b':
+	    	mcDBG_MSG_INFO(("b_tone_burst 0\n"));
+		AVL6211_SetToneOut(0);
+		break;	
+    case 'c':
+		mcDBG_MSG_INFO(("set 22k on.\n"));
+		AVL_DVBSx_IDiseqc_StartContinuous( pAVLChip);
+		break;	
+    case 'd':
+		mcDBG_MSG_INFO(("set 22k off.\n"));
+		AVL_DVBSx_IDiseqc_StopContinuous( pAVLChip);
+		break;	
+    case 'e':    
+		 AVL6211_SendCmd(1);
+        break;
+    case 'f':    
+		 AVL6211_SendCmd(2);
+        break;
+    case 'g':    
+		 AVL6211_SendCmd(3);
+        break;
+    case 'h':    
+		 AVL6211_SendCmd(4);
+        break;		
+	case 'i':
+		ExternalTuner();
+		break;
+	case 'j':
+		mcDBG_MSG_INFO(("Debug set 13V\n"));
+		AVL_DVBSx_IDiseqc_SetLNBOut(1, pAVLChip);
+		break;
+	case 'k':
+		mcDBG_MSG_INFO(("Debug set 18V\n"));
+		AVL_DVBSx_IDiseqc_SetLNBOut(0, pAVLChip);
+		break;
+	case 'l':
+		mcDBG_MSG_INFO(("Disable LNB Voltage\n"));
+		AVL6211_DisableLNBVoltage();
+		break;
+	case 'm':
+		mcDBG_MSG_INFO(("Enable LNB Voltage\n"));
+		AVL6211_EnableLNBVoltage();	
+		break;
+    default:
+  /*      mcSHOW_USER_MSG(("Cmd: \n"));
+        mcSHOW_USER_MSG(("\t SetChannel  [Freq (MHz)] [symbrate(kbps)]: set channel\n"));
+		mcSHOW_USER_MSG(("\t blindscan  [sFreq (MHz)] [eFreq (MHz)]  : blind scan\n"));
+		mcSHOW_USER_MSG(("\t s           : status\n"));
+		mcSHOW_USER_MSG(("\t ts [x]\n\t    'p'-parallel TS;\n\t    's'-serial TS;\n\t    'o'-open TS output;\n\t    'c'-close TS output;\n"));
+		mcSHOW_USER_MSG(("\t Dint        : demod driver init\n"));
+        mcSHOW_USER_MSG(("\t checkreg    : dump demod all regsiter\n"));
+        mcSHOW_USER_MSG(("\t diseqc_op [work mode][diseqc cmd][cmd length]:set diseqc 1x cmd\n"));
+		mcSHOW_USER_MSG(("\t setH/V [0/1] :0--set Horizontal  1--set Vertical\n"));
+		mcSHOW_USER_MSG(("\t scancontinue \n"));//liuyuan debug use
+		mcSHOW_USER_MSG(("\t Disc        : End blindscan\n"));
+		mcSHOW_USER_MSG(("\t w  [reg_addr][lenth][data]: write demod reg\n"));
+		mcSHOW_USER_MSG(("\t r  [reg_addr][lenth]: read demod reg\n"));
+		mcSHOW_USER_MSG(("\t iqswap  [0/1]:swap IQ signal\n"));*/
+
+        break;
+    }    
+
+    mcSEMA_UNLOCK_MTFE(pPdCtxDVBS->hHalLock);
+}
+
+static void DVBS_TunerDetachI2C(PTD_SPECIFIC_CTX ptTDSpecificCtx, BOOL bDetach)
+{
+    mcSEMA_LOCK_MTFE(pPdCtxDVBS->hHalLock);
+    //Not used
+
+    mcSEMA_UNLOCK_MTFE(pPdCtxDVBS->hHalLock);
+}
+//----------------------------------------------------------------------------- 
+/*
+ *  DVBS_GetTsFmt
+ *  Get demod TS output format.
+ *  @param  psDemodCtx  Pointer of context created by DVBT_DemodCtxCreate.
+ *  @retval   
+ */
+//-----------------------------------------------------------------------------
+TS_FMT_T DVBS_GetTsFmt()
+{
+	//UINT8 ucData,ucData2;
+	TS_FMT_T fgTsFmt;
+
+	//follow is an example,pls apply you code
+	//  nim_reg_read(dev,RD8_TS_OUT_SETTING, &ucData, 1);
+	//Parallel or Serial
+	if(0)// (ucData & 0x01)   
+		fgTsFmt.SerOrPar = SP_SERIAL;
+	else
+		fgTsFmt.SerOrPar = SP_PARALLEL;
+	    
+	//clock polarity  ;true means invert
+	if(0)//(ucData & 0x80)
+		fgTsFmt.ClockPolarity = POL_LOW_ACTIVE;     
+	else
+		fgTsFmt.ClockPolarity = POL_HIGH_ACTIVE;
+	//GateClock -->continue clk or not?,true means un-continues
+
+	fgTsFmt.fgGatedClock = BOOL_FALSE;//only continue clk  mode
+
+	//Tristate --->true means no TS output
+	//    nim_reg_read(dev,RAF_TSOUT_PAD,&ucData,1);
+	if(dvbs2_ts_outputflag ) //(ucData & 0x10)
+		fgTsFmt.fgTristate = BOOL_FALSE;
+	else
+		fgTsFmt.fgTristate = BOOL_TRUE;
+
+	//TS clk = ???KHZ,calculate by parallel
+	//   nim_reg_read(dev,0XDF,&ucData,1);
+	if (1)//((ucData & 0x11) == 0x10)                                  //TS CLK <50M.calculate by ssi mode
+	{
+		fgTsFmt.u4TsClockInKHz = 6750;        
+	}
+	else  
+	{ 
+	
+	}
+
+//external Demod or not
+    fgTsFmt.fgExternalDemod = BOOL_FALSE;
+
+    return fgTsFmt;
+}
+
+//-------------------------------------------------------------------------
+/**
+ *  This API get attribute from tuner driver
+ *  Inputs:
+ *  @param   ptTDSpecificCtx    Pointer to tuner driver context.
+ *  @param   e_get_type         tuner get type, refer x_tuner.h TUNER_GET_TYPE_DVBS
+ *  Outputs:
+ *  @param   *pzAttribute       Attribute structure to be filled. Refer x_tuner.h structure definition TUNER_DVBS_ATTRIBUTE_T
+ *  @param   *pzAttributeLen    length to be filled.
+ *  @retval  DRVAPI_TUNER_OK    success.
+ *  @retval  DRVAPI_TUNER_ERROR fail.
+ */
+//-------------------------------------------------------------------------
+static INT16 DVBS_TunerGetAttribute(PTD_SPECIFIC_CTX ptTDSpecificCtx, DRV_GET_TYPE_T  e_get_type,
+                                VOID *pzAttribute, SIZE_T* pzAttributeLen)
+{   
+	TUNER_SAT_DIG_TUNE_INFO_T *pAttri0;
+	TUNER_DIG_ATTRIBUTE_T *pAttri1;
+	INT32 i4Temp = 0;
+	pAttri0 = (TUNER_SAT_DIG_TUNE_INFO_T*)pzAttribute;
+   
+   mcSEMA_LOCK_MTFE(pPdCtxDVBS->hHalLock);
+   
+	 mcDBG_MSG_L2((" %s \n",__FUNCTION__));
+    //add driver implementation code here
+    switch (e_get_type)
+    {
+    case TUNER_GET_TYPE_SIGNAL_LEVEL:
+        mcDBG_MSG_INFO(("e_get_type = TUNER_GET_TYPE_SIGNAL_LEVEL\r\n"));
+        *pzAttributeLen = sizeof(INT32);
+	i4Temp =  AVL6211_GetSignalLevel();//TODO Get BER from demod driver.1-100
+        x_memcpy(pzAttribute, &i4Temp, *pzAttributeLen);
+        break;
+	case TUNER_GET_TYPE_SAT_DIG:
+		/*maybe return Last_program_channel*/
+        mcDBG_MSG_INFO(("e_get_type = TUNER_GET_TYPE_SAT_DIG:freq:%d\r\n",Current_channel.m_uiFrequency_kHz));
+        pAttri0->e_fec_inner = Current_channel.m_fec;
+        pAttri0->ui4_freq = Current_channel.m_uiFrequency_kHz/1000;
+	pAttri0->ui4_sym_rate = Current_channel.m_uiSymbolRate_Hz/1000;
+		break;
+	case TUNER_GET_TYPE_BER:
+        mcDBG_MSG_INFO(("e_get_type = TUNER_GET_TYPE_BER\r\n"));
+        *pzAttributeLen = sizeof(INT32);
+        i4Temp = 0; //TODO Get BER from demod driver.Note the unit is 1e-5
+        x_memcpy(pzAttribute, &i4Temp, *pzAttributeLen);
+        break;
+    case TUNER_GET_TYPE_DIG_ATTRIBUTE:   	
+        mcDBG_MSG_INFO(("e_get_type = TUNER_GET_TYPE_DIG_ATTRIBUTE\r\n"));
+        pAttri1 = (TUNER_DIG_ATTRIBUTE_T *) pzAttribute;
+        //follow is an example,pls apply you code
+       //Tuner frequency boundary
+        pAttri1->ui4_lower_bound_freq = bs_start_freq;//950Hz
+        pAttri1->ui4_upper_bound_freq = bs_stop_freq;//2150M
+        // freq offset tolerence range in Hz (1M mapping to 100K)
+        pAttri1->ui4_fine_tune_delta_freq = 3;  //3//
+        break;
+	case TUNER_GET_TYPE_TS_FMT:
+        {
+            TS_FMT_T tsFmt;
+		mcDBG_MSG_INFO(("e_get_type = TUNER_GET_TYPE_TS_FMT\r\n"));
+            *pzAttributeLen = sizeof(TS_FMT_T);
+            tsFmt = DVBS_GetTsFmt();
+            x_memcpy(pzAttribute, &tsFmt, *pzAttributeLen);
+        }
+        break;
+     default:
+        mcDBG_MSG_L4(("unknown: get Attribute %d\r \n",e_get_type));
+        break;
+    }
+    mcSEMA_UNLOCK_MTFE(pPdCtxDVBS->hHalLock);
+    return DRVAPI_TUNER_OK;
+}
+//-------------------------------------------------------------------------
+/**
+ *  This API set attribute to tuner driver
+ *  Inputs:
+ *  @param   ptTDSpecificCtx    Pointer to tuner driver context.
+ *  @param   e_set_type         tuner set type, check x_tuner.h set operation TUNER_SET_TYPE_DVBSX
+ *  @param   *pvAttribute       set value.
+ *  @param   zAttributeLen      length of *pvAttribute.
+ *  @param   e_conn_type        tuner connection type, refer x_tuner.h
+ *  @retval  DRVAPI_TUNER_OK    success.
+ *  @retval  DRVAPI_TUNER_ERROR fail.
+ */
+//-------------------------------------------------------------------------
+static INT32 DVBS_TunerSetAttribute(PTD_SPECIFIC_CTX ptTDSpecificCtx, DRV_SET_TYPE_T  e_set_type,
+                                        const VOID *pvAttribute, SIZE_T zAttributeLen)
+{
+	UINT32 i=0;
+	UCHAR	ucData = *(UCHAR *)pvAttribute;  
+	DISEQC_BUS_CMD_T *diseqc_cmd = (DISEQC_BUS_CMD_T*) pvAttribute; 
+	struct AVL_DVBSx_Chip * pAVLChip = &AVL_DVBSxChip;	
+	mcSEMA_LOCK_MTFE(pPdCtxDVBS->hHalLock);
+
+    //add driver implementation code here
+
+    switch (e_set_type)
+    {
+	case TUNER_SET_TYPE_SCAN_CONTINUE:
+		mcDBG_MSG_INFO(("[DVBS_TunerSetAttribute] MonitorProcess  continue...\n"));
+		x_sema_unlock(AutoScan_callback);
+        break;
+		
+	case TUNER_SET_TYPE_DISEQC_CMD:
+	if(do_blindscan == 1)
+		{
+		mcDBG_MSG_INFO(("[%s] TUNER_SET_TYPE_DISEQC_CMD doing blindscan.\n",__FUNCTION__));
+//	break;
+		}			
+		if((diseqc_cmd->ui1_control_mask & DISEQC_CMD_CTRL_POLARIZATION_MASK) != 0 )
+		{
+		//apply you code
+                     if(diseqc_cmd->ui1_polarity_13v_18v == 1)
+                 	{
+                     	mcDBG_MSG_INFO(("set 18V\n"));
+				AVL_DVBSx_IDiseqc_SetLNBOut(0, pAVLChip);
+                 	}
+			else
+			{
+				mcDBG_MSG_INFO(("set 13V\n"));
+				AVL_DVBSx_IDiseqc_SetLNBOut(1, pAVLChip);
+			}
+			mcDELAY_MS(20);
+			mcDBG_MSG_INFO(("After set H/V,delay 20ms,delay>15ms\n"));
+	    	}
+		if((diseqc_cmd->ui1_control_mask & DISEQC_CMD_CTRL_FULL_CMD_MASK) != 0)
+		{
+//apply you code
+			AVL6211_DiseqcSendCmd(diseqc_cmd->aui1_cmd, diseqc_cmd->ui1_cmd_len);
+			mcDELAY_MS(20);
+			mcDBG_MSG_INFO(("After set cmd,delay 20ms,delay>15ms\n"));
+			for(i=0;i<diseqc_cmd->ui1_cmd_len;i++)
+			{
+				mcDBG_MSG_INFO(("send cmd\n x%\t",diseqc_cmd->aui1_cmd[i]));
+				mcDBG_MSG_INFO(("\n"));
+			}
+	    	}
+		if((diseqc_cmd->ui1_control_mask &DISEQC_CMD_CTRL_TONE_BURST_MASK) != 0)
+		{   
+			if(diseqc_cmd->b_tone_burst)
+		    	{
+			    	mcDBG_MSG_INFO(("b_tone_burst 1 \n"));
+				AVL6211_SetToneOut(1);
+		    	}
+			else
+			{
+				mcDBG_MSG_INFO(("b_tone_burst 0 \n"));
+				AVL6211_SetToneOut(0);
+			}
+
+//apply you code
+			mcDELAY_MS(20);
+			mcDBG_MSG_INFO(("After set burst,delay 20ms,delay>15ms\n"));
+
+	    	}
+		if((diseqc_cmd->ui1_control_mask & DISEQC_CMD_CTRL_22K_MASK) != 0)
+ 		{   
+		    if(diseqc_cmd->b_22k)
+		    	{
+		    		mcDBG_MSG_INFO(("set 22k on.\n"));
+				AVL_DVBSx_IDiseqc_StartContinuous( pAVLChip);
+		    	}
+			else
+			{
+				mcDBG_MSG_INFO(("set 22k off.\n"));
+				AVL_DVBSx_IDiseqc_StopContinuous( pAVLChip);
+			}
+//apply you code
+			mcDELAY_MS(20);
+			mcDBG_MSG_INFO(("After set 22k\n"));
+	    	}
+		break;
+		
+	case TUNER_SET_TYPE_TS_TRISTATE:
+		if(do_blindscan == 1)
+		{
+			mcDBG_MSG_INFO(("[%s] TUNER_SET_TYPE_TS_TRISTATE doing blindscan.\n",__FUNCTION__));
+			//break;
+		}			
+		if (ucData == BOOL_FALSE) 
+		{
+			mcDBG_MSG_INFO(("[DVBS] SetTSPath : pass-through\n"));
+        	//Enable DVBS TS output
+	        	dvbs2_ts_outputflag = TRUE;
+			 AVL_DVBSx_IRx_DriveMpegOutput(pAVLChip); 
+			//open ts
+//apply you code
+			mcDBG_MSG_INFO(("[DVBS]	Set TS output on  \n"));
+		}
+		else if (ucData == BOOL_TRUE) 
+		{
+			mcDBG_MSG_INFO(("[DVBS] SetTSPath : tri-state\n"));
+        	//Set DVBS TS output to high-Z
+	        	dvbs2_ts_outputflag= FALSE;
+        		AVL_DVBSx_IRx_ReleaseMpegOutput(pAVLChip);
+			// close ts
+//apply you code
+			mcDBG_MSG_INFO(("[DVBS]	Set TS output off  \n"));
+		}
+	break;
+		
+	case TUNER_SET_TYPE_TS_SP:
+		if (ucData == SP_PARALLEL) 
+		{
+//apply you code
+           		 mcDBG_MSG_INFO(("[DVBS] SetTSInterface : parallel\n"));
+        	}
+
+		else if (ucData == SP_SERIAL) 
+		{
+//apply you code
+        		mcDBG_MSG_INFO(("[DVBS] SetTSInterface : serial\n"));
+		}
+ 
+	break;
+	
+    default:
+        mcDBG_MSG_INFO(("unknown: set Attribute\r\n"));
+        break;
+    }
+
+    mcSEMA_UNLOCK_MTFE(pPdCtxDVBS->hHalLock);
+
+    return DRVAPI_TUNER_OK;
+}
+#ifdef fcADD_DIAG_INFO
+static INT32 DVBS_TunerSetDiagCmd(PTD_SPECIFIC_CTX ptTDSpecificCtx, DRV_CUSTOM_TUNER_SET_TYPE_T e_tuner_set_type, VOID* pv_set_info, SIZE_T z_size)
+{
+    INT32   retSts = RMR_OK;
+    mcSEMA_LOCK_MTFE(pPdCtxDVBS->hHalLock);
+	//Not used
+
+    mcSEMA_UNLOCK_MTFE(pPdCtxDVBS->hHalLock);
+
+    return retSts;
+}
+static INT32 DVBS_TunerGetDiagInfo(PTD_SPECIFIC_CTX ptTDSpecificCtx, DRV_CUSTOM_TUNER_GET_TYPE_T e_tuner_get_type, VOID* pv_get_info, SIZE_T* pz_size)
+{
+    mcSEMA_LOCK_MTFE(pPdCtxDVBS->hHalLock);
+	//Not used
+
+    mcSEMA_UNLOCK_MTFE(pPdCtxDVBS->hHalLock);
+    return 0;
+}
+#endif
+//-------------------------------------------------------------------------
+/**
+*  This API  control  the i2c bypass to tuner. When zap from digital to ananlog,we need this api to bypass i2c to tuner. 
+* Inputs:
+* @param   ptTDSpecificCtx  Pointer to tuner driver context, there is no use for third party tuner.  
+* @param    bSwitchOn        TRUE(bypass i2c to tuner on).
+                             FALSE(bypass i2c to tuner off) 
+* @Retval                    void
+*/
+//-------------------------------------------------------------------------
+static void DVBS_TunerBypassI2C (PTD_SPECIFIC_CTX ptTDSpecificCtx, BOOL bSwitchOn)
+
+{
+    mcSEMA_LOCK_MTFE(pPdCtxDVBS->hHalLock);
+    //TODO  Bypass i2c to tuner connected(bSwitchOn is TRUE) or disconnect(bSwitchOn is FALSE)
+	
+	//END
+    mcSEMA_UNLOCK_MTFE(pPdCtxDVBS->hHalLock);
+}
+//-----------------------------------------------------------------------------
+// public functions
+//-----------------------------------------------------------------------------
+void PD_DVBS_Register_LTDIS_Fct(PTD_CTX ptTDCtx)
+{
+    TUNER_DEVICE_CTX_T*		pTunerDeviceCtx = (TUNER_DEVICE_CTX_T*)ptTDCtx;
+	
+    pTunerDeviceCtx->tLTDIS_Fct_Tbl.pf_TunerClose 	= DVBS_TunerClose;
+    pTunerDeviceCtx->tLTDIS_Fct_Tbl.pf_TunerAcq 	= DVBS_TunerAcq;
+    pTunerDeviceCtx->tLTDIS_Fct_Tbl.pf_TunerGerSync 	= DVBS_TunerGetSync;
+    pTunerDeviceCtx->tLTDIS_Fct_Tbl.pf_TunerGetSignal 	= DVBS_TunerGetSignal;
+    pTunerDeviceCtx->tLTDIS_Fct_Tbl.pf_TunerGetSignalLevel = DVBS_TunerGetSignalLevel;
+    pTunerDeviceCtx->tLTDIS_Fct_Tbl.pf_TunerGetSignalLeveldBm = DVBS_TunerGetSignalLeveldBm;
+    pTunerDeviceCtx->tLTDIS_Fct_Tbl.pf_TunerGetSignalPER = DVBS_TunerGetSignalPER;
+    pTunerDeviceCtx->tLTDIS_Fct_Tbl.pf_TunerGetSignalSNR = DVBS_TunerGetSignalSNR;
+    pTunerDeviceCtx->tLTDIS_Fct_Tbl.pf_TunerSetMpgFmt 	= DVBS_TunerSetMpgFmt;
+    pTunerDeviceCtx->tLTDIS_Fct_Tbl.pf_TunerGetVer 	= DVBS_TunerGetVer;
+    pTunerDeviceCtx->tLTDIS_Fct_Tbl.pf_TunerNimTest 	= DVBS_TunerNimTest;
+    pTunerDeviceCtx->tLTDIS_Fct_Tbl.pf_TunerSetRegSetting = DVBS_TunerSetRegSetting;
+    pTunerDeviceCtx->tLTDIS_Fct_Tbl.pf_TunerShowRegSetting = DVBS_TunerShowRegSetting;
+    pTunerDeviceCtx->tLTDIS_Fct_Tbl.pf_TunerTestI2C 	= DVBS_TunerTestI2C;
+    pTunerDeviceCtx->tLTDIS_Fct_Tbl.pf_TunerCommand 	= DVBS_TunerCommand;
+    pTunerDeviceCtx->tLTDIS_Fct_Tbl.pf_TunerDtdCommand 	= DVBS_TunerDtdCommand;
+    pTunerDeviceCtx->tLTDIS_Fct_Tbl.pf_TunerDetachI2C 	= DVBS_TunerDetachI2C;
+    pTunerDeviceCtx->tLTDIS_Fct_Tbl.pf_TunerDisc 	= DVBS_TunerDisc;
+    pTunerDeviceCtx->tLTDIS_Fct_Tbl.pf_TunerSetAttribute= DVBS_TunerSetAttribute;
+    pTunerDeviceCtx->tLTDIS_Fct_Tbl.pf_TunerGetAttribute= DVBS_TunerGetAttribute;
+    pTunerDeviceCtx->tLTDIS_Fct_Tbl.pf_TunerBypassI2C= DVBS_TunerBypassI2C;
+#ifdef fcADD_DIAG_INFO
+    pTunerDeviceCtx->tLTDIS_Fct_Tbl.pf_TunerSetDiagCmd	= DVBS_TunerSetDiagCmd;
+    pTunerDeviceCtx->tLTDIS_Fct_Tbl.pf_TunerGetDiagInfo = DVBS_TunerGetDiagInfo;
+#endif
+}
+//-------------------------------------------------------------------------
+/**
+ *  This API is driver entry point. It performs
+ *  1. allocate and initialize resource.
+ *  2. do demod/tuner initialization.
+ *  3. do LTDIS API mapping
+ *  @param   ptTDCtx            TunerHAL Context use for LTDIS API mapping
+ *  @param   ptTunerCfgInfo     Tuner configuration information.
+ *  @param   pptTDSpecificCtx   Pointer to tuner driver context.
+ *  @retval  DRVAPI_TUNER_OK    Success
+ *  @retval  DRVAPI_TUNER_ERROR Fail
+ */
+//-------------------------------------------------------------------------
+INT32 DVBS_TunerOpen(PTD_CTX ptTDCtx, TUNER_CONFIG_T * ptTunerCfgInfo, PTD_SPECIFIC_CTX* pptTDSpecificCtx)
+{
+    //create pdctx used in this file, you also can add any declaration you want in pdctx		 
+	struct AVL_DVBSx_Chip * pAVLChip = &AVL_DVBSxChip;		
+	struct AVL_Tuner * pTuner =&Tuner;	
+	
+     mcDBG_MSG_INFO((" %s \n",__FUNCTION__));
+
+    pPdCtxDVBS = (DVBS_PD_CTX_T *) x_mem_calloc(1, sizeof(DVBS_PD_CTX_T));
+    if (pPdCtxDVBS == NULL)
+    {
+        mcDBG_MSG_ERR(("DVB_PD_CTX_T malloc fail\n"));
+        return (DRVAPI_TUNER_ERROR);
+    }
+    *pptTDSpecificCtx = pPdCtxDVBS;/*There may be a question here.................................*/
+	
+	pDVBSTunerDeviceCtx = (TUNER_DEVICE_CTX_T*)ptTDCtx;/*Err:Porting Guiding has not TUNER_DEVICE_CTX_T defined. */
+	mcDBG_MSG_INFO(("pDVBSTunerDeviceCtx->tunerType=0x%02x\n",pDVBSTunerDeviceCtx->tunerType));
+#if 0
+    //create demod ctx
+    psDemodCtx = DVBS_DemodCtxCreate();
+    if (psDemodCtx == NULL)
+    {
+        mcDBG_MSG_ERR(("DEMOD_CTX_T malloc fail\n"));
+        return (DRVAPI_TUNER_ERROR);
+    }
+#endif
+    //Create a semaphore for low level demod PI access protection
+    if (x_sema_create(&AutoScan_callback, X_SEMA_TYPE_BINARY, X_SEMA_STATE_LOCK) != OSR_OK)
+    {
+        mcDBG_MSG_ERR(("%s:  x_sema_create(AutoScan_callback) Fail!\n",__FUNCTION__));
+        return (DRVAPI_TUNER_ERROR);
+    }
+    if (x_sema_create(&pPdCtxDVBS->hHalLock, X_SEMA_TYPE_BINARY, X_SEMA_STATE_LOCK) != OSR_OK)
+    {
+        mcDBG_MSG_ERR(("%s:  x_sema_create(pPdCtxDVBS->hHalLock) Fail!\n",__FUNCTION__));
+        return (DRVAPI_TUNER_ERROR);
+    }
+    mcSEMA_UNLOCK_MTFE(pPdCtxDVBS->hHalLock);
+
+    //register LTDIS APIs to HAL
+    PD_DVBS_Register_LTDIS_Fct(ptTDCtx);
+    //Regisiter tuner driver
+	ITunerRegistration(pDVBSTunerDeviceCtx->tunerType);
+	ITuner_Init(ITunerGetCtx());
+	
+	//TODO Here do demod init.If demod init fail,return DRVAPI_TUNER_ERROR
+
+//---------------------------------	Availink added
+	Demod_GPIO_Reset();
+	
+	 AVL6211_Initialize(pAVLChip,pTuner);
+
+//-----------------------------------------------------------------------------
+
+	
+	//END
+	 if(pDVBSTunerDeviceCtx->u1MWIntf != cMTAL_IF && pDVBSTunerDeviceCtx->u1MWIntf != cSDAL_IF)
+	 {
+		if (x_sema_create(&pPdCtxDVBS->t_escape_mon_suspend, X_SEMA_TYPE_BINARY,X_SEMA_STATE_LOCK) != OSR_OK)
+		{
+			mcDBG_MSG_ERR(("EN_DVBS_TunerOpen (mcSEMA_CREATE): ERROR!\n"));
+			return (DRVAPI_TUNER_ERROR);
+		}
+
+		pPdCtxDVBS->fgBreakMonitor = TRUE;//init
+		pPdCtxDVBS->fgPIMoniStatus = FALSE; //init
+		PD_StartMonitorEngine(pPdCtxDVBS);  //start monitor engine
+	}
+	 
+	return (DRVAPI_TUNER_OK);
+	
+}

@@ -1,6 +1,6 @@
 /* drivers/char/ser_a2232fw.h */
 
-/* $Id: ser_a2232fw.h,v 0.4 2000/01/25 12:00:00 ehaase Exp $ */
+/* $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/char/ser_a2232fw.h#1 $ */
 
 /*
  * Copyright (c) 1995 Jukka Marin <jmarin@jmp.fi>.

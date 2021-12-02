@@ -222,7 +222,7 @@ static struct safe_buffer *find_safe_buffer_dev(struct device *dev,
 static inline dma_addr_t map_single(struct device *dev, void *ptr, size_t size,
 		enum dma_data_direction dir)
 {
-	struct dmabounce_device_info *device_info = dev->archdata.dmabounce;
+	struct dmabounce_device_info *device_info = (dev) ? dev->archdata.dmabounce : (struct dmabounce_device_info *)0;
 	dma_addr_t dma_addr;
 	int needs_bounce = 0;
 
@@ -231,7 +231,7 @@ static inline dma_addr_t map_single(struct device *dev, void *ptr, size_t size,
 
 	dma_addr = virt_to_dma(dev, ptr);
 
-	if (dev->dma_mask) {
+	if (dev && dev->dma_mask) {
 		unsigned long mask = *dev->dma_mask;
 		unsigned long limit;
 

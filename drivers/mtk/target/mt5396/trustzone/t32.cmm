@@ -1,0 +1,31 @@
+reset
+
+SYStem.Option EnReset off
+SYStem.Option WaitReset on
+
+;T32 single core
+SYSTEM.CPU CortexA9MPCore
+SYS.JC 1.0MHz
+
+SYStem.MultiCore MEMORYACCESSPORT 0
+SYStem.MultiCore DEBUGACCESSPORT 1
+SYStem.MultiCore JTAGACCESSPORT 2
+
+SYStem.MultiCore    TPIUBASE    APB:0x80003000
+SYStem.MultiCore    FUNNELBASE  APB:0x80004000
+SYStem.MultiCore    ITMBASE     APB:0x80005000
+
+SYStem.MultiCore    COREBASE    APB:0x80110000
+SYStem.MultiCore    CTIBASE     APB:0x80118000
+
+SYS.M attach
+
+d.load mt5396_tz.axf /nocode
+
+y.spath.srd .
+
+d.l
+end
+
+
+

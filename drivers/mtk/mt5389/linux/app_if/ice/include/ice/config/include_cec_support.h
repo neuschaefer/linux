@@ -1,0 +1,3 @@
+#ifndef INCLUDE_CEC_SUPPORT
+    #define INCLUDE_CEC_SUPPORT 1
+#endif

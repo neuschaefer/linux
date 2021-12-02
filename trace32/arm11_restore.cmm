@@ -1,0 +1,186 @@
+; Script to restore system state save by _save.cmm
+; Stop at boot loader and run this script.
+; After this script is done, run attach.cmm and mt53xx_ko.cmm to debug.
+;
+; MEMEND     : Memory end of memory (can be lookup using max_pfn_low in kernel)
+; MEMBSTART  : ChB memory start (Enable to save ChB)
+; MEMBEND    : ChB memor end.
+; MEMBFILE   : File name to save ChB memory. Will save ChB memory if defined.
+; with_l2c   : System with L2 cache (ex, 5395/5389)
+; 
+
+local &CPFILE &REGFILE &MEMFILE &MEMEND
+local &MEMBSTART &MEMBEND &MEMBFILE
+
+&MEMEND=0x10300000            ; 259MB
+
+
+;&MEMBSTART=0x20000000        ; ChB Start
+;&MEMBEND=0x38800000          ; Before MJC
+;&MEMBFILE="memory_chb.bin"
+
+&CPFILE="cpregs0.bin"
+&REGFILE="registers0.bin"
+&MEMFILE="memory_all.bin"
+
+
+
+;=========================================================
+; Attach
+sys.cpu arm1176jz
+sys.jc 16mhz
+
+sys.mode attach
+
+if run()
+    break
+
+wait 100.ms
+
+ ; clean and invalidate D cache
+ d.s c15:0xE7 0
+ 
+ ; DWB + DSB
+ d.s c15:0x4A7 0
+ d.s c15:0x5A7 0
+
+wait 100.ms
+
+; Load all registers
+GOSUB load_registers &REGFILE
+
+; Load CP regs
+OPEN #1 &CPFILE /READ
+GOSUB read_cp c15:0x0000
+GOSUB read_cp c15:0x0001
+GOSUB read_cp c15:0x0101
+GOSUB read_cp c15:0x0201
+GOSUB read_cp c15:0x0011
+GOSUB read_cp c15:0x0111
+GOSUB read_cp c15:0x0211
+GOSUB read_cp c15:0x0010
+GOSUB read_cp c15:0x0110
+GOSUB read_cp c15:0x0210
+GOSUB read_cp c15:0x0310
+GOSUB read_cp c15:0x0410
+GOSUB read_cp c15:0x0510
+GOSUB read_cp c15:0x0610
+GOSUB read_cp c15:0x0710
+GOSUB read_cp c15:0x0020
+GOSUB read_cp c15:0x0120
+GOSUB read_cp c15:0x0220
+GOSUB read_cp c15:0x0320
+GOSUB read_cp c15:0x0420
+GOSUB read_cp c15:0x0520
+GOSUB read_cp c15:0x000C
+GOSUB read_cp c15:0x010C
+GOSUB read_cp c15:0x001C
+
+; MMU
+GOSUB read_cp c15:0x0300
+GOSUB read_cp c15:0x0002
+GOSUB read_cp c15:0x0102
+GOSUB read_cp c15:0x0202
+GOSUB read_cp c15:0x0003
+GOSUB read_cp c15:0x0005
+GOSUB read_cp c15:0x0105
+GOSUB read_cp c15:0x0006
+GOSUB read_cp c15:0x0106
+GOSUB read_cp c15:0x0206
+GOSUB read_cp c15:0x0078
+GOSUB read_cp c15:0x0178
+GOSUB read_cp c15:0x0278
+GOSUB read_cp c15:0x000A
+GOSUB read_cp c15:0x002A
+GOSUB read_cp c15:0x012A
+GOSUB read_cp c15:0x000D
+GOSUB read_cp c15:0x010D
+GOSUB read_cp c15:0x042F
+GOSUB read_cp c15:0x524F
+GOSUB read_cp c15:0x525F
+GOSUB read_cp c15:0x526F
+GOSUB read_cp c15:0x527F
+CLOSE #1
+
+; Restore memory
+data.load.binary memory_all.bin asd:0x0
+
+; Restore for CHB memory
+if ("&MEMBFILE"!="")
+    data.load.binary &MEMBFILE asd:&MEMBSTART--&MEMBEND
+
+; Optional, read HW registers.
+
+
+
+ENDDO
+
+
+load_registers:
+	ENTRY &file
+	OPEN #1 &file /READ
+	GOSUB load_reg R0
+	GOSUB load_reg R1
+	GOSUB load_reg R2
+	GOSUB load_reg R3
+	GOSUB load_reg R4
+	GOSUB load_reg R5
+	GOSUB load_reg R6
+	GOSUB load_reg R7
+	GOSUB load_reg R8
+	GOSUB load_reg R9
+	GOSUB load_reg R10
+	GOSUB load_reg R11
+	GOSUB load_reg R12
+	GOSUB load_reg R13
+	GOSUB load_reg R14
+	GOSUB load_reg PC
+	GOSUB load_reg CPSR
+	GOSUB load_reg SPSR
+	GOSUB load_reg R8_usr
+	GOSUB load_reg R9_usr
+	GOSUB load_reg R10_usr
+	GOSUB load_reg R11_usr
+	GOSUB load_reg R12_usr
+	GOSUB load_reg R13_usr
+	GOSUB load_reg R14_usr
+	GOSUB load_reg R8_fiq
+	GOSUB load_reg R9_fiq
+	GOSUB load_reg R10_fiq
+	GOSUB load_reg R11_fiq
+	GOSUB load_reg R12_fiq
+	GOSUB load_reg R13_fiq
+	GOSUB load_reg R14_fiq
+	GOSUB load_reg SPSR_fiq
+	GOSUB load_reg R13_irq
+	GOSUB load_reg R14_irq
+	GOSUB load_reg SPSR_irq
+	GOSUB load_reg R13_svc
+	GOSUB load_reg R14_svc
+	GOSUB load_reg SPSR_svc
+	GOSUB load_reg R13_mon
+	GOSUB load_reg R14_mon
+	GOSUB load_reg SPSR_mon
+	GOSUB load_reg R13_abt
+	GOSUB load_reg R14_abt
+	GOSUB load_reg SPSR_abt
+	GOSUB load_reg R13_und
+	GOSUB load_reg R14_und
+	GOSUB load_reg SPSR_und
+	CLOSE #1
+	RETURN
+
+load_reg:
+	ENTRY &reg
+
+	local &c1
+	READ #1 &c1
+	register.set &reg   &c1
+	RETURN
+
+read_cp:
+	ENTRY &cpreg
+	local &c1
+	READ #1 &c1
+	data.set &cpreg  %long  &c1
+	RETURN

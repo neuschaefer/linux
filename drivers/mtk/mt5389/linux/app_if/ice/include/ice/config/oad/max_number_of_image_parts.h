@@ -1,0 +1,3 @@
+#ifndef MAX_NUMBER_OF_IMAGE_PARTS
+    #define MAX_NUMBER_OF_IMAGE_PARTS 20
+#endif

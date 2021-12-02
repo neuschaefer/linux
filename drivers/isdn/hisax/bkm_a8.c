@@ -1,4 +1,4 @@
-/* $Id: bkm_a8.c,v 1.22.2.4 2004/01/15 14:02:34 keil Exp $
+/* $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/isdn/hisax/bkm_a8.c#1 $
  *
  * low level stuff for Scitel Quadro (4*S0, passive)
  *
@@ -22,7 +22,7 @@
 
 #define	ATTEMPT_PCI_REMAPPING	/* Required for PLX rev 1 */
 
-static const char sct_quadro_revision[] = "$Revision: 1.22.2.4 $";
+static const char sct_quadro_revision[] = "$Revision: #1 $";
 
 static const char *sct_quadro_subtypes[] =
 {

@@ -681,7 +681,12 @@ static int ntfs_read_locked_inode(struct inode *vi)
 	 */
 	vi->i_atime = ntfs2utc(si->last_access_time);
 
-	/* Find the attribute list attribute if present. */
+    if(si->file_attributes & FILE_ATTR_SYSTEM)
+    {
+        vi->i_mode |= S_ISYSTEM;
+    }
+    
+    /* Find the attribute list attribute if present. */
 	ntfs_attr_reinit_search_ctx(ctx);
 	err = ntfs_attr_lookup(AT_ATTRIBUTE_LIST, NULL, 0, 0, 0, NULL, 0, ctx);
 	if (err) {

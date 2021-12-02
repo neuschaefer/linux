@@ -269,7 +269,7 @@ static void jffs2_calc_trigger_levels(struct jffs2_sb_info *c)
 	/* Deletion should almost _always_ be allowed. We're fairly
 	   buggered once we stop allowing people to delete stuff
 	   because there's not enough free space... */
-	c->resv_blocks_deletion = 2;
+	c->resv_blocks_deletion = 1;// 2;
 
 	/* Be conservative about how much space we need before we allow writes.
 	   On top of that which is required for deletia, require an extra 2%

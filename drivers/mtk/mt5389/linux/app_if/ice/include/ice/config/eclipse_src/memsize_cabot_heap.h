@@ -1,0 +1,3 @@
+#ifndef MEMSIZE_CABOT_HEAP
+    #define MEMSIZE_CABOT_HEAP 8388608
+#endif

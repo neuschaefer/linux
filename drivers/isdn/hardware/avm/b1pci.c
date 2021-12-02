@@ -1,4 +1,4 @@
-/* $Id: b1pci.c,v 1.1.2.2 2004/01/16 21:09:27 keil Exp $
+/* $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/isdn/hardware/avm/b1pci.c#1 $
  * 
  * Module for AVM B1 PCI-card.
  * 
@@ -27,7 +27,7 @@
 
 /* ------------------------------------------------------------- */
 
-static char *revision = "$Revision: 1.1.2.2 $";
+static char *revision = "$Revision: #1 $";
 
 /* ------------------------------------------------------------- */
 

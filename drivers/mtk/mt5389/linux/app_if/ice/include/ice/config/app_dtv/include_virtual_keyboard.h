@@ -1,0 +1,3 @@
+#ifndef INCLUDE_VIRTUAL_KEYBOARD
+    #define INCLUDE_VIRTUAL_KEYBOARD 1
+#endif

@@ -67,6 +67,25 @@ static int ntfs_file_open(struct inode *vi, struct file *filp)
 	return generic_file_open(vi, filp);
 }
 
+static long ntfs_file_ioctl(struct file *filp, unsigned int cmd,
+			  unsigned long arg)
+{
+    struct inode *inode = filp->f_path.dentry->d_inode;
+    u32 __user *user_attr = (u32 __user *)arg;
+    u32 attr = 0;
+    
+    switch (cmd) {
+    case NTFS_IOCTL_GET_ATTRIBUTES:
+        attr = inode->i_mode;
+        return put_user(attr, user_attr);
+        
+    default:
+        printk(KERN_ERR "[%s]can not support the command\n", __func__);
+        return -ENOIOCTLCMD;
+    }
+}
+
+
 #ifdef NTFS_RW
 
 /**
@@ -2200,6 +2219,7 @@ const struct file_operations ntfs_file_ops = {
 						    i/o operations on a
 						    kiocb. */
 #endif /* NTFS_RW */
+    .unlocked_ioctl	= ntfs_file_ioctl,
 	/*.ioctl	= ,*/			 /* Perform function on the
 						    mounted filesystem. */
 	.mmap		= generic_file_mmap,	 /* Mmap file. */

@@ -127,6 +127,9 @@ ENTRY(secondary_startup)
 	sub	r4, r4, r5			@ mmu has been enabled
 	ldr	r4, [r7, r4]			@ get secondary_data.pgdir
 	adr	lr, BSYM(__enable_mmu)		@ return address
+    mrc     p15, 0, r11, c1, c0, 1
+    orr     r11, r11, #0x8    @FOZ=0x8  @enable FOZ for secondary core
+    mcr     p15, 0, r11, c1, c0, 1
 	mov	r13, r12			@ __secondary_switched address
  ARM(	add	pc, r10, #PROCINFO_INITFUNC	) @ initialise processor
 						  @ (return control reg)
@@ -158,6 +161,11 @@ __secondary_data:
  * registers.
  */
 __enable_mmu:
+#ifndef CONFIG_CPU_DCACHE_PREFETCH_DISABLE
+    mrc     p15, 0, r11, c1, c0, 1
+    orr     r11, r11, #0x86    @L1C_PREFETCH=0x4,L2C_PREFETCH_HINT=0x2,EXCL=0x80
+    mcr     p15, 0, r11, c1, c0, 1
+#endif
 #ifdef CONFIG_ALIGNMENT_TRAP
 	orr	r0, r0, #CR_A
 #else

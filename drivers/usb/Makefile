@@ -22,6 +22,8 @@ obj-$(CONFIG_USB_R8A66597_HCD)	+= host/
 obj-$(CONFIG_USB_HWA_HCD)	+= host/
 obj-$(CONFIG_USB_ISP1760_HCD)	+= host/
 obj-$(CONFIG_USB_IMX21_HCD)	+= host/
+obj-$(CONFIG_USB_MTK53xx_HCD)	+= host/
+obj-$(CONFIG_USB_MTK5395_HCD)	+= host/
 
 obj-$(CONFIG_USB_C67X00_HCD)	+= c67x00/
 
@@ -45,3 +47,4 @@ obj-y				+= early/
 
 obj-$(CONFIG_USB_ATM)		+= atm/
 obj-$(CONFIG_USB_SPEEDTOUCH)	+= atm/
+obj-$(CONFIG_USB_MTK_MUSB)           += mod-musb_qmu/

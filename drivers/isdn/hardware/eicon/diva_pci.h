@@ -1,4 +1,4 @@
-/* $Id: diva_pci.h,v 1.6 2003/01/04 15:29:45 schindler Exp $ */
+/* $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/isdn/hardware/eicon/diva_pci.h#1 $ */
 
 #ifndef __DIVA_PCI_INTERFACE_H__
 #define __DIVA_PCI_INTERFACE_H__

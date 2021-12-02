@@ -61,7 +61,7 @@
 				 __func__, ##__VA_ARGS__)
 
 /* Lowest number PEBs reserved for bad PEB handling */
-#define MIN_RESEVED_PEBS 2
+#define MIN_RESEVED_PEBS 5
 
 /* Background thread name pattern */
 #define UBI_BGT_NAME_PATTERN "ubi_bgt%dd"

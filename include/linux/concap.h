@@ -1,4 +1,4 @@
-/* $Id: concap.h,v 1.3.2.2 2004/01/12 23:08:35 keil Exp $
+/* $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/include/linux/concap.h#1 $
  *
  * Copyright 1997 by Henner Eisen <eis@baty.hanse.de>
  *

@@ -1,4 +1,4 @@
-/* $Id: ipac.h,v 1.7.2.2 2004/01/12 22:52:26 keil Exp $
+/* $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/isdn/hisax/ipac.h#1 $
  *
  * IPAC specific defines
  *

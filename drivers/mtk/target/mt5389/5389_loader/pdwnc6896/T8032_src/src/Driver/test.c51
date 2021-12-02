@@ -1,0 +1,46 @@
+#pragma NOAREGS
+
+#include "general.h"
+#include "hw_bim.h"
+#include "hw_rs232.h"
+
+#pragma DISABLE
+void vTestAsm(void)
+{ 
+	vRegWrite1B(REG_DATAW,0x20);//debug
+	vRegWrite1B(REG_DATAW,0x07);//debug
+	vRegWrite1B(REG_DATAW,0x11);//debug
+	vRegWrite1B(REG_DATAW,0x28);//debug
+
+	DBYTE[0x60] = 0x79;
+	vRegWrite1B(REG_DATAW, DBYTE[0x60]);
+	
+#pragma ASM
+	PUSH 0x60
+	POP 0x61
+#pragma ENDASM
+
+	vRegWrite1B(REG_DATAW, DBYTE[0x61]);
+	
+	while (1);
+}
+
+UINT8 data bAAA;
+
+void vTestFunc(void)
+{
+	bAAA = 0xa5;
+#if 0
+#pragma ASM
+	MOV  A,#0x7e
+	PUSH ACC	
+	MOV  A,#0x1d
+	PUSH ACC
+	MOV  A,#0x00
+	PUSH ACC
+	POP  0x60
+	//RET
+#pragma ENDASM
+#endif
+	while(bAAA);
+}

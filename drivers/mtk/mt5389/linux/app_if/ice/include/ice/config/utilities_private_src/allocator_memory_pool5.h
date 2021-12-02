@@ -1,0 +1,3 @@
+#ifndef ALLOCATOR_MEMORY_POOL5
+    #define ALLOCATOR_MEMORY_POOL5 1
+#endif

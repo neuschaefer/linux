@@ -1,0 +1,1 @@
+/* INCLUDE_THIRD_PARTY_TELETEXT is undefined */

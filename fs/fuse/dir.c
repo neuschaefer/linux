@@ -7,12 +7,14 @@
 */
 
 #include "fuse_i.h"
+#include "fuse.h"
 
 #include <linux/pagemap.h>
 #include <linux/file.h>
 #include <linux/gfp.h>
 #include <linux/sched.h>
 #include <linux/namei.h>
+#include <linux/freezer.h>
 
 #if BITS_PER_LONG >= 64
 static inline void fuse_dentry_settime(struct dentry *entry, u64 time)
@@ -174,6 +176,9 @@ static int fuse_dentry_revalidate(struct dentry *entry, struct nameidata *nd)
 			return 0;
 
 		fc = get_fuse_conn(inode);
+
+		FUSE_MIGHT_FREEZE(inode->i_sb, "fuse_dentry_revalidate");
+
 		req = fuse_get_req(fc);
 		if (IS_ERR(req))
 			return 0;
@@ -268,6 +273,8 @@ int fuse_lookup_name(struct super_block *sb, u64 nodeid, struct qstr *name,
 	if (name->len > FUSE_NAME_MAX)
 		goto out;
 
+	FUSE_MIGHT_FREEZE(sb, "fuse_lookup_name");
+
 	req = fuse_get_req(fc);
 	err = PTR_ERR(req);
 	if (IS_ERR(req))
@@ -331,6 +338,8 @@ static struct dentry *fuse_lookup(struct inode *dir, struct dentry *entry,
 	if (err)
 		goto out_err;
 
+	FUSE_MIGHT_FREEZE(dir->i_sb, "fuse_lookup");
+
 	err = -EIO;
 	if (inode && get_node_id(inode) == FUSE_ROOT_ID)
 		goto out_iput;
@@ -391,6 +400,8 @@ static int fuse_create_open(struct inode *dir, struct dentry *entry, int mode,
 	forget_req = fuse_get_req(fc);
 	if (IS_ERR(forget_req))
 		return PTR_ERR(forget_req);
+
+	FUSE_MIGHT_FREEZE(dir->i_sb, "fuse_create_open");
 
 	req = fuse_get_req(fc);
 	err = PTR_ERR(req);
@@ -484,6 +495,8 @@ static int create_new_entry(struct fuse_conn *fc, struct fuse_req *req,
 	struct inode *inode;
 	int err;
 	struct fuse_req *forget_req;
+
+	FUSE_MIGHT_FREEZE(dir->i_sb, "create_new_entry");
 
 	forget_req = fuse_get_req(fc);
 	if (IS_ERR(forget_req)) {
@@ -587,7 +600,11 @@ static int fuse_mkdir(struct inode *dir, struct dentry *entry, int mode)
 {
 	struct fuse_mkdir_in inarg;
 	struct fuse_conn *fc = get_fuse_conn(dir);
-	struct fuse_req *req = fuse_get_req(fc);
+	struct fuse_req *req;
+
+	FUSE_MIGHT_FREEZE(dir->i_sb, "fuse_mkdir");
+
+	req = fuse_get_req(fc);
 	if (IS_ERR(req))
 		return PTR_ERR(req);
 
@@ -611,7 +628,11 @@ static int fuse_symlink(struct inode *dir, struct dentry *entry,
 {
 	struct fuse_conn *fc = get_fuse_conn(dir);
 	unsigned len = strlen(link) + 1;
-	struct fuse_req *req = fuse_get_req(fc);
+	struct fuse_req *req;
+
+	FUSE_MIGHT_FREEZE(dir->i_sb, "fuse_symlink");
+
+	req = fuse_get_req(fc);
 	if (IS_ERR(req))
 		return PTR_ERR(req);
 
@@ -628,7 +649,11 @@ static int fuse_unlink(struct inode *dir, struct dentry *entry)
 {
 	int err;
 	struct fuse_conn *fc = get_fuse_conn(dir);
-	struct fuse_req *req = fuse_get_req(fc);
+	struct fuse_req *req;
+
+	FUSE_MIGHT_FREEZE(dir->i_sb, "fuse_unlink");
+
+	req = fuse_get_req(fc);
 	if (IS_ERR(req))
 		return PTR_ERR(req);
 
@@ -661,7 +686,11 @@ static int fuse_rmdir(struct inode *dir, struct dentry *entry)
 {
 	int err;
 	struct fuse_conn *fc = get_fuse_conn(dir);
-	struct fuse_req *req = fuse_get_req(fc);
+	struct fuse_req *req;
+
+	FUSE_MIGHT_FREEZE(dir->i_sb, "fuse_rmdir");
+
+	req = fuse_get_req(fc);
 	if (IS_ERR(req))
 		return PTR_ERR(req);
 

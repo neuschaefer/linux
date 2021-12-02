@@ -24,6 +24,14 @@
 #include <linux/types.h>
 #include <crypto/sha.h>
 #include <asm/byteorder.h>
+#include <crypto/mtk_crypto.h>
+#include <linux/semaphore.h>
+
+//#define SHA256_HW_VERSION
+
+#ifdef CC_MEASURE_TIME
+static HAL_TIME_T _Sha256_Time;
+#endif
 
 static inline u32 Ch(u32 x, u32 y, u32 z)
 {
@@ -232,7 +240,18 @@ static int sha224_init(struct shash_desc *desc)
 
 static int sha256_init(struct shash_desc *desc)
 {
-	struct sha256_state *sctx = shash_desc_ctx(desc);
+ #ifdef SHA256_HW_VERSION
+ //printk("^^^^Sha 256 hw init^^^^^!\n");	
+	if(SHA256_HW_INIT(desc)!= 0)	
+	{		
+		printk(KERN_ERR "Sha 256 hw init failure!\n");		
+		return -1;	
+	}	
+	return 0;
+ 
+ #else //SHA256_HW_VERSION
+ 
+ struct sha256_state *sctx = shash_desc_ctx(desc);
 	sctx->state[0] = SHA256_H0;
 	sctx->state[1] = SHA256_H1;
 	sctx->state[2] = SHA256_H2;
@@ -242,40 +261,81 @@ static int sha256_init(struct shash_desc *desc)
 	sctx->state[6] = SHA256_H6;
 	sctx->state[7] = SHA256_H7;
 	sctx->count = 0;
-
 	return 0;
+ #endif //SHA256_HW_VERSION
+	
 }
 
 static int sha256_update(struct shash_desc *desc, const u8 *data,
 			  unsigned int len)
 {
-	struct sha256_state *sctx = shash_desc_ctx(desc);
-	unsigned int partial, done;
-	const u8 *src;
+	#ifdef SHA256_HW_VERSION
 
-	partial = sctx->count & 0x3f;
-	sctx->count += len;
-	done = 0;
-	src = data;
+		//measure sha256 update time
+		#ifdef CC_MEASURE_TIME
+		HAL_TIME_T rTime_1, rTime_2 ,rTimeDiff;;
+		HAL_GetTime(&rTime_1);
+		#endif //CC_MEASURE_TIME
+		
+		if(SHA256_HW_UPDATE(desc, data, len)!= 0)	
+		{		
+			printk(KERN_ERR "Sha 256 hw update failure!\n");		
+			return -1;	
+		}	
 
-	if ((partial + len) > 63) {
-		if (partial) {
-			done = -partial;
-			memcpy(sctx->buf + partial, data, done + 64);
-			src = sctx->buf;
+		//measure sha256 update time
+		#ifdef CC_MEASURE_TIME
+		HAL_GetTime(&rTime_2);
+		HAL_GetDeltaTime(&rTimeDiff, &rTime_2, &rTime_1);
+		HAL_GetSumTime(&_Sha256_Time, &rTimeDiff);
+		#endif //CC_MEASURE_TIME
+		
+		return 0;
+	
+	#else //SHA256_HW_VERSION
+
+		//measure sha256 update time
+		#ifdef CC_MEASURE_TIME
+		HAL_TIME_T rTime_1, rTime_2 ,rTimeDiff;;
+		HAL_GetTime(&rTime_1);
+		#endif //CC_MEASURE_TIME
+		
+		struct sha256_state *sctx = shash_desc_ctx(desc);
+		unsigned int partial, done;
+		const u8 *src;
+
+		partial = sctx->count & 0x3f;
+		sctx->count += len;
+		done = 0;
+		src = data;
+
+		if ((partial + len) > 63) {
+			if (partial) {
+				done = -partial;
+				memcpy(sctx->buf + partial, data, done + 64);
+				src = sctx->buf;
+			}
+
+			do {
+				sha256_transform(sctx->state, src);
+				done += 64;
+				src = data + done;
+			} while (done + 63 < len);
+
+			partial = 0;
 		}
-
-		do {
-			sha256_transform(sctx->state, src);
-			done += 64;
-			src = data + done;
-		} while (done + 63 < len);
-
-		partial = 0;
-	}
-	memcpy(sctx->buf + partial, src, len - done);
-
-	return 0;
+		memcpy(sctx->buf + partial, src, len - done);
+		
+		//measure sha256 update time
+		#ifdef CC_MEASURE_TIME
+		HAL_GetTime(&rTime_2);
+		HAL_GetDeltaTime(&rTimeDiff, &rTime_2, &rTime_1);
+		HAL_GetSumTime(&_Sha256_Time, &rTimeDiff);
+		#endif //CC_MEASURE_TIME
+		
+		return 0;
+	
+	#endif //SHA256_HW_VERSION
 }
 
 static int sha256_final(struct shash_desc *desc, u8 *out)
@@ -287,6 +347,8 @@ static int sha256_final(struct shash_desc *desc, u8 *out)
 	int i;
 	static const u8 padding[64] = { 0x80, };
 
+	//printk("^^^^Sha 256 final -1^^^^^!\n");	
+	
 	/* Save number of bits */
 	bits = cpu_to_be64(sctx->count << 3);
 
@@ -303,8 +365,18 @@ static int sha256_final(struct shash_desc *desc, u8 *out)
 		dst[i] = cpu_to_be32(sctx->state[i]);
 
 	/* Zeroize sensitive information. */
-	memset(sctx, 0, sizeof(*sctx));
+	memset(sctx, 0, sizeof(*sctx));	
 
+	#ifdef CC_MEASURE_TIME
+	static UINT32 j;
+	j++;
+	if ((j % 100)== 0x0)
+	{
+		printk("^^^^Sha 256 caculate total time:[%d:%06d],Loop : %d.^^^^^!\n",_Sha256_Time.u4Seconds, _Sha256_Time.u4Micros, j);	
+	}
+	#endif
+	//printk("^^^^Sha 256 final -2^^^^^!\n");	
+	
 	return 0;
 }
 

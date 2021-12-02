@@ -1,0 +1,754 @@
+/*----------------------------------------------------------------------------*
+ * Copyright Statement:                                                       *
+ *                                                                            *
+ *   This software/firmware and related documentation ("MediaTek Software")   *
+ * are protected under international and related jurisdictions'copyright laws *
+ * as unpublished works. The information contained herein is confidential and *
+ * proprietary to MediaTek Inc. Without the prior written permission of       *
+ * MediaTek Inc., any reproduction, modification, use or disclosure of        *
+ * MediaTek Software, and information contained herein, in whole or in part,  *
+ * shall be strictly prohibited.                                              *
+ * MediaTek Inc. Copyright (C) 2010. All rights reserved.                     *
+ *                                                                            *
+ *   BY OPENING THIS FILE, RECEIVER HEREBY UNEQUIVOCALLY ACKNOWLEDGES AND     *
+ * AGREES TO THE FOLLOWING:                                                   *
+ *                                                                            *
+ *   1)Any and all intellectual property rights (including without            *
+ * limitation, patent, copyright, and trade secrets) in and to this           *
+ * Software/firmware and related documentation ("MediaTek Software") shall    *
+ * remain the exclusive property of MediaTek Inc. Any and all intellectual    *
+ * property rights (including without limitation, patent, copyright, and      *
+ * trade secrets) in and to any modifications and derivatives to MediaTek     *
+ * Software, whoever made, shall also remain the exclusive property of        *
+ * MediaTek Inc.  Nothing herein shall be construed as any transfer of any    *
+ * title to any intellectual property right in MediaTek Software to Receiver. *
+ *                                                                            *
+ *   2)This MediaTek Software Receiver received from MediaTek Inc. and/or its *
+ * representatives is provided to Receiver on an "AS IS" basis only.          *
+ * MediaTek Inc. expressly disclaims all warranties, expressed or implied,    *
+ * including but not limited to any implied warranties of merchantability,    *
+ * non-infringement and fitness for a particular purpose and any warranties   *
+ * arising out of course of performance, course of dealing or usage of trade. *
+ * MediaTek Inc. does not provide any warranty whatsoever with respect to the *
+ * software of any third party which may be used by, incorporated in, or      *
+ * supplied with the MediaTek Software, and Receiver agrees to look only to   *
+ * such third parties for any warranty claim relating thereto.  Receiver      *
+ * expressly acknowledges that it is Receiver's sole responsibility to obtain *
+ * from any third party all proper licenses contained in or delivered with    *
+ * MediaTek Software.  MediaTek is not responsible for any MediaTek Software  *
+ * releases made to Receiver's specifications or to conform to a particular   *
+ * standard or open forum.                                                    *
+ *                                                                            *
+ *   3)Receiver further acknowledge that Receiver may, either presently       *
+ * and/or in the future, instruct MediaTek Inc. to assist it in the           *
+ * development and the implementation, in accordance with Receiver's designs, *
+ * of certain softwares relating to Receiver's product(s) (the "Services").   *
+ * Except as may be otherwise agreed to in writing, no warranties of any      *
+ * kind, whether express or implied, are given by MediaTek Inc. with respect  *
+ * to the Services provided, and the Services are provided on an "AS IS"      *
+ * basis. Receiver further acknowledges that the Services may contain errors  *
+ * that testing is important and it is solely responsible for fully testing   *
+ * the Services and/or derivatives thereof before they are used, sublicensed  *
+ * or distributed. Should there be any third party action brought against     *
+ * MediaTek Inc. arising out of or relating to the Services, Receiver agree   *
+ * to fully indemnify and hold MediaTek Inc. harmless.  If the parties        *
+ * mutually agree to enter into or continue a business relationship or other  *
+ * arrangement, the terms and conditions set forth herein shall remain        *
+ * effective and, unless explicitly stated otherwise, shall prevail in the    *
+ * event of a conflict in the terms in any agreements entered into between    *
+ * the parties.                                                               *
+ *                                                                            *
+ *   4)Receiver's sole and exclusive remedy and MediaTek Inc.'s entire and    *
+ * cumulative liability with respect to MediaTek Software released hereunder  *
+ * will be, at MediaTek Inc.'s sole discretion, to replace or revise the      *
+ * MediaTek Software at issue.                                                *
+ *                                                                            *
+ *   5)The transaction contemplated hereunder shall be construed in           *
+ * accordance with the laws of Singapore, excluding its conflict of laws      *
+ * principles.  Any disputes, controversies or claims arising thereof and     *
+ * related thereto shall be settled via arbitration in Singapore, under the   *
+ * then current rules of the International Chamber of Commerce (ICC).  The    *
+ * arbitration shall be conducted in English. The awards of the arbitration   *
+ * shall be final and binding upon both parties and shall be entered and      *
+ * enforceable in any court of competent jurisdiction.                        *
+ *---------------------------------------------------------------------------*/
+/*-----------------------------------------------------------------------------
+ *
+ * $Author: dtvbm11 $
+ * $Date: 2012/04/27 $
+ * $RCSfile: pi_tuner_om3869.c,v $
+ * $Revision: #1 $
+ *
+ *---------------------------------------------------------------------------*/
+
+/** @file pi_tuner_om3869.c
+ *  NXP OM3869 tuner driver.
+ */
+
+
+#include "tuner_interface_if.h"
+#include "pi_def_dvbt.h"
+#include "PI_Def.h"
+#include "ctrl_bus.h"
+#include "pi_dvbt_if.h"  //add by liuqu,20090424
+#include "pi_demod_atd.h"
+#include "eq_script_om3869.h"
+#include "com_defs.h"      //add by rui.mei,20100209
+
+
+#include "user_i2c_api.h"
+#include "tmNxTypes.h"
+#include "tmFrontEnd.h"
+#include "tmCompId.h"
+#include "tmsysFrontEndTypes.h"
+#include "tmbslFrontEndTypes.h"
+#include "tmsysOM3869S.h"
+#include "tmbslTDA18272.h"
+
+
+
+
+
+// *** Release Note ***
+// Ver     Date         Description
+// 1.00    2010.02.02   file established
+#define C_OM3869_VERSION				"OM3869 2010-01-01\n 2011-04-07\n v1.0"
+
+#define cRISC_TVD_BASE           (IO_VIRT + 0x22000)
+
+
+#define C_OM3869_PLL_POLL_INTERVAL   10   // to solve SLT thread UART overflow issue, 090601, Ken
+#define C_OM3869_PLL_TIMEOUT         100
+#define C_OM3869_PLL_TIMEOUT_CNT     C_OM3869_PLL_TIMEOUT/C_OM3869_PLL_POLL_INTERVAL
+#define C_OM3869_I2C_CLK_DIV         0x100
+#define C_OM3869_PLL_LOCK_BIT        6
+
+#define C_OM3869_TOP_SET             ((U8)   0x02) 
+#define C_OM3869_TOP_SET_ANA         ((U8)   0x0A) 
+#define C_OM3869_SAW_BW                SAW_BW_8M 
+
+
+#define C_OM3869_FREQ_DBOUND_UPPER   859*1000*1000      //modified for DVB-C application, Menghau
+#define C_OM3869_FREQ_DBOUND_LOWER    48*1000*1000 
+#define C_OM3869_FREQ_DBOUND_UPPER_Ana     875*1000*1000
+#define C_OM3869_FREQ_DBOUND_LOWER_Ana    45*1000*1000
+
+#define C_OM3869_LO_ADDRESS         ((U16)  0xc0)
+#define C_OM3869_IF_FREQUENCY        ((U16)  4000)  /* kHz */
+#define C_OM3869_IF_FREQUENCY_ANA    ((U16)  6750)  /* kHz */
+#define C_OM3869_IF_FREQUENCY_L1     ((U16)  750)  /* kHz */
+#define C_OM3869_LO_DIVIDER_STEP     ((U32) 166667) /* Hz */
+#define C_OM3869_LO_DIVIDER_STEP_ANA ((U16)  62500) /* Hz */
+
+
+#define C_OM3869_CHANNEL_SCAN_JUMP_SMALL_STEP ((U16) 250)
+#define C_OM3869_CHANNEL_SCAN_JUMP_MIDDLE_STEP_UP ((U16) 1500)
+#define C_OM3869_CHANNEL_SCAN_JUMP_MIDDLE_STEP_DOWN ((U16) 500)
+
+
+#define C_OM3869_AGC_IF_SLP           0.75
+#define C_OM3869_AGC_IF_INT           -2
+#define C_OM3869_AGC_IF_MAX           0.499  // 0.5 will overflow
+#define C_OM3869_AGC_IF_MIN          -0.5
+#define C_OM3869_AGC_IF_SLP_SGN  (S8)((C_OM3869_AGC_IF_SLP>0)?1:-1) 
+#define C_OM3869_AGC_IF_LVL_MAX      0.4774    //-90dBm    127/256
+#define C_OM3869_AGC_IF_LVL_MIN      0.08203125   //-60dBm  21/256
+
+
+#define C_OM3869_MAX_IF_GAIN_SET       -0.12   
+#define C_OM3869_MIN_IF_GAIN_SET       -0.38   
+#define C_OM3869_MAX_RF_GAIN_SET        cALC_ADC_BIAS *2   // Volt
+#define C_OM3869_MIN_RF_GAIN_SET        cALC_ADC_BIAS *2   // Volt
+#define C_OM3869_MAX_IF_GAIN_POW       -100    // dBm
+#define C_OM3869_MIN_IF_GAIN_POW		-50     // dBm
+#define C_OM3869_MAX_RF_GAIN_POW		 C_OM3869_MIN_IF_GAIN_POW
+#define C_OM3869_MIN_RF_GAIN_POW		-20     // dBm
+#define C_OM3869_POWER_CALIBRATE        26     // dBm
+//#define C_OM3869_SIGNAL_LVL_TH          6  //liuqu,20080926,no use for nimtool
+
+#define C_OM3869_AGC_COEF			((U8)   0xBD)
+#define C_OM3869_DEMOD_INPUT_POWER	cIF_TARGET_LEVEL_0CCC_0D36
+
+// ********************************************* //
+
+#define C_U8_OM3869_AGC_IF_SLP         (S8)(C_OM3869_AGC_IF_SLP *64)
+#define C_U8_OM3869_AGC_IF_INT         (S8)(C_OM3869_AGC_IF_INT *16)
+#define C_U8_OM3869_AGC_IF_MAX         (S8)(C_OM3869_AGC_IF_MAX *256)
+#define C_U8_OM3869_AGC_IF_MIN         (S8)(C_OM3869_AGC_IF_MIN *256)
+#define C_U8_OM3869_AGC_IF_LVL_MAX        (S8)(C_OM3869_AGC_IF_LVL_MAX *256)
+#define C_U8_OM3869_AGC_IF_LVL_MIN         (S8)(C_OM3869_AGC_IF_LVL_MIN *256)
+
+#define C_U8_OM3869_MAX_IF_GAIN_SET	(S8)(C_OM3869_MAX_IF_GAIN_SET *256)
+#define C_U8_OM3869_MIN_IF_GAIN_SET	(S8)(C_OM3869_MIN_IF_GAIN_SET *256)
+#define C_U8_OM3869_MAX_RF_GAIN_SET	(S8)((C_OM3869_MAX_RF_GAIN_SET /2 -cALC_ADC_BIAS) /cALC_ADC_INPUT_SWING *256)
+#define C_U8_OM3869_MIN_RF_GAIN_SET	(S8)((C_OM3869_MIN_RF_GAIN_SET /2 -cALC_ADC_BIAS) /cALC_ADC_INPUT_SWING *256)
+#define C_U8_OM3869_IF_GAIN_RANGE      (S8)(C_OM3869_MIN_IF_GAIN_POW - C_OM3869_MAX_IF_GAIN_POW)
+#define C_U8_OM3869_RF_GAIN_RANGE      (S8)(C_OM3869_MIN_RF_GAIN_POW - C_OM3869_MAX_RF_GAIN_POW)
+
+STATIC UINT8* pOm3869EqNormal[MOD_ANA_TYPE_END - MOD_ANA_TYPE_BEGIN] = {NULL};
+STATIC UINT8* pOm3869EqWeak[MOD_ANA_TYPE_END - MOD_ANA_TYPE_BEGIN] = {NULL};
+
+/** remove the demod setting!!leo 20101015
+EXTERN void vSetIntfPara(DEMOD_CTX_T *psDemodCtx, UCHAR *para, UCHAR len);//NXP OM3869 low_middle_IF DIF setting
+*****/
+
+///////////////////////////////////
+// ALPS OM3869 driver
+///////////////////////////////////
+
+CHAR* OM3869_GetSwVer(void)
+{
+	return ((CHAR*)C_OM3869_VERSION);
+}
+
+
+
+VOID OM3869_TunerInit(ITUNER_CTX_T *pTCtx)
+{
+    ITUNER_CTX_T *psTunerCtx = pTCtx;
+    SPECIFIC_MEMBER_EU_CTX * pEUCtx= &(pTCtx->specific_member.eu_ctx);
+
+	static BOOL fgTunerInit = FALSE;
+    
+    psTunerCtx->I2cAddress = C_OM3869_LO_ADDRESS;
+    psTunerCtx->u2IF_Freq = C_OM3869_IF_FREQUENCY;
+    psTunerCtx->u4RF_Freq = 0;
+
+	/**********************************ATD Init part***********************************/
+	/******************************************************************************/
+    psTunerCtx->u1AtdPatchSwitch = (MASK_PATCH_CR|MASK_PATCH_DRO|MASK_PATCH_SENS);  //Justin TODO
+    psTunerCtx->fgRFAGC = TRUE;
+    
+    psTunerCtx->sAtdAgcPara.AgcRfBias = 0x2f;     //AGC para,according to yu ding's mail,20091123
+    psTunerCtx->sAtdAgcPara.AgcRfMin  = 0x80;
+    psTunerCtx->sAtdAgcPara.AgcIfMin  = 0x80;
+    psTunerCtx->sAtdAgcPara.AgcDrSel  = 0x0B;
+
+    pEUCtx->m_SAW_BW  = C_OM3869_SAW_BW;
+    pEUCtx->m_Ana_Top = C_OM3869_TOP_SET_ANA;
+    pEUCtx->m_s4FreqBoundUpper = C_OM3869_FREQ_DBOUND_UPPER;
+    pEUCtx->m_s4FreqBoundLower = C_OM3869_FREQ_DBOUND_LOWER;
+    pEUCtx->m_s4AnaFreqBoundUpper = C_OM3869_FREQ_DBOUND_UPPER_Ana;
+    pEUCtx->m_s4AnaFreqBoundLower = C_OM3869_FREQ_DBOUND_LOWER_Ana;
+    
+    pEUCtx->m_Small_Step = C_OM3869_CHANNEL_SCAN_JUMP_SMALL_STEP;
+    pEUCtx->m_Middle_Step_Up = C_OM3869_CHANNEL_SCAN_JUMP_MIDDLE_STEP_UP;
+    pEUCtx->m_Middle_Step_Down = C_OM3869_CHANNEL_SCAN_JUMP_MIDDLE_STEP_DOWN;
+    
+   
+    pEUCtx->m_ifAgc_lvl_max = (U8)C_U8_OM3869_AGC_IF_LVL_MAX;   // add by JC, 081215, for Signal Level display
+    pEUCtx->m_ifAgc_lvl_min = (U8)C_U8_OM3869_AGC_IF_LVL_MIN;
+    
+    pEUCtx->m_SigLvTh = 0;
+    pEUCtx->m_SigLvScan = 0;
+    
+    pEUCtx->m_aucPara[0] = C_OM3869_TOP_SET;
+    pEUCtx->m_aucPara[1] = 0;
+    
+    pEUCtx->m_aucPara[2] = (U8)C_U8_OM3869_AGC_IF_SLP;
+    pEUCtx->m_aucPara[3] = (U8)C_U8_OM3869_AGC_IF_INT;
+    pEUCtx->m_aucPara[4] = (U8)C_U8_OM3869_AGC_IF_MAX;
+    pEUCtx->m_aucPara[5] = (U8)C_U8_OM3869_AGC_IF_MIN;
+    
+    pEUCtx->m_aucPara[6] = C_OM3869_AGC_COEF;
+    pEUCtx->m_aucPara[7] = C_OM3869_DEMOD_INPUT_POWER;
+    
+    pEUCtx->m_aucPara[ 8] = (U8)C_U8_OM3869_MAX_IF_GAIN_SET;
+    pEUCtx->m_aucPara[ 9] = (U8)C_U8_OM3869_MIN_IF_GAIN_SET;
+    pEUCtx->m_aucPara[10] = (U8)C_U8_OM3869_MAX_RF_GAIN_SET;
+    pEUCtx->m_aucPara[11] = (U8)C_U8_OM3869_MIN_RF_GAIN_SET;
+    pEUCtx->m_aucPara[12] = (U8)C_U8_OM3869_IF_GAIN_RANGE;
+    pEUCtx->m_aucPara[13] = (U8)C_U8_OM3869_RF_GAIN_RANGE;
+    pEUCtx->m_aucPara[14] = C_OM3869_POWER_CALIBRATE;
+
+    pOm3869EqNormal[MOD_PAL_BG - MOD_ANA_TYPE_BEGIN]   = EQOm3869BG;
+    pOm3869EqNormal[MOD_PAL_DK - MOD_ANA_TYPE_BEGIN]   = EQOm3869DK;
+    pOm3869EqNormal[MOD_PAL_I - MOD_ANA_TYPE_BEGIN]    = EQOm3869I;
+    pOm3869EqNormal[MOD_SECAM_L - MOD_ANA_TYPE_BEGIN]  = EQOm3869L;
+#ifdef CC_MT5363	
+    pOm3869EqNormal[MOD_SECAM_L1 - MOD_ANA_TYPE_BEGIN] = EQOm3869L1;
+#else
+    pOm3869EqNormal[MOD_SECAM_L1 - MOD_ANA_TYPE_BEGIN] = EQOm3869L;
+#endif
+   
+
+ /***************************Tuner Init Part**********************************/
+/*************************************************************************/
+
+  if (!fgTunerInit)
+  	{
+   
+   tmbslFrontEndDependency_t sSrvTunerFunc;
+   tmUnitSelect_t	Tuner_Master = 0;
+   tmErrorCode_t err = TM_OK;
+
+
+/* Low layer struct set-up to link with user written functions */
+   sSrvTunerFunc.sIo.Write             = UserWrittenI2CWrite;
+   sSrvTunerFunc.sIo.Read              = UserWrittenI2CRead;
+   sSrvTunerFunc.sTime.Get             = Null;
+   sSrvTunerFunc.sTime.Wait            = UserWrittenWait;
+   sSrvTunerFunc.sDebug.Print          = UserWrittenPrint;
+   sSrvTunerFunc.sMutex.Init           = UserWrittenMutexInit;
+   sSrvTunerFunc.sMutex.DeInit         = UserWrittenMutexDeInit;
+   sSrvTunerFunc.sMutex.Acquire        = UserWrittenMutexAcquire;
+   sSrvTunerFunc.sMutex.Release        = UserWrittenMutexRelease;
+   sSrvTunerFunc.dwAdditionalDataSize  = 0;
+   sSrvTunerFunc.pAdditionalData       = Null;
+   
+   /* OM3869 Master Driver low layer setup */
+   err = tmsysOM3869SInit(Tuner_Master, &sSrvTunerFunc);
+   if(err != TM_OK)
+   	{
+      mcSHOW_USER_MSG(("tmsysOM3869SInit fail!\n"));	  
+   	}
+   else
+   	{
+
+	 mcSHOW_USER_MSG(("tmsysOM3869SInit success!\n"));
+
+    }
+
+   /* OM3869 Master Hardware power state */
+   err = tmsysOM3869SSetPowerState(Tuner_Master, tmPowerOn);
+   if(err != TM_OK)
+   	{
+      mcSHOW_USER_MSG(("tmsysOM3869SSetPowerState fail!\n"));	 
+   	}
+    else
+      {
+       mcSHOW_USER_MSG(("tmsysOM3869SSetPowerState success!\n"));
+     
+	  }
+
+   /* OM3869 Master Hardware initialization */
+   err = tmsysOM3869SReset(Tuner_Master);
+     if (err != TM_OK)
+   	 {
+      mcSHOW_USER_MSG(("tmsysOM3869SReset fail!\n"));	 
+   	 }
+    else
+      {
+        mcSHOW_USER_MSG(("tmsysOM3869SReset success!\n"));	
+        
+      }
+	fgTunerInit = TRUE;
+  	}  
+}
+
+
+ VOID OM3869_TunerClose(ITUNER_CTX_T *pTCtx)
+ {
+    tmUnitSelect_t  Tuner_Master = 0;
+	tmErrorCode_t err;
+    /* DeInitialize OM3869 Master Driver */
+   err = tmsysOM3869SDeInit(Tuner_Master);
+   if(err != TM_OK)
+   	{
+      mcSHOW_USER_MSG(("Tuner OM3869DeInit fail!\n"));
+   	}
+ }
+
+
+ STATIC void  OM3869_SetSawBw(ITUNER_CTX_T * pTunerCtx, UINT8 sawbw)
+ {
+   pTunerCtx->specific_member.eu_ctx.m_SAW_BW = sawbw;
+
+   mcSHOW_DRVAPI_MSG(("OM3869_SetSawBw = %d\n", sawbw));
+   
+ }
+
+ extern  DEMOD_CTX_T*    psDvbtDemodCtx;
+S16 OM3869_TunerSetFreq(ITUNER_CTX_T *pTCtx, PARAM_SETFREQ_T* param)
+{
+    SPECIFIC_MEMBER_EU_CTX * pTunerCtx= &(pTCtx->specific_member.eu_ctx);
+	tmUnitSelect_t	Tuner_Master = 0;
+	tmsysFrontEndState_t  LockStatus;
+	tmErrorCode_t err;
+	
+	U32 Freq = param->Freq; //KHz
+	
+    #ifdef CC_MT5363	
+    U8  AutoSearch = param->fgAutoSearch;
+   #endif
+
+
+    pTCtx->u4RF_Freq = Freq;
+    pTCtx->I2cAddress = C_OM3869_LO_ADDRESS;
+	
+    U8  Mode = param->Modulation;
+    mcSHOW_DRVERR_MSG(("tuner frequence setting.\n"));	
+	 
+    if ((Mode == MOD_DVBT) ||(Mode == MOD_DVBC))
+    {
+	   
+                          /*  Low  IF  DEMOD setting*/
+    mcSHOW_DBG_MSG(("TUNER_LOW_IF\n"));
+   // UCHAR   ucPara[ccCMD_REG_NUM];
+	 //INT8 ii;
+
+
+    pTCtx->u2IF_Freq = C_OM3869_IF_FREQUENCY;
+    
+	/*	   remove the demod setting!!leo 20101015  
+    for (ii = 0; ii < 4; ii++)
+      ucPara[ii+1] = pTunerCtx->m_aucPara[ii+2];  // write m_aucPara[2-5]
+             
+    vSetIntfPara(psDvbtDemodCtx, ucPara, ccOFST_SET_TUNER_PARA0_SIZE+1);
+    
+    ucPara[0] = ccCMD_ID_SET_TUNER_PARA1;
+    ucPara[1] = pTunerCtx->m_aucPara[7];   // IF taget level, 080826, JC
+    ucPara[2] = 0x7F;//(psDemodCtx->sTunerCtx.m_aucPara[6] & 0x3F) | 0x40;            // kp, ki; LF_CTRL
+
+     if (Mode == MOD_DVBC)
+	  pTunerCtx->m_SAW_BW = SAW_BW_8M; 
+	
+
+     if (pTunerCtx->m_SAW_BW == SAW_BW_6M)
+     {
+       ucPara[3] = mcLOW_BYTE(3000);   // 3.0Mhz
+       ucPara[4] = mcHIGH_BYTE(3000);  // IF_FREQ_HIGH, // 3.0Mhz
+     }
+    if (pTunerCtx->m_SAW_BW == SAW_BW_7M)
+     {
+       ucPara[3] = mcLOW_BYTE(3500);   // 3.5Mhz
+       ucPara[4] = mcHIGH_BYTE(3500);  // IF_FREQ_HIGH, // 3.5Mhz
+     }
+	 if (pTunerCtx->m_SAW_BW == SAW_BW_8M)
+     {
+       ucPara[3] = mcLOW_BYTE(4000);   // 4.0Mhz
+       ucPara[4] = mcHIGH_BYTE(4000);  // IF_FREQ_HIGH, // 4.0Mhz
+     }
+	 
+    vSetIntfPara(psDvbtDemodCtx, ucPara, ccOFST_SET_TUNER_PARA1_SIZE+1);
+*/
+
+/*add for test of tuner !************************************************************/
+
+	  /* OM3869 Master Hardware initialization */
+   err = tmsysOM3869SReset(Tuner_Master);
+     if (err != TM_OK)
+   	 {
+      mcSHOW_USER_MSG(("tmsysOM3869SReset fail!\n"));	 
+   	 }
+    else
+      {
+        mcSHOW_USER_MSG(("tmsysOM3869SReset success!\n"));	
+        
+      }
+/*************************************************************/
+
+								/* tuner setting*/
+	  tmDVBTRequest_t  TuneRequest;
+	  tmTDA182I2StandardMode_t  sysmode;
+      TuneRequest.dwFrequency = 1000*Freq; //Hz
+       if (TuneRequest.dwFrequency < C_OM3869_FREQ_DBOUND_LOWER || TuneRequest.dwFrequency > C_OM3869_FREQ_DBOUND_UPPER )
+        {
+            mcSHOW_DRVERR_MSG(("Out of range for LO!\n"));   
+        }
+      
+      switch (pTunerCtx->m_SAW_BW)
+      {
+         case SAW_BW_6M:
+		 	 {
+              sysmode = tmTDA182I2_DVBT_6MHz;
+			  break;
+		     }
+		 
+         case SAW_BW_7M:
+		 	 {
+              sysmode = tmTDA182I2_DVBT_7MHz;
+			  break;
+		     }
+		 case SAW_BW_8M:
+		 	 {
+              sysmode = tmTDA182I2_DVBT_8MHz;
+			  break;
+		     }
+          default:
+		  	  sysmode = tmTDA182I2_DVBT_8MHz;
+			  break;
+
+	  }
+	  mcSHOW_DRVERR_MSG(("DVBT mode,SysMode is %d,Freq is %d Hz\n", sysmode, TuneRequest.dwFrequency));	
+
+	   /* OM3869 Master Send Request  dwFrequency Hz standard DVB-T*/
+      err = tmsysOM3869SSendRequest(Tuner_Master,&TuneRequest,sizeof(TuneRequest), TRT_DVBT,sysmode);
+      if(err != TM_OK)
+      {
+        mcSHOW_DRVERR_MSG(("TunerWrite PLL failed!\n")); 
+		return (+1);
+
+	  }
+	  
+      /* OM3869 Master Get locked status */
+      err = tmsysOM3869SGetLockStatus(Tuner_Master,&LockStatus);
+      if(err != TM_OK)
+      {
+        mcSHOW_DRVERR_MSG(("LOCK  Fail!\n"));
+        return (+1);
+	  }
+	   mcSHOW_DRVERR_MSG(("LOCK  Success!\n"));
+	}
+
+	else
+	{
+	 tmAnalogTVRequest_t  TuneRequest;
+	 tmTDA182I2StandardMode_t  sysmode;
+     TuneRequest.dwFrequency = 1000*Freq; //Hz
+       if (TuneRequest.dwFrequency < C_OM3869_FREQ_DBOUND_LOWER_Ana || TuneRequest.dwFrequency > C_OM3869_FREQ_DBOUND_UPPER_Ana)
+        {
+            mcSHOW_DRVERR_MSG(("Out of range for LO!\n"));   
+        }
+	   
+         if (Mode == MOD_SECAM_L1)
+	     pTCtx->u2IF_Freq_A = C_OM3869_IF_FREQUENCY_L1;
+	  else
+	     pTCtx->u2IF_Freq_A = C_OM3869_IF_FREQUENCY_ANA;
+	  		 
+         switch (Mode)
+         {
+         case MOD_PAL_BG:
+		 	  if (TuneRequest.dwFrequency <= 300000000)
+		 	  	{
+			  	  sysmode = tmTDA182I2_ANLG_B;
+		 	  	}
+			   else
+			   	{
+		 	      sysmode = tmTDA182I2_ANLG_GH;
+			   	}
+			  break;
+		 case MOD_PAL_DK:
+		 	  sysmode = tmTDA182I2_ANLG_DK;
+			  break;
+		 case MOD_PAL_I:
+		 	  sysmode = tmTDA182I2_ANLG_I;
+			  break;
+		 case MOD_SECAM_L:
+		 	  sysmode = tmTDA182I2_ANLG_L;
+			  break;
+		 case MOD_SECAM_L1:
+		 	  sysmode = tmTDA182I2_ANLG_LL;
+			  break;
+		 default:
+		 	  sysmode = tmTDA182I2_ANLG_GH;
+			  break;
+          }
+
+		 /* OM3869 Master Send Request  dwFrequency Hz standard Analog */
+	  mcSHOW_DRVERR_MSG(("Analog mode,SysMode is %d,Freq is %d Hz\n", sysmode, TuneRequest.dwFrequency));	
+      err = tmsysOM3869SSendRequest(Tuner_Master,&TuneRequest,sizeof(TuneRequest), TRT_ANALOG_TV,sysmode);
+      if(err != TM_OK)
+      {
+        mcSHOW_DRVERR_MSG(("TunerWrite PLL failed!\n")); 
+		return (+1);
+	  }
+	  else
+	  	mcSHOW_DRVERR_MSG(("TunerWrite PLL success!\n")); 
+	  
+	 
+	  
+      // OM3869 Master Get locked status 
+      err = tmsysOM3869SGetLockStatus(Tuner_Master,&LockStatus);
+      if(err != TM_OK)
+      {
+        mcSHOW_DRVERR_MSG(("LOCK  Fail!\n"));
+        return (+1);
+	  }
+	   mcSHOW_DRVERR_MSG(("LOCK  Success!\n"));
+       
+	}
+
+   
+   #ifdef CC_MT5363
+     UCHAR u1IfAgc[2];  
+    if( (Mode ==MOD_DVBT ) && AutoSearch)
+    {
+        DEMOD_CTX_T    sDvbtDemodCtx;
+        sDvbtDemodCtx.I2cAddress = 0x82;
+    
+        mcDELAY(80);
+         /*** Record IfAgc value for channel scan ***/  //Menghau, 080314
+        DVBT_GetReg(&sDvbtDemodCtx, 0x1DB, u1IfAgc, 2);
+        pTunerCtx->m_SigLvScan = -(((S8)u1IfAgc[1])*C_OM3869_AGC_IF_SLP_SGN);
+        mcSHOW_DRVAPI_MSG(("IfAgc = %d\n", pTunerCtx->m_SigLvScan));
+        /*** Record IfAgc value before LNA on for BestMux selection ***/
+    }  
+    #endif
+    
+    return 0;
+}
+
+extern  ATD_CTX_T*    psAtdeuDemodCtx;
+INT16 OM3869_TunerOP(ITUNER_CTX_T * pTCtx, ITUNEROP_T eOperation, UINT8 SetVal,  VOID * pInOutVal){
+
+    switch(eOperation){
+    case itGetVer:
+        {
+        CHAR ** RetStr = (CHAR **)pInOutVal;
+        *RetStr = OM3869_GetSwVer();
+        }
+        break;
+    case itSetTop:
+	    {
+          SPECIFIC_MEMBER_EU_CTX * pTunerCtx= &(pTCtx->specific_member.eu_ctx);
+          pTunerCtx->m_aucPara[0] = SetVal;
+	    }
+		break;
+		
+    case itSetSawBw:
+		OM3869_SetSawBw(pTCtx,SetVal);
+        break;
+
+	case itTunerRead:
+        {
+          UINT8 addr = SetVal;
+		  UINT8 *outvalue = (UINT8*)pInOutVal;
+		  tmErrorCode_t err;
+		  err =  UserWrittenI2CRead(0,1,&addr,1, outvalue);
+		  //err = tmsysOM3869SReadRegister(0,addr,outvalue);
+          if (err != TM_OK)
+          	{
+             mcSHOW_DBG_MSG(("UserWrittenI2CRead fail\n"));
+		    }
+		  	
+	    }
+		break;
+	case itTunerWrite:
+        {
+
+          UINT8 addr = SetVal;
+		  UINT8 *value = (UINT8*)pInOutVal;
+		  tmErrorCode_t err;
+		  err =  UserWrittenI2CWrite(0,1,&addr,1, value);
+		 // err = tmsysOM3869SWriteRegister(0,addr,value);
+          if (err != TM_OK)
+          	{
+             mcSHOW_DBG_MSG((" UserWrittenI2CWrite fail\n"));
+		    }
+
+	    }
+		break;
+		
+    case itSetLNA:
+    case itGetLNA:
+        break;
+
+    case itGetEqScriptNormal: 
+        *(UINT8**)pInOutVal = pOm3869EqNormal[SetVal];
+        break;
+    case itGetEqScriptWeak: 
+        *(UINT8**)pInOutVal = pOm3869EqWeak[SetVal];
+        break;
+    case itGetEqScriptStrongChroma: 
+        *(UINT8**)pInOutVal = NULL;
+        break;
+
+	case itSetIfMin:
+	    {
+
+          mcSHOW_DBG_MSG(("OM3869 TOP Setting\n"));
+		  UINT8 subSysId = SetVal;
+		  UINT8 *ifMinPtr = (UINT8*)pInOutVal;
+		  UINT8  data;
+		  UINT32 u4Temp;		
+        
+		 mcSHOW_DBG_MSG(("OM3869 V_Sync Setting\n"));
+		  
+         u4Temp = 0x1000025E;
+         IO_WRITE32(cRISC_TVD_BASE, 0x5D8, u4Temp); 
+		 mcSHOW_DBG_MSG(("OM3869 V_Sync TVD Setting\n"));
+		 
+		 data = 0x01;  //b1=0
+		 ATD_SetReg( psAtdeuDemodCtx, 0x9E2, &data, 1);
+		 //V_SYNC  DELAY
+		 data = 0x30;
+		 ATD_SetReg( psAtdeuDemodCtx, 0x9E3, &data, 1);
+		 data = 0x00;
+		 ATD_SetReg( psAtdeuDemodCtx, 0x9E4, &data, 1);
+		 //V_SYNC WIDTH
+		 data = 0x1E;
+		 ATD_SetReg( psAtdeuDemodCtx, 0x9E5, &data, 1);
+		 data = 0x00;
+		 ATD_SetReg( psAtdeuDemodCtx, 0x9E6, &data, 1);
+         mcSHOW_DBG_MSG(("OM3869 V_Sync ATD Setting\n"));
+		 
+		 //data = 0xdf;
+		 //ATD_SetReg( psAtdeuDemodCtx, 0x938, &data, 1);
+		 data = 0x80;
+		 ATD_SetReg( psAtdeuDemodCtx, 0x92c, &data, 1);		 
+		 data = 0x0b;
+		 ATD_SetReg( psAtdeuDemodCtx, 0x95f, &data, 1);
+		 mcSHOW_DBG_MSG(("OM3869 LOW_IF ATD Setting\n"))
+    	 switch(subSysId){
+    	    case MOD_PAL_BG:
+				{
+                  *ifMinPtr = 0x80;
+				 	  
+				  data = 0x80;
+				  ATD_SetReg( psAtdeuDemodCtx, 0x929, &data, 1);
+				  if (( pTCtx->u4RF_Freq/1000) <= 300)
+			      {
+		            data = 0x72;
+			      }
+		          else
+			      {
+    	            data = 0x80; //according to CJ pan's mail
+			      }
+				  ATD_SetReg( psAtdeuDemodCtx, 0x92a, &data, 1);
+					 
+			    }
+			      break;
+    	    case MOD_PAL_I:
+			    {
+                   *ifMinPtr = 0x80;
+				   data = 0x80;
+				   ATD_SetReg( psAtdeuDemodCtx, 0x929, &data, 1);
+				   data = 0x92;
+				   ATD_SetReg( psAtdeuDemodCtx, 0x92a, &data, 1);
+                 
+			    }
+			      break;
+	       case MOD_PAL_DK:	
+	           {	 
+    	          *ifMinPtr = 0x80; //according to CJ PAN mail	
+    	          data = 0x80;
+			      ATD_SetReg( psAtdeuDemodCtx, 0x929, &data, 1);
+			      data = 0x83;
+			      ATD_SetReg( psAtdeuDemodCtx, 0x92a, &data, 1);
+    	       
+	       	   }
+    	        break;
+    	    case MOD_SECAM_L:
+			   {
+                  *ifMinPtr = 0x80;  
+                  data = 0x80;
+			      ATD_SetReg( psAtdeuDemodCtx, 0x929, &data, 1);
+			      data = 0x80;
+			      ATD_SetReg( psAtdeuDemodCtx, 0x92a, &data, 1);
+               }
+             break;
+            case MOD_SECAM_L1:
+			  {
+                 *ifMinPtr = 0x80;  //according to yuan.liu mail
+                 data = 0x88;
+			     ATD_SetReg( psAtdeuDemodCtx, 0x929, &data, 1);
+			     data = 0xaf;
+			     ATD_SetReg( psAtdeuDemodCtx, 0x92a, &data, 1);
+              }
+    		    break;
+    	    default:
+    	        mcSHOW_DBG_MSG(("TOP No change\n"));
+    	        break;
+        }
+
+	    }
+	    break;
+      case itSetSSICond:
+       // OM3869_SetSSICondition(pTCtx, pInOutVal);
+        break;
+    default:
+        return ITUNER_NOT_SUPPORTED;
+    }
+    return ITUNER_OK;
+}

@@ -95,6 +95,7 @@ struct usb_hcd {
 #define HCD_FLAG_SAW_IRQ	0x00000002
 
 	unsigned		rh_registered:1;/* is root hub registered? */
+	unsigned		msix_enabled:1;	/* driver has MSI-X enabled? */
 
 	/* The next flag is a stopgap, to be removed when all the HCDs
 	 * support the new root-hub polling mechanism. */
@@ -450,6 +451,10 @@ extern void usb_ep0_reinit(struct usb_device *);
 
 /*-------------------------------------------------------------------------*/
 
+/* class requests from USB 3.0 hub spec, table 10-5 */
+#define SetHubDepth		(0x3000 | HUB_SET_DEPTH)
+#define GetPortErrorCount	(0x8000 | HUB_GET_PORT_ERR_COUNT)
+
 /*
  * Generic bandwidth allocation constants/support
  */
@@ -593,13 +598,6 @@ static inline void usbmon_urb_complete(struct usb_bus *bus, struct urb *urb,
 		int status) {}
 
 #endif /* CONFIG_USB_MON || CONFIG_USB_MON_MODULE */
-
-/*-------------------------------------------------------------------------*/
-
-/* hub.h ... DeviceRemovable in 2.4.2-ac11, gone in 2.4.10 */
-/* bleech -- resurfaced in 2.4.11 or 2.4.12 */
-#define bitmap	DeviceRemovable
-
 
 /*-------------------------------------------------------------------------*/
 

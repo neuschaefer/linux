@@ -317,10 +317,8 @@ void usb_hcd_pci_shutdown(struct pci_dev *dev)
 	if (!hcd)
 		return;
 
-	if (hcd->driver->shutdown) {
+	if (hcd->driver->shutdown)
 		hcd->driver->shutdown(hcd);
-		pci_disable_device(dev);
-	}
 }
 EXPORT_SYMBOL_GPL(usb_hcd_pci_shutdown);
 
@@ -365,7 +363,12 @@ static int hcd_pci_suspend(struct device *dev)
 			return retval;
 	}
 
-	synchronize_irq(pci_dev->irq);
+	/* If MSI-X is enabled, the driver will have synchronized all vectors
+	 * in pci_suspend(). If MSI or legacy PCI is enabled, that will be
+	 * synchronized here.
+	 */
+	if (!hcd->msix_enabled)
+		synchronize_irq(pci_dev->irq);
 
 	/* Downstream ports from this root hub should already be quiesced, so
 	 * there will be no DMA activity.  Now we can shut down the upstream

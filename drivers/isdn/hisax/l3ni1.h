@@ -1,4 +1,4 @@
-/* $Id: l3ni1.h,v 2.3.6.2 2001/09/23 22:24:50 kai Exp $
+/* $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/isdn/hisax/l3ni1.h#1 $
  *
  * NI1 D-channel protocol
  *

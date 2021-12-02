@@ -1473,7 +1473,7 @@ static int nsp32_proc_info(struct Scsi_Host *host, char *buffer, char **start,
 	base = host->io_port;
 
 	SPRINTF("NinjaSCSI-32 status\n\n");
-	SPRINTF("Driver version:        %s, $Revision: 1.33 $\n", nsp32_release_version);
+	SPRINTF("Driver version:        %s, $Revision: #1 $\n", nsp32_release_version);
 	SPRINTF("SCSI host No.:         %d\n",		hostno);
 	SPRINTF("IRQ:                   %d\n",		host->irq);
 	SPRINTF("IO:                    0x%lx-0x%lx\n", host->io_port, host->io_port + host->n_io_port - 1);

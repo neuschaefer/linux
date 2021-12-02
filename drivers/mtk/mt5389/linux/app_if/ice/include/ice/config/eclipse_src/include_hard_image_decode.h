@@ -1,0 +1,3 @@
+#ifndef INCLUDE_HARD_IMAGE_DECODE
+    #define INCLUDE_HARD_IMAGE_DECODE 1
+#endif

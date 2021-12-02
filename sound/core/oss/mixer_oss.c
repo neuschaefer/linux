@@ -303,11 +303,31 @@ static int snd_mixer_oss_ioctl1(struct snd_mixer_oss_file *fmixer, unsigned int 
 	void __user *argp = (void __user *)arg;
 	int __user *p = argp;
 	int tmp;
-
+	static int iMtkVol=0;
 	if (snd_BUG_ON(!fmixer))
 		return -ENXIO;
 	if (((cmd >> 8) & 0xff) == 'M') {
 		switch (cmd) {
+		case SOUND_MIXER_WRITE_MTK_VOL:
+            // Lawrance.liu@mediatek.com (Aug 23, 2012)
+            // For volume control.
+        	{
+                extern int set_cur_ctl_value_direct(unsigned int, int);
+        		if (get_user(tmp, p))
+    	    		return -EFAULT;
+
+                iMtkVol = tmp;
+                // Currently, we only support controlling /dev/dsp. (not support /dev/dsp1...)
+                if ( set_cur_ctl_value_direct(0, iMtkVol) < 0 )
+                {
+                    printk("SOUND_MIXER_WRITE_MTK_VOL failed !\n");
+        		    return -1;
+        	    }
+        	}
+		    return 0;
+		case SOUND_MIXER_READ_MTK_VOL:
+		        return put_user(iMtkVol, p);
+		        
 		case SOUND_MIXER_INFO:
 			return snd_mixer_oss_info(fmixer, argp);
 		case SOUND_OLD_MIXER_INFO:

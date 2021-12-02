@@ -38,6 +38,19 @@
 #include <asm/localtimer.h>
 #include <asm/smp_plat.h>
 
+#ifndef CONFIG_PM
+void platform_cpu_die(unsigned int cpu)
+{
+}
+int platform_cpu_kill(unsigned int cpu)
+{
+	return 1;
+}
+int platform_cpu_disable(unsigned int cpu)
+{
+	return 0;
+}
+#endif
 /*
  * as from 2.5, kernels no longer have an init_tasks structure
  * so we need some other way of telling a new secondary core
@@ -148,7 +161,7 @@ int __cpuinit __cpu_up(unsigned int cpu)
 	pgd_free(&init_mm, pgd);
 
 	if (ret) {
-		printk(KERN_CRIT "CPU%u: processor failed to boot\n", cpu);
+		printk(KERN_CRIT "CPU%u: processor failed to boot(ret=%d)\n", cpu, ret);
 
 		/*
 		 * FIXME: We need to clean up the new idle thread. --rmk
@@ -405,7 +418,10 @@ static void ipi_timer(void)
 {
 	struct clock_event_device *evt = &__get_cpu_var(percpu_clockevent);
 	irq_enter();
-	evt->event_handler(evt);
+    if (evt->event_handler)
+    {
+        evt->event_handler(evt);
+    }
 	irq_exit();
 }
 
@@ -429,7 +445,11 @@ static void smp_timer_broadcast(const struct cpumask *mask)
 {
 	send_ipi_message(mask, IPI_TIMER);
 }
+#else
+#define smp_timer_broadcast	NULL
+#endif
 
+#ifndef CONFIG_LOCAL_TIMERS
 static void broadcast_timer_set_mode(enum clock_event_mode mode,
 	struct clock_event_device *evt)
 {
@@ -444,7 +464,6 @@ static void local_timer_setup(struct clock_event_device *evt)
 	evt->rating	= 400;
 	evt->mult	= 1;
 	evt->set_mode	= broadcast_timer_set_mode;
-	evt->broadcast	= smp_timer_broadcast;
 
 	clockevents_register_device(evt);
 }
@@ -456,6 +475,7 @@ void __cpuinit percpu_timer_setup(void)
 	struct clock_event_device *evt = &per_cpu(percpu_clockevent, cpu);
 
 	evt->cpumask = cpumask_of(cpu);
+	evt->broadcast = smp_timer_broadcast;
 
 	local_timer_setup(evt);
 }
@@ -467,10 +487,13 @@ static DEFINE_SPINLOCK(stop_lock);
  */
 static void ipi_cpu_stop(unsigned int cpu)
 {
-	spin_lock(&stop_lock);
-	printk(KERN_CRIT "CPU%u: stopping\n", cpu);
-	dump_stack();
-	spin_unlock(&stop_lock);
+	if (system_state == SYSTEM_BOOTING ||
+	    system_state == SYSTEM_RUNNING) {
+		spin_lock(&stop_lock);
+		printk(KERN_CRIT "CPU%u: stopping\n", cpu);
+		dump_stack();
+		spin_unlock(&stop_lock);
+	}
 
 	set_cpu_online(cpu, false);
 

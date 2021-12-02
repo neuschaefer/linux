@@ -1,4 +1,4 @@
-/* $Id: isdn_common.c,v 1.1.2.3 2004/02/10 01:07:13 keil Exp $
+/* $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/isdn/i4l/isdn_common.c#1 $
  *
  * Linux ISDN subsystem, common used functions (linklevel).
  *
@@ -42,7 +42,7 @@ MODULE_LICENSE("GPL");
 
 isdn_dev *dev;
 
-static char *isdn_revision = "$Revision: 1.1.2.3 $";
+static char *isdn_revision = "$Revision: #1 $";
 
 extern char *isdn_net_revision;
 extern char *isdn_tty_revision;

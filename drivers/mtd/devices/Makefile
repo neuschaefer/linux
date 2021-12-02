@@ -7,6 +7,7 @@ obj-$(CONFIG_MTD_DOC2001)	+= doc2001.o
 obj-$(CONFIG_MTD_DOC2001PLUS)	+= doc2001plus.o
 obj-$(CONFIG_MTD_DOCPROBE)	+= docprobe.o
 obj-$(CONFIG_MTD_DOCECC)	+= docecc.o
+obj-$(CONFIG_MTD_MT53XX_NOR)+= mt53xx_nor.o
 obj-$(CONFIG_MTD_SLRAM)		+= slram.o
 obj-$(CONFIG_MTD_PHRAM)		+= phram.o
 obj-$(CONFIG_MTD_PMC551)	+= pmc551.o

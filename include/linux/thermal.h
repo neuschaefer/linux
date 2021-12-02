@@ -1,5 +1,5 @@
 /*
- *  thermal.h  ($Revision: 0 $)
+ *  thermal.h  ($Revision: #1 $)
  *
  *  Copyright (C) 2008  Intel Corp
  *  Copyright (C) 2008  Zhang Rui <rui.zhang@intel.com>

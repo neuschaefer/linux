@@ -1,4 +1,4 @@
-/* $Id: cosa.h,v 1.6 1999/01/06 14:02:44 kas Exp $ */
+/* $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/net/wan/cosa.h#1 $ */
 
 /*
  *  Copyright (C) 1995-1997  Jan "Yenya" Kasprzak <kas@fi.muni.cz>

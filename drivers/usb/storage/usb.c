@@ -78,7 +78,7 @@ MODULE_AUTHOR("Matthew Dharm <mdharm-usb@one-eyed-alien.net>");
 MODULE_DESCRIPTION("USB Mass Storage driver for Linux");
 MODULE_LICENSE("GPL");
 
-static unsigned int delay_use = 1;
+static unsigned int delay_use = 2;
 module_param(delay_use, uint, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(delay_use, "seconds to delay before using a new device");
 
@@ -265,6 +265,10 @@ static int usb_stor_control_thread(void * __us)
 {
 	struct us_data *us = (struct us_data *)__us;
 	struct Scsi_Host *host = us_to_host(us);
+	struct sched_param sp;
+
+	sp.sched_priority = 99;
+	sched_setscheduler(current, SCHED_RR, &sp);
 
 	for(;;) {
 		US_DEBUGP("*** thread sleeping.\n");

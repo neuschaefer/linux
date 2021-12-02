@@ -802,7 +802,8 @@ void elv_put_request(struct request_queue *q, struct request *rq)
 {
 	struct elevator_queue *e = q->elevator;
 
-	if (e->ops->elevator_put_req_fn)
+	if (!test_bit(QUEUE_FLAG_DEAD,&q->queue_flags)&&e&&
+		e->ops->elevator_put_req_fn)
 		e->ops->elevator_put_req_fn(rq);
 }
 
@@ -843,7 +844,9 @@ void elv_completed_request(struct request_queue *q, struct request *rq)
 	 */
 	if (blk_account_rq(rq)) {
 		q->in_flight[rq_is_sync(rq)]--;
-		if (blk_sorted_rq(rq) && e->ops->elevator_completed_req_fn)
+	if (blk_sorted_rq(rq) &&(rq->cmd_flags&REQ_SORTED)&& e->ops&&
+			!test_bit(QUEUE_FLAG_DEAD,&q->queue_flags)&&e->ops->elevator_completed_req_fn)
+
 			e->ops->elevator_completed_req_fn(q, rq);
 	}
 

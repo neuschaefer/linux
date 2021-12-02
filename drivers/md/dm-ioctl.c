@@ -18,6 +18,7 @@
 #include <linux/compat.h>
 
 #include <asm/uaccess.h>
+#include <linux/nfsb.h>
 
 #define DM_MSG_PREFIX "ioctl"
 #define DM_DRIVER_EMAIL "dm-devel@redhat.com"
@@ -635,7 +636,7 @@ static int dev_create(struct dm_ioctl *param, size_t param_size)
 {
 	int r, m = DM_ANY_MINOR;
 	struct mapped_device *md;
-
+    
 	r = check_name(param->name);
 	if (r)
 		return r;
@@ -1112,10 +1113,55 @@ static int populate_table(struct dm_table *table,
 			return r;
 		}
 
-		r = dm_table_add_target(table, spec->target_type,
-					(sector_t) spec->sector_start,
-					(sector_t) spec->length,
-					target_params);
+#if defined(CONFIG_DM_NFSB)
+		if ((strncmp(spec->target_type, "verity", sizeof("verity")) == 0) && (spec->length == 0))
+		{
+			int argc;
+			char **argv;
+			ssize_t fs_offset, fs_size;
+			struct nfsb_header non_rootfs_hdr;
+			
+			r = dm_split_args(&argc, &argv, target_params);
+			if (r) {
+				DMWARN("couldn't split parameters (insufficient memory)");
+				return r;
+			}
+			
+			if (dm_check_nonroot_nfsb(&non_rootfs_hdr, argv[0]) == 0)
+			{
+				BUG();
+			}
+			
+			fs_offset = to_sector(nfsb_fs_offset(&non_rootfs_hdr));
+			fs_size = to_sector(nfsb_fs_size(&non_rootfs_hdr));
+
+			spec->sector_start = (ssize_t)0;
+			spec->length = fs_size;
+			
+			/* Add the NFSB verity target to the table. */
+			target_params = kmalloc(256, GFP_KERNEL);
+			snprintf(target_params, 256, "%s %u %s %u %u %s %u %s",
+					 argv[0], fs_offset, argv[0], fs_offset + fs_size, 
+					 nfsb_hash_depth(&non_rootfs_hdr), nfsb_hash_algo(&non_rootfs_hdr), 
+					 nfsb_hash_sectors(&non_rootfs_hdr), nfsb_verity_hash(&non_rootfs_hdr));
+
+			r = dm_table_add_target(table, spec->target_type,
+						(sector_t) spec->sector_start,
+						(sector_t) spec->length,
+						target_params);
+			
+			kfree(argv);
+			kfree(target_params);
+		}
+		else
+#endif
+		{
+			r = dm_table_add_target(table, spec->target_type,
+						(sector_t) spec->sector_start,
+						(sector_t) spec->length,
+						target_params);
+		}
+
 		if (r) {
 			DMWARN("error adding target to table");
 			return r;
@@ -1124,26 +1170,7 @@ static int populate_table(struct dm_table *table,
 		next = spec->next;
 	}
 
-	r = dm_table_set_type(table);
-	if (r) {
-		DMWARN("unable to set table type");
-		return r;
-	}
-
 	return dm_table_complete(table);
-}
-
-static int table_prealloc_integrity(struct dm_table *t,
-				    struct mapped_device *md)
-{
-	struct list_head *devices = dm_table_get_devices(t);
-	struct dm_dev_internal *dd;
-
-	list_for_each_entry(dd, devices, list)
-		if (bdev_get_integrity(dd->dm_dev.bdev))
-			return blk_integrity_register(dm_disk(md), NULL);
-
-	return 0;
 }
 
 static int table_load(struct dm_ioctl *param, size_t param_size)
@@ -1152,7 +1179,7 @@ static int table_load(struct dm_ioctl *param, size_t param_size)
 	struct hash_cell *hc;
 	struct dm_table *t;
 	struct mapped_device *md;
-
+    
 	md = find_device(param);
 	if (!md)
 		return -ENXIO;
@@ -1163,21 +1190,6 @@ static int table_load(struct dm_ioctl *param, size_t param_size)
 
 	r = populate_table(t, param, param_size);
 	if (r) {
-		dm_table_destroy(t);
-		goto out;
-	}
-
-	r = table_prealloc_integrity(t, md);
-	if (r) {
-		DMERR("%s: could not register integrity profile.",
-		      dm_device_name(md));
-		dm_table_destroy(t);
-		goto out;
-	}
-
-	r = dm_table_alloc_md_mempools(t);
-	if (r) {
-		DMWARN("unable to allocate mempools for this table");
 		dm_table_destroy(t);
 		goto out;
 	}
@@ -1611,7 +1623,8 @@ static const struct file_operations _ctl_fops = {
 };
 
 static struct miscdevice _dm_misc = {
-	.minor 		= MISC_DYNAMIC_MINOR,
+	//.minor 		= MISC_DYNAMIC_MINOR,
+	.minor 		= MAPPER_CTRL_MINOR,
 	.name  		= DM_NAME,
 	.nodename	= "mapper/control",
 	.fops  		= &_ctl_fops

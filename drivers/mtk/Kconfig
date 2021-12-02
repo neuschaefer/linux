@@ -1,0 +1,24 @@
+menu "MediaTek MT53XX Series Support"
+
+config MT5396_DRIVERS
+        tristate "MT5396 drivers support"
+        default n
+        depends on ARCH_MT5396
+        help
+          Include all the mt5396 drivers.
+
+config MT5368_DRIVERS
+        tristate "MT5368 drivers support"
+        default n
+        depends on ARCH_MT5368
+        help
+          Include all the mt5368 drivers.
+
+config MT5389_DRIVERS
+        tristate "MT5389 drivers support"
+        default n
+        depends on ARCH_MT5389
+        help
+          Include all the mt5389 drivers.
+endmenu
+

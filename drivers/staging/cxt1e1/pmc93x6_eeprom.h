@@ -1,5 +1,5 @@
 /*
- * $Id: pmc93x6_eeprom.h,v 1.1 2005/09/28 00:10:08 rickd PMCC4_3_1B $
+ * $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/staging/cxt1e1/pmc93x6_eeprom.h#1 $
  */
 
 #ifndef _INC_PMC93X6_EEPROM_H_

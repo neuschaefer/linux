@@ -24,6 +24,8 @@
 /* leave room for NETLINK_DM (DM Events) */
 #define NETLINK_SCSITRANSPORT	18	/* SCSI Transports */
 #define NETLINK_ECRYPTFS	19
+#define NETLINK_TOI_USERUI	20	/* TuxOnIce's userui */
+#define NETLINK_TOI_USM		21	/* Userspace storage manager */
 
 #define MAX_LINKS 32		
 

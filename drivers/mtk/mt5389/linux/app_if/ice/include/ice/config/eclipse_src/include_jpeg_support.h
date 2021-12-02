@@ -1,0 +1,3 @@
+#ifndef INCLUDE_JPEG_SUPPORT
+    #define INCLUDE_JPEG_SUPPORT 1
+#endif

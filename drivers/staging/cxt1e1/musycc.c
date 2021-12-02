@@ -1,5 +1,5 @@
 /*
- * $Id: musycc.c,v 2.1 2007/08/15 23:32:17 rickd PMCC4_3_1B $
+ * $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/staging/cxt1e1/musycc.c#1 $
  */
 
 unsigned int max_intcnt = 0;
@@ -25,9 +25,9 @@ unsigned int max_bh = 0;
  * One Stop Systems, Inc.  Escondido, California  U.S.A.
  *-----------------------------------------------------------------------------
  * RCS info:
- * RCS revision: $Revision: 2.1 $
- * Last changed on $Date: 2007/08/15 23:32:17 $
- * Changed by $Author: rickd $
+ * RCS revision: $Revision: #1 $
+ * Last changed on $Date: 2012/04/27 $
+ * Changed by $Author: dtvbm11 $
  *-----------------------------------------------------------------------------
  * $Log: musycc.c,v $
  * Revision 2.1  2007/08/15 23:32:17  rickd
@@ -69,7 +69,7 @@ unsigned int max_bh = 0;
  */
 
 char        SBEid_pmcc4_musyccc[] =
-"@(#)musycc.c - $Revision: 2.1 $      (c) Copyright 2004-2006 SBE, Inc.";
+"@(#)musycc.c - $Revision: #1 $      (c) Copyright 2004-2006 SBE, Inc.";
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 

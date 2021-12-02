@@ -34,6 +34,8 @@
 
 
 LIST_HEAD(super_blocks);
+EXPORT_SYMBOL_GPL(super_blocks);
+
 DEFINE_SPINLOCK(sb_lock);
 
 /**

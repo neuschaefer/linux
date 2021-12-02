@@ -1,0 +1,3 @@
+#ifndef INCLUDE_STANDBY_SEARCH
+    #define INCLUDE_STANDBY_SEARCH 1
+#endif

@@ -1,5 +1,5 @@
 /*
- *  video.c - ACPI Video Driver ($Revision:$)
+ *  video.c - ACPI Video Driver ($Revision: #1 $)
  *
  *  Copyright (C) 2004 Luming Yu <luming.yu@intel.com>
  *  Copyright (C) 2004 Bruno Ducrot <ducrot@poupinou.org>

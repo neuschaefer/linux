@@ -1,0 +1,1142 @@
+/*----------------------------------------------------------------------------*
+ * Copyright Statement:                                                       *
+ *                                                                            *
+ *   This software/firmware and related documentation ("MediaTek Software")   *
+ * are protected under international and related jurisdictions'copyright laws *
+ * as unpublished works. The information contained herein is confidential and *
+ * proprietary to MediaTek Inc. Without the prior written permission of       *
+ * MediaTek Inc., any reproduction, modification, use or disclosure of        *
+ * MediaTek Software, and information contained herein, in whole or in part,  *
+ * shall be strictly prohibited.                                              *
+ * MediaTek Inc. Copyright (C) 2010. All rights reserved.                     *
+ *                                                                            *
+ *   BY OPENING THIS FILE, RECEIVER HEREBY UNEQUIVOCALLY ACKNOWLEDGES AND     *
+ * AGREES TO THE FOLLOWING:                                                   *
+ *                                                                            *
+ *   1)Any and all intellectual property rights (including without            *
+ * limitation, patent, copyright, and trade secrets) in and to this           *
+ * Software/firmware and related documentation ("MediaTek Software") shall    *
+ * remain the exclusive property of MediaTek Inc. Any and all intellectual    *
+ * property rights (including without limitation, patent, copyright, and      *
+ * trade secrets) in and to any modifications and derivatives to MediaTek     *
+ * Software, whoever made, shall also remain the exclusive property of        *
+ * MediaTek Inc.  Nothing herein shall be construed as any transfer of any    *
+ * title to any intellectual property right in MediaTek Software to Receiver. *
+ *                                                                            *
+ *   2)This MediaTek Software Receiver received from MediaTek Inc. and/or its *
+ * representatives is provided to Receiver on an "AS IS" basis only.          *
+ * MediaTek Inc. expressly disclaims all warranties, expressed or implied,    *
+ * including but not limited to any implied warranties of merchantability,    *
+ * non-infringement and fitness for a particular purpose and any warranties   *
+ * arising out of course of performance, course of dealing or usage of trade. *
+ * MediaTek Inc. does not provide any warranty whatsoever with respect to the *
+ * software of any third party which may be used by, incorporated in, or      *
+ * supplied with the MediaTek Software, and Receiver agrees to look only to   *
+ * such third parties for any warranty claim relating thereto.  Receiver      *
+ * expressly acknowledges that it is Receiver's sole responsibility to obtain *
+ * from any third party all proper licenses contained in or delivered with    *
+ * MediaTek Software.  MediaTek is not responsible for any MediaTek Software  *
+ * releases made to Receiver's specifications or to conform to a particular   *
+ * standard or open forum.                                                    *
+ *                                                                            *
+ *   3)Receiver further acknowledge that Receiver may, either presently       *
+ * and/or in the future, instruct MediaTek Inc. to assist it in the           *
+ * development and the implementation, in accordance with Receiver's designs, *
+ * of certain softwares relating to Receiver's product(s) (the "Services").   *
+ * Except as may be otherwise agreed to in writing, no warranties of any      *
+ * kind, whether express or implied, are given by MediaTek Inc. with respect  *
+ * to the Services provided, and the Services are provided on an "AS IS"      *
+ * basis. Receiver further acknowledges that the Services may contain errors  *
+ * that testing is important and it is solely responsible for fully testing   *
+ * the Services and/or derivatives thereof before they are used, sublicensed  *
+ * or distributed. Should there be any third party action brought against     *
+ * MediaTek Inc. arising out of or relating to the Services, Receiver agree   *
+ * to fully indemnify and hold MediaTek Inc. harmless.  If the parties        *
+ * mutually agree to enter into or continue a business relationship or other  *
+ * arrangement, the terms and conditions set forth herein shall remain        *
+ * effective and, unless explicitly stated otherwise, shall prevail in the    *
+ * event of a conflict in the terms in any agreements entered into between    *
+ * the parties.                                                               *
+ *                                                                            *
+ *   4)Receiver's sole and exclusive remedy and MediaTek Inc.'s entire and    *
+ * cumulative liability with respect to MediaTek Software released hereunder  *
+ * will be, at MediaTek Inc.'s sole discretion, to replace or revise the      *
+ * MediaTek Software at issue.                                                *
+ *                                                                            *
+ *   5)The transaction contemplated hereunder shall be construed in           *
+ * accordance with the laws of Singapore, excluding its conflict of laws      *
+ * principles.  Any disputes, controversies or claims arising thereof and     *
+ * related thereto shall be settled via arbitration in Singapore, under the   *
+ * then current rules of the International Chamber of Commerce (ICC).  The    *
+ * arbitration shall be conducted in English. The awards of the arbitration   *
+ * shall be final and binding upon both parties and shall be entered and      *
+ * enforceable in any court of competent jurisdiction.                        *
+ *---------------------------------------------------------------------------*/
+/*-----------------------------------------------------------------------------
+ *
+ * $Author: dtvbm11 $
+ * $Date: 2012/04/27 $
+ * $RCSfile: piana_TDAU4XB02A.c,v $
+ * $Revision: #1 $
+ *
+ *---------------------------------------------------------------------------*/
+
+//-----------------------------------------------------------------------------
+// Include files
+//-----------------------------------------------------------------------------
+//#include "PI_ATuner.h"
+#include "PI_Def.h"
+#include "pi_anana_if.h"//For Driver Auto Test log macro define
+#include "piana_tdau4xb02a.h"
+//#include "tvsys_info.h"
+#include "pd_anana_glue.h"
+#include "tuner_interface_if.h"
+//#include "ctrl_bus.h"
+
+
+//-----------------------------------------------------------------------------
+// Configurations
+//-----------------------------------------------------------------------------
+
+//-----------------------------------------------------------------------------
+// Constant definitions
+//-----------------------------------------------------------------------------
+
+/*************************************************************
+  These values are according to the tuner module spec. On the
+  demo board, we uses 39K & 10K Ohm resisters to divide the AFT
+  output voltage and use 4/5 of original AFT output voltage range to
+  fit into servo ADC voltage range (0 ~ 2.8V).
+
+  So the AFT output is re-mapping from 0 ~ 3.5V -> 0 ~ 2.8V,
+  that means 0 ~ 3.5V -> 0 ~ 0xff (Servo ADC status).
+*************************************************************/
+
+#define TDAU4XB02A_AFT_CENTER_VOL_HIGH      0xC8//0xB4 -64kHz
+#define TDAU4XB02A_AFT_CENTER_VOL_LOW      0x6C//0x7C  64KHz
+
+#define TDAU4XB02A_AFT_CENTER_VOL_FINE_TUNE_HIGH_40KHZ 0xA4//-32KHz 
+#define TDAU4XB02A_AFT_CENTER_VOL_FINE_TUNE_LOW_40KHZ  0x80//32KHz 
+
+#define TDAU4XB02A_AFT_CENTER_VOL         0x90//0x8C//0x7C
+
+#define TDAU4XB02A_AFT_CENTER_VOL_HIGH_MONI    0xD8//  0xC6//75KHz// 0xFE       // 3.5V  ray modified
+#define TDAU4XB02A_AFT_CENTER_VOL_LOW_MONI     0x58//  0x68// 0x50        // 1.5V  ray modified
+
+/***********************************************************************/
+//#define cANA_TUNER_IF_FREQ      45750
+//#define cANA_TUNER_LO_STEP      62500
+
+//-----------------------------------------------------------------------------
+// Macro definitions
+//-----------------------------------------------------------------------------
+
+//-----------------------------------------------------------------------------
+// Static variables
+//-----------------------------------------------------------------------------
+
+//-----------------------------------------------------------------------------
+// global variables
+//-----------------------------------------------------------------------------
+static UINT32 PreLockFreq;
+//-----------------------------------------------------------------------------
+// Imported variables
+//-----------------------------------------------------------------------------
+
+//-----------------------------------------------------------------------------
+// Imported functions
+//-----------------------------------------------------------------------------
+//todo: pdwnc module should export _if.h
+EXTERN UINT32 PDWNC_ReadServoADCChannelValue(UINT32 u4Channel);
+//todo: pi_tuner.h
+//#ifndef PLUGGABLE_DEMOD_DESIGN
+//EXTERN INT16 Tuner_SetFreq(ITUNER_CTX_T *pTCtx,PARAM_SETFREQ_T* param);
+//EXTERN BOOL Tuner_GetStatus(ITUNER_CTX_T *pTCtx);
+//EXTERN VOID *GetUSTunerCtx(VOID);
+//#endif
+//todo: PD_ATUNER.h
+EXTERN  VOID    DigTunerBypassI2C(BOOL bSwitchOn);
+//VOID *GetDigiTunerCtx(VOID);
+EXTERN BOOL fgEnableATP;//Flag to check whether show  Driver ATP Auto Test log ,define in pd_anana_glue.c line 872
+//-----------------------------------------------------------------------------
+// Static functions
+//-----------------------------------------------------------------------------
+/*
+ *  ReadServoAD funtion
+ *  Get Servo AD value
+ *  @param  void 
+ *  @retval   range: 0x00-0xFF.
+ */
+static UINT32 ReadServoAD(VOID)
+{
+UINT32 u4Value;
+    u4Value = PDWNC_ReadServoADCChannelValue(AFT_AD_NUM);    
+    #if defined(CC_MT5360)  || defined(CC_MT5387)
+    // 6 bits, return bit5-0
+    u4Value = u4Value << 2;
+    if (u4Value >= 0xFC)
+    	u4Value = 0xFF;
+    #endif
+    return u4Value;
+}
+
+/*
+ *  bGetSCurveVol funtion
+ *  Get the voltage of AFT S-curve
+ *  @param  void 
+ *  @retval   the voltage of AFT S-curve (0~255  =>  0V~3.5V).
+ */
+static UINT8 bGetSCurveVol(void)
+{
+UINT8 i;
+UINT8 bCurveStatus, bCurveOld;
+INT8 bCurveDiff;
+
+    mcDELAY_MS(10);                         //change for one channel lost;0910
+    //bCurveOld = PDWNC_ReadServoADCChannelValue(AFT_AD_NUM);  //ServoADCNum for Tuner S-curve  :ADC IN3
+    bCurveOld = ReadServoAD();
+    
+    for(i=0; i<20;i++)
+    {
+        mcDELAY_MS(10);
+        //bCurveStatus = PDWNC_ReadServoADCChannelValue(AFT_AD_NUM);
+        bCurveStatus = ReadServoAD();
+        bCurveDiff = (INT8)(bCurveStatus - bCurveOld);
+        //LogSB("PDWNC_ReadServoADCChannelValue",bCurveStatus);
+        //LogB(bCurveOld);
+        if ((bCurveDiff > -5)&&(bCurveDiff < 5))
+        {
+            mcSHOW_DBG_MSG3(("bCurveStatus = %02X (%d)\n", bCurveStatus, bCurveStatus));
+            return bCurveStatus;
+        }
+        bCurveOld = bCurveStatus;
+    }
+
+  return 0xFF;
+}
+
+//-----------------------------------------------------------------------------
+// public functions
+//-----------------------------------------------------------------------------
+
+//----------------------------------------------------------------------------- 
+/*
+ *  TDAU4XB02A_AnaTunerInit
+ *  Tuner Driver Initial FUnction
+ *  @param  psAtvPiCtx  a type pointer use to point to struct ATV_PI_CTX_T.
+ *  @param  IFDEMOD_I2c_Addr	a I2C address of DEMOD.
+ *  @param  RF_I2c_Addr  a I2C address of RF Tuner.
+ *  @retval   TRUE : Success.
+ */
+//-----------------------------------------------------------------------------
+BOOL TDAU4XB02A_AnaTunerInit(ATV_PI_CTX_T *psAtvPiCtx, UINT8 IFDEMOD_I2c_Addr, UINT8 RF_I2c_Addr)
+{
+//ATV_PI_CTX_T *pTDAU4XB02A_AnaTuner = NULL;
+ATV_PI_CTX_T *pTDAU4XB02A_AnaTuner = psAtvPiCtx;
+
+//    pTDAU4XB02A_AnaTuner = (ATV_PI_CTX_T *) mcALLOC_MEM(sizeof(ATV_PI_CTX_T));
+    if (pTDAU4XB02A_AnaTuner == NULL)
+        return FALSE;
+//    pTDAU4XB02A_AnaTuner->u1IF_I2cAddr = IFDEMOD_I2c_Addr;
+//    pTDAU4XB02A_AnaTuner->u1RF_I2cAddr = RF_I2c_Addr;
+//    pTDAU4XB02A_AnaTuner->u1IF_I2cAddr = TUNER_ONE_ADDR_IF;
+//#if (fcNEW_ANA_PIPD_ARCH == 2)
+//#ifndef PLUGGABLE_DEMOD_DESIGN
+  //  pTDAU4XB02A_AnaTuner->pDigiTunerCtx = GetUSTunerCtx();
+//#else
+  //  pTDAU4XB02A_AnaTuner->pDigiTunerCtx = ITunerGetCtx();
+//#endif
+   // pTDAU4XB02A_AnaTuner->pDigiTunerCtx = GetDigiTunerCtx();
+//#endif
+    pTDAU4XB02A_AnaTuner->u1RF_I2cAddr = TUNER_ONE_ADDR_TUNER;
+    pTDAU4XB02A_AnaTuner->u2IF_Freq = TDAU4XB02A_ANA_PIC_IF;
+    pTDAU4XB02A_AnaTuner->u2LO_Step = TDAU4XB02A_ANA_FREQ_STEP;
+//    pTDAU4XB02A_AnaTuner->u4Frequency = TDAU4XB02A_ANA_INIT_FREQ;
+    pTDAU4XB02A_AnaTuner->u1DEMOD_state = TDAU4XB02A_ANA_UNLOCK;
+    pTDAU4XB02A_AnaTuner->u1AnaMode = MOD_ANA_CABLE;
+//    pTDAU4XB02A_AnaTuner->aSW_Ver_HW_Ver = TDAU4XB02A_ANA_TUNER_VER;
+
+//    *ppsAtvPiCtx = pTDAU4XB02A_AnaTuner;
+    return TRUE;
+}
+
+//----------------------------------------------------------------------------- 
+/*
+ *  TDAU4XB02A_AnaTunerClose
+ *  Tuner driver close FUnction
+ *  @param  psAtvPiCtx  a type pointer use to point to struct ATV_PI_CTX_T.
+ *  @retval   void
+ */
+//-----------------------------------------------------------------------------
+void TDAU4XB02A_AnaTunerClose(ATV_PI_CTX_T *psAtvPiCtx)
+{
+//    mcFREE_MEM(psAtvPiCtx);
+}
+
+//----------------------------------------------------------------------------- 
+/*
+ *  TDAU4XB02A_AnaTunerSetFreq
+ *  Set the frequency into tuner part.
+ *  @param  psAtvPiCtx  	a type pointer use to point to struct ATV_PI_CTX_T.
+ *  @param  wFreqInKHz	aFrequency value in KHz.
+ *  @param  u1AnaMode	Cable/Air Mode.
+ *  @retval   TRUE : I2C programming successful.
+ *  @retval   FALSE : FALSE => I2C programming fail 
+ */
+//-----------------------------------------------------------------------------
+BOOL  TDAU4XB02A_AnaTunerSetFreq(ATV_PI_CTX_T *psAtvPiCtx,PARAM_SETFREQ_T * param)
+{
+BOOL fgRetSts = TRUE;
+ATV_PI_CTX_T *pTDAU4XB02A_AnaTuner = psAtvPiCtx;
+
+    //if ((wFreqInKHz < 55000 )
+     //|| (wFreqInKHz > 863000 ))
+      // return (FALSE);
+
+   // mcSHOW_DBG_MSG(("Ray TDAU4XB02A_AnaTunerSetFreq\n"));
+    pTDAU4XB02A_AnaTuner->u1AnaMode =param->Modulation;
+    pTDAU4XB02A_AnaTuner->u4Freq =param->Freq;
+    //param->Freq+=1750;//Analog mode 45.75MHz
+
+    if (ITuner_SetFreq(ITunerGetCtx(),param) != 0)
+ {
+     fgRetSts = FALSE;
+ }
+    else//retry
+ {
+  ITuner_OP(ITunerGetCtx(),itGetStatus,0,&fgRetSts);
+  if(!fgRetSts){
+    if(ITuner_SetFreq(ITunerGetCtx(),param) != 0){
+         fgRetSts = FALSE;
+      }
+  }
+  }
+  return fgRetSts;
+}
+
+
+//----------------------------------------------------------------------------- 
+/*
+ *  TDAU4XB02A_GetAnaTunerVer
+ *  Get Tuner Version.
+ *  @param  psAtvPiCtx  	a type pointer use to point to struct ATV_PI_CTX_T.
+ *  @retval   TDAU4XB02A_ANA_TUNER_VER.
+ */
+//-----------------------------------------------------------------------------
+#if 0
+char *TDAU4XB02A_GetAnaTunerVer(ATV_PI_CTX_T *psAtvPiCtx)
+{
+//ATV_PI_CTX_T *pTDAU4XB02A_AnaTuner = psAtvPiCtx;
+
+//    return (pTDAU4XB02A_AnaTuner->aSW_Ver_HW_Ver);
+    return TDAU4XB02A_ANA_TUNER_VER;
+}
+#endif
+
+//----------------------------------------------------------------------------- 
+/*
+ *  fgDrvTunerSetSystem
+ *  Get the sound system of given sub system into tuner HW
+ *  @param  psAtvPiCtx  	a type pointer use to point to struct ATV_PI_CTX_T.
+ *  @retval   Sub system index.
+ */
+//-----------------------------------------------------------------------------
+UINT8 TDAU4XB02A_TunerGetSystem(ATV_PI_CTX_T *psAtvPiCtx)
+{
+ATV_PI_CTX_T *pTDAU4XB02A_AnaTuner = psAtvPiCtx;
+
+    return pTDAU4XB02A_AnaTuner->u1SubSysIdx;
+}
+
+//----------------------------------------------------------------------------- 
+/*
+ *  fgDrvTunerSetSystem
+ *  Set the sound system of given sub system into tuner HW
+ *  @param  psAtvPiCtx  	a type pointer use to point to struct ATV_PI_CTX_T.
+ *  @param  u1SubSysIdx  	set a sub system type.
+ *  @retval   TRUE : Set Successful.
+ */
+//-----------------------------------------------------------------------------
+BOOL TDAU4XB02A_TunerSetSystem(ATV_PI_CTX_T *psAtvPiCtx, UINT8 u1SubSysIdx)
+{
+ATV_PI_CTX_T *pTDAU4XB02A_AnaTuner = psAtvPiCtx;
+//mcLINT_UNUSED(u1SubSysIdx);
+
+    pTDAU4XB02A_AnaTuner->u1SubSysIdx = u1SubSysIdx;
+    return TRUE;
+//Gene Chang Because the Samsung tuner doesn't set IF part. 2006.04.18
+}
+
+//----------------------------------------------------------------------------- 
+/*
+ *  TDAU4XB02A_bDrvTunerCheckVIFLock
+ *  Check if programmed frequency has strong VIF signal nearby
+ *  @param  psAtvPiCtx  	a type pointer use to point to struct ATV_PI_CTX_T.
+ *  @param  wFreqInKHz  	The frequenccy in KHz need to check the VIF status
+ *  @retval   	 2  => Current frequency is very close to the nominal VIF.
+           		 1  => Current frequency is is near the nominal VIF.
+           		 0  => Current frequency is not close to the nominal VIF yet.
+ */
+//-----------------------------------------------------------------------------
+UINT8 TDAU4XB02A_bDrvTunerCheckVIFLock(ATV_PI_CTX_T *psAtvPiCtx, PARAM_SETFREQ_T * param)
+{
+//BOOL fgRetSts;
+ATV_PI_CTX_T *pTDAU4XB02A_AnaTuner = psAtvPiCtx;
+//UINT8 u1AnaMode = pTDAU4XB02A_AnaTuner->u1AnaMode;
+UINT8 bAFTStatus, bPreAFTStatus;
+UINT8 bDiffPreAFT;
+//UINT8 bNextAFTStatus, bPreAFTStatus;
+UINT32 Freq=param->Freq;
+param->Freq-=60;    
+    
+    
+    
+//    fgRetSts = TDAU4XB02A_AnaTunerSetFreq(psAtvPiCtx, wFreqInKHz - cFREQ_FINETUNE_RANGE,u1AnaMode);
+//    bPreAFTStatus = bGetSCurveVol();
+    TDAU4XB02A_AnaTunerSetFreq(psAtvPiCtx,param);
+    bPreAFTStatus = bGetSCurveVol();
+
+//    fgRetSts &= TDAU4XB02A_AnaTunerSetFreq(psAtvPiCtx, wFreqInKHz ,u1AnaMode);
+    param->Freq=Freq;
+    TDAU4XB02A_AnaTunerSetFreq(psAtvPiCtx,param);
+    bAFTStatus = bGetSCurveVol();
+    
+#if 0
+    if ((bAFTStatus <= TDAU4XB02A_AFT_CENTER_VOL_HIGH) && (bAFTStatus >= TDAU4XB02A_AFT_CENTER_VOL_LOW) && (bPreAFTStatus == 0xff))
+    { 
+	TDAU4XB02A_AnaTunerSetFreq(psAtvPiCtx, wFreqInKHz + 100 ,u1AnaMode);
+    	bPreAFTStatus = bAFTStatus;
+    	bAFTStatus = bGetSCurveVol();
+    	mcSHOW_DBG_MSG((" (+100) bAFTStatus, bPreAFTStatus,%02X,%02X\n", bAFTStatus, bPreAFTStatus));
+    }
+#endif
+
+    if (bPreAFTStatus > bAFTStatus)
+        bDiffPreAFT = bPreAFTStatus - bAFTStatus;
+    else
+        bDiffPreAFT = 0;
+
+    mcSHOW_DBG_MSG(("bAFTStatus, bPreAFTStatus, bDiffPreAFT %02X,%02X,%02X\n", bAFTStatus, bPreAFTStatus, bDiffPreAFT ));
+
+if ((bAFTStatus <= TDAU4XB02A_AFT_CENTER_VOL_HIGH) && (bAFTStatus >= TDAU4XB02A_AFT_CENTER_VOL_LOW)
+      && (bDiffPreAFT > 0x10))//&&(bPreAFTStatus!=0xff))
+    {
+    //Printf("VIFLock == 2\n");//EEE
+        mcSHOW_DBG_MSG(("CheckVIFLock-return 2 (2 means VIF lock)\n"));
+    // Current Freq is very close to the nominal VIF, don't tune the freq anymore.
+        pTDAU4XB02A_AnaTuner->u1DEMOD_state = TDAU4XB02A_ANA_LOCK;
+//  Printf("AFT Level %d\n",bAFTStatus);
+//  Printf("AFT Diff %d\n",bDiffPreAFT);
+        return 2;
+    }
+    //else if(((bAFTStatus < TDAU4XB02A_AFT_CENTER_VOL_LOW)&&(bPreAFTStatus!=0xff))||(bAFTStatus < TDAU4XB02A_AFT_CENTER_VOL_HIGH))
+    else if((bAFTStatus < TDAU4XB02A_AFT_CENTER_VOL_LOW)&&(bPreAFTStatus!=0xff))
+    {
+    //Printf("VIFLock == 1\n");//EEE
+        mcSHOW_DBG_MSG(("CheckVIFLock-return 1 (1 means current freq > signal freq)\n"));
+        pTDAU4XB02A_AnaTuner->u1DEMOD_state = TDAU4XB02A_ANA_UNLOCK;
+        return 1;
+    }
+    else
+    {
+    //Printf("VIFLock == 0\n");//EEE
+        mcSHOW_DBG_MSG(("CheckVIFLock-return 0 (0 means current freq < signal freq and far from signal freq)\n"));
+       pTDAU4XB02A_AnaTuner->u1DEMOD_state = TDAU4XB02A_ANA_UNLOCK;
+        return 0;
+    }
+// Fine tune part Gene Chang
+}
+
+//----------------------------------------------------------------------------- 
+/*
+ *  TDAU4XB02A_AnaTunerSearchNearbyFreq
+ *  Find the freq. value that near center frequency of the channel.
+ *  @param  psAtvPiCtx  	a type pointer use to point to struct ATV_PI_CTX_T.
+ *  @param  bScanType		AUTO_FINE_TUNE, UNI_AUTO_SCAN
+ *  @param  *wFreqInKHz  	THe point of frequenccy in KHz need to check the VIF status
+ *  @param  _BreakFct  	 	The break function
+ *  @param  *pvArg  		The argument of break function
+ *  @retval   TRUE  =>  center freq. found
+            	    FALSE =>  center freq. not found (no signal on this channel)
+ */
+//-----------------------------------------------------------------------------
+UINT8 TDAU4XB02A_AnaTunerSearchNearbyFreq(ATV_PI_CTX_T *psAtvPiCtx, UINT32 *wFreqInKHz,
+                                       x_break_fct _BreakFct, void *pvArg)
+{
+ATV_PI_CTX_T *pTDAU4XB02A_AnaTuner = psAtvPiCtx;
+UINT8 u1AnaMode = 0;
+UINT8 bAFTStatus, bPreAFTStatus;
+UINT8 bMaxStepNum = 0;
+UINT32 wFRTmp;
+UINT8 bVIFStatus = 0;
+UINT8 bTVDFlag = 0;
+UINT8 bATVStatus = 0;
+UINT32 wFRTmpScan = 0;
+UINT32 wFRTmpPre = 0;
+UINT32 wFreqInKHzTmp = 0;
+UINT8 bWeakSignalTVDFlag = 0;
+PARAM_SETFREQ_T param;
+mcSHOW_DBG_MSG3(("Start TDAU4XB02A_serach & Mod = %d\n",u1AnaMode));
+    
+    if (pTDAU4XB02A_AnaTuner == NULL)
+        return (FALSE);
+
+    if (wFreqInKHz != NULL)
+    {
+        wFRTmp = *wFreqInKHz;
+    }
+    else
+    {
+        return (bATVStatus);
+    }
+    pTDAU4XB02A_AnaTuner->isBreak = _BreakFct;
+    u1AnaMode = pTDAU4XB02A_AnaTuner->u1AnaMode;
+    param.Freq=wFRTmp;
+    param.Modulation=u1AnaMode;
+    param.fgAutoSearch=1;
+    wFreqInKHzTmp = *wFreqInKHz;
+   
+    bVIFStatus = TDAU4XB02A_bDrvTunerCheckVIFLock(psAtvPiCtx, &param);
+	
+// In the Weak Signal, the S Curve can't not work, so the check TVD lock again.
+   if(bVIFStatus !=2)
+      {        
+          bTVDFlag = fgDrvTunerCheckTVDLock(CHN_LOCK_CHECK_TIME);
+          if (bTVDFlag)
+           {
+                mcSHOW_DBG_MSG(("tvd success0_std (try again to avoid vif can't lock in weak signal)\n"));
+                mcSET_BIT(bWeakSignalTVDFlag, 0);
+            }
+	   else
+	   	mcSHOW_DBG_MSG(("tvd fail (try again to avoid vif can't lock in weak signal)\n"));
+       }
+
+#if fcTIMING_MEASURE
+    mcSHOW_DBG_MSG4(("[ATuner] SearchNearby.0=%3u ms, %d\n",
+                    (mcGET_SYS_TICK() - u2TickStart) * mcGET_TICK_PERIOD(),
+                    bVIFStatus));
+#endif
+
+// for HRC
+    if (bVIFStatus == 2)
+    {
+        mcSET_BIT(bATVStatus, cpANA_LOCK_STS_VIF);
+            bTVDFlag = fgDrvTunerCheckTVDLock(CHN_LOCK_CHECK_TIME);
+            if (bTVDFlag)
+            {
+            mcSHOW_DBG_MSG(("tvd success_std\n"));
+
+           // mcSHOW_DBG_MSG(("ana MOD= %d\n",(IO_READ8(0x20022080,0x03)>>4)&0x07));
+			
+            }
+            else
+            {
+                bVIFStatus = 0;
+            }
+    }
+
+  if ( u1AnaMode != MOD_ANA_TERR)
+  {
+    if (bVIFStatus != 2)
+    {
+        bVIFStatus=0;
+        param.Freq=wFRTmp-1250;
+        bVIFStatus = TDAU4XB02A_bDrvTunerCheckVIFLock(psAtvPiCtx,&param);
+#if fcTIMING_MEASURE
+        mcSHOW_DBG_MSG(("[ATuner] SearchNearby.HRC1=%3u ms, %d\n",
+                        (mcGET_SYS_TICK() - u2TickStart) * mcGET_TICK_PERIOD(),
+                        bVIFStatus));
+#endif
+
+        if (bVIFStatus == 2)
+        {
+            *wFreqInKHz = (wFRTmp-1250);
+            mcSET_BIT(bATVStatus, cpANA_LOCK_STS_VIF);
+        }
+            if (bVIFStatus == 2)
+            {
+                    bTVDFlag = fgDrvTunerCheckTVDLock(CHN_LOCK_CHECK_TIME);
+                    if (bTVDFlag)
+                    {
+                    mcSHOW_DBG_MSG(("tvd success_HRC1\n"));
+                    }
+                    else
+                    {
+                        bVIFStatus = 0;
+                    }
+            }
+    }
+
+// for HRC
+     if (bVIFStatus != 2 & ((wFreqInKHzTmp == 77250) | (wFreqInKHzTmp == 83250)))
+    {
+        bVIFStatus=0;
+        param.Freq= wFRTmp+750;
+        
+        bVIFStatus = TDAU4XB02A_bDrvTunerCheckVIFLock(psAtvPiCtx,&param);
+#if fcTIMING_MEASURE
+        mcSHOW_DBG_MSG(("[ATuner] SearchNearby.HRC2=%3u ms, %d\n",
+                        (mcGET_SYS_TICK() - u2TickStart) * mcGET_TICK_PERIOD(),
+                        bVIFStatus));
+#endif
+
+        if (bVIFStatus == 2)
+        {
+            *wFreqInKHz = (wFRTmp+750);
+            mcSET_BIT(bATVStatus, cpANA_LOCK_STS_VIF);
+        }
+            if (bVIFStatus == 2)
+            {
+                    bTVDFlag = fgDrvTunerCheckTVDLock(CHN_LOCK_CHECK_TIME);
+                    if (bTVDFlag)
+                    {
+                    mcSHOW_DBG_MSG(("tvd success_HRC2\n"));
+                    }
+                    else
+                    {
+                        bVIFStatus = 0;
+                    }
+            }
+    }
+
+// for IRC
+    if (bVIFStatus != 2 & ((wFreqInKHzTmp == 77250) | (wFreqInKHzTmp == 83250)))
+    {
+        bVIFStatus=0;
+        param.Freq=wFRTmp+2000;
+        
+        bVIFStatus = TDAU4XB02A_bDrvTunerCheckVIFLock(psAtvPiCtx, &param);
+#if fcTIMING_MEASURE
+        mcSHOW_DBG_MSG(("[ATuner] SearchNearby.IRC=%3u ms, %d\n",
+                        (mcGET_SYS_TICK() - u2TickStart) * mcGET_TICK_PERIOD(),
+                        bVIFStatus));
+#endif
+
+        if (bVIFStatus == 2)
+        {
+            *wFreqInKHz = (wFRTmp + 2000);
+            mcSET_BIT(bATVStatus, cpANA_LOCK_STS_VIF);
+        }
+            if (bVIFStatus == 2)
+            {
+                    bTVDFlag = fgDrvTunerCheckTVDLock(CHN_LOCK_CHECK_TIME);
+                    if (bTVDFlag)
+                    {
+                    mcSHOW_DBG_MSG(("tvd success_IRC\n"));
+                    }
+                    else
+                    {
+                        bVIFStatus = 0;
+                    }
+            }
+    }
+  }
+    if (bTVDFlag)
+    {
+        mcSHOW_DBG_MSG(("tvd success1 (means tvd lock)\n"));
+    }
+//--------------------------------------------------------------------------
+//MTK PATCH : For ALPS tuner loss channel after did channel scan
+//org ->    else
+    else if(bVIFStatus ==2)
+//--------------------------------------------------------------------------
+    {
+        bTVDFlag = fgDrvTunerCheckTVDLock(CHN_LOCK_CHECK_TIME);
+    }
+
+  // Initial check to see if curent freq need full range AFT or not
+    //if ((bScanType == eTUNER_UNI_AUTO_SCAN) && (bVIFStatus == 2) && (bTVDFlag)) //eTUNER_AUTO_FINE_TUNE
+    if ((bVIFStatus == 2) && (bTVDFlag))
+    {
+        mcSHOW_DBG_MSG(("tvd success2\n"));
+        mcSET_BIT(bATVStatus, cpANA_LOCK_STS_TVD);
+		
+        bAFTStatus = bGetSCurveVol();
+        
+        if((bAFTStatus>=TDAU4XB02A_AFT_CENTER_VOL_FINE_TUNE_HIGH_40KHZ)&&(bAFTStatus<TDAU4XB02A_AFT_CENTER_VOL_HIGH)){
+             mcSHOW_DBG_MSG(("fine tune1 +32KHz\n"));             
+             *wFreqInKHz += 32;   
+        }
+        else if(bAFTStatus>=TDAU4XB02A_AFT_CENTER_VOL_HIGH){
+             mcSHOW_DBG_MSG(("fine tune2 +63KHz\n"));             
+             *wFreqInKHz += 63;  
+        }
+        else if((bAFTStatus<=TDAU4XB02A_AFT_CENTER_VOL_FINE_TUNE_LOW_40KHZ)&&(bAFTStatus>TDAU4XB02A_AFT_CENTER_VOL_LOW)){
+             mcSHOW_DBG_MSG(("fine tune3 -32KHz\n"));             
+             *wFreqInKHz -= 32;   
+        }
+        else if(bAFTStatus<=TDAU4XB02A_AFT_CENTER_VOL_LOW){
+             mcSHOW_DBG_MSG(("fine tune4 -63KHz\n"));             
+             *wFreqInKHz -= 63;  
+        }
+        else{
+           mcSHOW_DBG_MSG(("don't need fine tune\n")); 
+        }
+        
+        /*if ((bAFTStatus >= TDAU4XB02A_AFT_CENTER_VOL_HIGH - 0x25) & (bAFTStatus <= TDAU4XB02A_AFT_CENTER_VOL_HIGH -0x15))
+        {
+                mcSHOW_DBG_MSG(("tvd success2+1\n"));
+               *wFreqInKHz += 32;
+        }
+      else if ((bAFTStatus >= TDAU4XB02A_AFT_CENTER_VOL_HIGH - 0x15) & (bAFTStatus <= TDAU4XB02A_AFT_CENTER_VOL_HIGH))
+        {
+                mcSHOW_DBG_MSG(("tvd success2+2\n"));
+                *wFreqInKHz += 63;
+        }
+
+       else if((bAFTStatus  >= TDAU4XB02A_AFT_CENTER_VOL_LOW) & (bAFTStatus <= TDAU4XB02A_AFT_CENTER_VOL_LOW + 0x15))
+        {
+                mcSHOW_DBG_MSG(("tvd success2-1\n"));
+                *wFreqInKHz -= 60;
+        }
+        else if((bAFTStatus  >= TDAU4XB02A_AFT_CENTER_VOL_LOW + 0x15) & (bAFTStatus <= TDAU4XB02A_AFT_CENTER_VOL_LOW+0x25))
+        {
+                 mcSHOW_DBG_MSG(("tvd success2-1\n"));
+                *wFreqInKHz -= 30;
+        }*/
+		 param.Freq=*wFreqInKHz;
+         TDAU4XB02A_AnaTunerSetFreq(psAtvPiCtx, &param);
+         //Driver  auto test log 
+       mcMSG_IN_SEARCHNEARBY_AUTO_TEST(3125)
+         
+        PreLockFreq = *wFreqInKHz;
+    //    if (bVIFStatus == 2)
+          *wFreqInKHz = wFreqInKHzTmp;
+            return bATVStatus;
+    }
+    else
+    {
+        *wFreqInKHz = wFRTmp;
+        bVIFStatus = 0;
+        wFRTmp -= (TV_FINE_TUNE_THRESHOLD_KHZ / 2);
+    }
+
+    if (bVIFStatus == 0)
+    {
+    #if fcTIMING_MEASURE
+        mcSHOW_DBG_MSG4(("[ATuner] SearchNearby.1=%3u ms\n",
+                        (mcGET_SYS_TICK() - u2TickStart) * mcGET_TICK_PERIOD()));
+    #endif
+    // Get the AFTStatus of lower frequency for precision initial PreAFTStatus.
+        mcSHOW_DBG_MSG(("Rough Search.Start freq = %d\n",(wFRTmp - SCAN_MIDDLE_STEP_KHZ)));
+        param.Freq= wFRTmp - SCAN_MIDDLE_STEP_KHZ;
+        
+        TDAU4XB02A_AnaTunerSetFreq(psAtvPiCtx, &param);
+	 bAFTStatus = bGetSCurveVol();
+        wFRTmpPre = wFRTmp - SCAN_MIDDLE_STEP_KHZ;//ray added
+      //  mcSHOW_DBG_MSG(("wFRTmp = %d,wFRTmpPre = %d, SCAN_MIDDLE_STEP_KHZ = %d\n",wFRTmp,wFRTmpPre,SCAN_MIDDLE_STEP_KHZ));
+       
+
+        // Divide the TV_FINE_TUNE_THRESHOLD_KHZ into several large steps.
+        // Right now, each large step is 500kHz (SCAN_MIDDLE_STEP_KHZ).
+        while (wFRTmp <= (*wFreqInKHz + (TV_FINE_TUNE_THRESHOLD_KHZ / 2)))
+        {
+            if (pTDAU4XB02A_AnaTuner->isBreak && pTDAU4XB02A_AnaTuner->isBreak(pvArg))
+            {
+                mcSHOW_DBG_MSG(("[ATuner] SearchNearby.BreakFct\n"));
+                mcSET_BIT(bATVStatus, cpANA_LOCK_STS_BREAK);
+		 *wFreqInKHz = wFreqInKHzTmp;
+                return bATVStatus;
+                //return (FALSE);
+            }
+            param.Freq=wFRTmp;
+            TDAU4XB02A_AnaTunerSetFreq(psAtvPiCtx,&param);
+
+            bPreAFTStatus = bAFTStatus;
+            bAFTStatus = bGetSCurveVol();
+
+        #if fcTIMING_MEASURE
+            mcSHOW_DBG_MSG(("[ATuner] SearchNearby.Rough=%3u ms / %d\n",
+                            (mcGET_SYS_TICK() - u2TickStart) * mcGET_TICK_PERIOD(),
+                            (INT16) (wFRTmp - *wFreqInKHz)));
+        #endif
+
+
+        // change 0xff to 0xF0 to try to force enter this slop ; 20060917
+            if ((bAFTStatus <= TDAU4XB02A_AFT_CENTER_VOL_HIGH)
+             && (bPreAFTStatus >= TDAU4XB02A_AFT_CENTER_VOL_HIGH)) // FF -> !FF (possible slope of S-Curve found)
+            {
+            // First time enter the slope.
+//-----------------------------------------------------------------------------
+//MTK PATCH : For ALPS tuner loss channel after did channel scan
+                param.Freq=wFRTmpPre + SCAN_MIDDLE_STEP_KHZ/2;
+                TDAU4XB02A_AnaTunerSetFreq(psAtvPiCtx, &param);
+		  mcSHOW_DBG_MSG(("set freq before check TVD  in rough search\n"));	
+		  if (fgDrvTunerCheckTVDLock(CHN_LOCK_CHECK_TIME))
+		    {
+		      mcSHOW_DBG_MSG(("check TVD before check VIF in rough search\n"));
+              param.Freq=wFRTmp;
+                      bVIFStatus = TDAU4XB02A_bDrvTunerCheckVIFLock(psAtvPiCtx,&param);
+                      if (bVIFStatus!=0)
+                       {
+                          mcSHOW_DBG_MSG(("Start fine search\n"));
+//-----------------------------------------------------------------------------
+                          break;
+//-----------------------------------------------------------------------------
+//MTK PATCH : For ALPS tuner loss channel after did channel scan
+                       }
+		    }
+                else
+                {
+                    mcSHOW_DBG_MSG(("The current AFT voltage in threshold but VIF unlock\n"));
+                    wFRTmpPre = wFRTmp;
+                    wFRTmp += SCAN_MIDDLE_STEP_KHZ;
+                }
+//-----------------------------------------------------------------------------
+            }
+            else    // Freq is too small
+            {
+                  mcSHOW_DBG_MSG(("Still skip 500KHz next time\n"));
+                wFRTmpPre = wFRTmp;
+                wFRTmp += SCAN_MIDDLE_STEP_KHZ;
+            }
+        }
+    }
+
+// If AFT slope exists, find the center frequency by Dichotomy.
+    if (wFRTmp <= (*wFreqInKHz + (TV_FINE_TUNE_THRESHOLD_KHZ / 2)))
+    {
+          wFRTmpScan = wFRTmpPre + (SCAN_MIDDLE_STEP_KHZ >>2);
+        //mcSHOW_DBG_MSG(("wFRTmpScan = %d,wFRTmpPre = %d\n",wFRTmpScan,wFRTmpPre));
+          mcSHOW_DBG_MSG(("Start fine search freq = %dKHz\n",wFRTmpScan));
+          param.Freq= wFRTmpScan ;
+          TDAU4XB02A_AnaTunerSetFreq(psAtvPiCtx,&param);
+        while (bMaxStepNum <= 3)    // SCAN_SMALL_STEP (0x04) can only shift right for 2 bits
+        {
+             // mcSHOW_DBG_MSG(("Start fine search\n"));
+            if (pTDAU4XB02A_AnaTuner->isBreak && pTDAU4XB02A_AnaTuner->isBreak(pvArg))
+            {
+                mcSHOW_DBG_MSG(("[ATuner] SearchNearby.BreakFct\n"));
+                mcSET_BIT(bATVStatus, cpANA_LOCK_STS_BREAK);
+		        *wFreqInKHz = wFreqInKHzTmp;
+                return bATVStatus;
+                //return (FALSE);
+            }
+            bAFTStatus = bGetSCurveVol();
+
+        #if fcTIMING_MEASURE
+            mcSHOW_DBG_MSG(("[ATuner] SearchNearby.Fine=%3u ms / %d\n",
+                            (mcGET_SYS_TICK() - u2TickStart) * mcGET_TICK_PERIOD(),
+                            (INT16) (wFRTmpScan - *wFreqInKHz)));
+        #endif
+           if (bAFTStatus <= TDAU4XB02A_AFT_CENTER_VOL_HIGH)
+            {
+                  mcSHOW_DBG_MSG(("Fine search end\n"));
+                wFRTmp = wFRTmpScan;
+                break;
+            }
+            else if (bAFTStatus > TDAU4XB02A_AFT_CENTER_VOL_HIGH)
+            {
+                  mcSHOW_DBG_MSG(("Still skip 125KHz next time\n"));
+                wFRTmpScan += (SCAN_MIDDLE_STEP_KHZ >>2);
+            }
+            param.Freq=wFRTmpScan;
+            TDAU4XB02A_AnaTunerSetFreq(psAtvPiCtx,&param);
+            bMaxStepNum ++;
+        }
+        if (bMaxStepNum == 4)
+        {
+              mcSHOW_DBG_MSG(("The fourth fine search\n"));
+             param.Freq=wFRTmp;
+            TDAU4XB02A_AnaTunerSetFreq(psAtvPiCtx,&param);
+	 
+         }
+
+        *wFreqInKHz = wFRTmp;
+        bATVStatus = mcBIT(cpANA_LOCK_STS_VIF);
+
+        if (fgDrvTunerCheckTVDLock(CHN_LOCK_CHECK_TIME))
+        {
+            mcSET_BIT(bATVStatus, cpANA_LOCK_STS_TVD);
+			
+	   /*bAFTStatus = bGetSCurveVol();
+       if ((bAFTStatus >= TDAU4XB02A_AFT_CENTER_VOL_HIGH - 0x25) & (bAFTStatus <= TDAU4XB02A_AFT_CENTER_VOL_HIGH -0x15))
+        {
+                mcSHOW_DBG_MSG(("tvd success2+1\n"));
+                wFRTmp += 32;
+        }
+      else if ((bAFTStatus >= TDAU4XB02A_AFT_CENTER_VOL_HIGH - 0x15) & (bAFTStatus <= TDAU4XB02A_AFT_CENTER_VOL_HIGH))
+        {
+                mcSHOW_DBG_MSG(("tvd success2+2\n"));
+               wFRTmp += 63;
+        }
+
+       else if((bAFTStatus  >= TDAU4XB02A_AFT_CENTER_VOL_LOW) & (bAFTStatus <= TDAU4XB02A_AFT_CENTER_VOL_LOW + 0x15))
+        {
+                mcSHOW_DBG_MSG(("tvd success2-1\n"));
+                wFRTmp -= 60;
+        }
+        else if((bAFTStatus  >= TDAU4XB02A_AFT_CENTER_VOL_LOW + 0x15) & (bAFTStatus <= TDAU4XB02A_AFT_CENTER_VOL_LOW+0x25))
+        {
+                 mcSHOW_DBG_MSG(("tvd success2-1\n"));
+                 wFRTmp -= 30;               
+        }*/
+        bAFTStatus = bGetSCurveVol();
+        
+        if((bAFTStatus>=TDAU4XB02A_AFT_CENTER_VOL_FINE_TUNE_HIGH_40KHZ)&&(bAFTStatus<TDAU4XB02A_AFT_CENTER_VOL_HIGH)){
+             mcSHOW_DBG_MSG(("fine tune1 +32KHz\n"));             
+             *wFreqInKHz += 32;   
+        }
+        else if(bAFTStatus>=TDAU4XB02A_AFT_CENTER_VOL_HIGH){
+             mcSHOW_DBG_MSG(("fine tune2 +63KHz\n"));             
+             *wFreqInKHz += 63;  
+        }
+        else if((bAFTStatus<=TDAU4XB02A_AFT_CENTER_VOL_FINE_TUNE_LOW_40KHZ)&&(bAFTStatus>TDAU4XB02A_AFT_CENTER_VOL_LOW)){
+             mcSHOW_DBG_MSG(("fine tune3 -32KHz\n"));             
+             *wFreqInKHz -= 32;   
+        }
+        else if(bAFTStatus<=TDAU4XB02A_AFT_CENTER_VOL_LOW){
+             mcSHOW_DBG_MSG(("fine tune4 -63KHz\n"));             
+             *wFreqInKHz -= 63;  
+        }
+        else{
+           mcSHOW_DBG_MSG(("don't need fine tune\n")); 
+        }
+         param.Freq= *wFreqInKHz;
+		TDAU4XB02A_AnaTunerSetFreq(psAtvPiCtx, &param);
+	     PreLockFreq = *wFreqInKHz;
+        // *wFreqInKHz = wFRTmp;
+         //Driver Auto Test log
+         mcMSG_IN_SEARCHNEARBY_AUTO_TEST(3125)
+         
+	    *wFreqInKHz = wFreqInKHzTmp;
+            return bATVStatus;
+        }
+        else
+        { 
+           *wFreqInKHz = wFreqInKHzTmp;
+            return bATVStatus;
+        }
+    }
+    else  // go to next channel
+    {
+        	if(bWeakSignalTVDFlag & 0x1)
+		{
+            param.Freq=wFreqInKHzTmp;
+			TDAU4XB02A_AnaTunerSetFreq(psAtvPiCtx,&param);
+			mcSHOW_DBG_MSG(("###STD(1)\n"));
+			 PreLockFreq = wFreqInKHzTmp;
+			*wFreqInKHz = wFreqInKHzTmp;
+	              mcSET_BIT(bATVStatus, cpANA_LOCK_STS_VIF);
+			mcSET_BIT(bATVStatus, cpANA_LOCK_STS_TVD);
+			return bATVStatus;
+		}
+
+		else // go to next channel
+		{
+	              *wFreqInKHz = wFreqInKHzTmp;
+	              return FALSE;
+		}
+    }
+}
+
+//----------------------------------------------------------------------------- 
+/*
+ *  TDAU4XB02A_MonitorAnaTuner
+ *  Find the freq. value that near center frequency of the channel.
+ *  @param  psAtvPiCtx  	a type pointer use to point to struct ATV_PI_CTX_T.
+ *  @param  bScanType		AUTO_FINE_TUNE, UNI_AUTO_SCAN
+ *  @param  *wFreqInKHz  	THe point of frequenccy in KHz need to check the VIF status
+ *  @param  _BreakFct  	 	The break function
+ *  @param  *pvArg  		The argument of break function
+ *  @retval   TRUE  =>  center freq. found
+            	    FALSE =>  center freq. not found (no signal on this channel)
+ */
+//-----------------------------------------------------------------------------
+#if 0
+UINT8 TDAU4XB02A_MonitorAnaTuner(ATV_PI_CTX_T *psAtvPiCtx, UINT32 *wFreqInKHz,
+                              x_break_fct _BreakFct, void *pvArg)
+{
+ATV_PI_CTX_T *pTDAU4XB02A_AnaTuner = psAtvPiCtx;
+UINT8 bAFTStatus;
+UINT8 bATVStatus = mcBIT(cpANA_LOCK_STS_VIF) | mcBIT(cpANA_LOCK_STS_TVD);
+static UINT8 TDAU4XB02A_Monitor_Counter = 0;
+
+    mcSHOW_DBG_MSG3(("TDAU4XB02A_Monitor Thread %d -------\n",*wFreqInKHz));
+    pTDAU4XB02A_AnaTuner->isBreak = _BreakFct;
+    bAFTStatus = bGetSCurveVol();    
+    if ((bAFTStatus <= TDAU4XB02A_AFT_CENTER_VOL_HIGH)
+       && (bAFTStatus >= TDAU4XB02A_AFT_CENTER_VOL_LOW))
+    {
+            TDAU4XB02A_Monitor_Counter = 0;
+        return bATVStatus;
+    }
+    else
+    {
+        if (pTDAU4XB02A_AnaTuner->isBreak)
+        {
+            if (pTDAU4XB02A_AnaTuner->isBreak(pvArg))
+            {
+                mcSHOW_DBG_MSG(("[ATuner] TDAU4XB02A_MonitorAnaTuner: SearchNearby.BreakFct\n"));
+                return (FALSE);
+            }
+        }
+         mcSHOW_DBG_MSG2(("Out of range, bCurveStatus = %02X (%d),TDAU4XB02A_Monitor_Counter= %d\n", bAFTStatus, bAFTStatus,TDAU4XB02A_Monitor_Counter));
+         mcSHOW_DBG_MSG2(("out of range\n"));
+          if(TDAU4XB02A_Monitor_Counter>=1)
+        {
+        DigTunerBypassI2C(TRUE);
+        bATVStatus = TDAU4XB02A_AnaTunerSearchNearbyFreq(psAtvPiCtx,wFreqInKHz,_BreakFct, pvArg);
+        DigTunerBypassI2C(FALSE);
+        }
+        TDAU4XB02A_Monitor_Counter++;
+    }
+    return bATVStatus;
+}
+#endif
+#if 1
+UINT8 TDAU4XB02A_MonitorAnaTuner(ATV_PI_CTX_T *psAtvPiCtx, UINT32 *wFreqInKHz,x_break_fct _BreakFct, void *pvArg)
+{
+ATV_PI_CTX_T *pTDAU4XB02A_AnaTuner = psAtvPiCtx;
+UINT8 bAFTStatus;
+UINT8 bATVStatus = mcBIT(cpANA_LOCK_STS_VIF) | mcBIT(cpANA_LOCK_STS_TVD);
+UINT8 u1AnaMode = pTDAU4XB02A_AnaTuner->u1AnaMode;
+//UINT8 u1AnaMode = u1MonitorAnaMode;
+static UINT8 TDAU4XB02A_Monitor_Counter = 0;
+static UINT8 TDAU4XB02A_SearchCnt = 0;
+static INT32 wFreqInKHz2 = 0;
+UINT32 wFreqInKHz1;
+UINT32 wFreqBoundary = TV_FINE_TUNE_THRESHOLD_KHZ/2;
+UINT32 Freq=pTDAU4XB02A_AnaTuner->u4Freq;
+PARAM_SETFREQ_T param;
+param.Modulation=u1AnaMode;
+param.fgAutoSearch=0;
+//mcSHOW_DBG_MSG(("Channel Monitor %d\n",u1AnaMode));
+//mcSHOW_DBG_MSG(("Channel Monitor %d\n",u1AnaMode));
+
+//if (PreLockFreq != 0)
+//{
+		wFreqInKHz1 = PreLockFreq;
+//}
+
+#if 0
+if (u1AnaMode == MOD_ANA_TERR)
+{
+		wFreqBoundary = TV_TERR_FINE_TUNE_THRESHOLD_KHZ/2;
+		pTDAU4XB02A_AnaTuner->u1AnaMode = u1AnaMode;
+}
+#endif
+    pTDAU4XB02A_AnaTuner->isBreak = _BreakFct;
+    
+//Driver Auto Test log 
+mcMSG_IN_MONITOR_AUTO_TEST(3125)
+
+{
+		  UINT8  	TVD_TMP,TVD_TMP2;
+			TVD_TMP = (IO_READ8(VIDEO_IN0_BASE, 0x81) & 0x10);    
+			if (TVD_TMP == 0x10)
+	    {
+	    	mcSHOW_DBG_MSG3(("Vpress = 1;\n"));
+	    	TVD_TMP2 = IO_READ8(0x20022000, 0x80); 
+	    	if(TVD_TMP2 < 0x15)
+	    	{
+	    		mcSHOW_DBG_MSG3(("Noise < 0x15 (%x)\n",TVD_TMP2));
+	  			bAFTStatus = bGetSCurveVol();
+    			if ((bAFTStatus <= TDAU4XB02A_AFT_CENTER_VOL_HIGH_MONI ) && (bAFTStatus >= TDAU4XB02A_AFT_CENTER_VOL_LOW_MONI))
+    			{
+         		if(wFreqInKHz2 != 0)	PreLockFreq = wFreqInKHz1 + wFreqInKHz2;
+         	            wFreqInKHz2 = 0;
+         	       TDAU4XB02A_Monitor_Counter = 0;
+         		TDAU4XB02A_SearchCnt = 0;
+        		return bATVStatus;
+    			}
+    			else
+    			{
+        		if (pTDAU4XB02A_AnaTuner->isBreak)
+        		{
+        			if (pTDAU4XB02A_AnaTuner->isBreak(pvArg))
+        			{
+         				mcSHOW_DBG_MSG(("[ATuner] SearchNearby.BreakFct\n"));
+         				return (FALSE);
+        			}
+        			
+         		mcSHOW_DBG_MSG(("Out of range, bCurveStatus = %02X (%d),TDAU4XB02A_Monitor_Counter= %d\n", bAFTStatus, bAFTStatus,TDAU4XB02A_Monitor_Counter));
+         		mcSHOW_DBG_MSG(("out of range\n"));
+          	if(TDAU4XB02A_Monitor_Counter>=1)
+        		{
+        			DigTunerBypassI2C(TRUE);
+           		if(((wFreqInKHz1 + wFreqInKHz2) <= (*wFreqInKHz + wFreqBoundary)) && 
+           			 ((wFreqInKHz1 + wFreqInKHz2) >= (*wFreqInKHz - wFreqBoundary)))
+           		{	 
+           		    if(bAFTStatus <= TDAU4XB02A_AFT_CENTER_VOL )
+           		    {
+           			  	 wFreqInKHz2 -= 50;
+           				   //TDAU4XB02A_AnaTunerSetFreq(psAtvPiCtx, wFreqInKHz1 + wFreqInKHz2, u1AnaMode);	
+           			     mcSHOW_DBG_MSG(("-50KHz (%d) %x\n",wFreqInKHz1 + wFreqInKHz2,bAFTStatus));
+           		    }
+           		    else
+           		    {           			
+           			     wFreqInKHz2 += 50;
+           			     //TDAU4XB02A_AnaTunerSetFreq(psAtvPiCtx, wFreqInKHz1 + wFreqInKHz2, u1AnaMode);	
+           			     mcSHOW_DBG_MSG(("+50KHz (%d) %x\n",wFreqInKHz1 + wFreqInKHz2,bAFTStatus));
+           		    }
+                    param.Freq=wFreqInKHz1 + wFreqInKHz2;
+                    TDAU4XB02A_AnaTunerSetFreq(psAtvPiCtx,&param);
+           		}
+           		else
+           		{
+           				bATVStatus = TDAU4XB02A_AnaTunerSearchNearbyFreq(psAtvPiCtx, wFreqInKHz,
+           					              pTDAU4XB02A_AnaTuner->isBreak, pvArg);
+           				wFreqInKHz2 = 0;           					              
+           		}	           		
+        			DigTunerBypassI2C(FALSE);
+        		}
+        		TDAU4XB02A_Monitor_Counter++;
+    			}
+    			}
+    		}
+	  	}
+	  	else
+	  	{
+	    	mcSHOW_DBG_MSG(("Vpress = 0;\n"));    	
+	    	if(TDAU4XB02A_SearchCnt >= 1)
+        {          
+        	mcSHOW_DBG_MSG(("TDAU4XB02A_SearchCnt >= 1\n"));
+        	DigTunerBypassI2C(TRUE);
+        	bATVStatus = TDAU4XB02A_AnaTunerSearchNearbyFreq(psAtvPiCtx, wFreqInKHz,
+        						              pTDAU4XB02A_AnaTuner->isBreak, pvArg);
+        	
+        	if(bATVStatus <= 1)
+        	{  // Improve Sentivity
+        		UINT32 FreqTmp;
+        		if(*wFreqInKHz > PreLockFreq)
+        			FreqTmp = *wFreqInKHz - PreLockFreq;
+        		else	
+        			FreqTmp = PreLockFreq - *wFreqInKHz;
+        			        	
+        	  if(FreqTmp > wFreqBoundary)
+        	  {
+        	      mcSHOW_DBG_MSG(("TDAU4XB02A_Monitor Freq %d : Rre_Freq %d\n",*wFreqInKHz,PreLockFreq));
+        	     // TDAU4XB02A_AnaTunerSetFreq(psAtvPiCtx, *wFreqInKHz, u1AnaMode);
+        		    PreLockFreq = *wFreqInKHz;
+        	  }
+        	  else
+        	  {
+        	      mcSHOW_DBG_MSG(("Pre-TDAU4XB02A_Monitor Freq %d : Rre_Freq %d\n",*wFreqInKHz,PreLockFreq));
+        	     // TDAU4XB02A_AnaTunerSetFreq(psAtvPiCtx, PreLockFreq, u1AnaMode);
+        	  }
+              param.Freq=PreLockFreq;
+             TDAU4XB02A_AnaTunerSetFreq(psAtvPiCtx,&param);
+        	}
+        	
+        	wFreqInKHz2 = 0;
+        	DigTunerBypassI2C(FALSE);
+        }
+        TDAU4XB02A_SearchCnt++;
+	  	}
+}  
+
+    return bATVStatus;
+}
+#endif
+//----------------------------------------------------------------------------- 
+/*
+ *  TDAU4XB02A_AnaTunerGetVer
+ *  Get Tuner Version.
+ *  @param  void.
+ *  @retval   TDAU4XB02A_ANA_TUNER_VER.
+ */
+//-----------------------------------------------------------------------------
+UINT8 *TDAU4XB02A_AnaTunerGetVer(ATV_PI_CTX_T *psAtvPiCtx){
+    return ("analog TDAU4XB02AX524A");
+}

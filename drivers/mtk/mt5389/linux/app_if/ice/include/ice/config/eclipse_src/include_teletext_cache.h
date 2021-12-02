@@ -1,0 +1,3 @@
+#ifndef INCLUDE_TELETEXT_CACHE
+    #define INCLUDE_TELETEXT_CACHE 1
+#endif

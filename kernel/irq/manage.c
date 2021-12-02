@@ -221,7 +221,10 @@ void __disable_irq(struct irq_desc *desc, unsigned int irq, bool suspend)
 		desc->status |= IRQ_SUSPENDED;
 	}
 
-	if (!desc->depth++) {
+#ifdef CHECK_DEPTH
+	if (!desc->depth++)
+#endif
+    {
 		desc->status |= IRQ_DISABLED;
 		desc->chip->disable(irq);
 	}
@@ -308,8 +311,10 @@ void __enable_irq(struct irq_desc *desc, unsigned int irq, bool resume)
 		check_irq_resend(desc, irq);
 		/* fall-through */
 	}
+#ifdef CHECK_DEPTH
 	default:
 		desc->depth--;
+#endif
 	}
 }
 
@@ -786,7 +791,9 @@ __setup_irq(unsigned int irq, struct irq_desc *desc, struct irqaction *new)
 			desc->status |= IRQ_ONESHOT;
 
 		if (!(desc->status & IRQ_NOAUTOEN)) {
+#ifdef CHECK_DEPTH
 			desc->depth = 0;
+#endif
 			desc->status &= ~IRQ_DISABLED;
 			desc->chip->startup(irq);
 		} else

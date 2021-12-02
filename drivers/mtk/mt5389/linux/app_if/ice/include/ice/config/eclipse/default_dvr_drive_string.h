@@ -1,0 +1,4 @@
+#ifndef DEFAULT_DVR_DRIVE_STRING
+    #define DEFAULT_DVR_DRIVE_STRING "1"
+    #define DEFAULT_DVR_DRIVE_STRING_IS_1
+#endif

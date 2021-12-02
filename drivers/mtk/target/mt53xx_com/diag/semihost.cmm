@@ -1,0 +1,81 @@
+;trace32 host code start here
+;-----------------------------------------------------------------------------
+;break.delete /ALL
+break.set _t32_HostBreakPT /PROGRAM
+
+;init status
+local &fg_run &target_flag &host_cmd
+local &host_cmd_count &host_act_count
+
+&fg_run=1
+&host_cmd_count=0
+&host_act_count=0
+
+while &fg_run==1
+(
+	; program start
+	go
+	; wait for t32 stop (when !run() is true, the follow code will be excuted )
+	wait !run()
+
+	if register(pc)!=address.offset(_t32_HostBreakPT)
+	(
+		;system breaks at some point not set by t32host
+		;go to the t32host breakpoint
+		d.l
+		stop
+	)
+	else
+	(
+		&target_flag=register(r0)
+		&host_act_count=&host_act_count+1
+
+		if &target_flag==0
+		(
+			;no opeartion
+			;show some info on window maybe
+		)
+		else if &target_flag==1
+		(
+			;run host command
+			&host_cmd_addr=register(r1)
+			&host_cmd=data.string(d:&host_cmd_addr)
+			&host_cmd
+			&host_cmd_count=&host_cmd_count+1
+		)
+		else if &target_flag==2
+		(
+			;in system restart
+			sys.up
+		)
+		else if &target_flag==3
+		(
+			;exit t32host
+			&fg_run=0
+			go
+		)
+		else if &target_flag==4
+		(
+			;run host command
+			&host_cmd_addr=register(r1)
+			&host_cmd=data.string(d:&host_cmd_addr)
+			&host_cmd
+			&host_cmd_count=&host_cmd_count+1
+		)
+		else if &target_flag==5
+		(
+			;detect host
+			register.set r0=0
+			go
+		)
+		else
+		(
+			;error target_flag
+			;stop here
+			stop
+		)
+	)
+)
+enddo
+go
+end

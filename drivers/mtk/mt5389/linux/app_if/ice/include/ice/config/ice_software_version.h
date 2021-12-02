@@ -1,0 +1,4 @@
+#ifndef ICE_SOFTWARE_VERSION
+    #define ICE_SOFTWARE_VERSION 0x100
+    #define ICE_SOFTWARE_VERSION_IS_0x100
+#endif

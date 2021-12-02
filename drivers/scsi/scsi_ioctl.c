@@ -224,7 +224,22 @@ int scsi_ioctl(struct scsi_device *sdev, int cmd, void __user *arg)
 		break;
 	}
 
-	switch (cmd) {
+	switch (cmd) {		        
+    case SCSI_IOCTL_GET_DEV_SIZE:
+        if(copy_to_user((unsigned long long __user *)arg, &(sdev->device_sz), sizeof(unsigned long long)))
+            return -EFAULT;
+	//printk(KERN_WARNING "scsi:Device capacity is %llu MB ", sdev->device_sz);
+        return 0;
+    case SCSI_IOCTL_GET_SECTOR_SIZE:
+        if(copy_to_user((unsigned __user *)arg, &(sdev->sector_size), sizeof(unsigned)))
+            return -EFAULT;
+        //printk(KERN_WARNING "scsi:Device sector size is %u", sdev->sector_size);
+        return 0;
+    case SCSI_IOCTL_GET_SECTOR_NUMBER:
+        if(copy_to_user((unsigned long long __user *)arg, &(sdev->sector_number), sizeof(unsigned long long)))
+            return -EFAULT;
+        //printk(KERN_WARNING "scsi:Device sector number is %llu ", sdev->sector_number);
+        return 0;
 	case SCSI_IOCTL_GET_IDLUN:
 		if (!access_ok(VERIFY_WRITE, arg, sizeof(struct scsi_idlun)))
 			return -EFAULT;

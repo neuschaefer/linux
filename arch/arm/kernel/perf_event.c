@@ -319,8 +319,8 @@ validate_event(struct cpu_hw_events *cpuc,
 {
 	struct hw_perf_event fake_event = event->hw;
 
-	if (event->pmu && event->pmu != &pmu)
-		return 0;
+	if (event->pmu != &pmu || event->state <= PERF_EVENT_STATE_OFF)
+		return 1;
 
 	return armpmu->get_event_idx(cpuc, &fake_event) >= 0;
 }
@@ -1043,8 +1043,8 @@ armv6pmu_handle_irq(int irq_num,
 	/*
 	 * Handle the pending perf events.
 	 *
-	 * Note: this call *must* be run with interrupts enabled. For
-	 * platforms that can have the PMU interrupts raised as a PMI, this
+	 * Note: this call *must* be run with interrupts disabled. For
+	 * platforms that can have the PMU interrupts raised as an NMI, this
 	 * will not work.
 	 */
 	perf_event_do_pending();
@@ -1704,7 +1704,7 @@ static inline int armv7_pmnc_has_overflowed(unsigned long pmnc)
 static inline int armv7_pmnc_counter_has_overflowed(unsigned long pmnc,
 					enum armv7_counters counter)
 {
-	int ret;
+	int ret = 0;
 
 	if (counter == ARMV7_CYCLE_COUNTER)
 		ret = pmnc & ARMV7_FLAG_C;
@@ -2019,8 +2019,8 @@ static irqreturn_t armv7pmu_handle_irq(int irq_num, void *dev)
 	/*
 	 * Handle the pending perf events.
 	 *
-	 * Note: this call *must* be run with interrupts enabled. For
-	 * platforms that can have the PMU interrupts raised as a PMI, this
+	 * Note: this call *must* be run with interrupts disabled. For
+	 * platforms that can have the PMU interrupts raised as an NMI, this
 	 * will not work.
 	 */
 	perf_event_do_pending();

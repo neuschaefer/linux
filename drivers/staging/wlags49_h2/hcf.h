@@ -7,7 +7,7 @@
 *
 * FILE	 : hcf.h
 *
-* DATE   : $Date: 2004/08/05 11:47:10 $   $Revision: 1.7 $
+* DATE   : $Date: 2012/04/27 $   $Revision: #1 $
 * Original: 2004/05/19 07:26:01    Revision: 1.56      Tag: hcf7_t20040602_01
 * Original: 2004/05/12 08:47:23    Revision: 1.53      Tag: hcf7_t7_20040513_01
 * Original: 2004/04/15 09:24:42    Revision: 1.46      Tag: hcf7_t7_20040415_01

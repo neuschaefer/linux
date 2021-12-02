@@ -1,0 +1,1 @@
+/* INCLUDE_EXTENDED_SYNOPSIS_SUPPORT is undefined */

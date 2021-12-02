@@ -1,0 +1,3 @@
+#ifndef JPEG_SPEED_OVER_QUALITY
+    #define JPEG_SPEED_OVER_QUALITY 1
+#endif

@@ -1,4 +1,4 @@
-/* $Id: isdnl3.h,v 2.6.6.2 2001/09/23 22:24:49 kai Exp $
+/* $Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/drivers/isdn/hisax/isdnl3.h#1 $
  *
  * This software may be used and distributed according to the terms
  * of the GNU General Public License, incorporated herein by reference.

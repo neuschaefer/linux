@@ -1,0 +1,48 @@
+
+store "breakpts.cmm" Break
+; store "windowps.cmm" Win
+
+res
+SYS.CPU ARM926EJ
+; In General, you can use rtck to select clock automatically.
+;SYS.JC rtck
+SYS.JC 13.0MHz
+SYS.M UP
+wait 10.ms
+; This is the program name that you want to load
+D.S C15:0x1 %LONG 0
+D.S 0x2000705c %LONG 0 0 0 0 0 0 0 0
+; Turn off MID memory protection
+D.S SD:0x2000705c %LE %LONG 0
+D.S SD:0x20007064 %LE %LONG 0
+D.S SD:0x2000706c %LE %LONG 0
+D.S SD:0x20007074 %LE %LONG 0
+D.S SD:0x200070c4 %LE %LONG 0
+; Turn off SimWatchdog Timer Isr enable.
+local &irq_en
+&irq_en=data.long(sd:0x20008034)
+&irq_en=&irq_en&(0xffffffef)
+D.S SD:0x20008034 %LE %LONG &irq_en
+; Clear SimWatchdog Timer isr status.
+D.S SD:0x20008038 %LE %LONG 0x10
+; Disable Watchdog enable.
+D.S SD:0x20028100 %LE %LONG 0
+D.LOAD .\common_debug_diag.axf
+
+do "breakpts.cmm"
+; do "windowps.cmm"
+
+setup.imaskhll on
+setup.imaskasm on
+; You need to set the path of source code, otherwise you could not
+; see the source when debugging.
+y.spath . 
+y.spath.srd ../5381_driver
+y.spath.srd ../../../../middleware
+data.list
+m
+V %HEX
+task.config C:\T32\demo\arm\KERNEL\NUCLEUS\nucleus
+menu.reprogram C:\T32\demo\arm\KERNEL\NUCLEUS\nucleus
+; go
+

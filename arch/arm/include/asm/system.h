@@ -1,6 +1,10 @@
 #ifndef __ASM_ARM_SYSTEM_H
 #define __ASM_ARM_SYSTEM_H
 
+#if defined(__GCC__) && defined(CC_MTK_LOADER)
+    #define __asmeq(x, y)  ".ifnc " x "," y " ; .err ; .endif\n\t"
+#endif
+
 #ifdef __KERNEL__
 
 #define CPU_ARCH_UNKNOWN	0
@@ -83,7 +87,7 @@ void arm_notify_die(const char *str, struct pt_regs *regs, struct siginfo *info,
 
 void hook_fault_code(int nr, int (*fn)(unsigned long, unsigned int,
 				       struct pt_regs *),
-		     int sig, const char *name);
+		     int sig, int code, const char *name);
 
 #define xchg(ptr,x) \
 	((__typeof__(*(ptr)))__xchg((unsigned long)(x),(ptr),sizeof(*(ptr))))

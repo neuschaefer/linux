@@ -1,4 +1,4 @@
-$Id: tgafb.txt,v 1.1.2.2 2000/04/04 06:50:18 mato Exp $
+$Id: //DTV/MP_BR/DTV_X_IDTV0801_002150_7_001_11_001/chiling/kernel/linux-2.6.35/Documentation/fb/tgafb.txt#1 $
 
 What is tgafb?
 ===============

@@ -1,0 +1,3 @@
+#ifndef UI_OSD_RESOLUTION_WIDTH
+    #define UI_OSD_RESOLUTION_WIDTH 960
+#endif

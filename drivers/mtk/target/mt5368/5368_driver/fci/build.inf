@@ -1,0 +1,51 @@
+[build]
+TARGETNAME = fci
+TARGETTYPE = library
+
+SOURCES = fci_main.c fci_if.c fci_sdc.c fci_sdio.c fcihw_reg.c \
+          sd_if.c fci_msp.c ms_if.c ms_l2p.c fci_cmd.c \
+#         dvbh_if.c
+
+CCFLAGS += -DCC_FCI_ENABLE \
+           -DCC_FCI_3_IN_1_SOCKET \
+           -DCC_FCI_ERROR_HANDLING \
+#          -DCC_FCI_POWER_CONTROL \
+#          -DCC_CARD_DETECT_PIN \
+#          -DCC_FCI_SDIO_SUPPORT \
+#          -DFCI_DIAG_TEST \
+#          -DMT8520_USE_SD2 \
+#          -DSDIO_DVBH_SUPPORT \
+#          -DSDIO_UINT_TEST \
+           -DCC_BD_FCI
+
+DIRS = \
+      wlancard
+
+INCLUDES += \
+
+
+[build_linux_ko]
+
+TARGETNAME =
+TARGETTYPE =
+
+SOURCES = fci_main.c fci_if.c fci_sdc.c fci_sdio.c fcihw_reg.c \
+          sd_if.c fci_msp.c ms_if.c ms_l2p.c fci_cmd.c \
+#         dvbh_if.c
+
+CCFLAGS += -DCC_FCI_ENABLE \
+           -DCC_FCI_3_IN_1_SOCKET \
+#          -DCC_FCI_ERROR_HANDLING \
+#          -DCC_FCI_POWER_CONTROL \
+#          -DCC_CARD_DETECT_PIN \
+#          -DCC_FCI_SDIO_SUPPORT \
+#          -DFCI_DIAG_TEST \
+#          -DMT8520_USE_SD2 \
+#          -DSDIO_DVBH_SUPPORT \
+#          -DSDIO_UINT_TEST \
+           -DCC_BD_FCI
+
+DIRS = \
+      wlancard
+
+INCLUDES += \
