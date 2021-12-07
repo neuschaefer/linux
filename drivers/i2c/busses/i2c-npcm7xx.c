@@ -196,6 +196,7 @@ static const int npcm_i2caddr[I2C_NUM_OWN_ADDR] = {
 #define I2CCTL3_SDA_LVL			BIT(6)
 #define I2CCTL3_SCL_LVL			BIT(7)
 
+// not on WPCM450
 /* NPCM_I2CCST2 reg fields */
 #define NPCM_I2CCST2_MATCHA1F		BIT(0)
 #define NPCM_I2CCST2_MATCHA2F		BIT(1)
@@ -206,12 +207,14 @@ static const int npcm_i2caddr[I2C_NUM_OWN_ADDR] = {
 #define NPCM_I2CCST2_MATCHA7F		BIT(5)
 #define NPCM_I2CCST2_INTSTS		BIT(7)
 
+// not on WPCM450
 /* NPCM_I2CCST3 reg fields */
 #define NPCM_I2CCST3_MATCHA8F		BIT(0)
 #define NPCM_I2CCST3_MATCHA9F		BIT(1)
 #define NPCM_I2CCST3_MATCHA10F		BIT(2)
 #define NPCM_I2CCST3_EO_BUSY		BIT(7)
 
+// not on WPCM450
 /* NPCM_I2CCTL4 reg fields */
 #define I2CCTL4_HLDT			GENMASK(5, 0)
 #define I2CCTL4_LVL_WE			BIT(7)
@@ -268,6 +271,12 @@ struct npcm_i2c_data {
 	u8 txf_sts_tx_bytes;
 	u8 rxf_sts_rx_bytes;
 	u8 rxf_ctl_last_pec;
+	bool can_read_line_level;
+};
+
+/* On WPCM450, the I2C block doesn't have a FIFO, and I2CSEGCTL doesn't exist. */
+static const struct npcm_i2c_data wpcm450_i2c_data = {
+	.fifo_size = 0,
 };
 
 static const struct npcm_i2c_data npxm7xx_i2c_data = {
@@ -276,6 +285,7 @@ static const struct npcm_i2c_data npxm7xx_i2c_data = {
 	.txf_sts_tx_bytes = GENMASK(4, 0),
 	.rxf_sts_rx_bytes = GENMASK(4, 0),
 	.rxf_ctl_last_pec = BIT(5),
+	.can_read_line_level = true,
 };
 
 static const struct npcm_i2c_data npxm8xx_i2c_data = {
@@ -284,6 +294,7 @@ static const struct npcm_i2c_data npxm8xx_i2c_data = {
 	.txf_sts_tx_bytes = GENMASK(5, 0),
 	.rxf_sts_rx_bytes = GENMASK(5, 0),
 	.rxf_ctl_last_pec = BIT(7),
+	.can_read_line_level = true,
 };
 
 /* Status of one I2C module */
@@ -336,6 +347,7 @@ struct npcm_i2c {
 	u64 tx_complete_cnt;
 };
 
+// Not on WPCM450.
 static inline void npcm_i2c_select_bank(struct npcm_i2c *bus,
 					enum i2c_bank bank)
 {
@@ -379,14 +391,18 @@ static int npcm_i2c_get_SCL(struct i2c_adapter *_adap)
 {
 	struct npcm_i2c *bus = container_of(_adap, struct npcm_i2c, adap);
 
-	return !!(I2CCTL3_SCL_LVL & ioread8(bus->reg + NPCM_I2CCTL3));
+	if (bus->data->can_read_line_level)
+		return !!(I2CCTL3_SCL_LVL & ioread8(bus->reg + NPCM_I2CCTL3));
+	return 1;
 }
 
 static int npcm_i2c_get_SDA(struct i2c_adapter *_adap)
 {
 	struct npcm_i2c *bus = container_of(_adap, struct npcm_i2c, adap);
 
-	return !!(I2CCTL3_SDA_LVL & ioread8(bus->reg + NPCM_I2CCTL3));
+	if (bus->data->can_read_line_level)
+		return !!(I2CCTL3_SDA_LVL & ioread8(bus->reg + NPCM_I2CCTL3));
+	return 1;
 }
 
 static inline u16 npcm_i2c_get_index(struct npcm_i2c *bus)
@@ -1946,7 +1962,7 @@ static int npcm_i2c_init_module(struct npcm_i2c *bus, enum i2c_mode mode,
 	npcm_i2c_disable(bus);
 
 	/* Configure FIFO mode : */
-	if (FIELD_GET(I2C_VER_FIFO_EN, ioread8(bus->reg + I2C_VER))) {
+	if (bus->data->fifo_size > 0 && FIELD_GET(I2C_VER_FIFO_EN, ioread8(bus->reg + I2C_VER))) {
 		bus->fifo_use = true;
 		npcm_i2c_select_bank(bus, I2C_BANK_0);
 		val = ioread8(bus->reg + NPCM_I2CFIF_CTL);
@@ -2001,7 +2017,6 @@ static int __npcm_i2c_init(struct npcm_i2c *bus, struct platform_device *pdev)
 	ret = device_property_read_u32(&pdev->dev, "clock-frequency",
 				       &clk_freq_hz);
 	if (ret) {
-		dev_info(&pdev->dev, "Could not read clock-frequency property");
 		clk_freq_hz = I2C_MAX_STANDARD_MODE_FREQ;
 	}
 
@@ -2122,6 +2137,7 @@ static int npcm_i2c_master_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs,
 		write_data = msg0->buf;
 		nread = 0;
 		read_data = NULL;
+		// oh wtf, why is this special-cased?
 		if (num == 2) {
 			msg1 = &msgs[1];
 			read_data = msg1->buf;
@@ -2307,14 +2323,15 @@ static int npcm_i2c_probe_bus(struct platform_device *pdev)
 		return PTR_ERR(i2c_clk);
 	bus->apb_clk = clk_get_rate(i2c_clk);
 
-	/* TODO: check if this makes any sense on WPCM450 */
-	gcr_regmap = syscon_regmap_lookup_by_phandle(np, "nuvoton,sys-mgr");
-	if (IS_ERR(gcr_regmap))
-		gcr_regmap = syscon_regmap_lookup_by_compatible("nuvoton,npcm750-gcr");
+	if (bus->data->segctl_init_val != 0) {
+		gcr_regmap = syscon_regmap_lookup_by_phandle(np, "nuvoton,sys-mgr");
+		if (IS_ERR(gcr_regmap))
+			gcr_regmap = syscon_regmap_lookup_by_compatible("nuvoton,npcm750-gcr");
 
-	if (IS_ERR(gcr_regmap))
-		return PTR_ERR(gcr_regmap);
-	regmap_write(gcr_regmap, NPCM_I2CSEGCTL, bus->data->segctl_init_val);
+		if (IS_ERR(gcr_regmap))
+			return PTR_ERR(gcr_regmap);
+		regmap_write(gcr_regmap, NPCM_I2CSEGCTL, bus->data->segctl_init_val);
+	}
 
 	bus->reg = devm_platform_ioremap_resource(pdev, 0);
 	if (IS_ERR(bus->reg))
@@ -2338,7 +2355,7 @@ static int npcm_i2c_probe_bus(struct platform_device *pdev)
 	if (irq < 0)
 		return irq;
 
-	ret = devm_request_irq(bus->dev, irq, npcm_i2c_bus_irq, 0,
+	ret = devm_request_irq(bus->dev, irq, npcm_i2c_bus_irq, IRQF_SHARED,
 			       dev_name(bus->dev), bus);
 	if (ret)
 		return ret;
@@ -2376,6 +2393,7 @@ static int npcm_i2c_remove_bus(struct platform_device *pdev)
 }
 
 static const struct of_device_id npcm_i2c_bus_of_table[] = {
+	{ .compatible = "nuvoton,wpcm450-i2c", .data = &wpcm450_i2c_data },
 	{ .compatible = "nuvoton,npcm750-i2c", .data = &npxm7xx_i2c_data },
 	{ .compatible = "nuvoton,npcm845-i2c", .data = &npxm8xx_i2c_data },
 	{}
