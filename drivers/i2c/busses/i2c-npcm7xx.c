@@ -2307,6 +2307,7 @@ static int npcm_i2c_probe_bus(struct platform_device *pdev)
 		return PTR_ERR(i2c_clk);
 	bus->apb_clk = clk_get_rate(i2c_clk);
 
+	/* TODO: check if this makes any sense on WPCM450 */
 	gcr_regmap = syscon_regmap_lookup_by_phandle(np, "nuvoton,sys-mgr");
 	if (IS_ERR(gcr_regmap))
 		gcr_regmap = syscon_regmap_lookup_by_compatible("nuvoton,npcm750-gcr");
