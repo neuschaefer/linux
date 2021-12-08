@@ -18,6 +18,12 @@
 		gpio5 = &gpio5;
 		gpio6 = &gpio6;
 		gpio7 = &gpio7;
+		i2c0 = &i2c0;
+		i2c1 = &i2c1;
+		i2c2 = &i2c2;
+		i2c3 = &i2c3;
+		i2c4 = &i2c4;
+		i2c5 = &i2c5;
 	};
 
 	cpus {
@@ -486,6 +492,78 @@
 			compatible = "nuvoton,wpcm450-shm", "syscon";
 			reg = <0xc8001000 0x1000>;
 			reg-io-width = <1>;
+		};
+
+		i2c0: i2c@b8006000 {
+			reg = <0xb8006000 0x100>;
+			compatible = "nuvoton,wpcm450-i2c";
+			#address-cells = <1>;
+			#size-cells = <0>;
+			clocks = <&clk WPCM450_CLK_SMB0>;
+			interrupts = <26 IRQ_TYPE_LEVEL_HIGH>;
+			pinctrl-names = "default";
+			pinctrl-0 = <&smb0_pins>;
+			status = "disabled";
+		};
+
+		i2c1: i2c@b8006100 {
+			reg = <0xb8006100 0x100>;
+			compatible = "nuvoton,wpcm450-i2c";
+			#address-cells = <1>;
+			#size-cells = <0>;
+			clocks = <&clk WPCM450_CLK_SMB1>;
+			interrupts = <26 IRQ_TYPE_LEVEL_HIGH>;
+			pinctrl-names = "default";
+			pinctrl-0 = <&smb1_pins>;
+			status = "disabled";
+		};
+
+		i2c2: i2c@b8006200 {
+			reg = <0xb8006200 0x100>;
+			compatible = "nuvoton,wpcm450-i2c";
+			#address-cells = <1>;
+			#size-cells = <0>;
+			clocks = <&clk WPCM450_CLK_SMB2>;
+			interrupts = <26 IRQ_TYPE_LEVEL_HIGH>;
+			pinctrl-names = "default";
+			pinctrl-0 = <&smb2_pins>;
+			status = "disabled";
+		};
+
+		i2c3: i2c@b8006300 {
+			reg = <0xb8006300 0x100>;
+			compatible = "nuvoton,wpcm450-i2c";
+			#address-cells = <1>;
+			#size-cells = <0>;
+			clocks = <&clk WPCM450_CLK_SMB3>;
+			interrupts = <23 IRQ_TYPE_LEVEL_HIGH>;
+			pinctrl-names = "default";
+			pinctrl-0 = <&smb3_pins>;
+			status = "disabled";
+		};
+
+		i2c4: i2c@b8006400 {
+			reg = <0xb8006400 0x100>;
+			compatible = "nuvoton,wpcm450-i2c";
+			#address-cells = <1>;
+			#size-cells = <0>;
+			clocks = <&clk WPCM450_CLK_SMB4>;
+			interrupts = <27 IRQ_TYPE_LEVEL_HIGH>;
+			pinctrl-names = "default";
+			pinctrl-0 = <&smb4_pins>;
+			status = "disabled";
+		};
+
+		i2c5: i2c@b8006500 {
+			reg = <0xb8006500 0x100>;
+			compatible = "nuvoton,wpcm450-i2c";
+			#address-cells = <1>;
+			#size-cells = <0>;
+			clocks = <&clk WPCM450_CLK_SMB5>;
+			interrupts = <29 IRQ_TYPE_LEVEL_HIGH>;
+			pinctrl-names = "default";
+			pinctrl-0 = <&smb5_pins>;
+			status = "disabled";
 		};
 	};
 };
