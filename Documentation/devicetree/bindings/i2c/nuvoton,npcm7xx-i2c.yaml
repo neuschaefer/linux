@@ -17,6 +17,7 @@ maintainers:
 properties:
   compatible:
     enum:
+      - nuvoton,npcm450-i2c
       - nuvoton,npcm750-i2c
       - nuvoton,npcm845-i2c
 
