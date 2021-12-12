@@ -1,0 +1,125 @@
+#!/bin/bash
+#
+#	VKCS driver install 
+#
+
+RETVAL=0
+prog="VKCS driver"
+modulename="VKCSDriver.ko"
+nodename="/dev/vkcs"
+
+start() {
+	# Check if vkcs is already running
+	isvkcsdriverexit=`lsmod|grep VKCS`
+	
+	if [ "$isvkcsdriverexit" != "" ]; then
+		echo "$prog has installed"
+	else
+		echo -n $"$prog install start..."
+		echo
+		echo -n $"install vkcs module..."
+		echo
+		#clear the dmesg
+		dmesg -c|grep XXX
+		#install module
+		insmod $modulename
+		#check installed or not
+		isinstalled=`lsmod|grep VKCS`
+		#do rebuild if have no .ko file
+		if [ "$isinstalled" != "" ]; then
+			echo "insmod vkcsdriver..."
+		else
+			#rebuild VKCSDrivr.ko
+			echo "Please input kernel path"
+			read kernel
+			make clean
+			make kernel=$kernel
+			isvkcsok=`ls|grep $modulename`
+			#build vkcsdriver fail
+			if [ "$isvkcsok" == "" ]; then
+				echo "kernel path error!!"
+				return $RETVAL
+			else
+				insmod $modulename
+			fi
+		fi
+		#get the make node command
+		makevkcsnode=`dmesg|grep mknod`
+		#make node
+		echo -n "make node ..."
+		`$makevkcsnode`
+		echo
+		echo -n "$prog install success!!"
+		echo
+	fi 		
+	return $RETVAL
+}
+
+stop() {
+	isvkcsdriverexit=`lsmod|grep VKCS`
+	if [ "$isvkcsdriverexit" == "" ]; then
+		echo "$prog does not installed"
+	else
+	echo -n $"Stopping $prog... "
+	rmmod $modulename
+	echo
+	echo -n $"Remove node..."
+	rm -f $nodename
+	echo
+	echo -n "$prog stoped"
+	echo
+	fi
+	return $RETVAL
+}
+
+
+restart() {
+	stop
+	start
+}	
+
+reload() {
+	restart
+}	
+
+status_at() {
+	moif=`lsmod|grep VKCS`
+	if [ "$moif" == "" ]; then
+		echo -n "$prog does not installed"
+		echo
+	else
+		echo -n "$prog installed"
+		echo
+		lsmod|grep VKCS
+	fi
+	moex=`ls|grep $modulename`
+	if [ "$moex" == "" ]; then
+		echo -n "$modulename does not existd"
+		echo
+	else
+		modinfo $modulename
+	fi
+	
+	
+}
+
+case "$1" in
+start)
+	start
+	;;
+stop)
+	stop
+	;;
+reload|restart)
+	restart
+	;;
+status)
+	status_at
+	;;
+*)
+	echo $"Usage: $0 {start|stop|restart|status}"
+	exit 1
+esac
+
+exit $?
+exit $RETVAL
