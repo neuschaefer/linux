@@ -60,6 +60,24 @@
 			#reset-cells = <1>;
 		};
 
+		usb0: usb@b0005000 {
+			compatible = "chipidea,usb2";
+			reg = <0xb0005000 0x1000>;
+			interrupts = <20 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&clk WPCM450_CLK_USB0>;
+			dr_mode = "peripheral";
+			status = "disabled";
+		};
+
+		usb1: usb@b0006000 {
+			compatible = "chipidea,usb2";
+			reg = <0xb0006000 0x1000>;
+			interrupts = <21 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&clk WPCM450_CLK_USB0>;
+			dr_mode = "peripheral";
+			status = "disabled";
+		};
+
 		serial0: serial@b8000000 {
 			compatible = "nuvoton,wpcm450-uart";
 			reg = <0xb8000000 0x20>;
