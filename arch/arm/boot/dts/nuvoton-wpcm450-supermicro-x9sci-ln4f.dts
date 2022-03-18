@@ -109,3 +109,11 @@
 	/* "Serial over LAN" port. Connected to ttyS2 of the host system. */
 	status = "okay";
 };
+
+&usb0 {
+	status = "okay";
+};
+
+&usb1 {
+	status = "okay";
+};
