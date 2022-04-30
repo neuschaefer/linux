@@ -61,13 +61,10 @@ mpc83xx_find_end_of_memory(void)
 long __init
 mpc83xx_time_init(void)
 {
-#define SPCR_OFFS   0x00000110
-#define SPCR_TBEN   0x00400000
-
 	bd_t *binfo = (bd_t *)__res;
-	u32 *spcr = ioremap(binfo->bi_immr_base + SPCR_OFFS, 4);
+	u32 *spcr = ioremap(binfo->bi_immr_base + MPC83xx_SPCR, 4);
 
-	*spcr |= SPCR_TBEN;
+	*spcr |= MPC83xx_SPCR_TBEN;
 
 	iounmap(spcr);
 
@@ -130,35 +127,23 @@ mpc83xx_early_serial_map(void)
 void
 mpc83xx_restart(char *cmd)
 {
-	volatile unsigned char __iomem *reg;
-	unsigned char tmp;
+	bd_t *binfo = (bd_t *)__res;
 
-	reg = ioremap(BCSR_PHYS_ADDR, BCSR_SIZE);
+	u32 *rcr = ioremap(binfo->bi_immr_base + MPC83xx_RCR, 4);
+	u32 *rpr = ioremap(binfo->bi_immr_base + MPC83xx_RPR, 4);
 
-	local_irq_disable();
+	/* apply reset protect unlock command to
+	 * reset control protection  register */
+	*rpr = MPC83xx_RPR_RSTE;
 
-	/*
-	 * Unlock the BCSR bits so a PRST will update the contents.
-	 * Otherwise the reset asserts but doesn't clear.
-	 */
-	tmp = in_8(reg + BCSR_MISC_REG3_OFF);
-	tmp |= BCSR_MISC_REG3_CNFLOCK; /* low true, high false */
-	out_8(reg + BCSR_MISC_REG3_OFF, tmp);
+	/* apply software hard reset to
+	 * reset control register*/
+	*rcr = MPC83xx_RCR_SWHR;
 
-	/*
-	 * Trigger a reset via a low->high transition of the
-	 * PORESET bit.
-	 */
-	tmp = in_8(reg + BCSR_MISC_REG2_OFF);
-	tmp &= ~BCSR_MISC_REG2_PORESET;
-	out_8(reg + BCSR_MISC_REG2_OFF, tmp);
-
-	udelay(1);
-
-	tmp |= BCSR_MISC_REG2_PORESET;
-	out_8(reg + BCSR_MISC_REG2_OFF, tmp);
-
-	for(;;);
+	/* not reached, but... */
+	iounmap(rcr);
+	iounmap(rpr);
+	for (;;) ;
 }
 
 void
@@ -234,6 +219,7 @@ mpc83xx_setup_pci1(struct pci_controller *hose)
 	iounmap(ios);
 }
 
+#ifdef CONFIG_MPC83xx_PCI2
 void __init
 mpc83xx_setup_pci2(struct pci_controller *hose)
 {
@@ -291,8 +277,11 @@ mpc83xx_setup_pci2(struct pci_controller *hose)
 	iounmap(pci_ctrl);
 	iounmap(ios);
 }
+#endif
 
 /*
+ * NOTICE for the MPC83xx SYS Freescale evaluation board:
+ *
  * PCI buses can be enabled only if SYS board combinates with PIB
  * (Platform IO Board) board which provide 3 PCI slots. There is 2 PCI buses
  * and 3 PCI slots, so people must configure the routes between them before
@@ -300,10 +289,6 @@ mpc83xx_setup_pci2(struct pci_controller *hose)
  * can be accessed via I2C bus 2 and are configured by firmware. Refer to
  * Freescale to get more information about firmware configuration.
  */
-
-extern int mpc83xx_exclude_device(u_char bus, u_char devfn);
-extern int mpc83xx_map_irq(struct pci_dev *dev, unsigned char idsel,
-		unsigned char pin);
 void __init
 mpc83xx_setup_hose(void)
 {
@@ -319,21 +304,45 @@ mpc83xx_setup_hose(void)
 			sizeof(immr_clk_t));
 
 	/*
-	 * Configure PCI controller and PCI_CLK_OUTPUT both in 66M mode
+	 * Configure PCI_CLK_OUTPUT
 	 */
 	val32 = clk->occr;
 	udelay(2000);
-	clk->occr = 0xff000000;
+	
+#ifdef CONFIG_TQM834x
+	/*
+	 * WARNING! only PCI_CLK_OUTPUT1 is enabled for the TQM834x as this is
+	 * the one line actually used for clocking all external PCI devices in
+	 * current setup of the STK85xx.  Enabling other PCI_CLK_OUTPUT lines
+	 * may lead to board's hang for unknown reasons - particularly
+	 * PCI_CLK_OUTPUT6 and PCI_CLK_OUTPUT7 are known to hang the board;
+	 * this issue is under investigation (18 oct 05)
+	 */
+	val32 = OCCR_PCICOE1; 
+#else
+	/* enable all PCI_CLK_OUTs */
+	val32 = (OCCR_PCICOE0 | OCCR_PCICOE1 | OCCR_PCICOE2 | OCCR_PCICOE3 \
+		 | OCCR_PCICOE4 | OCCR_PCICOE5 | OCCR_PCICOE6 | OCCR_PCICOE7);
+#endif
+	/* set frequency of the PCI and clock outputs for external devicesc
+	 * according to system clocking settings */
+	if (clk->spmr & SPMR_CKID) {
+		/* PCI Clock is 1/2 of CONFIG_83XX_CLKIN so need to set up OCCR
+		 * fields accordingly */
+		val32 |= (OCCR_PCI1CR | OCCR_PCI2CR);
+		
+		val32 |= (OCCR_PCICD0 | OCCR_PCICD1 | OCCR_PCICD2 \
+			  | OCCR_PCICD3 | OCCR_PCICD4 | OCCR_PCICD5 \
+			  | OCCR_PCICD6 | OCCR_PCICD7);
+	}
+	
+	clk->occr = val32;
 	udelay(2000);
-
 	iounmap(clk);
 
 	hose1 = pcibios_alloc_controller();
 	if(!hose1)
 		return;
-
-	ppc_md.pci_swizzle = common_swizzle;
-	ppc_md.pci_map_irq = mpc83xx_map_irq;
 
 	hose1->bus_offset = 0;
 	hose1->first_busno = 0;
@@ -370,7 +379,6 @@ mpc83xx_setup_hose(void)
 			MPC83xx_PCI1_UPPER_MEM,
 			IORESOURCE_MEM, "PCI host bridge 1");
 
-	ppc_md.pci_exclude_device = mpc83xx_exclude_device;
 	hose1->last_busno = pciauto_bus_scan(hose1, hose1->first_busno);
 
 #ifdef CONFIG_MPC83xx_PCI2
@@ -407,5 +415,39 @@ mpc83xx_setup_hose(void)
 
 	hose2->last_busno = pciauto_bus_scan(hose2, hose2->first_busno);
 #endif /* CONFIG_MPC83xx_PCI2 */
+}
+
+
+void __init
+mpc834x_pcibios_fixup(void)
+{
+	struct pci_dev *dev = NULL;
+	unsigned int class;
+	int i;
+	
+	if ((dev = pci_find_device(PCI_VENDOR_ID_FREESCALE,
+				   PCI_DEVICE_ID_FREESCALE_MPC8349E, NULL))) {
+		class = dev->class >> 8;
+		if (class == PCI_CLASS_BRIDGE_OTHER) {
+			/*
+			 * at least rev 1.1 of the MPC8349E chip has the class
+			 * wrongly set in the host/PCI bridge config space
+			 * register; this leads to the host/PCI bridge being
+			 * treated as a regular client device, trying to assign
+			 * PCI resources to it etc.
+			 *
+			 */
+			dev->class = (PCI_CLASS_BRIDGE_HOST << 8) & ~0xf;
+
+			/* for some odd reasons the host/PCI bridge behaves
+			 * like an agent device and would claim PCI mem/io/irq
+			 * resources, so we make these resources inactive (i.e.
+			 * the bridge will not claim resources from itself)
+			 */
+			for (i = 0; i < DEVICE_COUNT_RESOURCE; i++) 
+				dev->resource[i].flags = IORESOURCE_UNSET;
+		}
+	}	
+	
 }
 #endif /*CONFIG_PCI*/

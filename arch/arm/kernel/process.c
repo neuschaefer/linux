@@ -72,8 +72,67 @@ static int __init hlt_setup(char *__unused)
 __setup("nohlt", nohlt_setup);
 __setup("hlt", hlt_setup);
 
+
+
+
+int disable_interrupts (void)
+{
+	unsigned long old,temp;
+	__asm__ __volatile__("mrs %0, cpsr\n"
+			"orr %1, %0, #0xc0\n"
+			"msr cpsr_c, %1"
+			: "=r" (old), "=r" (temp)
+			:
+			: "memory");
+	return (old & 0x80) == 0;
+}
+
+#define SPLUS_SYS_CONTROLLER_BASE   0xFCA00000
+
+typedef struct
+{
+	unsigned long SCCTRL;
+	unsigned long SCSYSSTAT;
+	unsigned long SCIMCTRL; 
+	unsigned long SCIMSTAT; 
+	unsigned long SCXTALCTRL;
+	unsigned long SCPLLCTRL; 
+	unsigned long SCPLLFCTRL; 
+	unsigned long SCPERCTRL0; 
+	unsigned long SCPERCTRL1; 
+	unsigned long SCPEREN; 
+	unsigned long SCPERDIS; 
+	unsigned long SCPERCLKEN; 
+	unsigned long SCPERSTAT;
+
+} SYS_CONTROLLER;
+
+
+void reset_cpu (ulong ignored)
+{
+	volatile SYS_CONTROLLER *pSysCtrl = (SYS_CONTROLLER *) (SPLUS_SYS_CONTROLLER_BASE);
+	
+	printk("System is going to reboot ...\n");
+
+	/* This 1 second delay will allow the above message to be printed before reset */
+//	mdelay(1000);
+	mdelay(10);
+
+	pSysCtrl->SCCTRL = 0x2;
+	/* Writing any value to the system status register will reset the SOC */	
+	pSysCtrl->SCSYSSTAT = 0x00;
+
+	/* system will restart */
+	while(1);
+
+}
+
+
+
+
 void arm_machine_restart(char mode)
 {
+	printk("machine restart\n");
 	/*
 	 * Clean and disable cache, and turn off interrupts
 	 */
@@ -89,7 +148,12 @@ void arm_machine_restart(char mode)
 	/*
 	 * Now call the architecture specific reboot code.
 	 */
-	arch_reset(mode);
+//	arch_reset(mode); //test
+
+	disable_interrupts ();
+	reset_cpu(0);
+
+
 
 	/*
 	 * Whoops - the architecture was unable to reboot.

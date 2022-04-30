@@ -31,7 +31,8 @@ void __init ibm440gx_get_clocks(struct ibm44x_clocks* p, unsigned int sys_clk,
 	u32 plld  = CPR_READ(DCRN_CPR_PLLD);
 	u32 uart0 = SDR_READ(DCRN_SDR_UART0);
 	u32 uart1 = SDR_READ(DCRN_SDR_UART1);
-#ifdef CONFIG_440EP
+#if defined(CONFIG_440EP) || defined(CONFIG_440GR) || \
+    defined(CONFIG_440EPX) || defined(CONFIG_440GRX)
 	u32 uart2 = SDR_READ(DCRN_SDR_UART2);
 	u32 uart3 = SDR_READ(DCRN_SDR_UART3);
 #endif
@@ -97,7 +98,8 @@ bypass:
 		p->uart1 = ser_clk;
 	else
 		p->uart1 = p->plb / __fix_zero(uart1 & 0xff, 256);
-#ifdef CONFIG_440EP
+#if defined(CONFIG_440EP) || defined(CONFIG_440GR) || \
+    defined(CONFIG_440EPX) || defined(CONFIG_440GRX)
 	if (uart2 & 0x00800000)
 		p->uart2 = ser_clk;
 	else

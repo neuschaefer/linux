@@ -321,4 +321,11 @@ config RTC_DRV_V3020
 	  This driver can also be built as a module. If so, the module
 	  will be called rtc-v3020.
 
+config SPEAR_RTC_ST
+	tristate "SPEAR ST RTC"
+	default y
+	help
+	  The SPEAR RTC driver
+
+
 endmenu

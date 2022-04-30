@@ -659,6 +659,7 @@ static unsigned int br_nf_forward_arp(unsigned int hook, struct sk_buff **pskb,
 {
 	struct sk_buff *skb = *pskb;
 	struct net_device **d = (struct net_device **)(skb->cb);
+	int tmpin; int tmpout;
 
 #ifdef CONFIG_SYSCTL
 	if (!brnf_call_arptables)
@@ -680,8 +681,9 @@ static unsigned int br_nf_forward_arp(unsigned int hook, struct sk_buff **pskb,
 		return NF_ACCEPT;
 	}
 	*d = (struct net_device *)in;
-	NF_HOOK(NF_ARP, NF_ARP_FORWARD, skb, (struct net_device *)in,
-		(struct net_device *)out, br_nf_forward_finish);
+	tmpin = (int)in;tmpout = (int)out;
+	NF_HOOK(NF_ARP, NF_ARP_FORWARD, skb, (struct net_device *)tmpin,
+		(struct net_device *)tmpout, br_nf_forward_finish);
 
 	return NF_STOLEN;
 }

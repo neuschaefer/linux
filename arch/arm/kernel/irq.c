@@ -51,6 +51,10 @@
 void (*init_arch_irq)(void) __initdata = NULL;
 unsigned long irq_err_count;
 
+unsigned int total_interrupts, tdm_interrupts;
+EXPORT_SYMBOL(total_interrupts);
+EXPORT_SYMBOL(tdm_interrupts);
+
 int show_interrupts(struct seq_file *p, void *v)
 {
 	int i = *(loff_t *) v, cpu;
@@ -121,6 +125,9 @@ asmlinkage void asm_do_IRQ(unsigned int irq, struct pt_regs *regs)
 	if (irq >= NR_IRQS)
 		desc = &bad_irq_desc;
 
+	total_interrupts++;
+	if(irq == 28) tdm_interrupts++;
+	
 	irq_enter();
 
 	desc_handle_irq(irq, desc);

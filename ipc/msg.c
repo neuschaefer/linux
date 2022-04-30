@@ -387,7 +387,7 @@ copy_msqid_from_user(struct msq_setbuf *out, void __user *buf, int version)
 asmlinkage long sys_msgctl(int msqid, int cmd, struct msqid_ds __user *buf)
 {
 	struct kern_ipc_perm *ipcp;
-	struct msq_setbuf setbuf;
+	struct msq_setbuf setbuf={0,0,0,0};
 	struct msg_queue *msq;
 	int err, version;
 	struct ipc_namespace *ns;

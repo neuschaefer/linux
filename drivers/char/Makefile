@@ -40,6 +40,17 @@ obj-$(CONFIG_SYNCLINK_GT)	+= synclink_gt.o
 obj-$(CONFIG_N_HDLC)		+= n_hdlc.o
 obj-$(CONFIG_AMIGA_BUILTIN_SERIAL) += amiserial.o
 obj-$(CONFIG_SX)		+= sx.o generic_serial.o
+obj-$(CONFIG_SPEAR_GPIO_pl061)	+= spr_gpio_pl061_hal.o  spr_gpio_pl061.o
+obj-$(CONFIG_SPEAR_IPC)		+= spr_ipc_mpi_hal.o spr_ipc_mpi.o
+obj-$(CONFIG_SPEAR_DMA_pl080)	+= spr_dma_pl080_hal.o  spr_dma_pl080.o
+obj-$(CONFIG_SPEAR_SSP_pl022)	+= spr_ssp_pl022.o  spr_ssp_pl022_hal.o
+obj-$(CONFIG_SPEAR_ADC_st10)	+= spr_adc_st10.o spr_adc_st10_hal.o
+ifdef CONFIG_ARCH_SPEARPLUS
+obj-$(CONFIG_SPEAR_JPEG)	+= sprplus_jpeg_hdr_decode.o sprplus_jpeg_syn_hal.o sprplus_jpeg_syn.o 
+else
+obj-$(CONFIG_SPEAR_JPEG)	+= sprbasic_jpeg_syn_hal.o sprbasic_jpeg_syn.o 
+endif
+obj-$(CONFIG_SPEAR_ARM2)   	+= spr_arm2_enable.o
 obj-$(CONFIG_RIO)		+= rio/ generic_serial.o
 obj-$(CONFIG_HVC_CONSOLE)	+= hvc_vio.o hvsi.o
 obj-$(CONFIG_HVC_ISERIES)	+= hvc_iseries.o

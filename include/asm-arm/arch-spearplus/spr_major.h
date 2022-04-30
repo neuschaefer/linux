@@ -1,0 +1,8 @@
+#define MAJOR_UART	4
+#define MAJOR_JPEG	249
+#define MAJOR_WDT	250
+#define MAJOR_GPIO	251
+#define MAJOR_SSP	252
+#define MAJOR_IPC	253
+#define MAJOR_ENBARM2	254
+#define MAJOR_ADC	255

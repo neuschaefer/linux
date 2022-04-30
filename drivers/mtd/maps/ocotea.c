@@ -1,9 +1,8 @@
 /*
  * Mapping for Ocotea user flash
  *
- * Matt Porter <mporter@kernel.crashing.org>
- *
  * Copyright 2002-2004 MontaVista Software Inc.
+ * Copyright 2005 Matt Porter <mporter@kernel.crashing.org>
  *
  * This program is free software; you can redistribute  it and/or modify it
  * under  the terms of  the GNU General  Public License as published by the
@@ -25,17 +24,50 @@
 static struct mtd_info *flash;
 
 static struct map_info ocotea_small_map = {
-	.name =		"Ocotea small flash",
+	.name =		"Small-flash",
 	.size =		OCOTEA_SMALL_FLASH_SIZE,
-	.buswidth =	1,
+	.bankwidth =	1,
 };
 
 static struct map_info ocotea_large_map = {
-	.name =		"Ocotea large flash",
+	.name =		"Large-flash",
 	.size =		OCOTEA_LARGE_FLASH_SIZE,
-	.buswidth =	1,
+	.bankwidth =	1,
 };
 
+#ifdef CONFIG_MTD_UBOOT_PARTITIONS
+static struct mtd_partition ocotea_small_partitions[] = {
+	{
+		.name =   "reserved",
+		.offset = 0,
+		.size =   0xa0000,
+	},
+	{
+		.name =   "env",
+		.offset = 0xa0000,
+		.size =   0x20000,
+	},
+	{
+		.name =   "u-boot",
+		.offset = 0x40000,
+		.size =   0x40000,
+		/*.mask_flags = MTD_WRITEABLE, */ /* force read-only */
+	}
+};
+
+static struct mtd_partition ocotea_large_partitions[] = {
+	{
+		.name =   "kernel",
+		.offset = 0,
+		.size =   0x180000,
+	},
+	{
+		.name =   "root",
+		.offset = 0x180000,
+		.size =   0x280000,
+	}
+};
+#else /* CONFIG_MTD_UBOOT_PARTITIONS */
 static struct mtd_partition ocotea_small_partitions[] = {
 	{
 		.name =   "pibs",
@@ -56,6 +88,7 @@ static struct mtd_partition ocotea_large_partitions[] = {
 		.size =   0x100000,
 	}
 };
+#endif /* CONFIG_MTD_UBOOT_PARTITIONS */
 
 int __init init_ocotea(void)
 {
@@ -63,11 +96,11 @@ int __init init_ocotea(void)
 	u8 *fpga0_adr;
 	unsigned long long small_flash_base, large_flash_base;
 
-	fpga0_adr = ioremap64(OCOTEA_FPGA_ADDR, 16);
+	fpga0_adr = ioremap64(OCOTEA_FPGA_REG_0, 16);
 	if (!fpga0_adr)
 		return -ENOMEM;
 
-	fpga0_reg = readb((unsigned long)fpga0_adr);
+	fpga0_reg = readb(fpga0_adr);
 	iounmap(fpga0_adr);
 
 	if (OCOTEA_BOOT_LARGE_FLASH(fpga0_reg)) {
@@ -90,7 +123,11 @@ int __init init_ocotea(void)
 
 	simple_map_init(&ocotea_small_map);
 
+#ifdef CONFIG_MTD_UBOOT_PARTITIONS
+	flash = do_map_probe("jedec_probe", &ocotea_small_map);
+#else
 	flash = do_map_probe("map_rom", &ocotea_small_map);
+#endif
 	if (flash) {
 		flash->owner = THIS_MODULE;
 		add_mtd_partitions(flash, ocotea_small_partitions,

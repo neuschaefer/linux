@@ -69,7 +69,7 @@ ocotea_calibrate_decr(void)
 static int
 ocotea_show_cpuinfo(struct seq_file *m)
 {
-	seq_printf(m, "vendor\t\t: IBM\n");
+	seq_printf(m, "vendor\t\t: AMCC\n");
 	seq_printf(m, "machine\t\t: PPC440GX EVB (Ocotea)\n");
 	ibm440gx_show_cpuinfo(m);
 	return 0;

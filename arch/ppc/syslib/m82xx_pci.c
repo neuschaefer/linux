@@ -301,6 +301,19 @@ pq2ads_setup_pci(struct pci_controller *hose)
 
 }
 
+void m8260_pcibios_fixup(void)
+{
+	struct pci_dev *dev = NULL;
+
+	for_each_pci_dev(dev) {
+#ifdef CONFIG_PM82X
+		if (dev->bus->number == 0 && (dev->devfn & ~0x7) == (0xD << 3)) {
+			dev->irq = SIU_INT_IRQ5;
+		}
+#endif
+	}
+}
+
 void __init pq2_find_bridges(void)
 {
 	extern int pci_assign_all_buses;
@@ -378,7 +391,7 @@ void __init pq2_find_bridges(void)
 	hose->last_busno = pciauto_bus_scan(hose, hose->first_busno);
 
 	ppc_md.pci_map_irq = pq2pci_map_irq;
-	ppc_md.pcibios_fixup = NULL;
+	ppc_md.pcibios_fixup = m8260_pcibios_fixup;
 	ppc_md.pcibios_fixup_bus = NULL;
 
 }

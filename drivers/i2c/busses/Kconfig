@@ -242,6 +242,16 @@ config I2C_IXP2000
 	  This support is also available as a module. If so, the module
 	  will be called i2c-ixp2000.
 
+config I2C_TQM8272
+	tristate "TQM8272 Bitbanged I2C Interface"
+	depends on I2C && TQM8272
+	select I2C_ALGOBIT
+	help
+	  Say Y here if you have a TQM8272 board.
+
+	  This support is also available as a module. If so, the module
+	  will be called i2c-tqm8272.
+
 config I2C_POWERMAC
 	tristate "Powermac I2C interface"
 	depends on I2C && PPC_PMAC
@@ -265,6 +275,16 @@ config I2C_MPC
 
 	  This driver can also be built as a module.  If so, the module
 	  will be called i2c-mpc.
+
+config I2C_MPC8260
+        tristate "MPC 8260"
+        depends on I2C && PPC32
+        help
+          If you say yes to this option, support will be included for the
+          I2C interface on the MPC8260.
+
+          This driver can also be built as a module.  If so, the module
+          will be called i2c-m8260.
 
 config I2C_NFORCE2
 	tristate "Nvidia nForce2, nForce3 and nForce4"
@@ -546,5 +566,12 @@ config I2C_MV64XXX
 
 	  This driver can also be built as a module.  If so, the module
 	  will be called i2c-mv64xxx.
+
+config SPEAR_I2C_Syn
+	tristate "SPEAR I2C syn controller driver"
+	depends on SBASIC_I2C || ARCH_SPEARPLUS
+	default y
+	help
+	  The SPEAR I2C driver
 
 endmenu

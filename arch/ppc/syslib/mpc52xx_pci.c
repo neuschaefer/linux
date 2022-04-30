@@ -134,6 +134,7 @@ mpc52xx_pci_write_config(struct pci_bus *bus, unsigned int devfn,
 
 		out_le32(hose->cfg_data, val);
 	}
+
 	mb();
 
 	out_be32(hose->cfg_addr, 0);

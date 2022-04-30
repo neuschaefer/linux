@@ -30,6 +30,10 @@
 #include <platforms/4xx/ep405.h>
 #endif
 
+#if defined(CONFIG_PPChameleonEVB)
+#include <platforms/4xx/ppchameleon.h>
+#endif
+
 #if defined(CONFIG_REDWOOD_5)
 #include <platforms/4xx/redwood5.h>
 #endif
@@ -40,6 +44,10 @@
 
 #if defined(CONFIG_SYCAMORE)
 #include <platforms/4xx/sycamore.h>
+#endif
+
+#if defined(CONFIG_TAIHU)
+#include <platforms/4xx/taihu.h>
 #endif
 
 #if defined(CONFIG_WALNUT)
@@ -88,6 +96,10 @@ void ppc4xx_init(unsigned long r3, unsigned long r4, unsigned long r5,
 
 #elif defined(CONFIG_44x)
 
+#if defined(CONFIG_ALPR)
+#include <platforms/4xx/alpr.h>
+#endif
+
 #if defined(CONFIG_BAMBOO)
 #include <platforms/4xx/bamboo.h>
 #endif
@@ -106,6 +118,18 @@ void ppc4xx_init(unsigned long r3, unsigned long r4, unsigned long r5,
 
 #if defined(CONFIG_OCOTEA)
 #include <platforms/4xx/ocotea.h>
+#endif
+
+#if defined(CONFIG_P3P440)
+#include <platforms/4xx/p3p440.h>
+#endif
+
+#if defined(CONFIG_YELLOWSTONE) || defined(CONFIG_YOSEMITE)
+#include <platforms/4xx/yosemite.h>
+#endif
+
+#if defined(CONFIG_SEQUOIA) || defined(CONFIG_RAINIER)
+#include <platforms/4xx/sequoia.h>
 #endif
 
 #ifndef __ASSEMBLY__

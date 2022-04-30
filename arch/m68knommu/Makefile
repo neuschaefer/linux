@@ -114,5 +114,17 @@ core-y	+= arch/m68knommu/kernel/ \
 	   arch/m68knommu/platform/$(PLATFORM)/
 libs-y	+= arch/m68knommu/lib/
 
+all: uImage
+
+boot := arch/$(ARCH)/boot
+
+uImage: vmlinux
+	$(Q)$(MAKE) $(build)=$(boot)/images $(boot)/images/$@
+
+define archhelp
+	@echo '  uImage          - Create a bootable image for U-Boot'
+	@echo '  *_defconfig     - Select default config from arch/$(ARCH)/m68knommu/configs'
+endef
+
 archclean:
 	$(Q)$(MAKE) $(clean)=arch/m68knommu/boot

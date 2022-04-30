@@ -256,6 +256,12 @@ config MTD_SBC8240
           Flash access on the SBC8240 board from Wind River.  See
           <http://www.windriver.com/products/sbc8240/>
 
+config MTD_PM82X
+        tristate "Flash device on PM82X Boards"
+        depends on PPC32 && 6xx && 8260 && MTD_COMPLEX_MAPPINGS && MTD_PARTITIONS
+        help
+          Flash access on the PM82X boards from Microsys.
+
 config MTD_TQM8XXL
 	tristate "CFI Flash device mapped on TQM8XXL"
 	depends on MTD_CFI && TQM8xxL
@@ -316,12 +322,19 @@ config MTD_ARCTIC
 	  use the flash chips on it, say 'Y'.
 
 config MTD_WALNUT
-	tristate "Flash device mapped on IBM 405GP Walnut"
-	depends on MTD_JEDECPROBE && WALNUT
+	tristate "Flash device mapped on AMCC 405GP/r/EP Walnut/Sycamore/Bubinga"
+	depends on MTD_JEDECPROBE && (WALNUT || SYCAMORE || BUBINGA)
 	help
-	  This enables access routines for the flash chips on the IBM 405GP
-	  Walnut board. If you have one of these boards and would like to
-	  use the flash chips on it, say 'Y'.
+	  This enables access routines for the flash chips on the AMCC 40x eval
+	  boards (Walnut, Sycamore & Bubinga). If you have one of these boards
+	  and would like to use the flash chips on it, say 'Y'.
+
+config MTD_ALPR
+	tristate "Flash devices mapped on Prodrive ALPR board."
+	depends on MTD_CFI && 44x && ALPR
+	help
+	  This enables access routined for the flash chips on the Prodrive
+	  ALPR board. 
 
 config MTD_EBONY
 	tristate "Flash devices mapped on IBM 440GP Ebony"
@@ -339,6 +352,23 @@ config MTD_OCOTEA
 	  Ocotea board. If you have one of these boards and would like to
 	  use the flash chips on it, say 'Y'.
 
+config MTD_BAMBOO
+	tristate "Flash devices mapped on IBM 440EP Bamboo"
+	depends on MTD_CFI && PPC32 && 44x && BAMBOO
+	help
+	  This enables access routined for the flash chips on the IBM 440EP
+	  Bamboo board.  If you have one of these boards and would like to
+	  use the flash chips on it, say 'Y'.
+
+config MTD_YOSEMITE
+	tristate "Flash devices mapped on AMCC 440EP(x)/GR(x) Yosemite/Yellowstone"
+	depends on MTD_CFI && PPC32 && 44x && (YOSEMITE || YELLOWSTONE || SEQUOIA || RAINIER)
+	help
+	  This enables access routined for the flash chips on the AMCC 440EP
+	  Yosemite, 440GR Yellostone, 440EPx Sequoia and 440GRx Rainier board.
+	  If you have one of these boards and would like to use the flash
+	  chips on it, say 'Y'.
+
 config MTD_REDWOOD
 	tristate "CFI Flash devices mapped on IBM Redwood"
 	depends on MTD_CFI && ( REDWOOD_4 || REDWOOD_5 || REDWOOD_6 )
@@ -347,13 +377,58 @@ config MTD_REDWOOD
 	  Redwood board. If you have one of these boards and would like to
 	  use the flash chips on it, say 'Y'.
 
+config MTD_PPCHAMELEON
+	tristate "Flash device mapped on DAVE PPChamelonEVB Boards"
+	depends on MTD_CFI && PPC32 && 40x && PPChameleonEVB
+	help
+	  This enables access routines for the flash chips on the
+	  DAVE PPChamelonEVB board. If you have one of these boards
+	  and would like to use the flash chips on it, say 'Y'.
+
+config MTD_TQM82xx
+	tristate "Flash device mapped on TQ Components TQM827x Boards"
+	depends on MTD_CFI && (TQM8272)
+	help
+	  This enables access routines for the flash chips on the
+	  TQ Components TQM82xx boards. If you have one of these boards
+	  and would like to use the flash chips on it, say 'Y'.
+
 config MTD_TQM834x
 	tristate "Flash device mapped on TQ Components TQM834x Boards"
-	depends on MTD_CFI && TQM834x
+	depends on MTD_CFI && PPC32 && 83xx && TQM834x
 	help
 	  This enables access routines for the flash chips on the
 	  TQ Components TQM834x boards. If you have one of these boards
 	  and would like to use the flash chips on it, say 'Y'.
+
+config MTD_P3P440
+	tristate "Flash devices mapped on Prodrive P3P440"
+	depends on MTD_CFI && P3P440
+	help
+	  This enables access routined for the flash chips on the Prodrive
+	  P3P440 board.  If you have this board and would like to use the
+	  flash chips on it, say 'Y'.
+
+config MTD_TQM85xx
+	tristate "Flash device mapped on TQ Components TQM85xx Boards"
+	depends on MTD_CFI && (TQM8540 || TQM8541 || TQM8555 || TQM8560)
+	help
+	  This enables access routines for the flash chips on the
+	  TQ Components TQM85xx boards. If you have one of these boards
+	  and would like to use the flash chips on it, say 'Y'.
+
+config MTD_TAIHU
+	tristate "Flash device mapped on AMCC 405EP Taihu"
+	depends on MTD_CFI && PPC32 && 40x && TAIHU
+	help
+	  This enables access routines for the flash chips on the AMCC 405EP
+	  Taihu board. If you have one of these boards and would like to
+	  use the flash chips on it, say 'Y'.
+
+config MTD_UBOOT_PARTITIONS
+	bool "Use U-Boot partition setup"
+	depends on MTD_WALNUT || MTD_EBONY || MTD_OCOTEA || MTD_BAMBOO
+	default n
 
 config MTD_CSTM_MIPS_IXX
 	tristate "Flash chip mapping on ITE QED-4N-S01B, Globespan IVR or custom board"

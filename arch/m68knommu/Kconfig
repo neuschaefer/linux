@@ -455,6 +455,14 @@ config AVNET
 	default y
 	depends on (AVNET5282)
 
+config UBOOT
+	bool "Support for U-Boot command line parameters"
+	help
+	  If you say Y here kernel will try to collect a command
+	  line parameters from the initial u-boot stack.
+	default n
+	depends on M5271EVB
+
 config LARGE_ALLOCS
 	bool "Allow allocating large blocks (> 1MB) of memory"
 	help

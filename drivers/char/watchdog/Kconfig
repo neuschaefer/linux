@@ -750,4 +750,11 @@ config USBPCWATCHDOG
 
 	  Most people will say N.
 
+config SPEAR_WDT_sp805
+	depends on WATCHDOG
+	tristate "SPEAR WDT sp805"
+	default y
+	help
+	  The SPEAR WDT driver
+
 endmenu

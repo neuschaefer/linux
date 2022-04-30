@@ -37,13 +37,13 @@
 /*-------------------------------------------------------------------------*/
 
 /* hcd->hub_irq_enable() */
-static void ohci_rhsc_enable (struct usb_hcd *hcd)
+/*static void ohci_rhsc_enable (struct usb_hcd *hcd)
 {
 	struct ohci_hcd		*ohci = hcd_to_ohci (hcd);
 
 	ohci_writel (ohci, OHCI_INTR_RHSC, &ohci->regs->intrenable);
 }
-
+*/
 #define OHCI_SCHED_ENABLES \
 	(OHCI_CTRL_CLE|OHCI_CTRL_BLE|OHCI_CTRL_PLE|OHCI_CTRL_IE)
 
@@ -132,7 +132,7 @@ static inline struct ed *find_head (struct ed *ed)
 	return ed;
 }
 
-static int ohci_restart (struct ohci_hcd *ohci);
+//static int ohci_restart (struct ohci_hcd *ohci);
 
 /* caller has locked the root hub */
 static int ohci_rh_resume (struct ohci_hcd *ohci)

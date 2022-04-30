@@ -1,19 +1,21 @@
 #
 # USB Host Controller Drivers
 #
+
+
 comment "USB Host Controller Drivers"
 	depends on USB
 
 config USB_EHCI_HCD
 	tristate "EHCI HCD (USB 2.0) support"
-	depends on USB && USB_ARCH_HAS_EHCI
+	depends on USB 
 	---help---
 	  The Enhanced Host Controller Interface (EHCI) is standard for USB 2.0
 	  "high speed" (480 Mbit/sec, 60 Mbyte/sec) host controller hardware.
 	  If your USB host controller supports USB 2.0, you will likely want to
-	  configure this Host Controller Driver.  At the time of this writing, 
+	  configure this Host Controller Driver.  At the time of this writing,
 	  the primary implementation of EHCI is a chip from NEC, widely available
-	  in add-on PCI cards, but implementations are in the works from other 
+	  in add-on PCI cards, but implementations are in the works from other
 	  vendors including Intel and Philips.  Motherboard support is appearing.
 
 	  EHCI controllers are packaged with "companion" host controllers (OHCI
@@ -28,6 +30,27 @@ config USB_EHCI_HCD
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called ehci-hcd.
+
+config USB_ARCH_HAS_HCD
+	depends on USB 
+        default y if USB_ARCH_HAS_OHCI
+        default y if ARM           # SL-811
+    	default y if ARCH_SPEARPLUS
+	    default y if ARCH_SPEARBASIC
+        default PCI
+
+# many non-PCI hcds implement OHCI
+config USB_ARCH_HAS_OHCI
+	depends on USB 
+        default y if SA1111
+        default y if ARCH_OMAP
+        default y if ARCH_LH7A404
+        default y if PXA27x
+        default y if ARCH_SPEARPLUS
+        default y if ARCH_SPEARBASIC
+        default PCI
+        #default y
+
 
 config USB_EHCI_SPLIT_ISO
 	bool "Full speed ISO transactions (EXPERIMENTAL)"
@@ -81,7 +104,7 @@ config USB_ISP116X_HCD
 
 config USB_OHCI_HCD
 	tristate "OHCI HCD support"
-	depends on USB && USB_ARCH_HAS_OHCI
+	depends on USB
 	select ISP1301_OMAP if MACH_OMAP_H2 || MACH_OMAP_H3
 	select I2C if ARCH_PNX4008
 	---help---
@@ -99,12 +122,12 @@ config USB_OHCI_HCD
 
 config USB_OHCI_HCD_PPC_SOC
 	bool "OHCI support for on-chip PPC USB controller"
-	depends on USB_OHCI_HCD && (STB03xxx || PPC_MPC52xx)
+	depends on USB_OHCI_HCD && (STB03xxx || PPC_MPC52xx || 440EP || 440EPX)
 	default y
 	select USB_OHCI_BIG_ENDIAN
 	---help---
-	  Enables support for the USB controller on the MPC52xx or
-	  STB03xxx processor chip.  If unsure, say Y.
+	  Enables support for the USB controller on the MPC52xx,
+	  STB03xxx, 440EP or 440EPx processor chip.  If unsure, say Y.
 
 config USB_OHCI_HCD_PCI
 	bool "OHCI support for PCI-bus USB controllers"
@@ -123,7 +146,7 @@ config USB_OHCI_BIG_ENDIAN
 config USB_OHCI_LITTLE_ENDIAN
 	bool
 	depends on USB_OHCI_HCD
-	default n if STB03xxx || PPC_MPC52xx
+	default n if STB03xxx || PPC_MPC52xx || 440EP || 440EPX
 	default y
 
 config USB_UHCI_HCD
@@ -176,7 +199,7 @@ config USB_SL811_HCD
 	help
 	  The SL811HS is a single-port USB controller that supports either
 	  host side or peripheral side roles.  Enable this option if your
-	  board has this chip, and you want to use it as a host controller. 
+	  board has this chip, and you want to use it as a host controller.
 	  If unsure, say N.
 
 	  To compile this driver as a module, choose M here: the

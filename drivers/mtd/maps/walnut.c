@@ -1,11 +1,16 @@
 /*
  * $Id: walnut.c,v 1.3 2005/11/07 11:14:29 gleixner Exp $
  *
- * Mapping for Walnut flash
- * (used ebony.c as a "framework")
+ * drivers/mtd/maps/walnut.c
  *
- * Heikki Lindholm <holindho@infradead.org>
+ * Mapping for Walnut (405GP), Sycamore (405GPr) and Bubinga (405EP) flash
  *
+ * Copyright (c) 2005 DENX Software Engineering
+ * Stefan Roese <sr@denx.de>
+ *
+ * Based on original work by
+ * 	Heikki Lindholm <holindho@infradead.org>
+ *      Matt Porter <mporter@kernel.crashing.org>
  *
  * This program is free software; you can redistribute  it and/or modify it
  * under  the terms of  the GNU General  Public License as published by the
@@ -22,33 +27,46 @@
 #include <linux/mtd/partitions.h>
 #include <asm/io.h>
 #include <asm/ibm4xx.h>
-#include <platforms/4xx/walnut.h>
-
-/* these should be in platforms/4xx/walnut.h ? */
-#define WALNUT_FLASH_ONBD_N(x)		(x & 0x02)
-#define WALNUT_FLASH_SRAM_SEL(x)	(x & 0x01)
-#define WALNUT_FLASH_LOW		0xFFF00000
-#define WALNUT_FLASH_HIGH		0xFFF80000
-#define WALNUT_FLASH_SIZE		0x80000
 
 static struct mtd_info *flash;
 
 static struct map_info walnut_map = {
-	.name =		"Walnut flash",
-	.size =		WALNUT_FLASH_SIZE,
+	.name =		"PPC40x-flash",
+	.size =		PPC40x_FLASH_SIZE,
 	.bankwidth =	1,
 };
 
+#ifdef CONFIG_MTD_UBOOT_PARTITIONS
+static struct mtd_partition walnut_partitions[] = {
+	{
+		.name =   "reserved",
+		.offset = 0,
+		.size =   0x20000,
+	},
+	{
+		.name =   "env",
+		.offset = 0x20000,
+		.size =   0x20000,
+	},
+	{
+		.name =   "u-boot",
+		.offset = 0x40000,
+		.size =   0x40000,
+		/*.mask_flags = MTD_WRITEABLE, */ /* force read-only */
+	}
+};
+#else /* CONFIG_MTD_UBOOT_PARTITIONS */
 /* Actually, OpenBIOS is the last 128 KiB of the flash - better
  * partitioning could be made */
 static struct mtd_partition walnut_partitions[] = {
 	{
 		.name =   "OpenBIOS",
 		.offset = 0x0,
-		.size =   WALNUT_FLASH_SIZE,
+		.size =   PPC40x_FLASH_SIZE,
 		/*.mask_flags = MTD_WRITEABLE, */ /* force read-only */
 	}
 };
+#endif /* CONFIG_MTD_UBOOT_PARTITIONS */
 
 int __init init_walnut(void)
 {
@@ -58,23 +76,23 @@ int __init init_walnut(void)
 	unsigned long flash_base;
 
 	/* this should already be mapped (platform/4xx/walnut.c) */
-	fpga_status_adr = ioremap(WALNUT_FPGA_BASE, 8);
+	fpga_status_adr = ioremap(PPC40x_FPGA_BASE, 8);
 	if (!fpga_status_adr)
 		return -ENOMEM;
 
-	fpga_brds1_adr = fpga_status_adr+5;
+	fpga_brds1_adr = fpga_status_adr + PPC40x_FPGA_REG_OFFS;
 	fpga_brds1 = readb(fpga_brds1_adr);
 	/* iounmap(fpga_status_adr); */
 
-	if (WALNUT_FLASH_ONBD_N(fpga_brds1)) {
+	if (PPC40x_FLASH_ONBD_N(fpga_brds1)) {
 		printk("The on-board flash is disabled (U79 sw 5)!");
 		iounmap(fpga_status_adr);
 		return -EIO;
 	}
-	if (WALNUT_FLASH_SRAM_SEL(fpga_brds1))
-		flash_base = WALNUT_FLASH_LOW;
+	if (PPC40x_FLASH_SRAM_SEL(fpga_brds1))
+		flash_base = PPC40x_FLASH_LOW;
 	else
-		flash_base = WALNUT_FLASH_HIGH;
+		flash_base = PPC40x_FLASH_HIGH;
 
 	walnut_map.phys = flash_base;
 	walnut_map.virt =
@@ -120,5 +138,5 @@ module_init(init_walnut);
 module_exit(cleanup_walnut);
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Heikki Lindholm <holindho@infradead.org>");
-MODULE_DESCRIPTION("MTD map and partitions for IBM 405GP Walnut boards");
+MODULE_AUTHOR("Stefan Roese <sr@denx.de>");
+MODULE_DESCRIPTION("MTD map and partitions for IBM 405GP/r/EP boards");

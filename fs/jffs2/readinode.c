@@ -664,7 +664,7 @@ static int jffs2_do_read_inode_internal(struct jffs2_sb_info *c,
 	struct jffs2_full_dirent *fd_list;
 	struct jffs2_full_dnode *fn, *first_fn = NULL;
 	uint32_t crc;
-	uint32_t latest_mctime, mctime_ver;
+	uint32_t latest_mctime=0, mctime_ver;
 	size_t retlen;
 	int ret;
 

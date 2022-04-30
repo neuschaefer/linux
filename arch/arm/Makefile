@@ -72,7 +72,7 @@ tune-$(CONFIG_CPU_XSC3)		:=$(call cc-option,-mtune=xscale,-mtune=strongarm110) -
 tune-$(CONFIG_CPU_V6)		:=$(call cc-option,-mtune=arm1136j-s,-mtune=strongarm)
 
 ifeq ($(CONFIG_AEABI),y)
-CFLAGS_ABI	:=-mabi=aapcs-linux -mno-thumb-interwork
+CFLAGS_ABI	:=  -mfloat-abi=soft  -mno-thumb-interwork
 else
 CFLAGS_ABI	:=$(call cc-option,-mapcs-32,-mabi=apcs-gnu) $(call cc-option,-mno-thumb-interwork,)
 endif
@@ -125,6 +125,11 @@ endif
  machine-$(CONFIG_ARCH_EP93XX)     := ep93xx
  machine-$(CONFIG_ARCH_PNX4008)    := pnx4008
  machine-$(CONFIG_ARCH_NETX)       := netx
+ machine-$(CONFIG_ARCH_SPEARBASIC) := spearbasic
+ textofs-$(CONFIG_ARCH_SPEARBASIC) := 0x00008000
+ machine-$(CONFIG_ARCH_SPEARPLUS)  := spearplus
+ textofs-$(CONFIG_ARCH_SPEARPLUS)  := 0x00008000
+
 
 ifeq ($(CONFIG_ARCH_EBSA110),y)
 # This is what happens if you forget the IOCS16 line.

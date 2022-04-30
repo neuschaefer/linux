@@ -63,6 +63,7 @@ int             sound_dmap_flag = 1;
 int             sound_dmap_flag = 0;
 #endif
 
+
 static char     dma_alloc_map[MAX_DMA_CHANNELS];
 
 #define DMA_MAP_UNAVAIL		0

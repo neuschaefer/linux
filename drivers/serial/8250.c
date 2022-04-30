@@ -76,8 +76,14 @@ static unsigned int nr_uarts = CONFIG_SERIAL_8250_RUNTIME_UARTS;
  * We default to IRQ0 for the "no irq" hack.   Some
  * machine types want others as well - they're free
  * to redefine this in their header file.
+ * NOTE:  Some PPC4xx use IRQ0 for a UART Interrupt, so
+ * we will assume that the IRQ is always real
  */
+#ifdef CONFIG_4xx
+#define is_real_interrupt(irq)	(1)
+#else
 #define is_real_interrupt(irq)	((irq) != 0)
+#endif
 
 #ifdef CONFIG_SERIAL_8250_DETECT_IRQ
 #define CONFIG_SERIAL_DETECT_IRQ 1
@@ -604,7 +610,7 @@ static unsigned int autoconfig_read_divisor_id(struct uart_8250_port *p)
  * its clones.  (We treat the broken original StarTech 16650 V1 as a
  * 16550, and why not?  Startech doesn't seem to even acknowledge its
  * existence.)
- * 
+ *
  * What evil have men's minds wrought...
  */
 static void autoconfig_has_efr(struct uart_8250_port *up)
@@ -657,7 +663,7 @@ static void autoconfig_has_efr(struct uart_8250_port *up)
 			up->bugs |= UART_BUG_QUOT;
 		return;
 	}
-	
+
 	/*
 	 * We check for a XR16C850 by setting DLL and DLM to 0, and then
 	 * reading back DLL and DLM.  The chip type depends on the DLM
@@ -800,7 +806,7 @@ static void autoconfig_16550a(struct uart_8250_port *up)
 			status1 &= ~0xB0; /* Disable LOCK, mask out PRESL[01] */
 			status1 |= 0x10;  /* 1.625 divisor for baud_base --> 921600 */
 			serial_outp(up, 0x04, status1);
-			
+
 			serial_dl_write(up, quot);
 
 			serial_outp(up, UART_LCR, 0);
@@ -905,7 +911,7 @@ static void autoconfig(struct uart_8250_port *up, unsigned int probeflags)
 		/*
 		 * Do a simple existence test first; if we fail this,
 		 * there's no point trying anything else.
-		 * 
+		 *
 		 * 0x80 is used as a nonsense port to prevent against
 		 * false positives due to ISA bus float.  The
 		 * assumption is that 0x80 is a non-existent port;
@@ -940,7 +946,7 @@ static void autoconfig(struct uart_8250_port *up, unsigned int probeflags)
 	save_mcr = serial_in(up, UART_MCR);
 	save_lcr = serial_in(up, UART_LCR);
 
-	/* 
+	/*
 	 * Check to see if a UART is really there.  Certain broken
 	 * internal modems based on the Rockwell chipset fail this
 	 * test, because they apparently don't implement the loopback
@@ -1047,7 +1053,7 @@ static void autoconfig(struct uart_8250_port *up, unsigned int probeflags)
 	else
 		serial_outp(up, UART_IER, 0);
 
- out:	
+ out:
 	spin_unlock_irqrestore(&up->port.lock, flags);
 //	restore_flags(flags);
 	DEBUG_AUTOCONF("type=%s\n", uart_config[up->port.type].name);
@@ -1073,7 +1079,7 @@ static void autoconfig_irq(struct uart_8250_port *up)
 	save_mcr = serial_inp(up, UART_MCR);
 	save_ier = serial_inp(up, UART_IER);
 	serial_outp(up, UART_MCR, UART_MCR_OUT1 | UART_MCR_OUT2);
-	
+
 	irqs = probe_irq_on();
 	serial_outp(up, UART_MCR, 0);
 	udelay (10);
@@ -1801,7 +1807,7 @@ serial8250_set_termios(struct uart_port *port, struct termios *termios,
 	/*
 	 * Ask the core to calculate the divisor for us.
 	 */
-	baud = uart_get_baud_rate(port, termios, old, 0, port->uartclk/16); 
+	baud = uart_get_baud_rate(port, termios, old, 0, port->uartclk/16);
 	quot = serial8250_get_divisor(port, baud);
 
 	/*

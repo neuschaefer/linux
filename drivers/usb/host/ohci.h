@@ -1,9 +1,9 @@
 /*
  * OHCI HCD (Host Controller Driver) for USB.
- * 
+ *
  * (C) Copyright 1999 Roman Weissgaerber <weissg@vienna.at>
  * (C) Copyright 2000-2002 David Brownell <dbrownell@users.sourceforge.net>
- * 
+ *
  * This file is licenced under the GPL.
  */
 
@@ -14,7 +14,7 @@
  */
 typedef __u32 __bitwise __hc32;
 typedef __u16 __bitwise __hc16;
- 
+
 /*
  * OHCI Endpoint Descriptor (ED) ... holds TD queue
  * See OHCI spec, section 4.2
@@ -70,7 +70,7 @@ struct ed {
 
 #define ED_MASK	((u32)~0x0f)		/* strip hw status in low addr bits */
 
- 
+
 /*
  * OHCI Transfer Descriptor (TD) ... one per transfer segment
  * See OHCI spec, sections 4.3.1 (general = control/bulk/interrupt)
@@ -152,8 +152,8 @@ struct td {
 #define TD_NOTACCESSED     0x0F
 
 
-/* map OHCI TD status codes (CC) to errno values */ 
-static const int cc_to_error [16] = { 
+/* map OHCI TD status codes (CC) to errno values */
+static const int cc_to_error [16] = {
 	/* No  Error  */               0,
 	/* CRC Error  */               -EILSEQ,
 	/* Bit Stuff  */               -EPROTO,
@@ -169,7 +169,7 @@ static const int cc_to_error [16] = {
 	/* BufferOver */               -ECOMM,
 	/* BuffUnder  */               -ENOSR,
 	/* (for HCD)  */               -EALREADY,
-	/* (for HCD)  */               -EALREADY 
+	/* (for HCD)  */               -EALREADY
 };
 
 
@@ -182,7 +182,7 @@ struct ohci_hcca {
 #define NUM_INTS 32
 	__hc32	int_table [NUM_INTS];	/* periodic schedule */
 
-	/* 
+	/*
 	 * OHCI defines u16 frame_no, followed by u16 zero pad.
 	 * Since some processors can't do 16 bit bus accesses,
 	 * portable access must be a 32 bits wide.
@@ -285,7 +285,7 @@ struct ohci_regs {
 
 
 /* OHCI ROOT HUB REGISTER MASKS */
- 
+
 /* roothub.portstatus [i] bits */
 #define RH_PS_CCS            0x00000001   	/* current connect status */
 #define RH_PS_PES            0x00000002   	/* port enable status*/
@@ -333,7 +333,7 @@ typedef struct urb_priv {
 } urb_priv_t;
 
 #define TD_HASH_SIZE    64    /* power'o'two */
-// sizeof (struct td) ~= 64 == 2^6 ... 
+// sizeof (struct td) ~= 64 == 2^6 ...
 #define TD_HASH_FUNC(td_dma) ((td_dma ^ (td_dma >> 6)) % TD_HASH_SIZE)
 
 
@@ -368,7 +368,7 @@ struct ohci_hcd {
 
 	/*
 	 * OTG controllers and transceivers need software interaction;
-	 * other external transceivers should be software-transparent 
+	 * other external transceivers should be software-transparent
 	 */
 	struct otg_transceiver	*transceiver;
 
@@ -559,7 +559,7 @@ static inline u32 hc32_to_cpup (const struct ohci_hcd *ohci, const __hc32 *x)
  * some big-endian SOC implementations.  Same thing happens with PSW access.
  */
 
-#ifdef CONFIG_STB03xxx
+#if defined(CONFIG_STB03xxx) || defined(CONFIG_440EP) || defined(CONFIG_440EPX)
 #define OHCI_BE_FRAME_NO_SHIFT	16
 #else
 #define OHCI_BE_FRAME_NO_SHIFT	0

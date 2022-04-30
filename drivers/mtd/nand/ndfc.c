@@ -56,7 +56,7 @@ static void ndfc_select_chip(struct mtd_info *mtd, int chip)
 		ccr |= NDFC_CCR_BS(chip + pchip->chip_offset);
 	} else
 		ccr |= NDFC_CCR_RESET_CE;
-	writel(ccr, ndfc->ndfcbase + NDFC_CCR);
+	__raw_writel(ccr, ndfc->ndfcbase + NDFC_CCR);
 }
 
 static void ndfc_hwcontrol(struct mtd_info *mtd, int cmd, unsigned int ctrl)
@@ -228,7 +228,8 @@ static int ndfc_nand_probe(struct platform_device *pdev)
 	struct ndfc_controller_settings *settings = nc->priv;
 	struct resource *res = pdev->resource;
 	struct ndfc_controller *ndfc = &ndfc_ctrl;
-	unsigned long long phys = settings->ndfc_erpn | res->start;
+	unsigned long long phys = ((unsigned long long)settings->ndfc_erpn << 32)
+		| res->start;
 
 	ndfc->ndfcbase = ioremap64(phys, res->end - res->start + 1);
 	if (!ndfc->ndfcbase) {

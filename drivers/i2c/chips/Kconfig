@@ -36,12 +36,22 @@ config SENSORS_EEPROM
 	  This driver can also be built as a module.  If so, the module
 	  will be called eeprom.
 
+config SENSORS_MAX6900
+	tristate "Maxim MAX6900 Real Time Clock"
+	depends on I2C && EXPERIMENTAL
+	help
+	  If you say yes here you get support for Maxim MAX6900
+	  real-time clock chip.
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called max6900.
+
 config SENSORS_PCF8574
 	tristate "Philips PCF8574 and PCF8574A"
 	depends on I2C && EXPERIMENTAL
 	default n
 	help
-	  If you say yes here you get support for Philips PCF8574 and 
+	  If you say yes here you get support for Philips PCF8574 and
 	  PCF8574A chips.
 
 	  This driver can also be built as a module.  If so, the module
@@ -81,7 +91,7 @@ config ISP1301_OMAP
 	  USB-On-The-Go transceiver working with the OMAP OTG controller.
 	  The ISP1301 is used in products including H2 and H3 development
 	  boards for Texas Instruments OMAP processors.
-	  
+
 	  This driver can also be built as a module.  If so, the module
 	  will be called isp1301_omap.
 
@@ -100,6 +110,16 @@ config TPS65010
 
 	  This driver can also be built as a module.  If so, the module
 	  will be called tps65010.
+
+config SPEAR_M24CXX
+	tristate "SPEAr M24CXX I2C driver"
+	depends on SPEAR_I2C_Syn
+	default y
+	help
+	  If you say yes here you get support for the eeprom m24cxx  chip.
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called m24cxx.
 
 config SENSORS_M41T00
 	tristate "ST M41T00 RTC chip"

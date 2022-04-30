@@ -221,10 +221,10 @@ static void usb_autosuspend_work(void *_udev)
 }
 
 #else
-
+/*
 static void usb_autosuspend_work(void *_udev)
 {}
-
+*/
 #endif
 
 /**

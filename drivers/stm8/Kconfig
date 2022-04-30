@@ -1,0 +1,20 @@
+menu "STM8 Driver support"
+
+config STM8_DRIVER
+	tristate "STM8 device interface"
+	default y
+	help
+	  STM8 is a micro controller developed by ST. STM8 driver are supported here. You will need this for
+	  hardware STM8 support.
+
+	  If you want STM8 support, you should say Y here.
+
+	  This STM8 support can also be built as a module.  If so, the module will be called stm8.
+
+config STM8_870E_DRIVER
+	tristate "STM8 870E device interface"
+	default y
+	help
+          Outdated STM8 driver, but working for 870E device.
+
+endmenu

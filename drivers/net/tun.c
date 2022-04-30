@@ -292,13 +292,14 @@ static ssize_t tun_chr_aio_write(struct kiocb *iocb, const struct iovec *iv,
 			      unsigned long count, loff_t pos)
 {
 	struct tun_struct *tun = iocb->ki_filp->private_data;
+	int tmpiv = (int)iv;
 
 	if (!tun)
 		return -EBADFD;
 
 	DBG(KERN_INFO "%s: tun_chr_write %ld\n", tun->dev->name, count);
 
-	return tun_get_user(tun, (struct iovec *) iv, iov_total(iv, count));
+	return tun_get_user(tun, (struct iovec *) tmpiv, iov_total(iv, count));
 }
 
 /* Put packet to the user space buffer */
@@ -342,6 +343,7 @@ static ssize_t tun_chr_aio_read(struct kiocb *iocb, const struct iovec *iv,
 	DECLARE_WAITQUEUE(wait, current);
 	struct sk_buff *skb;
 	ssize_t len, ret = 0;
+	int tmpiv;
 
 	if (!tun)
 		return -EBADFD;
@@ -399,7 +401,8 @@ static ssize_t tun_chr_aio_read(struct kiocb *iocb, const struct iovec *iv,
 			DBG(KERN_DEBUG "%s: tun_chr_readv: accepted: %x:%x:%x:%x:%x:%x\n",
 					tun->dev->name, addr[0], addr[1], addr[2],
 					addr[3], addr[4], addr[5]);
-			ret = tun_put_user(tun, skb, (struct iovec *) iv, len);
+			tmpiv =(int)iv;		
+			ret = tun_put_user(tun, skb, (struct iovec *) tmpiv, len);
 			kfree_skb(skb);
 			break;
 		} else {

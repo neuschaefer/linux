@@ -32,6 +32,11 @@ config EP405
 	help
 	  This option enables support for the EP405/EP405PC boards.
 
+config PPChameleonEVB
+	bool "PPChameleonEVB"
+	help
+	  This option enables support for the DAVE 405EP evaluation board.
+
 config REDWOOD_5
 	bool "Redwood-5"
 	help
@@ -46,6 +51,12 @@ config SYCAMORE
 	bool "Sycamore"
 	help
 	  This option enables support for the IBM PPC405GPr evaluation board.
+
+config TAIHU
+	bool "Taihu"
+	select WANT_EARLY_SERIAL
+	help
+	  This option enables support for the AMCC 405EP evaluation board.
 
 config WALNUT
 	bool "Walnut"
@@ -67,6 +78,12 @@ choice
 	prompt "Machine Type"
 	depends on 44x
 	default EBONY
+
+config ALPR
+	bool "ALPR"
+	select WANT_EARLY_SERIAL
+	help
+	  This option enables support for the ALPR board from Prodrive.
 
 config BAMBOO
 	bool "Bamboo"
@@ -98,6 +115,36 @@ config OCOTEA
 	help
 	  This option enables support for the IBM PPC440GX evaluation board.
 
+config P3P440
+	bool "P3P440"
+	select WANT_EARLY_SERIAL
+	help
+	  This option enables support for the Prodrive P3P440 board.
+
+config YELLOWSTONE
+       bool "Yellowstone"
+       select WANT_EARLY_SERIAL
+       help
+         This option enables support for the AMCC PPC440GR evaluation board.
+
+config YOSEMITE
+       bool "Yosemite"
+       select WANT_EARLY_SERIAL
+       help
+         This option enables support for the AMCC PPC440EP evaluation board.
+
+config SEQUOIA
+	bool "Sequoia"
+	select WANT_EARLY_SERIAL
+	help
+	  This option enables support for the AMCC PPC440EPx evaluation board.
+
+config RAINIER
+	bool "Rainier"
+	select WANT_EARLY_SERIAL
+	help
+	  This option enables support for the AMCC PPC440GRx evaluation board.
+
 endchoice
 
 config EP405PC
@@ -115,18 +162,34 @@ config NP405H
 
 config 440EP
 	bool
-	depends on BAMBOO
+	depends on BAMBOO || YOSEMITE
+	select PPC_FPU
+	default y
+
+config 440EPX
+	bool
+	depends on SEQUOIA
 	select PPC_FPU
 	default y
 
 config 440GP
 	bool
-	depends on EBONY
+	depends on EBONY || P3P440
+	default y
+
+config 440GR
+	bool
+	depends on YELLOWSTONE
+	default y
+
+config 440GRX
+	bool
+	depends on RAINIER
 	default y
 
 config 440GX
 	bool
-	depends on OCOTEA
+	depends on ALPR || OCOTEA
 	default y
 
 config 440SP
@@ -141,17 +204,17 @@ config 440SPE
 
 config 440
 	bool
-	depends on 440GP || 440SP || 440SPE || 440EP
+	depends on 440GP || 440SP || 440SPE || 440EP || 440GR
 	default y
 
 config 440A
 	bool
-	depends on 440GX
+	depends on 440GX || 440EPX || 440GRX
 	default y
 
 config IBM440EP_ERR42
 	bool
-	depends on 440EP
+	depends on 440EP || 440GR
 	default y
 
 # All 405-based cores up until the 405GPR and 405EP have this errata.
@@ -173,17 +236,22 @@ config BOOKE
 
 config IBM_OCP
 	bool
-	depends on ASH || BAMBOO || BUBINGA || CPCI405 || EBONY || EP405 || LUAN || YUCCA || OCOTEA || REDWOOD_5 || REDWOOD_6 || SYCAMORE || WALNUT
+	depends on ALPR || ASH || BAMBOO || BUBINGA || CPCI405 || EBONY || EP405 || LUAN || OCOTEA || P3P440 || PPChameleonEVB || RAINIER || REDWOOD_5 || REDWOOD_6 || SEQUOIA || SYCAMORE || TAIHU || WALNUT || YELLOWSTONE || YOSEMITE || YUCCA
 	default y
 
 config IBM_EMAC4
 	bool
-	depends on 440GX || 440SP || 440SPE
+	depends on 440GX || 440SP || 440SPE || 440EPX || 440GRX
+	default y
+
+config IBM_EMAC4V4
+	bool
+	depends on 440EPX || 440GRX
 	default y
 
 config BIOS_FIXUP
 	bool
-	depends on BUBINGA || EP405 || SYCAMORE || WALNUT || CPCI405
+	depends on BUBINGA || EP405 || SYCAMORE || TAIHU || WALNUT || CPCI405
 	default y
 
 # OAK doesn't exist but wanted to keep this around for any future 403GCX boards
@@ -194,7 +262,7 @@ config 403GCX
 
 config 405EP
 	bool
-	depends on BUBINGA
+	depends on BUBINGA || PPChameleonEVB || TAIHU
 	default y
 
 config 405GP

@@ -56,3 +56,5 @@ obj-$(CONFIG_SERIAL_SGI_IOC4) += ioc4_serial.o
 obj-$(CONFIG_SERIAL_SGI_IOC3) += ioc3_serial.o
 obj-$(CONFIG_SERIAL_ATMEL) += atmel_serial.o
 obj-$(CONFIG_SERIAL_NETX) += netx-serial.o
+obj-$(CONFIG_SERIAL_PRODRIVE_FPGA) += fpga_uart.o
+obj-$(CONFIG_SPEAR_UART_pl011)+= spr_uart_pl011_hal.o spr_uart_pl011.o

@@ -865,3 +865,7 @@ config SOUND_SH_DAC_AUDIO_CHANNEL
 	int "DAC channel"
 	default "1"
 	depends on SOUND_SH_DAC_AUDIO
+
+config SOUND_STW5094A
+	tristate "OSS Sound driver for STW5094A"
+

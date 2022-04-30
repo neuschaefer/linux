@@ -27,17 +27,50 @@
 static struct mtd_info *flash;
 
 static struct map_info ebony_small_map = {
-	.name =		"Ebony small flash",
+	.name =		"Small-flash",
 	.size =		EBONY_SMALL_FLASH_SIZE,
 	.bankwidth =	1,
 };
 
 static struct map_info ebony_large_map = {
-	.name =		"Ebony large flash",
+	.name =		"Large-flash",
 	.size =		EBONY_LARGE_FLASH_SIZE,
 	.bankwidth =	1,
 };
 
+#ifdef CONFIG_MTD_UBOOT_PARTITIONS
+static struct mtd_partition ebony_small_partitions[] = {
+	{
+		.name =   "reserved",
+		.offset = 0,
+		.size =   0x20000,
+	},
+	{
+		.name =   "env",
+		.offset = 0x20000,
+		.size =   0x20000,
+	},
+	{
+		.name =   "u-boot",
+		.offset = 0x40000,
+		.size =   0x40000,
+		/*.mask_flags = MTD_WRITEABLE, */ /* force read-only */
+	}
+};
+
+static struct mtd_partition ebony_large_partitions[] = {
+	{
+		.name =   "kernel",
+		.offset = 0,
+		.size =   0x180000,
+	},
+	{
+		.name =   "root",
+		.offset = 0x180000,
+		.size =   0x280000,
+	}
+};
+#else /* CONFIG_MTD_UBOOT_PARTITIONS */
 static struct mtd_partition ebony_small_partitions[] = {
 	{
 		.name =   "OpenBIOS",
@@ -58,6 +91,7 @@ static struct mtd_partition ebony_large_partitions[] = {
 		.size =   0x80000,
 	}
 };
+#endif /* CONFIG_MTD_UBOOT_PARTITIONS */
 
 int __init init_ebony(void)
 {

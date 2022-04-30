@@ -33,6 +33,28 @@ static struct fsl_i2c_platform_data mpc52xx_fsl_i2c_pdata = {
    possibly using IORESOURCE_DMA. But that's when BestComm is ready ... */
 
 struct platform_device ppc_sys_platform_devices[] = {
+	[MPC52xx_SDMA] = {
+		.name		= "mpc52xx-sdma",
+		.id		= -1,
+		.num_resources	= 3,
+		.resource	= (struct resource[]) {
+			{
+				.start	= 0x1200,
+				.end	= 0x12ff,
+				.flags	= IORESOURCE_MEM,
+			},
+			{
+				.start	= 0x8000,
+				.end	= 0xbfff,
+				.flags	= IORESOURCE_MEM,
+			},
+			{
+				.start	= MPC52xx_SDMA_IRQ,
+				.end	= MPC52xx_SDMA_IRQ,
+				.flags	= IORESOURCE_IRQ,
+			},
+		},
+	},
 	[MPC52xx_MSCAN1] = {
 		.name		= "mpc52xx-mscan",
 		.id		= 0,

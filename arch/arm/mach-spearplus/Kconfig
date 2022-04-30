@@ -1,0 +1,17 @@
+menu "SPEAR platform options"
+	depends on ARCH_SPEARPLUS
+
+
+config SPEAR_MISC_CONFIG
+	tristate "SPEAR Miscellaneous Register Configuration."
+	default y
+	help
+	  The SPEAR Misc Config
+
+config SPEAR_LOCK
+	tristate "SPEAR Hw Lock"
+	default y
+	help
+	  The SPEAR Hw Lock
+
+endmenu

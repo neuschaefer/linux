@@ -51,6 +51,23 @@
 #define PPC4xx_ONB_IO_VADDR	PPC4xx_ONB_IO_PADDR
 #define PPC4xx_ONB_IO_SIZE	((uint)4*1024)
 
+/* GPIO macro register defines */
+#define GPIO_BASE		((uint)0xEF600700)
+#define GPIO0_OR		(GPIO_BASE+0x0)
+#define GPIO0_TCR		(GPIO_BASE+0x4)
+#define GPIO0_OSRH		(GPIO_BASE+0x8)
+#define GPIO0_OSRL		(GPIO_BASE+0xC)
+#define GPIO0_TSRH		(GPIO_BASE+0x10)
+#define GPIO0_TSRL		(GPIO_BASE+0x14)
+#define GPIO0_ODR		(GPIO_BASE+0x18)
+#define GPIO0_IR		(GPIO_BASE+0x1C)
+#define GPIO0_RR1		(GPIO_BASE+0x20)
+#define GPIO0_RR2		(GPIO_BASE+0x24)
+#define GPIO0_ISR1H		(GPIO_BASE+0x30)
+#define GPIO0_ISR1L		(GPIO_BASE+0x34)
+#define GPIO0_ISR2H		(GPIO_BASE+0x38)
+#define GPIO0_ISR2L		(GPIO_BASE+0x3C)
+
 /* serial port defines */
 #define RS_TABLE_SIZE	2
 
@@ -88,8 +105,8 @@
 	STD_UART_OP(1)
 
 /* DCR defines */
-#define DCRN_CPMSR_BASE         0x0BA
-#define DCRN_CPMFR_BASE         0x0B9
+#define DCRN_CPMSR_BASE		0x0BA
+#define DCRN_CPMFR_BASE		0x0B9
 
 #define DCRN_CPC0_PLLMR0_BASE   0x0F0
 #define DCRN_CPC0_BOOT_BASE     0x0F1
@@ -104,20 +121,20 @@
 #define DCRN_CPC0_PCI_BASE      0x0F9
 
 
-#define IBM_CPM_GPT             0x80000000      /* GPT interface */
-#define IBM_CPM_PCI             0x40000000      /* PCI bridge */
-#define IBM_CPM_UIC             0x00010000      /* Universal Int Controller */
-#define IBM_CPM_CPU             0x00008000      /* processor core */
-#define IBM_CPM_EBC             0x00002000      /* EBC controller */
-#define IBM_CPM_SDRAM0          0x00004000      /* SDRAM memory controller */
-#define IBM_CPM_GPIO0           0x00001000      /* General Purpose IO */
-#define IBM_CPM_TMRCLK          0x00000400      /* CPU timers */
-#define IBM_CPM_PLB             0x00000100      /* PLB bus arbiter */
-#define IBM_CPM_OPB             0x00000080      /* PLB to OPB bridge */
-#define IBM_CPM_DMA             0x00000040      /* DMA controller */
-#define IBM_CPM_IIC0            0x00000010      /* IIC interface */
-#define IBM_CPM_UART1           0x00000002      /* serial port 0 */
-#define IBM_CPM_UART0           0x00000001      /* serial port 1 */
+#define IBM_CPM_GPT		0x80000000      /* GPT interface */
+#define IBM_CPM_PCI		0x40000000      /* PCI bridge */
+#define IBM_CPM_UIC		0x00010000      /* Universal Int Controller */
+#define IBM_CPM_CPU		0x00008000      /* processor core */
+#define IBM_CPM_EBC		0x00002000      /* EBC controller */
+#define IBM_CPM_SDRAM0		0x00004000      /* SDRAM memory controller */
+#define IBM_CPM_GPIO0		0x00001000      /* General Purpose IO */
+#define IBM_CPM_TMRCLK		0x00000400      /* CPU timers */
+#define IBM_CPM_PLB		0x00000100      /* PLB bus arbiter */
+#define IBM_CPM_OPB		0x00000080      /* PLB to OPB bridge */
+#define IBM_CPM_DMA		0x00000040      /* DMA controller */
+#define IBM_CPM_IIC0		0x00000010      /* IIC interface */
+#define IBM_CPM_UART1		0x00000002      /* serial port 0 */
+#define IBM_CPM_UART0		0x00000001      /* serial port 1 */
 #define DFLT_IBM4xx_PM          ~(IBM_CPM_PCI | IBM_CPM_CPU | IBM_CPM_DMA \
                                         | IBM_CPM_OPB | IBM_CPM_EBC \
                                         | IBM_CPM_SDRAM0 | IBM_CPM_PLB \

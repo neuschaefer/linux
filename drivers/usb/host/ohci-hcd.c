@@ -422,6 +422,7 @@ static void ohci_usb_reset (struct ohci_hcd *ohci)
  * other cases where the next software may expect clean state from the
  * "firmware".  this is bus-neutral, unlike shutdown() methods.
  */
+#if 0
 static void
 ohci_shutdown (struct usb_hcd *hcd)
 {
@@ -433,7 +434,7 @@ ohci_shutdown (struct usb_hcd *hcd)
 	/* flush the writes */
 	(void) ohci_readl (ohci, &ohci->regs->control);
 }
-
+#endif
 /*-------------------------------------------------------------------------*
  * HC functions
  *-------------------------------------------------------------------------*/
@@ -943,6 +944,10 @@ MODULE_LICENSE ("GPL");
 #include "ohci-pnx4008.c"
 #endif
 
+#if defined(CONFIG_ARCH_SPEARPLUS) || defined(CONFIG_ARCH_SPEARBASIC)
+#include "spr_ohci_syn.c"
+#endif
+
 #if !(defined(CONFIG_PCI) \
       || defined(CONFIG_SA1111) \
       || defined(CONFIG_ARCH_S3C2410) \
@@ -955,6 +960,7 @@ MODULE_LICENSE ("GPL");
       || defined (CONFIG_ARCH_AT91RM9200) \
       || defined (CONFIG_ARCH_AT91SAM9261) \
       || defined (CONFIG_ARCH_PNX4008) \
-	)
+      || defined (CONFIG_ARCH_SPEARPLUS)\
+      || defined (CONFIG_ARCH_SPEARBASIC))
 #error "missing bus glue for ohci-hcd"
 #endif

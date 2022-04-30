@@ -622,6 +622,7 @@ static struct input_handle *evdev_connect(struct input_handler *handler, struct 
 	struct evdev *evdev;
 	struct class_device *cdev;
 	int minor;
+	int err;
 
 	for (minor = 0; minor < EVDEV_MINORS && evdev_table[minor]; minor++);
 	if (minor == EVDEV_MINORS) {
@@ -650,7 +651,7 @@ static struct input_handle *evdev_connect(struct input_handler *handler, struct 
 			dev->cdev.dev, evdev->name);
 
 	/* temporary symlink to keep userspace happy */
-	sysfs_create_link(&input_class.subsys.kset.kobj, &cdev->kobj,
+	err = sysfs_create_link(&input_class.subsys.kset.kobj, &cdev->kobj,
 			  evdev->name);
 
 	return &evdev->handle;

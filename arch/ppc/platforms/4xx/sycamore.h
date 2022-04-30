@@ -43,7 +43,7 @@
 #define PPC40x_FLASH_HIGH	0xFFF80000
 #define PPC40x_FLASH_SIZE	0x80000
 
-#define PPC4xx_MACHINE_NAME	"IBM Sycamore"
+#define PPC4xx_MACHINE_NAME	"AMCC Sycamore"
 
 #endif /* __ASM_SYCAMORE_H__ */
 #endif /* __KERNEL__ */

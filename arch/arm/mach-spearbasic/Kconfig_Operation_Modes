@@ -1,0 +1,295 @@
+menu "SPEArBasic Operation Modes"
+	depends on ARCH_SPEARBASIC
+
+
+#/***************************************************************************************************/
+#Operation Modes
+#/***************************************************************************************************/
+choice
+	prompt "Select Operation Mode"
+	default SBASIC_PHOTO_FRAME_MODE
+
+config SBASIC_NAND_MODE
+	bool "NAND Mode"
+	help
+	  This is used to enable IP's on Fixed part and RAS in NAND Mode.
+
+config SBASIC_NOR_MODE
+	bool "NOR Mode"
+	help
+	  This is used to enable IP's on Fixed part and RAS in NOR  Mode.
+
+config SBASIC_PHOTO_FRAME_MODE
+	bool "PHOTO_FRAME Mode"
+	help
+	  This is used to enable IP's on Fixed part and RAS in PHOTO_FRAME Mode.
+
+config SBASIC_LEND_IP_PHONE_MODE
+	bool "LEND_IP_PHONE (LOW END IP PHONE mode)"
+	help
+	  This is used to enable IP's on Fixed part and RAS in LEND_IP_PHONE Mode.
+
+config SBASIC_HEND_IP_PHONE_MODE
+	bool "HEND_IP_PHONE (HIGH END IP PHONE mode)"
+	help
+	  This is used to enable IP's on Fixed part and RAS in HEND_IP_PHONE Mode.
+
+config SBASIC_LEND_WIFI_PHONE_MODE
+	bool "LEND_WIFI_PHONE (LOW END WI-FI PHONE mode)"
+	help
+	  This is used to enable IP's on Fixed part and RAS in LEND_WIFI_PHONE Mode.
+
+config SBASIC_HEND_WIFI_PHONE_MODE
+	bool "HEND_WIFI_PHONE (HIGH END WI-FI PHONE mode)"
+	help
+	  This is used to enable IP's on Fixed part and RAS in HEND_WIFI_PHONE Mode.
+
+config SBASIC_ATA_PABX_wI2S_MODE
+	bool "ATA_PABX_wI2S (ATA PABX without I2S) mode"
+	help
+	  This is used to enable IP's on Fixed part and RAS in ATA_PABX_wI2S Mode.
+
+config SBASIC_ATA_PABX_I2S_MODE
+	bool "ATA_PABX_I2S (ATA PABX with I2S) Mode"
+	help
+	  This is used to enable IP's on Fixed part and RAS in ATA_PABX_I2S Mode.
+
+config SBASIC_CAMl_LCDw_MODE
+	bool "CAMl_LCDw (8 bit CAMERA without LCD) Mode"
+	help
+	  This is used to enable IP's on Fixed part and RAS in CAMl_LCDw Mode.
+
+config SBASIC_CAMu_LCD_MODE
+	bool "CAMu_LCD (14 bit CAMERA with LCD) Mode"
+	help
+	  This is used to enable IP's on Fixed part and RAS in CAMu_LCD Mode.
+
+config SBASIC_CAMu_wLCD_MODE
+	bool "CAMu_wLCD (14 bit CAMERA without LCD) Mode"
+	help
+	  This is used to enable IP's on Fixed part and RAS in CAMu_wLCD Mode.
+
+config SBASIC_CAMl_LCD_MODE
+	bool "CAMl_LCD (8 bit CAMERA with LCD) Mode"
+	help
+	  This is used to enable IP's on Fixed part and RAS in CAMl_LCD Mode.
+
+endchoice
+
+#IPs of Fixed Part *********************************************************************************
+config SBASIC_FIRDA
+	bool "FIRDA"
+	depends on !SBASIC_FSMC_4_CHIPS
+	depends on !SBASIC_FSMC_2_CHIPS
+	default y
+
+config SBASIC_I2C
+	bool "I2C"
+	default y
+
+config SBASIC_SSP_ENHANCED
+	bool "SSP_ENHANCED"
+	depends on !SBASIC_TL_TDM
+	default y
+
+config SBASIC_SSP_BASIC
+	bool "SSP_BASIC"
+	depends on !SBASIC_SDIO_1
+	depends on !SBASIC_SDIO_2
+	default y
+
+config SBASIC_MII
+	bool "MII"
+	depends on !SBASIC_TL_GPIO_1
+	depends on !SBASIC_TL_GPIO_2
+	depends on !SBASIC_TL_GPIO_3
+	depends on !SBASIC_TL_GPIO_4
+	depends on !SBASIC_TL_GPIO_5
+	depends on !SBASIC_TL_CAMERA_1
+	depends on !SBASIC_TL_CAMERA_2
+	depends on !SBASIC_SDIO_2
+	default y
+
+config SBASIC_LEG_GPIO
+	bool "LEG_GPIO"
+	depends on !SBASIC_SDIO_1
+	depends on !SBASIC_SDIO_2
+	default y
+
+config SBASIC_UART_ENHANCED
+	bool "UART_ENHANCED"
+	depends on !SBASIC_TL_GPIO_5
+	depends on !SBASIC_TL_TDM
+	depends on !SBASIC_TL_AUDIO_1
+	depends on !SBASIC_TL_AUDIO_2
+	depends on !SBASIC_BOOT_PINS
+	depends on !SBASIC_RAS_GPIO
+	default y
+
+config SBASIC_UART_BASIC
+	bool "UART_BASIC"
+	depends on !SBASIC_FSMC_4_CHIPS
+	default y
+
+config SBASIC_TIMER_B
+	bool "TIMER_B"
+	depends on !SBASIC_CLCD_1
+	depends on !SBASIC_CLCD_2
+	depends on !SBASIC_TL_GPIO_2
+	depends on !SBASIC_TL_GPIO_3
+	depends on !SBASIC_TL_GPIO_5
+	depends on !SBASIC_TL_SPI_I2C3
+	depends on !SBASIC_BOOT_PINS
+	depends on !SBASIC_RAS_GPIO
+	depends on !SBASIC_TL_CAMERA_2
+	default y
+
+config SBASIC_TIMER_A
+	bool "TIMER_A"
+	depends on !SBASIC_CLCD_1
+	depends on !SBASIC_TL_GPIO_2
+	depends on !SBASIC_TL_GPIO_4
+	depends on !SBASIC_TL_GPIO_5
+	depends on !SBASIC_TL_SPI_I2C3
+	depends on !SBASIC_TL_CAMERA_2
+	depends on !SBASIC_BOOT_PINS
+	depends on !SBASIC_RAS_GPIO
+	default y
+
+#RAS IPS*********************************************************************************************/
+#/***************************************************************************************************/
+#FSMC Combinations
+#/***************************************************************************************************/
+config SBASIC_FSMC_4_CHIPS
+	depends on SBASIC_NAND_MODE || SBASIC_NOR_MODE || SBASIC_PHOTO_FRAME_MODE || SBASIC_ATA_PABX_wI2S_MODE || SBASIC_ATA_PABX_I2S_MODE
+	depends on !SBASIC_FSMC_2_CHIPS
+	bool "FSMC_4_CHIPS - Disables UART_BASIC and FIRDA"
+	default n
+
+config SBASIC_FSMC_2_CHIPS
+	depends on SBASIC_NAND_MODE || SBASIC_NOR_MODE || SBASIC_PHOTO_FRAME_MODE || SBASIC_ATA_PABX_wI2S_MODE || SBASIC_ATA_PABX_I2S_MODE
+#	depends on !SBASIC_FSMC_4_CHIPS
+	bool "FSMC_2_CHIPS - Disables FIRDA"
+	default n
+
+#/***************************************************************************************************/
+#Keyboard Combinations
+#/***************************************************************************************************/
+config SBASIC_KEYBOARD
+	depends on SBASIC_LEND_IP_PHONE_MODE || SBASIC_HEND_IP_PHONE_MODE || SBASIC_LEND_WIFI_PHONE_MODE || SBASIC_HEND_WIFI_PHONE_MODE || SBASIC_CAMl_LCDw_MODE || SBASIC_CAMu_LCD_MODE || SBASIC_CAMu_wLCD_MODE || SBASIC_CAMl_LCD_MODE
+	bool "Keyboard IP"
+	default n
+
+#/***************************************************************************************************/
+#CLCD Combinations
+#/***************************************************************************************************/
+config SBASIC_CLCD_1
+	depends on SBASIC_PHOTO_FRAME_MODE
+	bool "CLCD - Disables TIMER_A and TIMER_B"
+	default n
+
+config SBASIC_CLCD_2
+	depends on SBASIC_HEND_IP_PHONE_MODE || SBASIC_HEND_WIFI_PHONE_MODE || SBASIC_CAMu_LCD_MODE || SBASIC_CAMl_LCD_MODE
+	bool "CLCD - Disables TIMER_B"
+	default n
+
+#/***************************************************************************************************/
+#TL_GPIO Combinations
+#/***************************************************************************************************/
+config SBASIC_TL_GPIO_1
+	depends on SBASIC_PHOTO_FRAME_MODE || SBASIC_CAMu_LCD_MODE || SBASIC_CAMl_LCD_MODE
+	bool "TL_GPIO - Disables MII"
+	default n
+
+config SBASIC_TL_GPIO_2
+	depends on SBASIC_LEND_IP_PHONE_MODE || SBASIC_LEND_WIFI_PHONE_MODE
+	bool "TL_GPIO - Disables TIMER_A, Timer_B and MII"
+	default n
+
+config SBASIC_TL_GPIO_3
+	depends on SBASIC_ATA_PABX_I2S_MODE || SBASIC_CAMl_LCDw_MODE || SBASIC_CAMu_wLCD_MODE
+	bool "TL_GPIO - Disables TIMER_B and MII"
+	default n
+
+config SBASIC_TL_GPIO_4
+	depends on SBASIC_HEND_IP_PHONE_MODE || SBASIC_HEND_WIFI_PHONE_MODE
+	bool "TL_GPIO - Disables TIMER_A and MII"
+	default n
+
+config SBASIC_TL_GPIO_5
+	depends on SBASIC_ATA_PABX_wI2S_MODE
+	bool "TL_GPIO - Disables TIMER_A, Timer_B, UART_ENHANCED and MII"
+	default n
+
+#/***************************************************************************************************/
+#TL_TDM Combinations
+#/***************************************************************************************************/
+config SBASIC_TL_TDM
+	depends on SBASIC_PHOTO_FRAME_MODE || SBASIC_LEND_IP_PHONE_MODE || SBASIC_HEND_IP_PHONE_MODE || SBASIC_LEND_WIFI_PHONE_MODE || SBASIC_HEND_WIFI_PHONE_MODE || SBASIC_ATA_PABX_wI2S_MODE || SBASIC_ATA_PABX_I2S_MODE || SBASIC_CAMl_LCDw_MODE || SBASIC_CAMu_LCD_MODE || SBASIC_CAMu_wLCD_MODE || SBASIC_CAMl_LCD_MODE
+	bool "TL_TDM - Disables UART_ENHANCED and SSP_ENHANCED"
+	default n
+
+#/***************************************************************************************************/
+#TL_SPI_I2C3 Combinations
+#/***************************************************************************************************/
+config SBASIC_TL_SPI_I2C3
+	depends on SBASIC_LEND_IP_PHONE_MODE || SBASIC_HEND_IP_PHONE_MODE || SBASIC_LEND_WIFI_PHONE_MODE || SBASIC_HEND_WIFI_PHONE_MODE || SBASIC_ATA_PABX_wI2S_MODE || SBASIC_ATA_PABX_I2S_MODE || SBASIC_CAMl_LCDw_MODE || SBASIC_CAMl_LCD_MODE
+	bool "TL_SPI_I2C3 - Disables TIMER_A and TIMER_B"
+	default n
+
+#/***************************************************************************************************/
+#TL_CAMERA Combinations
+#/***************************************************************************************************/
+config SBASIC_TL_CAMERA_1
+	depends on SBASIC_CAMl_LCDw_MODE || SBASIC_CAMl_LCD_MODE
+	bool "TL_CAMERA - Disables MII"
+	default n
+
+config SBASIC_TL_CAMERA_2
+	depends on SBASIC_CAMu_LCD_MODE || SBASIC_CAMu_wLCD_MODE
+	bool "TL_CAMERA - Disables TIMER_A, TIMER_B and MII"
+	default n
+
+#/***************************************************************************************************/
+#TL_AUDIO Combinations
+#/***************************************************************************************************/
+config SBASIC_TL_AUDIO_1
+	depends on SBASIC_LEND_IP_PHONE_MODE || SBASIC_HEND_IP_PHONE_MODE || SBASIC_LEND_WIFI_PHONE_MODE || SBASIC_HEND_WIFI_PHONE_MODE
+	bool "TL_AUDIO - Disables UART_ENHANCED"
+	default n
+
+config SBASIC_TL_AUDIO_2
+	depends on SBASIC_ATA_PABX_I2S_MODE || SBASIC_CAMl_LCDw_MODE || SBASIC_CAMu_LCD_MODE || SBASIC_CAMu_wLCD_MODE || SBASIC_CAMl_LCD_MODE
+	bool "TL_AUDIO - Disables UART_ENHANCED and Timer A"
+	default n
+
+#/***************************************************************************************************/
+#Boot Pins Combinations
+#/***************************************************************************************************/
+config SBASIC_BOOT_PINS
+	depends on SBASIC_NAND_MODE || SBASIC_NOR_MODE
+	bool "BOOT_PINS - Disables UART_ENHANCED, TIMER_A and TIMER_B"
+	default n
+
+#/***************************************************************************************************/
+#SDIO Combinations
+#/***************************************************************************************************/
+config SBASIC_SDIO_1
+	depends on SBASIC_ATA_PABX_wI2S_MODE || SBASIC_ATA_PABX_I2S_MODE
+	bool "SDIO - Disables LEG_GPIO and SSP_BASIC"
+	default n
+
+config SBASIC_SDIO_2
+	depends on SBASIC_PHOTO_FRAME_MODE || SBASIC_LEND_IP_PHONE_MODE || SBASIC_HEND_IP_PHONE_MODE || SBASIC_LEND_WIFI_PHONE_MODE || SBASIC_HEND_WIFI_PHONE_MODE || SBASIC_CAMl_LCDw_MODE || SBASIC_CAMu_LCD_MODE || SBASIC_CAMu_wLCD_MODE || SBASIC_CAMl_LCD_MODE
+	bool "SDIO - Disables LEG_GPIO, MII and SSP_BASIC"
+	default n
+
+#/***************************************************************************************************/
+#GPIO Combinations
+#/***************************************************************************************************/
+config SBASIC_RAS_GPIO
+	depends on SBASIC_PHOTO_FRAME_MODE
+	bool "RAS_GPIO - Disables UART_ENHANCED, TIMER_A and TIMER_B"
+	default n
+
+endmenu

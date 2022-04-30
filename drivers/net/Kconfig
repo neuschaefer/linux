@@ -96,6 +96,76 @@ config EQUALIZER
 	  To compile this driver as a module, choose M here: the module
 	  will be called eql.  If unsure, say N.
 
+config 870_ETH_SPEAR_DRIVER
+	tristate "SPEAR IP phone support (with RTL Gigabit Switch)"
+        depends on NET_ETHERNET && ARM && ((ARCH_SPEARBASIC && SBASIC_MII) || ARCH_SPEARPLUS) 
+		default m
+        help
+          This is the driver for ST's Spear SoC MAC IP core, specific to RTL switch. Say
+          Y here if you want to build support for this into the kernel.
+
+config 870_ETH_SPEAR_MAC_RXB
+    int "Number of receive buffers for RTL switch"
+    depends on 870_ETH_SPEAR_DRIVER
+    default "32"
+    help
+    The number of recieve descriptor buffers used by the Etherner Driver.
+    Use a minimum of 16 for optimum performance, and more the buffers,
+    more would be the memory consumption, specific to RTL switch.
+
+config 870_ETH_SPEAR_MAC_TXB
+    int "Number of transmit buffers for RTL switch"
+    depends on 870_ETH_SPEAR_DRIVER
+    default "32"
+    help
+    The number of recieve descriptor buffers used by the Etherner Driver.
+    Use a minimum of 16 for optimum performance, and more the buffers,
+    more would be the memory consumption, specific to RTL switch.
+
+config 870_ETH_SPEAR_CHECKSUM_OFFLOAD
+    bool "TCP/IP Recieve Check Sum Offload Feature for RTL switch"
+    depends on 870_ETH_SPEAR_DRIVER
+    default n
+    help
+    Checksum offloading is used to relief the kernel (and thus the CPU)
+    from the burden of calculating transport-PDU checksums (TCP and UDP checksums)
+    when the SPEAr MAC hardware can perform these calculations itself, specific to RTL switch.
+
+config 870E_ETH_SPEAR_DRIVER
+        tristate "SPEAR Expansion Module Ethernet Support"
+        depends on NET_ETHERNET && ARM && ((ARCH_SPEARBASIC && SBASIC_MII) || ARCH_SPEARPLUS) 
+		default m
+        help
+          This is the driver for ST's Spear SoC MAC IP core. Say
+          Y here if you want to build support for this into the kernel.
+
+config 870E_ETH_SPEAR_MAC_RXB
+    int "Number of receive buffers"
+    depends on 870E_ETH_SPEAR_DRIVER
+    default "32"
+    help
+    The number of recieve descriptor buffers used by the Etherner Driver.
+    Use a minimum of 16 for optimum performance, and more the buffers,
+    more would be the memory consumption.
+
+config 870E_ETH_SPEAR_MAC_TXB
+    int "Number of transmit buffers"
+    depends on 870E_ETH_SPEAR_DRIVER
+    default "32"
+    help
+    The number of recieve descriptor buffers used by the Etherner Driver.
+    Use a minimum of 16 for optimum performance, and more the buffers,
+    more would be the memory consumption.
+
+config 870E_ETH_SPEAR_CHECKSUM_OFFLOAD
+    bool "TCP/IP Recieve Check Sum Offload Feature"
+    depends on 870E_ETH_SPEAR_DRIVER
+    default n
+    help
+    Checksum offloading is used to relief the kernel (and thus the CPU)
+    from the burden of calculating transport-PDU checksums (TCP and UDP checksums)
+    when the SPEAr MAC hardware can perform these calculations itself.
+
 config TUN
 	tristate "Universal TUN/TAP device driver support"
 	select CRC32
@@ -1240,7 +1310,7 @@ config IBM_EMAC_RX_SKB_HEADROOM
 
 config IBM_EMAC_PHY_RX_CLK_FIX
 	bool "PHY Rx clock workaround"
-	depends on IBM_EMAC && (405EP || 440GX || 440EP || 440GR)
+	depends on IBM_EMAC && (405EP || 440GX || 440EP || 440GR || 440EPX || 440GRX)
 	help
 	  Enable this if EMAC attached to a PHY which doesn't generate
 	  RX clock if there is no link, if this is the case, you will 
@@ -1261,7 +1331,7 @@ config IBM_EMAC_ZMII
 
 config IBM_EMAC_RGMII
 	bool
-	depends on IBM_EMAC && 440GX
+	depends on IBM_EMAC && (440GX || 440EPX || 440GRX)
 	default y
 		
 config IBM_EMAC_TAH
@@ -1891,6 +1961,7 @@ config NE_H8300
 	  controller on the Renesas H8/300 processor.
 
 source "drivers/net/fec_8xx/Kconfig"
+source "drivers/net/fec_mpc52xx/Kconfig"
 source "drivers/net/fs_enet/Kconfig"
 
 endmenu

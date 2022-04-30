@@ -438,6 +438,14 @@ static int __init mal_probe(struct ocp_device *ocpdev)
 	mal_reset(mal);
 
 	/* Set the MAL configuration register */
+#if defined(CONFIG_440EPX) || defined(CONFIG_440GRX)
+        /*
+         * Clear PLB4A0_ACR[WRP]
+         * This fix will make the MAL burst disabling patch for the Linux
+         * EMAC driver obsolete.
+         */
+	mtdcr(0x81, mfdcr(0x81) & ~(0x80000000 >> 7));
+#endif
 	set_mal_dcrn(mal, MAL_CFG, MAL_CFG_DEFAULT | MAL_CFG_PLBB |
 		     MAL_CFG_OPBBL | MAL_CFG_LEA);
 

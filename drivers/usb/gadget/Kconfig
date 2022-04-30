@@ -74,8 +74,8 @@ config USB_GADGET_NET2280
 	select USB_GADGET_DUALSPEED
 	help
 	   NetChip 2280 / 2282 is a PCI based USB peripheral controller which
-	   supports both full and high speed USB 2.0 data transfers.  
-	   
+	   supports both full and high speed USB 2.0 data transfers.
+
 	   It has six configurable endpoints, as well as endpoint zero
 	   (for control transfers) and several endpoints with dedicated
 	   functions.
@@ -127,7 +127,7 @@ config USB_GADGET_GOKU
 	help
 	   The Toshiba TC86C001 is a PCI device which includes controllers
 	   for full speed USB devices, IDE, I2C, SIO, plus a USB host (OHCI).
-	   
+
 	   The device controller has three configurable (bulk or interrupt)
 	   endpoints, plus endpoint zero (for control transfers).
 
@@ -154,6 +154,17 @@ config USB_LH7A40X
 	default USB_GADGET
 	select USB_GADGET_SELECTED
 
+config USB_GADGET_PD12
+	boolean "PD12 UDC"
+	depends on TAIHU
+	help
+    This driver provides USB Device Controller driver for PD12 UDC
+
+config USB_PD12
+	tristate
+	depends on USB_GADGET_PD12
+	default USB_GADGET
+	select USB_GADGET_SELECTED
 
 config USB_GADGET_OMAP
 	boolean "OMAP USB Device Controller"
@@ -205,6 +216,34 @@ config USB_AT91
 	depends on USB_GADGET_AT91
 	default USB_GADGET
 
+config USB_GADGET_MUSBHSFC
+	boolean "Inventra MUSBHSFC"
+	depends on 440EP || 440EPX
+	select USB_GADGET_DUALSPEED
+	help
+	   This driver provides USB Device Controller support for the
+	   Inventra MUSBHSFC used on the IBM/AMCC 440EP/440EPX.
+
+
+config USB_GADGET_SPEAR_SYN
+        boolean "SPEAR USB Device"
+        depends on ARCH_SPEARPLUS || ARCH_SPEARBASIC
+        help
+    This driver provides USB Device Controller driver for STM SPEAr platform
+
+config USB_SPEAR_SYN
+        tristate
+        depends on USB_GADGET_SPEAR_SYN
+        default USB_GADGET
+	select USB_GADGET_SELECTED
+	select USB_GADGET_DUALSPEED
+
+config USB_MUSBHSFC
+	tristate
+	depends on USB_GADGET_MUSBHSFC
+	default USB_GADGET
+	select USB_GADGET_SELECTED
+
 config USB_GADGET_DUMMY_HCD
 	boolean "Dummy HCD (DEVELOPMENT)"
 	depends on (USB=y || (USB=m && USB_GADGET=m)) && EXPERIMENTAL
@@ -215,11 +254,11 @@ config USB_GADGET_DUMMY_HCD
 	  side is the master; the gadget side is the slave.  Gadget drivers
 	  can be high, full, or low speed; and they have access to endpoints
 	  like those from NET2280, PXA2xx, or SA1100 hardware.
-	  
+
 	  This may help in some stages of creating a driver to embed in a
 	  Linux device, since it lets you debug several parts of the gadget
 	  driver without its hardware or drivers being involved.
-	  
+
 	  Since such a gadget side driver needs to interoperate with a host
 	  side Linux-USB device driver, this may help to debug both sides
 	  of a USB protocol stack.
@@ -313,7 +352,7 @@ config USB_ETH
 	help
 	  This driver implements Ethernet style communication, in either
 	  of two ways:
-	  
+
 	   - The "Communication Device Class" (CDC) Ethernet Control Model.
 	     That protocol is often avoided with pure Ethernet adapters, in
 	     favor of simpler vendor-specific hardware, but is widely
@@ -349,7 +388,7 @@ config USB_ETH_RNDIS
 	   If you say "y" here, the Ethernet gadget driver will try to provide
 	   a second device configuration, supporting RNDIS to talk to such
 	   Microsoft USB hosts.
-	   
+
 	   To make MS-Windows work with this, use Documentation/usb/linux.inf
 	   as the "driver info file".  For versions of MS-Windows older than
 	   XP, you'll need to download drivers from Microsoft's website; a URL
@@ -367,6 +406,34 @@ config USB_GADGETFS
 
 	  Say "y" to link the driver statically, or "m" to build a
 	  dynamically linked module called "gadgetfs".
+
+config USB_G_SPR_MUX
+        tristate "SPEAr Gadget Mux (DEVELOPMENT)"
+        depends on EXPERIMENTAL
+        help
+          Say "y" to link the driver statically, or "m" to build a
+          dynamically linked module called "g_spr_mux".
+
+config USB_G_SPR_PRINTER
+        tristate "SPEAr Gadget Printer (DEVELOPMENT)"
+        depends on EXPERIMENTAL
+        help
+          Say "y" to link the driver statically, or "m" to build a
+          dynamically linked module called "g_spr_printer".
+
+config USB_G_SPR_SCANNER
+        tristate "SPEAr Gadget Scanner (DEVELOPMENT)"
+        depends on EXPERIMENTAL
+        help
+          Say "y" to link the driver statically, or "m" to build a
+          dynamically linked module called "g_spr_sacnner".
+
+config USB_G_SPR_FAX
+        tristate "SPEAr Gadget Fax (DEVELOPMENT)"
+        depends on EXPERIMENTAL
+        help
+          Say "y" to link the driver statically, or "m" to build a
+          dynamically linked module called "g_spr_fax".
 
 config USB_FILE_STORAGE
 	tristate "File-backed Storage Gadget"
@@ -388,6 +455,8 @@ config USB_FILE_STORAGE_TEST
 	  File-backed Storage Gadget, useful for probing the
 	  behavior of USB Mass Storage hosts.  Not needed for
 	  normal operation.
+
+
 
 config USB_G_SERIAL
 	tristate "Serial Gadget (with CDC ACM support)"

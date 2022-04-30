@@ -36,3 +36,4 @@ obj-$(CONFIG_RTC_DRV_MAX6902)	+= rtc-max6902.o
 obj-$(CONFIG_RTC_DRV_V3020)	+= rtc-v3020.o
 obj-$(CONFIG_RTC_DRV_AT91)	+= rtc-at91.o
 obj-$(CONFIG_RTC_DRV_SH)	+= rtc-sh.o
+obj-$(CONFIG_SPEAR_RTC_ST)+= spr_rtc_st_hal.o  spr_rtc_st.o

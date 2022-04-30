@@ -26,11 +26,63 @@
 #include <linux/clk.h>
 
 #include <asm/sizes.h>
+#include <asm/arch/spear.h>
+#include <linux/kthread.h>
 
 #define to_clcd(info)	container_of(info, struct clcd_fb, fb)
 
+
+extern int spearbasic_clcd_enable_vertical_synchro(struct clcd_fb *fb, wait_queue_head_t * wq);
+extern void spearbasic_clcd_disable_vertical_synchro(wait_queue_head_t * wq);
+extern int spearvsyncdone;
+static wait_queue_head_t spearverticalinterruptqueue;
+static struct task_struct * spearvsyncthread = NULL;
+
 /* This is limited to 16 characters when displayed by X startup */
 static const char *clcd_name = "CLCD FB";
+
+
+/* Rotation thread */
+#define SPEARNVSYNC 8
+static int spearvsync_thread(void * arg)
+{
+    struct fb_info *info = (struct fb_info *)arg;
+    u32 __iomem *dst;
+    u32 __iomem *src; 
+    unsigned int i,j;
+
+    //allow_signal(SIGKILL);
+    spearvsyncdone = 0;
+    printk("VSYNC KTHREAD ROTATION STARTED\n");
+    while (!kthread_should_stop())
+    {
+        wait_event_interruptible(spearverticalinterruptqueue, (spearvsyncdone>=SPEARNVSYNC ) || kthread_should_stop());
+        if(kthread_should_stop())
+        {
+            printk("EXITING VSYNC THREAD\n");
+            spearbasic_clcd_disable_vertical_synchro(&spearverticalinterruptqueue);
+        }
+        else
+        {
+            spearvsyncdone = 0;
+       
+            // rotate screen
+            dst = (u32 __iomem *) (info->screen_base + 480*272*4);
+            src = (u32 __iomem *) (info->screen_base + 271*4);
+            for(j=0;j<272;j++)
+            {
+                for(i=0;i<480;i++)
+                {
+                    *dst++ = *src; 
+                    src += 272;
+                }
+                src -= (480*272 + 1);
+            }
+        }        
+    }
+    return 0;
+}
+
 
 /*
  * Unfortunately, the enable/disable functions may be called either from
@@ -69,7 +121,8 @@ static void clcdfb_disable(struct clcd_fb *fb)
 		val &= ~CNTL_LCDPWR;
 		writel(val, fb->regs + CLCD_CNTL);
 
-		clcdfb_sleep(20);
+		//clcdfb_sleep(20);
+		clcdfb_sleep(200);//as per armando
 	}
 	if (val & CNTL_LCDEN) {
 		val &= ~CNTL_LCDEN;
@@ -89,13 +142,15 @@ static void clcdfb_enable(struct clcd_fb *fb, u32 cntl)
 	 */
 	clk_enable(fb->clk);
 
+
 	/*
 	 * Bring up by first enabling..
 	 */
 	cntl |= CNTL_LCDEN;
 	writel(cntl, fb->regs + CLCD_CNTL);
 
-	clcdfb_sleep(20);
+	//clcdfb_sleep(200);
+	clcdfb_sleep(200);//as per armando
 
 	/*
 	 * and now apply power.
@@ -143,11 +198,13 @@ clcdfb_set_bitfields(struct clcd_fb *fb, struct fb_var_screeninfo *var)
 		if (var->green.length != 5 && var->green.length != 6)
 			var->green.length = 6;
 		break;
+	case 24:
 	case 32:
 		if (fb->panel->cntl & CNTL_LCDTFT) {
 			var->red.length		= 8;
 			var->green.length	= 8;
 			var->blue.length	= 8;
+			var->transp.length	= (var->bits_per_pixel == 32) ? 8 : 0;
 			break;
 		}
 	default:
@@ -165,10 +222,14 @@ clcdfb_set_bitfields(struct clcd_fb *fb, struct fb_var_screeninfo *var)
 			var->blue.offset = 0;
 			var->green.offset = var->blue.offset + var->blue.length;
 			var->red.offset = var->green.offset + var->green.length;
+			if (var->transp.length == 8)
+				var->transp.offset	= var->red.offset + var->red.length;
 		} else {
 			var->red.offset = 0;
 			var->green.offset = var->red.offset + var->red.length;
 			var->blue.offset = var->green.offset + var->green.length;
+			if (var->transp.length == 8)
+				var->transp.offset	= var->blue.offset + var->blue.length;
 		}
 	}
 
@@ -182,6 +243,21 @@ static int clcdfb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
 
 	if (fb->board->check)
 		ret = fb->board->check(fb, var);
+
+/// This is added to remove BUG (55914)!!! 
+	/*Now Error returned if either x resolution or y resolution is 0.*/
+	if( (var->xres_virtual==0) || (var->yres_virtual==0))
+	{
+		ret = -EINVAL;
+	}
+
+	/// This is added to remove BUG (56821) and BUG(56818) !!! 
+	/*Now Error returned if either x resolution or y resolution is Greater than Panel Resolution.*/
+	/*if( (var->xres_virtual>fb->panel->mode.xres ) || (var->yres_virtual>fb->panel->mode.yres ))
+	{
+		ret = -EINVAL;
+	}*/
+////
 
 	if (ret == 0 &&
 	    var->xres_virtual * var->bits_per_pixel / 8 *
@@ -199,6 +275,12 @@ static int clcdfb_set_par(struct fb_info *info)
 	struct clcd_fb *fb = to_clcd(info);
 	struct clcd_regs regs;
 
+/* This is a BUG (55911)!!! 
+    This was not letting initialize 2 variables:
+	'fix.line_length'  and 'fix.visual' (as 'clcdfb_set_par' is not already called when
+	ioctl 'FBIOGET_FSCREENINFO' is called)
+Hence moved to the routine 'clcdfb_register'.
+
 	fb->fb.fix.line_length = fb->fb.var.xres_virtual *
 				 fb->fb.var.bits_per_pixel / 8;
 
@@ -206,24 +288,85 @@ static int clcdfb_set_par(struct fb_info *info)
 		fb->fb.fix.visual = FB_VISUAL_PSEUDOCOLOR;
 	else
 		fb->fb.fix.visual = FB_VISUAL_TRUECOLOR;
+*/
 
-	fb->board->decode(fb, &regs);
+    if((fb->fb.var.xres == 272) && (fb->fb.var.yres == 480))
+    {
+        // rotated display customization for SNOM
+        fb->fb.var.xres		= 480;
+        fb->fb.var.yres		= 272;
+        fb->fb.var.xres_virtual	= 480;
+        // line_length must be updated here!
+        fb->fb.fix.line_length = fb->fb.var.xres_virtual * fb->fb.var.bits_per_pixel / 8;
+        fb->fb.var.yoffset  = 480*272 / (fb->fb.fix.line_length/4);
+        
+    	fb->board->decode(fb, &regs);
+    
+    	clcdfb_disable(fb);
+    
+    	writel(regs.tim0, fb->regs + CLCD_TIM0);
+    	writel(regs.tim1, fb->regs + CLCD_TIM1);
+    	writel(regs.tim2, fb->regs + CLCD_TIM2);
+    	writel(regs.tim3, fb->regs + CLCD_TIM3);
+    
+    	clcdfb_set_start(fb);
+    
+    	clk_set_rate(fb->clk, (1000000000 / regs.pixclock) * 1000);
+    
+    	fb->clcd_cntl = regs.cntl;
+    
+        fb->fb.var.xres		= 272;
+	fb->fb.var.yres		= 480;
+	fb->fb.var.xres_virtual	= 272;
+  // line_length must be updated here!
+  fb->fb.fix.line_length = fb->fb.var.xres_virtual * fb->fb.var.bits_per_pixel / 8;
+	fb->fb.var.yoffset  = 0;
+        
+        // start thread    
+        if(spearvsyncthread == NULL)
+        {
+            init_waitqueue_head(&spearverticalinterruptqueue);
+            spearvsyncthread = kthread_run(spearvsync_thread, (void*)&fb->fb, "spearvsyncthread");    
+            if(spearvsyncthread == NULL)
+            {
+                printk(KERN_ERR "spearvsync: Failed to create kernel thread\n");
+        		return -1;
+            }
+            spearbasic_clcd_enable_vertical_synchro(fb, &spearverticalinterruptqueue);
+        }
+        clcdfb_enable(fb, regs.cntl);
+    }
+    else
+    {
+      // normal behaviour
 
-	clcdfb_disable(fb);
+      // line_length must be updated here!
+      fb->fb.fix.line_length = fb->fb.var.xres_virtual * fb->fb.var.bits_per_pixel / 8;
 
-	writel(regs.tim0, fb->regs + CLCD_TIM0);
-	writel(regs.tim1, fb->regs + CLCD_TIM1);
-	writel(regs.tim2, fb->regs + CLCD_TIM2);
-	writel(regs.tim3, fb->regs + CLCD_TIM3);
-
-	clcdfb_set_start(fb);
-
-	clk_set_rate(fb->clk, (1000000000 / regs.pixclock) * 1000);
-
-	fb->clcd_cntl = regs.cntl;
-
-	clcdfb_enable(fb, regs.cntl);
-
+    	fb->board->decode(fb, &regs);
+    
+    	clcdfb_disable(fb);
+    
+    	writel(regs.tim0, fb->regs + CLCD_TIM0);
+    	writel(regs.tim1, fb->regs + CLCD_TIM1);
+    	writel(regs.tim2, fb->regs + CLCD_TIM2);
+    	writel(regs.tim3, fb->regs + CLCD_TIM3);
+    
+    	clcdfb_set_start(fb);
+    
+    	clk_set_rate(fb->clk, (1000000000 / regs.pixclock) * 1000);
+    
+    	fb->clcd_cntl = regs.cntl;
+    
+        if(spearvsyncthread != NULL)
+        {
+            kthread_stop(spearvsyncthread);    
+            spearvsyncthread = NULL;
+            //spearbasic_clcd_disable_vertical_synchro(&spearverticalinterruptqueue);
+        }
+    
+    	clcdfb_enable(fb, regs.cntl);
+    }
 #ifdef DEBUG
 	printk(KERN_INFO "CLCD: Registers set to\n"
 	       KERN_INFO "  %08x %08x %08x %08x\n"
@@ -386,11 +529,24 @@ static int clcdfb_register(struct clcd_fb *fb)
 	fb->fb.var.vsync_len	= fb->panel->mode.vsync_len;
 	fb->fb.var.sync		= fb->panel->mode.sync;
 	fb->fb.var.vmode	= fb->panel->mode.vmode;
-	fb->fb.var.activate	= FB_ACTIVATE_NOW;
+	fb->fb.var.activate	= FB_ACTIVATE_FORCE;
 	fb->fb.var.nonstd	= 0;
 	fb->fb.var.height	= fb->panel->height;
 	fb->fb.var.width	= fb->panel->width;
 	fb->fb.var.accel_flags	= 0;
+
+	/* This was a BUG(55911)!!!
+	 This was not letting initialize 2 variables:
+	 'fix.line_length'  and 'fix.visual' (as 'clcdfb_set_par' is not already called when
+	 ioctl 'FBIOGET_FSCREENINFO' is called)
+
+	Hence moved from 'clcdfb_set_par'*/
+	fb->fb.fix.line_length = fb->fb.var.xres_virtual * fb->fb.var.bits_per_pixel / 8;
+	if (fb->fb.var.bits_per_pixel <= 8)
+		fb->fb.fix.visual = FB_VISUAL_PSEUDOCOLOR;
+	else
+		fb->fb.fix.visual = FB_VISUAL_TRUECOLOR;
+
 
 	fb->fb.monspecs.hfmin	= 0;
 	fb->fb.monspecs.hfmax   = 100000;
@@ -413,13 +569,13 @@ static int clcdfb_register(struct clcd_fb *fb)
 	 * Ensure interrupts are disabled.
 	 */
 	writel(0, fb->regs + CLCD_IENB);
-
 	fb_set_var(&fb->fb, &fb->fb.var);
 
         printk(KERN_INFO "CLCD: %s hardware, %s display\n",
                fb->board->name, fb->panel->mode.name);
 
 	ret = register_framebuffer(&fb->fb);
+
 	if (ret == 0)
 		goto out;
 
@@ -483,6 +639,12 @@ static int clcdfb_remove(struct amba_device *dev)
 
 	amba_set_drvdata(dev, NULL);
 
+	if(spearvsyncthread != NULL)
+	{
+		kthread_stop(spearvsyncthread);    
+		spearvsyncthread = NULL;
+	}
+
 	clcdfb_disable(fb);
 	unregister_framebuffer(&fb->fb);
 	iounmap(fb->regs);
@@ -518,7 +680,7 @@ static int __init amba_clcdfb_init(void)
 {
 	if (fb_get_options("ambafb", NULL))
 		return -ENODEV;
-
+    
 	return amba_driver_register(&clcd_driver);
 }
 

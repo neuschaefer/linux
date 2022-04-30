@@ -1,0 +1,19 @@
+menu "SPEAR platform options"
+	depends on ARCH_SPEARBASIC
+	
+
+source "arch/arm/mach-spearbasic/Kconfig_Operation_Modes"
+
+config SPEAR_MISC_CONFIG
+	tristate "SPEAR Miscellaneous Register Configuration."
+	default y
+	help
+	  The SPEAR Misc Config
+
+#config SPEAR_LOCK
+#	tristate "SPEAR Hw Lock"
+#	default y
+#	help
+#	  The SPEAR Hw Lock
+
+endmenu

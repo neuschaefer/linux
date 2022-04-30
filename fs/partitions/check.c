@@ -330,6 +330,7 @@ void delete_partition(struct gendisk *disk, int part)
 void add_partition(struct gendisk *disk, int part, sector_t start, sector_t len)
 {
 	struct hd_struct *p;
+	int err;
 
 	p = kmalloc(sizeof(*p), GFP_KERNEL);
 	if (!p)
@@ -348,10 +349,10 @@ void add_partition(struct gendisk *disk, int part, sector_t start, sector_t len)
 	p->kobj.parent = &disk->kobj;
 	p->kobj.ktype = &ktype_part;
 	kobject_init(&p->kobj);
-	kobject_add(&p->kobj);
+	err = kobject_add(&p->kobj);
 	if (!disk->part_uevent_suppress)
 		kobject_uevent(&p->kobj, KOBJ_ADD);
-	sysfs_create_link(&p->kobj, &block_subsys.kset.kobj, "subsystem");
+	err = sysfs_create_link(&p->kobj, &block_subsys.kset.kobj, "subsystem");
 	partition_sysfs_add_subdir(p);
 	disk->part[part-1] = p;
 }

@@ -42,7 +42,7 @@ static inline int fs_uart_id_smc2fsid(int id)
 
 static inline int fs_uart_id_fsid2smc(int id)
 {
-    return id - fsid_smc1_uart + 1;
+	return id - fsid_smc1_uart + 1;
 }
 
 struct fs_uart_platform_info {

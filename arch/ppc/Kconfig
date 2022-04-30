@@ -691,6 +691,11 @@ config TQM8260
 	  End of Life: not yet :-)
 	  URL: <http://www.denx.de/PDF/TQM82xx_SPEC_Rev005.pdf>
 
+config PM82X
+	bool "PM82X"
+	help
+	  This option enables support for the MicroSys PM82x evaluation boards.
+
 config ADS8272
 	bool "ADS8272"
 
@@ -731,6 +736,18 @@ config EV64360
 	help
 	  Select EV64360 if configuring a Marvell EV64360BP Evaluation
 	  platform.
+
+config TQM834x
+	bool "TQM834x"
+	help
+	  This option enables support for the TQM834x boards from TQ
+	  Components.
+
+config TQM8272
+	bool "TQM8272"
+	help
+	  This option enables support for the TQM8272 boards from TQ.
+
 endchoice
 
 config PQ2ADS
@@ -751,10 +768,15 @@ config EMBEDDEDBOOT
 config PPC_MPC52xx
 	bool
 
+config PPC_BESTCOMM
+	bool
+	depends on PPC_MPC52xx
+	default y
+
 config 8260
 	bool "CPM2 Support" if WILLOW
 	depends on 6xx
-	default y if TQM8260 || RPX8260 || EST8260 || SBS8260 || SBC82xx || PQ2FADS
+	default y if TQM8260 || RPX8260 || EST8260 || SBS8260 || SBC82xx || PQ2FADS || PM82X
 	help
 	  The MPC8260 is a typical embedded CPU made by Motorola.  Selecting
 	  this option means that you wish to build a kernel for a machine with
@@ -763,7 +785,7 @@ config 8260
 config 8272
 	bool
 	depends on 6xx
-	default y if ADS8272
+	default y if ADS8272 || TQM8272
 	select 8260
 	help
 	  The MPC8272 CPM has a different internal dpram setup than other CPM2
@@ -771,11 +793,11 @@ config 8272
 
 config 83xx
 	bool
-	default y if MPC834x_SYS
+	default y if MPC834x_SYS || TQM834x
 
 config MPC834x
 	bool
-	default y if MPC834x_SYS
+	default y if MPC834x_SYS || TQM834x
 
 config PPC_83xx
 	bool
@@ -1209,6 +1231,7 @@ config PCI_DOMAINS
 config MPC83xx_PCI2
 	bool "Support for 2nd PCI host controller"
 	depends on PCI && MPC834x
+	depends on !TQM834x
 	default y if MPC834x_SYS
 
 config PCI_QSPAN
@@ -1255,6 +1278,18 @@ config PCI_PERMEDIA
 source "drivers/pci/Kconfig"
 
 source "drivers/pcmcia/Kconfig"
+
+menu "PCI Express support"
+
+config PCIE_ENDPOINT
+	bool "PCI Express endpoint support"
+	depends on 440SPE
+	default n
+	help
+	  Say Y here if you want PCI Express configured as an endpoint. Else
+	  PCI Express will be configured as a rootpoint.
+
+endmenu
 
 config RAPIDIO
 	bool "RapidIO support" if MPC8540 || MPC8560

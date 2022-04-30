@@ -172,7 +172,7 @@ static int flow_key_compare(struct flowi *key1, struct flowi *key2)
 void *flow_cache_lookup(struct flowi *key, u16 family, u8 dir,
 			flow_resolve_t resolver)
 {
-	struct flow_cache_entry *fle, **head;
+	struct flow_cache_entry *fle, **head = NULL;
 	unsigned int hash;
 	int cpu;
 

@@ -8,12 +8,12 @@
  *  Based on drivers/serial/amba.c by Russell King
  *
  *  Maintainer: Kumar Gala (galak@kernel.crashing.org) (CPM2)
- *              Pantelis Antoniou (panto@intracom.gr) (CPM1)
+ *	      Pantelis Antoniou (panto@intracom.gr) (CPM1)
  *
  *  Copyright (C) 2004 Freescale Semiconductor, Inc.
- *            (C) 2004 Intracom, S.A.
- *            (C) 2005-2006 MontaVista Software, Inc.
- * 		Vitaly Bordug <vbordug@ru.mvista.com>
+ *	      (C) 2004 Intracom, S.A.
+ *	      (C) 2005-2006 MontaVista Software, Inc.
+ *		Vitaly Bordug <vbordug@ru.mvista.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -22,7 +22,7 @@
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
@@ -426,7 +426,7 @@ static int cpm_uart_startup(struct uart_port *port)
 	}
 
 	if (!(pinfo->flags & FLAG_CONSOLE))
-		cpm_line_cr_cmd(line,CPM_CR_INIT_TRX);
+		cpm_line_cr_cmd(line,CPM_CR_RESTART_TX);
 	return 0;
 }
 
@@ -467,7 +467,6 @@ static void cpm_uart_shutdown(struct uart_port *port)
 			smcp->smc_smcm &= ~(SMCM_RX | SMCM_TX);
 		} else {
 			volatile scc_t *sccp = pinfo->sccp;
-			sccp->scc_gsmrl &= ~(SCC_GSMRL_ENR | SCC_GSMRL_ENT);
 			sccp->scc_sccm &= ~(UART_SCCM_TX | UART_SCCM_RX);
 		}
 
@@ -585,9 +584,9 @@ static void cpm_uart_set_termios(struct uart_port *port,
 		 * enables, because we want to put them back if they were
 		 * present.
 		 */
-		prev_mode = smcp->smc_smcmr;
-		smcp->smc_smcmr = smcr_mk_clen(bits) | cval | SMCMR_SM_UART;
-		smcp->smc_smcmr |= (prev_mode & (SMCMR_REN | SMCMR_TEN));
+		prev_mode = smcp->smc_smcmr & (SMCMR_REN | SMCMR_TEN);
+		smcp->smc_smcmr = smcr_mk_clen(bits) | cval | SMCMR_SM_UART
+				| prev_mode;
 	} else {
 		sccp->scc_psmr = (sbits << 12) | scval;
 	}
@@ -823,7 +822,7 @@ static void cpm_uart_init_smc(struct uart_cpm_port *pinfo)
 	up->smc_tbptr = pinfo->smcup->smc_tbase;
 	up->smc_rstate = 0;
 	up->smc_tstate = 0;
-	up->smc_brkcr = 1;              /* number of break chars */
+	up->smc_brkcr = 1;		/* number of break chars */
 	up->smc_brkec = 0;
 #endif
 
@@ -1025,9 +1024,9 @@ int cpm_uart_drv_get_platform_data(struct platform_device *pdev, int is_con)
 	int idx;	/* It is UART_SMCx or UART_SCCx index */
 	struct uart_cpm_port *pinfo;
 	int line;
-	u32 mem, pram;
+	u32 mem, pram, pram_base;
 
-        idx = pdata->fs_no = fs_uart_get_id(pdata);
+	idx = pdata->fs_no = fs_uart_get_id(pdata);
 
 	line = cpm_uart_id2nr(idx);
 	if(line < 0) {
@@ -1051,6 +1050,12 @@ int cpm_uart_drv_get_platform_data(struct platform_device *pdev, int is_con)
 	if (!(r = platform_get_resource_byname(pdev, IORESOURCE_MEM, "pram")))
 		return -EINVAL;
 	pram = (u32)ioremap(r->start, r->end - r->start + 1);
+
+	r = platform_get_resource_byname(pdev, IORESOURCE_MEM, "pram_base");
+	if (r) {
+		pram_base = r->start;
+		out_be16((u16 *)pram_base, pram & 0xffff);
+	}
 
 	if(idx > fsid_smc2_uart) {
 		pinfo->sccp = (scc_t *)mem;
@@ -1181,7 +1186,7 @@ static int __init cpm_uart_console_setup(struct console *co, char *options)
 		pdata = pdev->dev.platform_data;
 		if (pdata)
 			if (pdata->init_ioports)
-    	                	pdata->init_ioports(pdata);
+    				pdata->init_ioports(pdata);
 
 		cpm_uart_drv_get_platform_data(pdev, 1);
 	}
@@ -1271,11 +1276,11 @@ static int cpm_uart_drv_probe(struct device *dev)
 	pr_debug("cpm_uart_drv_probe: Adding CPM UART %d\n", cpm_uart_id2nr(pdata->fs_no));
 
 	if (pdata->init_ioports)
-                pdata->init_ioports(pdata);
+		pdata->init_ioports(pdata);
 
 	ret = uart_add_one_port(&cpm_reg, &cpm_uart_ports[pdata->fs_no].port);
 
-        return ret;
+	return ret;
 }
 
 static int cpm_uart_drv_remove(struct device *dev)
@@ -1286,22 +1291,22 @@ static int cpm_uart_drv_remove(struct device *dev)
 	pr_debug("cpm_uart_drv_remove: Removing CPM UART %d\n",
 			cpm_uart_id2nr(pdata->fs_no));
 
-        uart_remove_one_port(&cpm_reg, &cpm_uart_ports[pdata->fs_no].port);
-        return 0;
+	uart_remove_one_port(&cpm_reg, &cpm_uart_ports[pdata->fs_no].port);
+	return 0;
 }
 
 static struct device_driver cpm_smc_uart_driver = {
-        .name   = "fsl-cpm-smc:uart",
-        .bus    = &platform_bus_type,
-        .probe  = cpm_uart_drv_probe,
-        .remove = cpm_uart_drv_remove,
+	.name   = "fsl-cpm-smc:uart",
+	.bus    = &platform_bus_type,
+	.probe  = cpm_uart_drv_probe,
+	.remove = cpm_uart_drv_remove,
 };
 
 static struct device_driver cpm_scc_uart_driver = {
-        .name   = "fsl-cpm-scc:uart",
-        .bus    = &platform_bus_type,
-        .probe  = cpm_uart_drv_probe,
-        .remove = cpm_uart_drv_remove,
+	.name   = "fsl-cpm-scc:uart",
+	.bus    = &platform_bus_type,
+	.probe  = cpm_uart_drv_probe,
+	.remove = cpm_uart_drv_remove,
 };
 
 /*

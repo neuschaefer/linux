@@ -2439,7 +2439,7 @@ static long snd_pcm_oss_ioctl(struct file *file, unsigned int cmd, unsigned long
 		if (res < 0)
 			return res;
 		return put_user(res, p);
-	case SNDCTL_DSP_CHANNELS:
+	case SNDCTL_DSP_CHANNELSSNDCTL_DSP_CHANNELS:
 		if (get_user(res, p))
 			return -EFAULT;
 		res = snd_pcm_oss_set_channels(pcm_oss_file, res);

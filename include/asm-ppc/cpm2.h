@@ -189,7 +189,11 @@ typedef struct cpm_buf_desc {
  */
 #define PROFF_SMC1	(0)
 #define PROFF_SMC2	(64)
-
+#if defined(CONFIG_8272) || defined(CONFIG_MPC8555)
+#define PROFF_I2C	((8 * 1024) - 64)
+#else
+#define PROFF_I2C	((16 * 1024) - 64)
+#endif
 
 /* Define enough so I can at least use the serial port as a UART.
  */

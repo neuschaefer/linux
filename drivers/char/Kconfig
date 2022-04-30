@@ -1034,6 +1034,60 @@ config MMTIMER
 	  The mmtimer device allows direct userspace access to the
 	  Altix system timer.
 
+
+config SPEAR_ARM2
+	tristate "Enable SPEAR ARM2"
+    depends on ARCH_SPEARPLUS
+    default y
+    help
+		Select to Enable ARM2
+
+config SPEAR_GPIO_pl061
+	 tristate "SPEAR GPIO pl061"
+	 depends on SBASIC_LEG_GPIO || SBASIC_RAS_GPIO || ARCH_SPEARPLUS
+         default y
+         help
+	  The SPEAR GPIO driver
+
+config SPEAR_IPC
+	 tristate "SPEAR IPC"
+	 depends on ARCH_SPEARPLUS
+         default y
+         help
+	 The SPEAR Inter Processor Communication (IPC) driver
+
+config MY_CORE_ID
+	int "core_id of precessor on which IPC is running"
+	depends SPEAR_IPC && ARCH_SPEARPLUS
+	default "0"
+	help 
+	ARM1 - 0, ARM2 - 1, RAS0 -2 ,RAS1 - 3
+
+config SPEAR_DMA_pl080
+	tristate "SPEAR DMA pl080"
+	default y
+	help
+	  The SPEAR DMA driver
+
+config SPEAR_SSP_pl022
+	tristate "SPEAR SSP pl022"
+	depends on SBASIC_SSP_ENHANCED || SBASIC_SSP_BASIC || ARCH_SPEARPLUS
+	default y
+	help
+	  The SPEAR SSP driver
+
+config SPEAR_ADC_st10
+	tristate "SPEAR ADC st10"
+	default y
+	help
+	  The SPEAR ADC driver
+
+config SPEAR_JPEG
+	 tristate "SPEAR JPEG"
+         default y
+         help
+	  The SPEAR JPEG driver
+
 source "drivers/char/tpm/Kconfig"
 
 config TELCLOCK

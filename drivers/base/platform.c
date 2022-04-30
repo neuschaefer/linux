@@ -563,7 +563,8 @@ EXPORT_SYMBOL_GPL(platform_bus_type);
 
 int __init platform_bus_init(void)
 {
-	device_register(&platform_bus);
+    int err;
+	err=device_register(&platform_bus);
 	return bus_register(&platform_bus_type);
 }
 

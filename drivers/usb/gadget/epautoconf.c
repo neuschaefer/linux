@@ -96,6 +96,9 @@ ep_matches (
 				 */
 				if ('s' == tmp[2])	// == "-iso"
 					return 0;
+				if('i' != tmp[1] )
+					return 0;
+			
 				/* for now, avoid PXA "interrupt-in";
 				 * it's documented as never using DATA1.
 				 */
@@ -274,6 +277,21 @@ struct usb_ep * __devinit usb_ep_autoconfig (
 		ep = find_ep (gadget, "ep1-bulk");
 		if (ep && ep_matches (gadget, ep, desc))
 			return ep;
+
+	} else if (gadget_is_pd12 (gadget)) {
+		if (USB_ENDPOINT_XFER_BULK == type
+				&& (USB_DIR_IN & desc->bEndpointAddress)) {
+			/* single buffering is enough */
+			ep = find_ep (gadget, "ep2in-bulk");
+			if (ep && ep_matches (gadget, ep, desc))
+				return ep;
+		} else if (USB_ENDPOINT_XFER_BULK == type
+				&& (USB_DIR_OUT & desc->bEndpointAddress)) {
+			/* DMA may be available */
+			ep = find_ep (gadget, "ep1out-bulk");
+			if (ep && ep_matches (gadget, ep, desc))
+				return ep;
+		}
 	}
 
 	/* Second, look at endpoints until an unclaimed one looks usable */
@@ -308,3 +326,5 @@ void __devinit usb_ep_autoconfig_reset (struct usb_gadget *gadget)
 	epnum = 0;
 }
 
+EXPORT_SYMBOL(usb_ep_autoconfig_reset);
+EXPORT_SYMBOL(usb_ep_autoconfig);

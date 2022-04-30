@@ -12,6 +12,9 @@ obj-$(CONFIG_PPC_OCP)		+= ocp.o
 obj-$(CONFIG_IBM_OCP)		+= ibm_ocp.o
 obj-$(CONFIG_44x)		+= ibm44x_common.o
 obj-$(CONFIG_440EP)		+= ibm440gx_common.o
+obj-$(CONFIG_440EPX)		+= ibm440gx_common.o
+obj-$(CONFIG_440GR)		+= ibm440gx_common.o
+obj-$(CONFIG_440GRX)		+= ibm440gx_common.o
 obj-$(CONFIG_440GP)		+= ibm440gp_common.o
 obj-$(CONFIG_440GX)		+= ibm440gx_common.o
 obj-$(CONFIG_440SP)		+= ibm440gx_common.o ibm440sp_common.o
@@ -28,7 +31,6 @@ endif
 endif
 obj-$(CONFIG_44x)		+= ppc4xx_pic.o
 obj-$(CONFIG_40x)		+= ppc4xx_setup.o
-obj-$(CONFIG_GEN_RTC)		+= todc_time.o
 obj-$(CONFIG_PPC4xx_DMA)	+= ppc4xx_dma.o
 obj-$(CONFIG_PPC4xx_EDMA)	+= ppc4xx_sgdma.o
 ifeq ($(CONFIG_40x),y)
@@ -39,9 +41,13 @@ obj-$(CONFIG_8xx)		+= m8xx_setup.o ppc8xx_pic.o $(wdt-mpc8xx-y) \
 				   ppc_sys.o mpc8xx_devices.o mpc8xx_sys.o
 obj-$(CONFIG_PCI_QSPAN)		+= qspan_pci.o
 obj-$(CONFIG_PPC_PREP)		+= open_pic.o todc_time.o
+obj-$(CONFIG_ALPR)		+= pci_auto.o
 obj-$(CONFIG_BAMBOO)		+= pci_auto.o todc_time.o
+obj-$(CONFIG_BUBINGA)		+= todc_time.o
+obj-$(CONFIG_CPCI405)		+= todc_time.o
 obj-$(CONFIG_CPCI690)		+= todc_time.o pci_auto.o
 obj-$(CONFIG_EBONY)		+= pci_auto.o todc_time.o
+obj-$(CONFIG_EP405)		+= todc_time.o
 obj-$(CONFIG_EV64260)		+= todc_time.o pci_auto.o
 obj-$(CONFIG_EV64360)		+= todc_time.o
 obj-$(CONFIG_CHESTNUT)		+= mv64360_pic.o pci_auto.o
@@ -57,6 +63,7 @@ obj-$(CONFIG_MV64X60)		+= mv64x60.o mv64x60_win.o
 obj-$(CONFIG_MVME5100)		+= open_pic.o todc_time.o \
 					pci_auto.o hawk_common.o
 obj-$(CONFIG_OCOTEA)		+= pci_auto.o todc_time.o
+obj-$(CONFIG_P3P440)		+= pci_auto.o
 obj-$(CONFIG_PAL4)		+= cpc700_pic.o
 obj-$(CONFIG_POWERPMC250)	+= pci_auto.o
 obj-$(CONFIG_PPLUS)		+= hawk_common.o open_pic.o \
@@ -66,10 +73,16 @@ obj-$(CONFIG_PRPMC750)		+= open_pic.o pci_auto.o \
 obj-$(CONFIG_HARRIER)		+= harrier.o
 obj-$(CONFIG_PRPMC800)		+= open_pic.o pci_auto.o
 obj-$(CONFIG_RADSTONE_PPC7D)	+= pci_auto.o
+obj-$(CONFIG_RAINIER)		+= pci_auto.o
 obj-$(CONFIG_SANDPOINT)		+= pci_auto.o todc_time.o
 obj-$(CONFIG_SBC82xx)		+= todc_time.o
+obj-$(CONFIG_SEQUOIA)		+= pci_auto.o
 obj-$(CONFIG_SPRUCE)		+= cpc700_pic.o pci_auto.o \
 				   todc_time.o
+obj-$(CONFIG_SYCAMORE)		+= todc_time.o
+obj-$(CONFIG_WALNUT)		+= todc_time.o
+obj-$(CONFIG_YELLOWSTONE)	+= pci_auto.o
+obj-$(CONFIG_YOSEMITE)		+= pci_auto.o
 obj-$(CONFIG_8260)		+= m8260_setup.o pq2_devices.o pq2_sys.o \
 				   ppc_sys.o
 obj-$(CONFIG_PCI_8260)		+= m82xx_pci.o pci_auto.o
@@ -104,5 +117,5 @@ obj-$(CONFIG_PPC_MPC52xx)	+= mpc52xx_setup.o mpc52xx_pic.o \
 ifeq ($(CONFIG_PPC_MPC52xx),y)
 obj-$(CONFIG_PCI)		+= mpc52xx_pci.o
 endif
-
+obj-$(CONFIG_PPC_BESTCOMM)	+= bestcomm/
 obj-$(CONFIG_PPC_I8259)		+= i8259.o

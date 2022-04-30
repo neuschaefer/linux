@@ -197,12 +197,16 @@ __lookup_machine_type:
 	sub	r3, r3, r4			@ get offset between virt&phys
 	add	r5, r5, r3			@ convert virt addresses to
 	add	r6, r6, r3			@ physical address space
-1:	ldr	r3, [r5, #MACHINFO_TYPE]	@ get machine type
+	rsb	r3, r5, r6			@ number of machine types
+	teq	r3, #SIZEOF_MACHINE_DESC	@ only one?
+	ldreq	r1, [r5]			@ if so do not bother with r1
+	beq	2f				@ ...and be happy.
+1:	ldr	r3, [r5]			@ get machine type
 	teq	r3, r1				@ matches loader number?
 	beq	2f				@ found
 	add	r5, r5, #SIZEOF_MACHINE_DESC	@ next machine_desc
 	cmp	r5, r6
-	blo	1b
+	blt	1b
 	mov	r5, #0				@ unknown machine
 2:	mov	pc, lr
 

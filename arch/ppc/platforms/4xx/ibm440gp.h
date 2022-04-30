@@ -25,6 +25,11 @@
 #define UART0_INT		0
 #define UART1_INT		1
 
+/* GPIO macro register defines */
+#define GPIO_BASE		0x0000000140000700ULL
+#define GPIO0_OR		(GPIO_BASE+0x0)
+#define GPIO0_IR		(GPIO_BASE+0x1C)
+
 /* Clock and Power Management */
 #define IBM_CPM_IIC0		0x80000000	/* IIC interface */
 #define IBM_CPM_IIC1		0x40000000	/* IIC interface */

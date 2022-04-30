@@ -101,9 +101,15 @@ void smc1_lineif(struct uart_cpm_port *pinfo)
 	io->iop_pdird &= ~0x00800000;
 	io->iop_psord &= ~0x00c00000;
 
+#if defined(CONFIG_PM82X)
+	/* Wire BRG7 to SMC1 */
+	cpmux->cmx_smr &= 0x1f;
+	pinfo->brg = 7;
+#else
 	/* Wire BRG1 to SMC1 */
 	cpmux->cmx_smr &= 0x0f;
 	pinfo->brg = 1;
+#endif
 
 	cpm2_unmap(cpmux);
 	cpm2_unmap(io);
@@ -114,15 +120,32 @@ void smc2_lineif(struct uart_cpm_port *pinfo)
 	volatile iop_cpm2_t *io = cpm2_map(im_ioport);
 	volatile cpmux_t *cpmux = cpm2_map(im_cpmux);
 
+#if 0
 	/* SMC2 is only on port A */
 	io->iop_ppara |= 0x00c00000;
 	io->iop_pdira |= 0x00400000;
 	io->iop_pdira &= ~0x00800000;
 	io->iop_psora &= ~0x00c00000;
+#else
+	/* SMC2 is only on port A */
+	io->iop_ppard |= 0x08000000;
+	io->iop_pdird &= ~0x08000000;
+	io->iop_psord |= 0x08000000;
+	io->iop_pparc |= 0x00010000;
+	io->iop_pdirc |= 0x00010000;
+	io->iop_psorc &= ~0x00010000;
 
+#endif
+
+#if defined(CONFIG_PM82X)
+	/* Wire BRG8 to SMC2 */
+	cpmux->cmx_smr &= 0xf1;
+	pinfo->brg = 8;
+#else
 	/* Wire BRG2 to SMC2 */
 	cpmux->cmx_smr &= 0xf0;
 	pinfo->brg = 2;
+#endif
 
 	cpm2_unmap(cpmux);
 	cpm2_unmap(io);
@@ -133,12 +156,22 @@ void scc1_lineif(struct uart_cpm_port *pinfo)
 	volatile iop_cpm2_t *io = cpm2_map(im_ioport);
 	volatile cpmux_t *cpmux = cpm2_map(im_cpmux);
 
+#if defined(CONFIG_PM82X)
+	io->iop_ppard |= 0x00000001;	/* Rx */
+	io->iop_pparb |= 0x00000008;	/* Tx */
+
+	io->iop_psord &= ~0x00000001;   /* Rx */
+	io->iop_psorb |= 0x00000008;    /* Tx */
+	io->iop_pdird &= ~0x00000001;   /* Rx */
+	io->iop_pdirb |= 0x00000008;    /* Tx */
+#else
 	/* Use Port D for SCC1 instead of other functions.  */
 	io->iop_ppard |= 0x00000003;
 	io->iop_psord &= ~0x00000001;	/* Rx */
 	io->iop_psord |= 0x00000002;	/* Tx */
 	io->iop_pdird &= ~0x00000001;	/* Rx */
 	io->iop_pdird |= 0x00000002;	/* Tx */
+#endif
 
 	/* Wire BRG1 to SCC1 */
 	cpmux->cmx_scr &= 0x00ffffff;
@@ -151,6 +184,9 @@ void scc1_lineif(struct uart_cpm_port *pinfo)
 
 void scc2_lineif(struct uart_cpm_port *pinfo)
 {
+	volatile iop_cpm2_t *io = cpm2_map(im_ioport);
+	volatile cpmux_t *cpmux = cpm2_map(im_cpmux);
+
 	/*
 	 * STx GP3 uses the SCC2 secondary option pin assignment
 	 * which this driver doesn't account for in the static
@@ -159,15 +195,28 @@ void scc2_lineif(struct uart_cpm_port *pinfo)
 	 * be supported in a sane fashion.
 	 */
 #ifndef CONFIG_STX_GP3
-	volatile iop_cpm2_t *io = cpm2_map(im_ioport);
-	volatile cpmux_t *cpmux = cpm2_map(im_cpmux);
-
+# if defined(CONFIG_MPC8560_ADS) || defined(CONFIG_TQM8560)
+	io->iop_ppard |= 0x00000018;
+	io->iop_psord &= ~0x00000008;	/* Rx */
+	io->iop_psord &= ~0x00000010;	/* Tx */
+	io->iop_pdird &= ~0x00000008;	/* Rx */
+	io->iop_pdird |= 0x00000010;	/* Tx */
+# elif defined(CONFIG_PM82X)
+	io->iop_pparb |= 0x00010000;	/* Rx */
+	io->iop_pdirb &= ~0x00010000;
+	io->iop_psorb &= ~0x00010000;
+	io->iop_ppard |= 0x00000010;	/* Tx */
+	io->iop_pdird |= 0x00000010;
+	io->iop_psord &= ~0x00000010;
+# else
 	io->iop_pparb |= 0x008b0000;
 	io->iop_pdirb |= 0x00880000;
 	io->iop_psorb |= 0x00880000;
 	io->iop_pdirb &= ~0x00030000;
 	io->iop_psorb &= ~0x00030000;
-#endif
+# endif
+#endif /* CONFIG_STX_GP3 */
+
 	cpmux->cmx_scr &= 0xff00ffff;
 	cpmux->cmx_scr |= 0x00090000;
 	pinfo->brg = 2;
@@ -181,11 +230,19 @@ void scc3_lineif(struct uart_cpm_port *pinfo)
 	volatile iop_cpm2_t *io = cpm2_map(im_ioport);
 	volatile cpmux_t *cpmux = cpm2_map(im_cpmux);
 
+#if defined(CONFIG_PM82X)
+	io->iop_pparb |= 0x00820000;	/* Rx */
+	io->iop_pdirb &= ~0x00020000;
+	io->iop_psorb &= ~0x00020000;
+	io->iop_pdirb |= 0x00800000;	/* Tx */
+	io->iop_psorb |= 0x00800000;
+#else
 	io->iop_pparb |= 0x008b0000;
 	io->iop_pdirb |= 0x00880000;
 	io->iop_psorb |= 0x00880000;
 	io->iop_pdirb &= ~0x00030000;
 	io->iop_psorb &= ~0x00030000;
+#endif
 	cpmux->cmx_scr &= 0xffff00ff;
 	cpmux->cmx_scr |= 0x00001200;
 	pinfo->brg = 3;
@@ -199,10 +256,19 @@ void scc4_lineif(struct uart_cpm_port *pinfo)
 	volatile iop_cpm2_t *io = cpm2_map(im_ioport);
 	volatile cpmux_t *cpmux = cpm2_map(im_cpmux);
 
+#if defined(CONFIG_PM82X)
+	io->iop_ppard |= 0x00000200;	/* Rx */
+	io->iop_pdird &= ~0x00000200;
+	io->iop_psord &= ~0x00000200;
+	io->iop_ppard |= 0x00000400;	/* Tx */
+	io->iop_pdird |= 0x00000400;
+	io->iop_psord &= ~0x00000400;
+#else
 	io->iop_ppard |= 0x00000600;
 	io->iop_psord &= ~0x00000600;	/* Tx/Rx */
 	io->iop_pdird &= ~0x00000200;	/* Rx */
 	io->iop_pdird |= 0x00000400;	/* Tx */
+#endif
 
 	cpmux->cmx_scr &= 0xffffff00;
 	cpmux->cmx_scr |= 0x0000001b;
@@ -285,7 +351,7 @@ void cpm_uart_freebuf(struct uart_cpm_port *pinfo)
 int cpm_uart_init_portdesc(void)
 {
 #if defined(CONFIG_SERIAL_CPM_SMC1) || defined(CONFIG_SERIAL_CPM_SMC2)
-	u32 addr;
+	u16 *addr;
 #endif
 	pr_debug("CPM uart[-]:init portdesc\n");
 

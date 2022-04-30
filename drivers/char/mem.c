@@ -269,6 +269,14 @@ static int mmap_mem(struct file * file, struct vm_area_struct * vma)
 {
 	size_t size = vma->vm_end - vma->vm_start;
 
+#ifdef CONFIG_44x
+	/*
+	 * 2006-08-07: sr
+	 * Needed on 44x-er systems for 36bit addresses (like pci on 440gx)
+	 */
+	vma->vm_pgoff = (fixup_bigphys_addr(vma->vm_pgoff << PAGE_SHIFT, size) >> PAGE_SHIFT);
+#endif
+
 	if (!valid_mmap_phys_addr_range(vma->vm_pgoff, size))
 		return -EINVAL;
 

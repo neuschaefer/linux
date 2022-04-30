@@ -32,6 +32,8 @@ extern int show_fiq_list(struct seq_file *, void *);
  */
 static inline void desc_handle_irq(unsigned int irq, struct irq_desc *desc)
 {
+	//if(irq == 28)
+		//printk("desc_handle_irq IRQ: %d\n", irq);
 	desc->handle_irq(irq, desc);
 }
 

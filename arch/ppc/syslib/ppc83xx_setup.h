@@ -33,6 +33,7 @@ extern void mpc83xx_restart(char *cmd);
 extern void mpc83xx_power_off(void);
 extern void mpc83xx_halt(void);
 extern void mpc83xx_setup_hose(void) __init;
+extern void mpc834x_pcibios_fixup(void);
 
 /* PCI config */
 #define PCI1_CFG_ADDR_OFFSET (0x8300)

@@ -131,6 +131,8 @@ struct zero_dev {
 
 	/* autoresume timer */
 	struct timer_list	resume;
+	struct usb_request	*in_req;
+	struct usb_request	*out_req;
 };
 
 #define xprintk(d,level,fmt,args...) \
@@ -571,11 +573,13 @@ static void source_sink_complete (struct usb_ep *ep, struct usb_request *req)
 	switch (status) {
 
 	case 0: 			/* normal completion? */
+#if 0
 		if (ep == dev->out_ep) {
 			check_read_data (dev, ep, req);
 			memset (req->buf, 0x55, req->length);
 		} else
 			reinit_write_data (dev, ep, req);
+#endif
 		break;
 
 	/* this endpoint is normally active while we're configured */
@@ -586,7 +590,10 @@ static void source_sink_complete (struct usb_ep *ep, struct usb_request *req)
 				req->actual, req->length);
 		if (ep == dev->out_ep)
 			check_read_data (dev, ep, req);
+#if 0
+		printk("****Calling free req****\n");
 		free_ep_req (ep, req);
+#endif
 		return;
 
 	case -EOVERFLOW:		/* buffer overrun on read means that
@@ -617,9 +624,20 @@ source_sink_start_ep (struct usb_ep *ep, gfp_t gfp_flags)
 	struct usb_request	*req;
 	int			status;
 
+#if 0
 	req = alloc_ep_req (ep, buflen);
 	if (!req)
 		return NULL;
+#endif
+	/*********************/
+	if (strcmp (ep->name, EP_IN_NAME) == 0) 
+		req = ((struct zero_dev *)ep->driver_data)->in_req;
+	else if (strcmp (ep->name, EP_OUT_NAME) == 0) 
+		req = ((struct zero_dev *)ep->driver_data)->out_req;
+	else
+		return NULL;
+
+	/*********************/
 
 	memset (req->buf, 0, req->length);
 	req->complete = source_sink_complete;
@@ -1128,6 +1146,13 @@ zero_unbind (struct usb_gadget *gadget)
 
 	DBG (dev, "unbind\n");
 
+	/****************/
+	if(dev->in_ep)
+		free_ep_req (dev->in_ep, dev->in_req);
+	if(dev->out_ep)
+		free_ep_req (dev->out_ep, dev->out_req);
+	/****************/
+
 	/* we've already been disconnected ... no i/o is active */
 	if (dev->req) {
 		dev->req->length = USB_BUFSIZ;
@@ -1144,6 +1169,7 @@ zero_bind (struct usb_gadget *gadget)
 	struct zero_dev		*dev;
 	struct usb_ep		*ep;
 	int			gcnum;
+	struct usb_request	*in_req, *out_req;
 
 	/* FIXME this can't yet work right with SH ... it has only
 	 * one configuration, numbered one.
@@ -1163,14 +1189,26 @@ autoconf_fail:
 			shortname, gadget->name);
 		return -ENODEV;
 	}
+
 	EP_IN_NAME = ep->name;
 	ep->driver_data = ep;	/* claim */
+	/*************************************/
+	in_req = alloc_ep_req (ep, buflen);
+	if(!in_req)
+		goto enomem;
+	/*************************************/
 	
 	ep = usb_ep_autoconfig (gadget, &fs_sink_desc);
 	if (!ep)
 		goto autoconf_fail;
 	EP_OUT_NAME = ep->name;
 	ep->driver_data = ep;	/* claim */
+	/*************************************/
+	out_req = alloc_ep_req (ep, buflen);
+	if(!out_req)
+		goto enomem;
+	/*************************************/
+
 
 	gcnum = usb_gadget_controller_number (gadget);
 	if (gcnum >= 0)
@@ -1193,6 +1231,8 @@ autoconf_fail:
 	dev = kzalloc(sizeof(*dev), SLAB_KERNEL);
 	if (!dev)
 		return -ENOMEM;
+	dev->in_req = in_req;
+	dev->out_req = out_req;
 	spin_lock_init (&dev->lock);
 	dev->gadget = gadget;
 	set_gadget_data (gadget, dev);
@@ -1236,6 +1276,8 @@ autoconf_fail:
 	}
 
 	gadget->ep0->driver_data = dev;
+	/* allocate request for source sink */
+
 
 	INFO (dev, "%s, version: " DRIVER_VERSION "\n", longname);
 	INFO (dev, "using %s, OUT %s IN %s\n", gadget->name,
@@ -1289,7 +1331,7 @@ static struct usb_gadget_driver zero_driver = {
 #endif
 	.function	= (char *) longname,
 	.bind		= zero_bind,
-	.unbind		= __exit_p(zero_unbind),
+	.unbind		= zero_unbind,
 
 	.setup		= zero_setup,
 	.disconnect	= zero_disconnect,

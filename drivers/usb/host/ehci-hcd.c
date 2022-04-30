@@ -43,7 +43,6 @@
 #include <asm/system.h>
 #include <asm/unaligned.h>
 
-
 /*-------------------------------------------------------------------------*/
 
 /*
@@ -133,6 +132,7 @@ MODULE_PARM_DESC (park, "park setting; 1-3 back-to-back async packets");
 #include "ehci.h"
 #include "ehci-dbg.c"
 
+
 /*-------------------------------------------------------------------------*/
 
 /*
@@ -169,6 +169,7 @@ static int handshake (void __iomem *ptr, u32 mask, u32 done, int usec)
 	return -ETIMEDOUT;
 }
 
+#if 0
 /* force HC to halt state from unknown (EHCI spec section 2.3) */
 static int ehci_halt (struct ehci_hcd *ehci)
 {
@@ -185,7 +186,7 @@ static int ehci_halt (struct ehci_hcd *ehci)
 	writel (temp, &ehci->regs->command);
 	return handshake (&ehci->regs->status, STS_HALT, STS_HALT, 16 * 125);
 }
-
+#endif
 /* put TDI/ARC silicon into EHCI mode */
 static void tdi_reset (struct ehci_hcd *ehci)
 {
@@ -291,6 +292,7 @@ static void ehci_watchdog (unsigned long param)
 	spin_unlock_irqrestore (&ehci->lock, flags);
 }
 
+#if 0
 /* ehci_shutdown kick in for silicon on any bus (not just pci, etc).
  * This forcibly disables dma and IRQs, helping kexec and other cases
  * where the next system software may expect clean state.
@@ -306,6 +308,7 @@ ehci_shutdown (struct usb_hcd *hcd)
 	/* make BIOS/etc use companion controller during reboot */
 	writel (0, &ehci->regs->configured_flag);
 }
+#endif
 
 static void ehci_port_power (struct ehci_hcd *ehci, int is_on)
 {
@@ -895,11 +898,17 @@ MODULE_LICENSE ("GPL");
 #define	PLATFORM_DRIVER		ehci_hcd_au1xxx_driver
 #endif
 
+#if defined(CONFIG_ARCH_SPEARPLUS) || defined(CONFIG_ARCH_SPEARBASIC)
+#include "spr_ehci_syn.c"
+#define PLATFORM_DRIVER
+#endif
+
+
 #if !defined(PCI_DRIVER) && !defined(PLATFORM_DRIVER)
 #error "missing bus glue for ehci-hcd"
 #endif
 
-static int __init ehci_hcd_init(void)
+int __init ehci_hcd_init(void)
 {
 	int retval = 0;
 
@@ -908,6 +917,7 @@ static int __init ehci_hcd_init(void)
 		 sizeof(struct ehci_qh), sizeof(struct ehci_qtd),
 		 sizeof(struct ehci_itd), sizeof(struct ehci_sitd));
 
+#if 0
 #ifdef PLATFORM_DRIVER
 	retval = platform_driver_register(&PLATFORM_DRIVER);
 	if (retval < 0)
@@ -922,19 +932,32 @@ static int __init ehci_hcd_init(void)
 #endif
 	}
 #endif
+#endif
+
+#if defined(CONFIG_ARCH_SPEARPLUS) || defined(CONFIG_ARCH_SPEARBASIC)
+	retval = spear_ehci_init();
+#endif
 
 	return retval;
 }
 module_init(ehci_hcd_init);
 
+
 static void __exit ehci_hcd_cleanup(void)
 {
+#if 0
 #ifdef PLATFORM_DRIVER
 	platform_driver_unregister(&PLATFORM_DRIVER);
 #endif
 #ifdef PCI_DRIVER
 	pci_unregister_driver(&PCI_DRIVER);
 #endif
+#endif
+#if defined(CONFIG_ARCH_SPEARPLUS) || defined(CONFIG_ARCH_SPEARBASIC)
+         spear_ehci_cleanup();
+#endif
+
 }
 module_exit(ehci_hcd_cleanup);
+
 

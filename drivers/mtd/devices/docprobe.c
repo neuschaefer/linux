@@ -80,7 +80,11 @@ static unsigned long __initdata doc_locations[] = {
 	0xe8000, 0xea000, 0xec000, 0xee000,
 #endif /*  CONFIG_MTD_DOCPROBE_HIGH */
 #elif defined(__PPC__)
+#if defined(CONFIG_PM82X)
+	0xff800000,
+#else
 	0xe4000000,
+#endif
 #elif defined(CONFIG_MOMENCO_OCELOT)
 	0x2f000000,
         0xff000000,

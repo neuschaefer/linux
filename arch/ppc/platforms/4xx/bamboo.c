@@ -30,6 +30,10 @@
 #include <linux/serial.h>
 #include <linux/serial_core.h>
 #include <linux/ethtool.h>
+#include <linux/platform_device.h>
+#include <linux/mtd/partitions.h>
+#include <linux/mtd/nand.h>
+#include <linux/mtd/ndfc.h>
 
 #include <asm/system.h>
 #include <asm/pgtable.h>
@@ -44,6 +48,7 @@
 #include <asm/bootinfo.h>
 #include <asm/ppc4xx_pic.h>
 #include <asm/ppcboot.h>
+#include <platforms/4xx/bamboo.h>
 
 #include <syslib/gen550.h>
 #include <syslib/ibm440gx_common.h>
@@ -85,7 +90,7 @@ bamboo_calibrate_decr(void)
 static int
 bamboo_show_cpuinfo(struct seq_file *m)
 {
-	seq_printf(m, "vendor\t\t: IBM\n");
+	seq_printf(m, "vendor\t\t: AMCC\n");
 	seq_printf(m, "machine\t\t: PPC440EP EVB (Bamboo)\n");
 
 	return 0;
@@ -379,6 +384,180 @@ bamboo_early_serial_map(void)
 		printk("Early serial init of port 3 failed\n");
 	}
 }
+
+static struct resource bamboo_small_nor = {
+	.start = BAMBOO_SMALL_FLASH_LOW,
+	.end = BAMBOO_SMALL_FLASH_LOW + BAMBOO_SMALL_FLASH_SIZE,
+	.flags = IORESOURCE_MEM,
+};
+
+static struct resource bamboo_large_nor = {
+	.start = BAMBOO_LARGE_FLASH_LOW,
+	.end = BAMBOO_LARGE_FLASH_LOW + BAMBOO_LARGE_FLASH_SIZE,
+	.flags = IORESOURCE_MEM,
+};
+
+static struct resource bamboo_sram = {
+	.start = BAMBOO_SRAM_LOW,
+	.end = BAMBOO_SRAM_LOW + BAMBOO_SRAM_SIZE,
+	.flags = IORESOURCE_MEM,
+};
+
+static struct resource bamboo_ndfc = {
+	.start = BAMBOO_NAND_FLASH_REG_ADDR,
+	.end = BAMBOO_NAND_FLASH_REG_ADDR + BAMBOO_NAND_FLASH_REG_SIZE,
+	.flags = IORESOURCE_MEM,
+};
+
+static struct platform_device bamboo_large_nor_device = {
+	.name = "bamboo-large-nor",
+	.id = 0,
+	.num_resources = 1,
+	.resource = &bamboo_large_nor,
+};
+
+static struct platform_device bamboo_small_nor_device = {
+	.name = "bamboo-small-nor",
+	.id = 0,
+	.num_resources = 1,
+	.resource = &bamboo_small_nor,
+};
+
+static struct platform_device bamboo_sram_device = {
+	.name = "bamboo-sram",
+	.id = 0,
+	.num_resources = 1,
+	.resource = &bamboo_sram,
+};
+
+#define CS_NAND_0	1	/* use chip select 1 for NAND device 0 */
+
+static struct mtd_partition nand_parts[] = {
+        {
+                .name   = "content",
+                .offset = 0,
+                .size   = MTDPART_SIZ_FULL,
+        }
+};
+
+struct ndfc_controller_settings bamboo_ndfc_settings = {
+	.ccr_settings = (NDFC_CCR_BS(CS_NAND_0) |
+			 NDFC_CCR_ARAC1),
+	.ndfc_erpn = 0,
+};
+
+struct platform_nand_ctrl bamboo_nand_ctrl = {
+	.priv = &bamboo_ndfc_settings,
+};
+
+static struct platform_device bamboo_ndfc_device = {
+	.name = "ndfc-nand",
+	.id = 0,
+	.dev = {
+		.platform_data = &bamboo_nand_ctrl,
+	},
+	.num_resources = 1,
+	.resource = &bamboo_ndfc,
+};
+
+static struct ndfc_chip_settings bamboo_chip0_settings = {
+	.bank_settings = 0x80002222,
+};
+
+static struct nand_ecclayout nand_oob_16 = {
+	.eccbytes = 6,
+	.eccpos = {9, 10, 11, 13, 14, 15},
+	.oobfree = {
+		 {.offset = 8,
+		  . length = 8}}
+};
+
+static struct platform_nand_chip bamboo_nand_chip0 = {
+	.nr_chips = 1,
+	.chip_offset = CS_NAND_0,
+	.nr_partitions = ARRAY_SIZE(nand_parts),
+	.partitions = nand_parts,
+	.chip_delay = 50,
+	.ecclayout = &nand_oob_16,
+	.priv = &bamboo_chip0_settings,
+};
+
+static struct platform_device bamboo_nand_device = {
+	.name = "ndfc-chip",
+	.id = 0,
+	.num_resources = 1,
+	.resource = &bamboo_ndfc,
+	.dev = {
+		.platform_data = &bamboo_nand_chip0,
+		.parent = &bamboo_ndfc_device.dev,
+	}
+};
+
+static int bamboo_setup_flash(void)
+{
+	u8 setting_reg;
+	u8 *setting_adr;
+	unsigned long *gpio_base;
+
+	setting_adr = ioremap64(BAMBOO_FPGA_SETTING_REG_ADDR, 8);
+	if (!setting_adr)
+		return -ENOMEM;
+
+	setting_reg = readb(setting_adr);
+	iounmap(setting_adr);
+
+	/* Some versions of PIBS don't set up the GPIO controller
+	   for the devices on chip select 4 (large flash and sram). */
+	gpio_base = ioremap64(0xEF600B00ULL, 0x80);
+	if (!gpio_base) {
+		printk(KERN_ERR "Failed to ioremap GPIO\n");
+		return -ENOMEM;
+	}
+	*(gpio_base + 0x02) |= 0x00001000;
+	*(gpio_base + 0x04) |= 0x00001000;
+	iounmap(gpio_base);
+
+	if (!BAMBOO_BOOT_NAND_FLASH(setting_reg)) {
+		if (BAMBOO_BOOT_SMALL_FLASH(setting_reg)) {
+			bamboo_small_nor.start = BAMBOO_SMALL_FLASH_HIGH;
+			bamboo_small_nor.end = BAMBOO_SMALL_FLASH_HIGH +
+				BAMBOO_SMALL_FLASH_SIZE-1;
+		}
+		platform_device_register(&bamboo_small_nor_device);
+	}
+
+	if (BAMBOO_BOOT_NAND_FLASH(setting_reg) ||
+	    BAMBOO_BOOT_SMALL_FLASH(setting_reg)) {
+	} else if (BAMBOO_LARGE_FLASH_EN(setting_reg)) {
+		bamboo_large_nor.start = BAMBOO_LARGE_FLASH_HIGH1;
+		bamboo_large_nor.end = BAMBOO_LARGE_FLASH_HIGH1 +
+			BAMBOO_LARGE_FLASH_SIZE;
+
+		bamboo_sram.start = BAMBOO_SRAM_HIGH2;
+		bamboo_sram.end = BAMBOO_SRAM_HIGH2 + BAMBOO_SRAM_SIZE;
+	} else {
+		bamboo_large_nor.start = BAMBOO_LARGE_FLASH_HIGH2;
+		bamboo_large_nor.end = BAMBOO_LARGE_FLASH_HIGH2 +
+			BAMBOO_LARGE_FLASH_SIZE;
+
+		bamboo_sram.start = BAMBOO_SRAM_HIGH1;
+		bamboo_sram.end = BAMBOO_SRAM_HIGH1 + BAMBOO_SRAM_SIZE;
+	}
+	platform_device_register(&bamboo_large_nor_device);
+	platform_device_register(&bamboo_sram_device);
+
+	platform_device_register(&bamboo_ndfc_device);
+	platform_device_register(&bamboo_nand_device);
+
+	printk(KERN_DEBUG "small: %08x %08x\n",
+	       bamboo_small_nor.start, bamboo_small_nor.end);
+
+	printk(KERN_DEBUG "large: %08x %08x\n", bamboo_large_nor.start, bamboo_large_nor.end);
+	printk(KERN_DEBUG "sram: %08x %08x\n", bamboo_sram.start, bamboo_sram.end);
+
+	return 0;
+}
+arch_initcall(bamboo_setup_flash);
 
 static void __init
 bamboo_setup_arch(void)

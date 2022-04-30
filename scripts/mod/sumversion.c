@@ -8,6 +8,7 @@
 #include <errno.h>
 #include <string.h>
 #include "modpost.h"
+#include "limits.h"
 
 /*
  * Stolen form Cryptographic API.

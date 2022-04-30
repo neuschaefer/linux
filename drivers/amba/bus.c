@@ -231,12 +231,12 @@ int amba_device_register(struct amba_device *dev, struct resource *parent)
 			ret = -ENODEV;
 
 		if (ret == 0) {
-			device_create_file(&dev->dev, &dev_attr_id);
+			ret = device_create_file(&dev->dev, &dev_attr_id);
 			if (dev->irq[0] != NO_IRQ)
-				device_create_file(&dev->dev, &dev_attr_irq0);
+				ret = device_create_file(&dev->dev, &dev_attr_irq0);
 			if (dev->irq[1] != NO_IRQ)
-				device_create_file(&dev->dev, &dev_attr_irq1);
-			device_create_file(&dev->dev, &dev_attr_resource);
+				ret = device_create_file(&dev->dev, &dev_attr_irq1);
+			ret = device_create_file(&dev->dev, &dev_attr_resource);
 		} else {
  out:
 			release_resource(&dev->res);

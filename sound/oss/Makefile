@@ -60,6 +60,8 @@ endif
 obj-$(CONFIG_SOUND_EMU10K1)	+= emu10k1/
 obj-$(CONFIG_DMASOUND)		+= dmasound/
 
+obj-$(CONFIG_SOUND_STW5094A)    += stw5094a.o  
+
 # Declare multi-part drivers.
 
 sound-objs	:= 							\

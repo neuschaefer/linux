@@ -776,11 +776,10 @@ int
 fb_set_var(struct fb_info *info, struct fb_var_screeninfo *var)
 {
 	int err, flags = info->flags;
-
+	
 	if (var->activate & FB_ACTIVATE_INV_MODE) {
 		struct fb_videomode mode1, mode2;
 		int ret = 0;
-
 		fb_var_to_videomode(&mode1, var);
 		fb_var_to_videomode(&mode2, &info->var);
 		/* make sure we don't delete the videomode of current var */
@@ -813,8 +812,8 @@ fb_set_var(struct fb_info *info, struct fb_var_screeninfo *var)
 		if ((var->activate & FB_ACTIVATE_MASK) == FB_ACTIVATE_NOW) {
 			struct fb_videomode mode;
 			int err = 0;
-
 			info->var = *var;
+
 			if (info->fbops->fb_set_par)
 				info->fbops->fb_set_par(info);
 
@@ -879,6 +878,8 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	struct fb_event event;
 	void __user *argp = (void __user *)arg;
 	int i;
+	/*unsigned int *LCD_CTRL_REG = 0;
+	unsigned int *LCD_BLITE_GPIO = 0;*/
 	
 	if (!fb)
 		return -ENODEV;
@@ -957,6 +958,47 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		info->flags &= ~FBINFO_MISC_USEREVENT;
 		release_console_sem();
 		return i;
+			
+	case FBIO_SNOM_LCD_POWER_ON:
+	    
+	    return -EINVAL;
+	
+/*		LCD_CTRL_REG = ioremap(0x99000004, 4);
+		*LCD_CTRL_REG = 0x00000002;
+		LCD_CTRL_REG = ioremap(0x60000000, 4);
+		*LCD_CTRL_REG = 0x00002d74;//was 2d78
+		LCD_CTRL_REG = ioremap(0x60000004, 4);
+		*LCD_CTRL_REG = 0x0000210f;
+		LCD_CTRL_REG = ioremap(0x60000008, 4);
+		*LCD_CTRL_REG = 0x01DF5823;//0x01DF7823:480pixel, but very bad quality 
+		LCD_CTRL_REG = ioremap(0x6000000C, 4);
+		*LCD_CTRL_REG = 0x00000000;
+		LCD_CTRL_REG = ioremap(0x60000010, 4);
+		// *LCD_CTRL_REG = 0x03C00000;//was 0x03E00000, but /dev/fb0 returns a different physical address
+		//25 March 2009 snapshot: requires 03E00000
+		//FIXME investigate why
+		*LCD_CTRL_REG = 0x03E00000;
+		LCD_CTRL_REG = ioremap(0x60000014, 4);
+		*LCD_CTRL_REG = 0x3E3FC000;
+		LCD_CTRL_REG = ioremap(0x6000001C, 4);
+		*LCD_CTRL_REG = 0x0000092B;
+		LCD_CTRL_REG = ioremap(0x99000000, 4);
+		// *LCD_CTRL_REG = 0x0000bff4;
+		*LCD_CTRL_REG = 0x00002ff4;//to not disable TDM
+		//FIXME temp using this ioctl for backlight management
+		//Backlight managed via GPIO4
+		//GPIO_BASE is 0xA9000400
+		LCD_BLITE_GPIO = ioremap(0xA9000400, 4);
+		//configure GPIO4 as output
+		*LCD_BLITE_GPIO |= (1<<4);
+		//GPIO_DATA is (GPIO_BASE - 4)
+		LCD_BLITE_GPIO = ioremap((0xA9000400 - 4), 4);
+		//writing '1' on GPIO4
+		*LCD_BLITE_GPIO |= (0x1 << 4);
+		
+		//returning the framebuffer address in kernel space //FIXME 
+		return (unsigned int)LCD_CTRL_REG;
+*/		
 	default:
 		if (fb->fb_ioctl == NULL)
 			return -EINVAL;

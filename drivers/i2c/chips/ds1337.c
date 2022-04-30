@@ -1,6 +1,10 @@
 /*
  *  linux/drivers/i2c/chips/ds1337.c
  *
+ *  Copyright 2005 DENX Software Engineering
+ *  Added ds1337_get_rtc_time and ds1337_set_rtc_time routines.
+ *  Based on radstone platform specific code.
+ * 
  *  Copyright (C) 2005 James Chapman <jchapman@katalix.com>
  *
  *	based on linux/drivers/acorn/char/pcf8583.c
@@ -21,6 +25,7 @@
 #include <linux/rtc.h>		/* get the user-level API */
 #include <linux/bcd.h>
 #include <linux/list.h>
+#include <asm/time.h>
 
 /* Device registers */
 #define DS1337_REG_HOUR		2
@@ -33,6 +38,8 @@
 /* FIXME - how do we export these interface constants? */
 #define DS1337_GET_DATE		0
 #define DS1337_SET_DATE		1
+
+extern spinlock_t rtc_lock;
 
 /*
  * Functions declaration
@@ -223,6 +230,37 @@ int ds1337_do_command(int bus, int cmd, void *arg)
 	return -ENODEV;
 }
 
+ulong ds1337_get_rtc_time(void)
+{
+	struct rtc_time tm;
+	int result;
+
+	spin_lock(&rtc_lock);
+	result = ds1337_do_command(0, DS1337_GET_DATE, &tm);
+	spin_unlock(&rtc_lock);
+
+	if (result == 0)
+		result = mktime(tm.tm_year + 1900, tm.tm_mon + 1,
+				tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
+
+	return result;
+}
+
+int ds1337_set_rtc_time(unsigned long nowtime)
+{
+	struct rtc_time tm;
+	int result;
+
+	spin_lock(&rtc_lock);
+	to_tm(nowtime, &tm);
+	tm.tm_year -= 1900;
+	tm.tm_mon -= 1;
+	result = ds1337_do_command(0, DS1337_SET_DATE, &tm);
+	spin_unlock(&rtc_lock);
+
+	return result;
+}
+
 static int ds1337_attach_adapter(struct i2c_adapter *adapter)
 {
 	return i2c_probe(adapter, &addr_data, ds1337_detect);
@@ -405,6 +443,8 @@ MODULE_DESCRIPTION("DS1337 RTC driver");
 MODULE_LICENSE("GPL");
 
 EXPORT_SYMBOL_GPL(ds1337_do_command);
+EXPORT_SYMBOL_GPL(ds1337_get_rtc_time);
+EXPORT_SYMBOL_GPL(ds1337_set_rtc_time);
 
 module_init(ds1337_init);
 module_exit(ds1337_exit);

@@ -2275,11 +2275,12 @@ void print_modules(void)
 
 void module_add_driver(struct module *mod, struct device_driver *drv)
 {
+    int err;
 	if (!mod || !drv)
 		return;
 
 	/* Don't check return code; this call is idempotent */
-	sysfs_create_link(&drv->kobj, &mod->mkobj.kobj, "module");
+	err = sysfs_create_link(&drv->kobj, &mod->mkobj.kobj, "module");
 }
 EXPORT_SYMBOL(module_add_driver);
 

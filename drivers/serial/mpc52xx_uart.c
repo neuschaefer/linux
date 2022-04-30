@@ -39,7 +39,7 @@
  * The idx field must be equal to the PSC index ( e.g. 0 for PSC1, 1 for PSC2,
  * and so on). So the PSC1 is mapped to /dev/ttyPSC0, PSC2 to /dev/ttyPSC1 and
  * so on. But be warned, it's an ABSOLUTE REQUIREMENT ! This is needed mainly
- * fpr the console code : without this 1:1 mapping, at early boot time, when we
+ * for the console code : without this 1:1 mapping, at early boot time, when we
  * are parsing the kernel args console=ttyPSC?, we wouldn't know which PSC it
  * will be mapped to.
  */

@@ -165,9 +165,11 @@ config FB_PM2_FIFO_DISCONNECT
 config FB_ARMCLCD
 	tristate "ARM PrimeCell PL110 support"
 	depends on FB && ARM && ARM_AMBA
+	depends on SBASIC_CLCD_1 || SBASIC_CLCD_2 || ARCH_SPEARPLUS
 	select FB_CFB_FILLRECT
 	select FB_CFB_COPYAREA
 	select FB_CFB_IMAGEBLIT
+	default y
 	help
 	  This framebuffer device driver is for the ARM PrimeCell PL110
 	  Colour LCD controller.  ARM PrimeCells provide the building
@@ -179,64 +181,107 @@ config FB_ARMCLCD
 	  will be called amba-clcd.
 
 choice
-
-	depends on FB_ARMCLCD && (ARCH_LH7A40X || ARCH_LH7952X)
+#	depends on FB_ARMCLCD && (ARCH_LH7A40X || ARCH_LH7952X)
+	depends on FB_ARMCLCD
 	prompt "LCD Panel"
-	default FB_ARMCLCD_SHARP_LQ035Q7DB02
+	default FB_ARMCLCD_SHARP_LQ043T1DG01
 
-config FB_ARMCLCD_SHARP_LQ035Q7DB02_HRTFT
-	bool "LogicPD LCD 3.5\" QVGA w/HRTFT IC"
+config FB_ARMCLCD_SHARP_LQ043T1DG01
+	bool "SHARP LQ043T1DG01 CLCD 4.2\" TFT(480x272)"
 	help
-	  This is an implementation of the Sharp LQ035Q7DB02, a 3.5"
-	  color QVGA, HRTFT panel.  The LogicPD device includes
-	  an integrated HRTFT controller IC.
-	  The native resolution is 240x320.
+	  This is an implementation of the Sharp LQ043T1DG01, a 4.2"
+	  color High Performance TFT panel. 
+	  The native resolution is 480x272.
+	  
+config FB_ARMCLCD_INNOLUX_AT043TN24
+	bool "INNOLUX AT043TN24 CLCD 4.2\" TFT(480x272)"
+	help
+	  This is an implementation of the Innolux AT043TN24, a 4.2"
+	  color High Performance TFT panel. 
+	  The native resolution is 480x272.
 
-config FB_ARMCLCD_SHARP_LQ057Q3DC02
-	bool "LogicPD LCD 5.7\" QVGA"
+config FB_ARMCLCD_EASYTEK_EAGT35S
+	bool "EASYTEK EAGT35S CLCD 3.5\" TFT(320x240)"
 	help
-	  This is an implementation of the Sharp LQ057Q3DC02, a 5.7"
-	  color QVGA, TFT panel.  The LogicPD device includes an
+	  This is an implementation of the Easytek EAGT35S, a 3.5"
+	  color High Performance TFT panel. 
 	  The native resolution is 320x240.
 
-config FB_ARMCLCD_SHARP_LQ64D343
-	bool "LogicPD LCD 6.4\" VGA"
+config FB_ARMCLCD_SHARP_LQ043T3DX0A
+	bool "SHARP LQ043T3DX0A CLCD TFT(480x272)"
 	help
-	  This is an implementation of the Sharp LQ64D343, a 6.4"
-	  color VGA, TFT panel.  The LogicPD device includes an
-	  The native resolution is 640x480.
+	  This is an implementation of the Sharp LQ043T3DX0A, a"
+	  color TFT panel. 
+	  The native resolution is 480x272.
 
-config FB_ARMCLCD_SHARP_LQ10D368
-	bool "LogicPD LCD 10.4\" VGA"
+config FB_ARMCLCD_SHARP_LQ038Q5DR
+	bool "SHARP LQ038Q5DR CLCD TFT(320x240)"
 	help
-	  This is an implementation of the Sharp LQ10D368, a 10.4"
-	  color VGA, TFT panel.  The LogicPD device includes an
-	  The native resolution is 640x480.
+	  This is an implementation of the Sharp LQ038Q5DR, a"
+	  color QVGA, TFT panel. 
+	  The native resolution is 320x240.
 
-
-config FB_ARMCLCD_SHARP_LQ121S1DG41
-	bool "LogicPD LCD 12.1\" SVGA"
+config FB_ARMCLCD_SAMSUNG_LMS700
+	bool "SAMSUNG CLCD 7\" TFT(800x480)"
 	help
-	  This is an implementation of the Sharp LQ121S1DG41, a 12.1"
-	  color SVGA, TFT panel.  The LogicPD device includes an
-	  The native resolution is 800x600.
+	  This is an implementation of the Samsung LMS700, a"
+	  color TFT panel. 
+	  The native resolution is 800x480.
 
-	  This panel requires a clock rate may be an integer fraction
-	  of the base LCDCLK frequency.  The driver will select the
-	  highest frequency available that is lower than the maximum
-	  allowed.  The panel may flicker if the clock rate is
-	  slower than the recommended minimum.
-
-config FB_ARMCLCD_AUO_A070VW01_WIDE
-	bool "AU Optronics A070VW01 LCD 7.0\" WIDE"
-	help
-	  This is an implementation of the AU Optronics, a 7.0"
-	  WIDE Color.  The native resolution is 234x480.
-
-config FB_ARMCLCD_HITACHI
-	bool "Hitachi Wide Screen 800x480"
-	help
-	  This is an implementation of the Hitachi 800x480.
+#
+#config FB_ARMCLCD_SHARP_LQ035Q7DB02_HRTFT
+#	bool "LogicPD LCD 3.5\" QVGA w/HRTFT IC"
+#	help
+#	  This is an implementation of the Sharp LQ035Q7DB02, a 3.5"
+#	  color QVGA, HRTFT panel.  The LogicPD device includes
+#	  an integrated HRTFT controller IC.
+#	  The native resolution is 240x320.
+#
+#config FB_ARMCLCD_SHARP_LQ057Q3DC02
+#	bool "LogicPD LCD 5.7\" QVGA"
+#	help
+#	  This is an implementation of the Sharp LQ057Q3DC02, a 5.7"
+#	  color QVGA, TFT panel.  The LogicPD device includes an
+#	  The native resolution is 320x240.
+#
+#config FB_ARMCLCD_SHARP_LQ64D343
+#   bool "LogicPD LCD 6.4\" VGA"
+#   help
+#     This is an implementation of the Sharp LQ64D343, a 6.4"
+#     color VGA, TFT panel.  The LogicPD device includes an
+#     The native resolution is 640x480.
+#
+#config FB_ARMCLCD_SHARP_LQ10D368
+#   bool "LogicPD LCD 10.4\" VGA"
+#   help
+#     This is an implementation of the Sharp LQ10D368, a 10.4"
+#     color VGA, TFT panel.  The LogicPD device includes an
+#     The native resolution is 640x480.
+#
+#
+#config FB_ARMCLCD_SHARP_LQ121S1DG41
+#	bool "LogicPD LCD 12.1\" SVGA"
+#	help
+#	  This is an implementation of the Sharp LQ121S1DG41, a 12.1"
+#	  color SVGA, TFT panel.  The LogicPD device includes an
+#	  The native resolution is 800x600.
+#
+#	  This panel requires a clock rate may be an integer fraction
+#	  of the base LCDCLK frequency.  The driver will select the
+#	  highest frequency available that is lower than the maximum
+#	  allowed.  The panel may flicker if the clock rate is
+#	  slower than the recommended minimum.
+#
+#config FB_ARMCLCD_AUO_A070VW01_WIDE
+#	bool "AU Optronics A070VW01 LCD 7.0\" WIDE"
+#	help
+#	  This is an implementation of the AU Optronics, a 7.0"
+#	  WIDE Color.  The native resolution is 234x480.
+#
+#config FB_ARMCLCD_HITACHI
+#	bool "Hitachi Wide Screen 800x480"
+#	help
+#	  This is an implementation of the Hitachi 800x480.
 
 endchoice
 

@@ -1,4 +1,9 @@
 /*
+ * Copyright 2005 DENX Software Engineering
+ * ppc7d_get_rtc_time(), ppc7d_set_rtc_time() renamed
+ * to generic ds1337_get_rtc_time() and ds1337_set_rtc_time()
+ * and moved to ds1337.c
+ *
  * Board setup routines for the Radstone PPC7D boards.
  *
  * Author: James Chapman <jchapman@katalix.com>
@@ -72,10 +77,10 @@ static int ppc7d_has_alma;
 extern void gen550_progress(char *, unsigned short);
 extern void gen550_init(int, struct uart_port *);
 
-/* FIXME - move to h file */
-extern int ds1337_do_command(int id, int cmd, void *arg);
-#define DS1337_GET_DATE         0
-#define DS1337_SET_DATE         1
+/* Real Time Clock support.
+ * PPC7D has a DS1337 accessed by I2C. */
+extern ulong ds1337_get_rtc_time(void);
+extern int ds1337_set_rtc_time(unsigned long nowtime);
 
 /* residual data */
 unsigned char __res[sizeof(bd_t)];
@@ -1242,37 +1247,6 @@ static void __init ppc7d_setup_arch(void)
 
 }
 
-/* Real Time Clock support.
- * PPC7D has a DS1337 accessed by I2C.
- */
-static ulong ppc7d_get_rtc_time(void)
-{
-        struct rtc_time tm;
-        int result;
-
-        spin_lock(&rtc_lock);
-        result = ds1337_do_command(0, DS1337_GET_DATE, &tm);
-        spin_unlock(&rtc_lock);
-
-        if (result == 0)
-                result = mktime(tm.tm_year, tm.tm_mon, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
-
-        return result;
-}
-
-static int ppc7d_set_rtc_time(unsigned long nowtime)
-{
-        struct rtc_time tm;
-        int result;
-
-        spin_lock(&rtc_lock);
-        to_tm(nowtime, &tm);
-        result = ds1337_do_command(0, DS1337_SET_DATE, &tm);
-        spin_unlock(&rtc_lock);
-
-        return result;
-}
-
 /* This kernel command line parameter can be used to have the target
  * wait for a JTAG debugger to attach. Of course, a JTAG debugger
  * with hardware breakpoint support can have the target stop at any
@@ -1329,8 +1303,8 @@ static void ppc7d_init2(void)
 	outb(data8, PPC7D_CPLD_LEDS);
 
         /* Hook up RTC. We couldn't do this earlier because we need the I2C subsystem */
-        ppc_md.set_rtc_time = ppc7d_set_rtc_time;
-        ppc_md.get_rtc_time = ppc7d_get_rtc_time;
+        ppc_md.set_rtc_time = ds1337_set_rtc_time;
+        ppc_md.get_rtc_time = ds1337_get_rtc_time;
 
 	pr_debug("%s: exit\n", __FUNCTION__);
 }

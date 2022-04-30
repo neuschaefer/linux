@@ -288,7 +288,7 @@ cmpxchg(volatile int *p, int old, int new)
 	: /* No output */		\
 	: "o" (*(char *)MCF_MBAR) );	\
 })
-#elif defined(CONFIG_M528x)
+#elif defined(CONFIG_M528x) || defined(CONFIG_M5271)
 /*
  * The MCF528x has a bit (SOFTRST) in memory (Reset Control Register RCR),
  * that when set, resets the MCF528x.

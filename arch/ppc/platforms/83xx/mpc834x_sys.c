@@ -254,6 +254,40 @@ mpc834x_sys_set_bat(void)
 	mb();
 }
 
+void
+mpc83xx_sys_restart(char *cmd)
+{
+	volatile unsigned char __iomem *reg;
+	unsigned char tmp;
+
+	reg = ioremap(BCSR_PHYS_ADDR, BCSR_SIZE);
+
+	local_irq_disable();
+
+	/*
+	 * Unlock the BCSR bits so a PRST will update the contents.
+	 * Otherwise the reset asserts but doesn't clear.
+	 */
+	tmp = in_8(reg + BCSR_MISC_REG3_OFF);
+	tmp |= BCSR_MISC_REG3_CNFLOCK; /* low true, high false */
+	out_8(reg + BCSR_MISC_REG3_OFF, tmp);
+
+	/*
+	 * Trigger a reset via a low->high transition of the
+	 * PORESET bit.
+	 */
+	tmp = in_8(reg + BCSR_MISC_REG2_OFF);
+	tmp &= ~BCSR_MISC_REG2_PORESET;
+	out_8(reg + BCSR_MISC_REG2_OFF, tmp);
+
+	udelay(1);
+
+	tmp |= BCSR_MISC_REG2_PORESET;
+	out_8(reg + BCSR_MISC_REG2_OFF, tmp);
+
+	for(;;);
+}
+
 void __init
 platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	      unsigned long r6, unsigned long r7)
@@ -322,7 +356,7 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.init_IRQ = mpc834x_sys_init_IRQ;
 	ppc_md.get_irq = ipic_get_irq;
 
-	ppc_md.restart = mpc83xx_restart;
+	ppc_md.restart = mpc83xx_sys_restart;
 	ppc_md.power_off = mpc83xx_power_off;
 	ppc_md.halt = mpc83xx_halt;
 
@@ -338,6 +372,13 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 #if defined(CONFIG_SERIAL_8250) && defined(CONFIG_SERIAL_TEXT_DEBUG)
 	ppc_md.progress = gen550_progress;
 #endif	/* CONFIG_SERIAL_8250 && CONFIG_SERIAL_TEXT_DEBUG */
+
+#ifdef CONFIG_PCI
+	ppc_md.pci_swizzle = common_swizzle;
+	ppc_md.pci_map_irq = mpc83xx_map_irq; 
+	ppc_md.pci_exclude_device = mpc83xx_exclude_device;
+	ppc_md.pcibios_fixup = mpc834x_pcibios_fixup;
+#endif /* CONFIG_PCI */
 
 	if (ppc_md.progress)
 		ppc_md.progress("mpc834x_sys_init(): exit", 0);

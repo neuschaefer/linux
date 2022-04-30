@@ -1,0 +1,252 @@
+/*
+ *
+ *  Copyright (C) 2006 ST MICROELECTRONICS
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+  * AUTHOR :  Arif Khan <arif.khan@st.com>*/
+
+
+#ifndef __SPEARPLUS_H
+#define __SPEARPLUS_H
+
+/*------------------------------------------------------------------------------
+ External Reference Clock 0x3000_0FFF
+------------------------------------------------------------------------------*/
+
+/*========================================*/
+
+#define SPEARPLUS_START_SDRAM					0x00000000
+
+
+/* ICM1 - Low speed connection */
+
+
+#define SPEARPLUS_START_APB_UART0				0xD0000000
+#define VA_SPEARPLUS_START_APB_UART0			IO_ADDRESS(0xD0000000)
+#define SPEARPLUS_SIZE_APB_UART0				0x00080000
+
+#define SPEARPLUS_START_APB_UART1				(0xD0080000)          
+#define VA_SPEARPLUS_START_APB_UART1			IO_ADDRESS(0xD0080000)
+#define SPEARPLUS_SIZE_APB_UART1				0x00080000            
+
+#define SPEARPLUS_START_SSP0					0xD0100000
+#define SPEARPLUS_SIZE_SSP0						0x00080000
+#define VA_SPEARPLUS_START_SSP0					IO_ADDRESS(0xD0100000)
+
+#define SPEARPLUS_START_SSP1					0xD0180000
+#define SPEARPLUS_SIZE_SSP1						0x00080000
+#define VA_SPEARPLUS_START_SSP1					IO_ADDRESS(0xD0180000)
+
+#define SPEARPLUS_START_I2C 					0xD0200000
+#define SPEARPLUS_SIZE_I2C 						0x00080000
+#define VA_SPEARPLUS_START_I2C 					IO_ADDRESS(0xD0200000)
+
+
+#define SPEARPLUS_START_AHB_JPEG 				0xD0800000
+#define SPEARPLUS_SIZE_AHB_JPEG				0x00800000 
+#define VA_SPEARPLUS_START_AHB_JPEG 			IO_ADDRESS(0xD0800000)
+
+
+#define SPEARPLUS_START_IRDA					0xD1000000
+#define SPEARPLUS_SIZE_IRDA						0x00080000
+#define VA_SPEARPLUS_START_IRDA					IO_ADDRESS(0xD1000000)
+
+#define SPEARPLUS_START_NAND_FLASH_CTRLR		0xD1800000
+#define SPEARPLUS_SIZE_NAND_FLASH_CTRLR			0x00800000
+#define VA_SPEARPLUS_START_NAND_FLASH_CTRLR 	IO_ADDRESS(0xD1800000)
+
+
+#define SPEARPLUS_START_NAND_FLASH_MEM			0xD2000000
+#define SPEARPLUS_SIZE_NAND_FLASH_MEM  			0x00800000
+#define VA_SPEARPLUS_START_NAND_FLASH_MEM   	IO_ADDRESS(0xD2000000)
+#define VA_SPEARPLUS_START_NAND_FLASH_CMD   	IO_ADDRESS(0xD2010000)
+#define VA_SPEARPLUS_START_NAND_FLASH_ADDR   	IO_ADDRESS(0xD2020000)
+
+
+#define SPEARPLUS_START_SRAM					0xD2800000
+#define SPEARPLUS_SIZE_SRAM						0x05800000
+#define VA_SPEARPLUS_START_SRAM					IO_ADDRESS(0xD2800000)
+
+
+/* ICM2 - Application Subsystem */
+
+#define SPEARPLUS_START_ICM2_TMR0					0xD8000000
+#define VA_SPEARPLUS_START_ICM2_TMR0				IO_ADDRESS(0xD8000000)
+#define SPEARPLUS_SIZE_ICM2_TMR0					0x00080000
+
+#define SPEARPLUS_START_ICM2_TMR1					0xD8080000
+#define VA_SPEARPLUS_START_ICM2_TMR1				IO_ADDRESS(0xD8080000)
+#define SPEARPLUS_SIZE_ICM2_TMR1					0x00080000
+
+
+#define SPEARPLUS_START_APB_GPIO0    				0xD8100000 
+#define SPEARPLUS_SIZE_APB_GPIO0      				0x00080000
+#define VA_SPEARPLUS_START_APB_GPIO0  				IO_ADDRESS(0xD8100000)
+
+#define SPEARPLUS_START_ICM2_SSP2					0xD8180000
+#define VA_SPEARPLUS_START_ICM2_SSP2				IO_ADDRESS(0xD8180000)
+#define SPEARPLUS_SIZE_ICM2_SSP2					0x00080000
+
+
+#define SPEARPLUS_START_ICM2_ADC 					0xD8200000
+#define VA_SPEARPLUS_START_ICM2_ADC 				IO_ADDRESS(0xD8200000)
+#define SPEARPLUS_SIZE_ICM2_ADC 					0x00080000
+
+
+/* ICM4 - High Speed Connection */
+#define SPEARPLUS_START_GMAC						0xE0800000
+#define VA_SPEARPLUS_START_GMAC						IO_ADDRESS(0xE0800000)
+#define SPEARPLUS_SIZE_GMAC							0x00800000
+
+
+#define SPEARPLUS_START_USBD_FIFO					0xE1000000
+#define VA_SPEARPLUS_START_USBD_FIFO				IO_ADDRESS(0xE1000000)
+#define SPEARPLUS_SIZE_USBD_FIFO					0x00100000
+
+
+#define SPEARPLUS_START_USBD_CFG 					0xE1100000
+#define VA_SPEARPLUS_START_USBD_CFG 				IO_ADDRESS(0xE1100000)
+#define SPEARPLUS_SIZE_USBD_CFG 					0x00100000
+
+
+#define SPEARPLUS_START_USBD_PLUG					0xE1200000
+#define VA_SPEARPLUS_START_USBD_PLUG				IO_ADDRESS(0xE1200000)
+#define SPEARPLUS_SIZE_USBD_PLUG					0x00100000
+
+
+
+#define SPEARPLUS_START_USB_EHCI0					0xE1800000
+#define VA_SPEARPLUS_START_USB_EHCI0				IO_ADDRESS(0xE1800000)
+#define SPEARPLUS_SIZE_USB_EHCI0					0x00100000
+
+
+#define SPEARPLUS_START_USB_OHCI0					0xE1900000
+#define VA_SPEARPLUS_START_USB_OHCI0				IO_ADDRESS(0xE1900000)
+#define SPEARPLUS_SIZE_USB_OHCI0					0x00100000
+
+
+#define SPEARPLUS_START_USB_EHCI1					0xE2000000
+#define VA_SPEARPLUS_START_USB_EHCI1				IO_ADDRESS(0xE2000000)
+#define SPEARPLUS_SIZE_USB_EHCI1					0x00100000
+
+
+#define SPEARPLUS_START_USB_OHCI1					0xE2100000
+#define VA_SPEARPLUS_START_USB_OHCI1				IO_ADDRESS(0xE2100000)
+#define SPEARPLUS_SIZE_USB_OHCI1					0x00100000
+
+
+#define SPEARPLUS_START_USB_ARB  					0xE2800000
+#define VA_SPEARPLUS_START_USB_ARB  				IO_ADDRESS(0xE2800000)
+#define SPEARPLUS_SIZE_USB_ARB  					0x00010000
+
+
+/* ML-1,2 -  Multi Layer CPU Subsystem */
+
+#define SPEARPLUS_START_APB_GPT0				0xF0000000	
+#define VA_SPEARPLUS_START_APB_GPT0				IO_ADDRESS(SPEARPLUS_START_APB_GPT0)
+#define SPEARPLUS_SIZE_APB_GPT0					0x00100000
+
+#define SPEARPLUS_START_APB_GPIO2    			0xF0100000
+#define SPEARPLUS_SIZE_APB_GPIO2      			0x00100000
+#define VA_SPEARPLUS_START_APB_GPIO2  			IO_ADDRESS(0xF0100000)
+
+#define SPEARPLUS_START_VIC1					0xF1100000 
+#define VA_SPEARPLUS_START_VIC1					IO_ADDRESS(0xF1100000)
+#define SPEARPLUS_SIZE_VIC1						0x00100000
+
+#define SPEARPLUS_START_VIC2					0xF1000000 
+#define VA_SPEARPLUS_START_VIC2					IO_ADDRESS(0xF1000000)
+#define SPEARPLUS_SIZE_VIC2						0x00100000
+
+/* ICM3 - Basic Subsystem */
+
+#define SPEARPLUS_START_SFLASH_MEM				0xF8000000
+#define VA_SPEARPLUS_START_SFLASH_MEM			IO_ADDRESS(0xF8000000)
+#define SPEARPLUS_SIZE_SFLASH_MEM				0x04000000
+
+#define SPEARPLUS_START_SFLASH_CTRL				0xFC000000 
+#define VA_SPEARPLUS_START_SFLASH_CTRL			IO_ADDRESS(0xFC000000)
+#define SPEARPLUS_SIZE_SFALSH_CTRL				0x00200000
+
+
+#define SPEARPLUS_START_CLCD_CTRL				0xFC200000
+#define VA_SPEARPLUS_START_CLCD_CTRL				IO_ADDRESS(0xFC200000)
+#define SPEARPLUS_SIZE_CLCD_CTRL					0x00200000
+
+
+#define SPEARPLUS_START_DMA		 				0xFC400000
+#define VA_SPEARPLUS_START_DMA					IO_ADDRESS(0xFC400000)
+#define SPEARPLUS_SIZE_DMA						0x00200000	
+
+
+#define SPEARPLUS_START_SDRAM_CTRL				0xFC600000
+#define VA_SPEARPLUS_START_SDRAM_CTRL			IO_ADDRESS(0xFC600000)
+#define SPEARPLUS_SIZE_SDRAM_CTRL				0x00200000
+
+#define SPEARPLUS_START_BASIC_TMR 				0xFC800000
+#define VA_SPEARPLUS_START_BASIC_TMR 			IO_ADDRESS(0xFC800000)
+#define SPEARPLUS_SIZE_BASIC_TMR 				0x00080000
+
+#define SPEARPLUS_START_APB_WDT					0xFC880000
+#define SPEARPLUS_SIZE_APB_WDT					0x00080000
+#define VA_SPEARPLUS_START_APB_WDT				IO_ADDRESS(0xFC880000)
+
+
+#define SPEARPLUS_START_APB_RTC					0xFC900000
+#define SPEARPLUS_SIZE_APB_RTC					0x00080000
+#define VA_SPEARPLUS_START_APB_RTC				IO_ADDRESS(SPEARPLUS_START_APB_RTC)
+
+
+#define SPEARPLUS_START_APB_GPIO1    			0xFC980000
+#define SPEARPLUS_SIZE_APB_GPIO1      			0x00080000
+#define VA_SPEARPLUS_START_APB_GPIO1  			IO_ADDRESS(0xFC980000)
+
+
+#define SPEARPLUS_START_SYS_CTRL				0xFCA00000	
+#define VA_SPEARPLUS_START_SYS_CTRL				IO_ADDRESS(0xFCA00000)
+#define SPEARPLUS_SIZE_SYS_CTRL					0x00080000
+
+
+#define SPEARPLUS_START_MISC_REG 				0xFCA80000 
+#define VA_SPEARPLUS_START_MISC_REG 			IO_ADDRESS(0xFCA80000)
+#define SPEARPLUS_SIZE_MISC_REG 				0x00080000	
+
+
+/*========================================*/
+
+
+#if 0
+/*------------------------------------------------------------------------------
+DMA MAC
+------------------------------------------------------------------------------*/
+#include "dmamac.h" 
+
+/*------------------------------------------------------------------------------
+ ST GENERAL CONFIGURATION REGISTERS
+------------------------------------------------------------------------------*/
+#include "gcfg.h" 
+
+/*------------------------------------------------------------------------------
+ST WATCHDOG TIMER
+------------------------------------------------------------------------------*/
+#include "wdt.h" 
+
+/*------------------------------------------------------------------------------
+ACCENT APB UART
+------------------------------------------------------------------------------*/
+#include "uart.h"
+#endif 
+
+#endif

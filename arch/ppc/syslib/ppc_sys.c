@@ -98,8 +98,11 @@ static int __init find_chip_by_name_and_id(char *name, u32 id)
 void __init identify_ppc_sys_by_name_and_id(char *name, u32 id)
 {
 	int i = find_chip_by_name_and_id(name, id);
-	BUG_ON(i < 0);
-	cur_ppc_sys_spec = &ppc_sys_specs[i];
+	if (i < 0) {
+		printk(KERN_ERR "ppc_sys: Unable to identify PPC system!\n");
+		cur_ppc_sys_spec = NULL;
+	} else
+		cur_ppc_sys_spec = &ppc_sys_specs[i];
 }
 
 /* Update all memory resources by paddr, call before platform_device_register */
@@ -303,7 +306,8 @@ static int __init ppc_sys_init(void)
 {
 	unsigned int i, dev_id, ret = 0;
 
-	BUG_ON(cur_ppc_sys_spec == NULL);
+	if(cur_ppc_sys_spec == NULL)
+		return 1;
 
 	for (i = 0; i < cur_ppc_sys_spec->num_devices; i++) {
 		dev_id = cur_ppc_sys_spec->device_list[i];

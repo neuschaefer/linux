@@ -3551,6 +3551,7 @@ void kfree(const void *objp)
 {
 	struct kmem_cache *c;
 	unsigned long flags;
+	unsigned int i = (unsigned int)objp;
 
 	if (unlikely(!objp))
 		return;
@@ -3558,7 +3559,7 @@ void kfree(const void *objp)
 	kfree_debugcheck(objp);
 	c = virt_to_cache(objp);
 	debug_check_no_locks_freed(objp, obj_size(c));
-	__cache_free(c, (void *)objp);
+	__cache_free(c, (void *)i);
 	local_irq_restore(flags);
 }
 EXPORT_SYMBOL(kfree);

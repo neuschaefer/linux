@@ -107,7 +107,7 @@ endef
 
 archclean:
 	$(Q)$(MAKE) $(clean)=arch/ppc/boot
-	# Temporary hack until we have migrated to asm-powerpc
+	@# Temporary hack until we have migrated to asm-powerpc
 	$(Q)rm -rf arch/$(ARCH)/include
 
 archprepare: checkbin

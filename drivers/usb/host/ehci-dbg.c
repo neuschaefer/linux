@@ -35,6 +35,7 @@
 #	define ehci_vdbg(ehci, fmt, args...) do { } while (0)
 #endif
 
+#if 0
 #ifdef	DEBUG
 
 /* check the values in the HCSPARAMS register
@@ -111,6 +112,7 @@ static void dbg_hcc_params (struct ehci_hcd *ehci, char *label)
 
 static inline void dbg_hcc_params (struct ehci_hcd *ehci, char *label) {}
 
+#endif
 #endif
 
 #ifdef	DEBUG

@@ -400,6 +400,7 @@ int device_add(struct device *dev)
 	char *class_name = NULL;
 	struct class_interface *class_intf;
 	int error = -EINVAL;
+	int err;
 
 	dev = get_device(dev);
 	if (!dev || !strlen(dev->bus_id))
@@ -459,14 +460,14 @@ int device_add(struct device *dev)
 	}
 
 	if (dev->class) {
-		sysfs_create_link(&dev->kobj, &dev->class->subsys.kset.kobj,
+		err=sysfs_create_link(&dev->kobj, &dev->class->subsys.kset.kobj,
 				  "subsystem");
-		sysfs_create_link(&dev->class->subsys.kset.kobj, &dev->kobj,
+		err=sysfs_create_link(&dev->class->subsys.kset.kobj, &dev->kobj,
 				  dev->bus_id);
 		if (parent) {
-			sysfs_create_link(&dev->kobj, &dev->parent->kobj, "device");
+			err=sysfs_create_link(&dev->kobj, &dev->parent->kobj, "device");
 			class_name = make_class_name(dev->class->name, &dev->kobj);
-			sysfs_create_link(&dev->parent->kobj, &dev->kobj, class_name);
+			err=sysfs_create_link(&dev->parent->kobj, &dev->kobj, class_name);
 		}
 	}
 
@@ -801,7 +802,7 @@ int device_rename(struct device *dev, char *new_name)
 	char *old_class_name = NULL;
 	char *new_class_name = NULL;
 	char *old_symlink_name = NULL;
-	int error;
+	int error,err;
 
 	dev = get_device(dev);
 	if (!dev)
@@ -828,7 +829,7 @@ int device_rename(struct device *dev, char *new_name)
 	if (old_class_name) {
 		new_class_name = make_class_name(dev->class->name, &dev->kobj);
 		if (new_class_name) {
-			sysfs_create_link(&dev->parent->kobj, &dev->kobj,
+			err=sysfs_create_link(&dev->parent->kobj, &dev->kobj,
 					  new_class_name);
 			sysfs_remove_link(&dev->parent->kobj, old_class_name);
 		}
@@ -836,7 +837,7 @@ int device_rename(struct device *dev, char *new_name)
 	if (dev->class) {
 		sysfs_remove_link(&dev->class->subsys.kset.kobj,
 				  old_symlink_name);
-		sysfs_create_link(&dev->class->subsys.kset.kobj, &dev->kobj,
+		err=sysfs_create_link(&dev->class->subsys.kset.kobj, &dev->kobj,
 				  dev->bus_id);
 	}
 	put_device(dev);

@@ -87,6 +87,12 @@
 #define gadget_is_at91(g)	0
 #endif
 
+#ifdef CONFIG_USB_GADGET_PD12
+#define gadget_is_pd12(g)	!strcmp("pd12_udc", (g)->name)
+#else
+#define gadget_is_pd12(g)	0
+#endif
+
 #ifdef CONFIG_USB_GADGET_IMX
 #define gadget_is_imx(g)	!strcmp("imx_udc", (g)->name)
 #else
@@ -111,6 +117,14 @@
 #define gadget_is_mpc8272(g)	!strcmp("mpc8272_udc", (g)->name)
 #else
 #define gadget_is_mpc8272(g)	0
+#endif
+
+
+
+#ifdef CONFIG_USB_GADGET_SPEARPLUS
+#define gadget_is_spearplus(g)  !strcmp("spearplus_udc", (g)->name)
+#else
+#define gadget_is_spearplus(g)  0
 #endif
 
 // CONFIG_USB_GADGET_SX2
@@ -169,5 +183,9 @@ static inline int usb_gadget_controller_number(struct usb_gadget *gadget)
 		return 0x16;
 	else if (gadget_is_mpc8272(gadget))
 		return 0x17;
+	else if (gadget_is_pd12(gadget))
+		return 0x18;
+	else if (gadget_is_spearplus(gadget))
+		return 0x19;
 	return -ENOENT;
 }

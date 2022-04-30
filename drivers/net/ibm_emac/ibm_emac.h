@@ -26,7 +26,7 @@
 #if !defined(CONFIG_405GP) && !defined(CONFIG_405GPR) && !defined(CONFIG_405EP) && \
     !defined(CONFIG_440GP) && !defined(CONFIG_440GX) && !defined(CONFIG_440SP) && \
     !defined(CONFIG_440EP) && !defined(CONFIG_NP405H) && !defined(CONFIG_440SPE) && \
-    !defined(CONFIG_440GR)
+    !defined(CONFIG_440GR) && !defined(CONFIG_440EPX) && !defined(CONFIG_440GRX)
 #error	"Unknown SoC. Please, check chip user manual and make sure EMAC defines are OK"
 #endif
 
@@ -227,9 +227,15 @@ struct emac_regs {
 #define EMAC_STACR_PHYD_SHIFT		16
 #define EMAC_STACR_OC			0x00008000
 #define EMAC_STACR_PHYE			0x00004000
+#if defined(CONFIG_IBM_EMAC4V4)
+#define EMAC_STACR_STAC_MASK		0x00003800
+#define EMAC_STACR_STAC_READ		0x00001000
+#define EMAC_STACR_STAC_WRITE		0x00000800
+#else
 #define EMAC_STACR_STAC_MASK		0x00003000
 #define EMAC_STACR_STAC_READ		0x00001000
 #define EMAC_STACR_STAC_WRITE		0x00002000
+#endif
 #if !defined(CONFIG_IBM_EMAC4)
 #define EMAC_STACR_OPBC_MASK		0x00000C00
 #define EMAC_STACR_OPBC_50		0x00000000
@@ -250,8 +256,11 @@ struct emac_regs {
 /*
  * For the 440SPe, AMCC inexplicably changed the polarity of
  * the "operation complete" bit in the MII control register.
+ *
+ * This change is not associated to 440SPe but to EMAC core version used in
+ * 440SPe, 440EPx, 440GRx.
  */
-#if defined(CONFIG_440SPE)
+#if defined(CONFIG_440SPE) || defined(CONFIG_IBM_EMAC4V4)
 static inline int emac_phy_done(u32 stacr)
 {
 	return !(stacr & EMAC_STACR_OC);

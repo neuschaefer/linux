@@ -111,7 +111,7 @@ menu "System Type"
 
 choice
 	prompt "ARM system type"
-	default ARCH_VERSATILE
+	default ARCH_SPEARBASIC
 
 config ARCH_AAEC2000
 	bool "Agilent AAEC-2000 based"
@@ -317,6 +317,18 @@ config ARCH_OMAP
 	help
 	  Support for TI's OMAP platform (OMAP1 and OMAP2).
 
+config ARCH_SPEARBASIC
+	bool "SPEArBasic"
+	select ARM_AMBA
+	help
+	  ST Microelectronics SPEArBasic SoC (based on ARM926EJS core).
+
+config ARCH_SPEARPLUS
+    bool "SPEArPlus"
+    select ARM_AMBA
+    help
+      ST Microelectronics SPEArPlus SoC (based on ARM926EJS core).
+
 endchoice
 
 source "arch/arm/mach-clps711x/Kconfig"
@@ -364,6 +376,10 @@ source "arch/arm/mach-realview/Kconfig"
 source "arch/arm/mach-at91rm9200/Kconfig"
 
 source "arch/arm/mach-netx/Kconfig"
+
+source "arch/arm/mach-spearbasic/Kconfig"
+
+source "arch/arm/mach-spearplus/Kconfig"
 
 # Definitions to make life easier
 config ARCH_ACORN
@@ -926,6 +942,8 @@ source "drivers/usb/Kconfig"
 source "drivers/mmc/Kconfig"
 
 source "drivers/rtc/Kconfig"
+
+source "drivers/stm8/Kconfig"
 
 endmenu
 

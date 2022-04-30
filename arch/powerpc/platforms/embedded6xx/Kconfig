@@ -140,6 +140,9 @@ config TQM8260
 config ADS8272
 	bool "ADS8272"
 
+config TQM8272
+	bool "TQM8272"
+
 config PQ2FADS
 	bool "Freescale-PQ2FADS"
 	help
@@ -187,7 +190,7 @@ config 8260
 config 8272
 	bool
 	depends on 6xx
-	default y if ADS8272
+	default y if ADS8272 || TQM8272
 	select 8260
 	help
 	  The MPC8272 CPM has a different internal dpram setup than other CPM2

@@ -43,8 +43,12 @@
 #elif defined(CONFIG_440SPE)
 #define UART0_PHYS_ERPN		4
 #define UART0_PHYS_IO_BASE	0xf0000200
-#elif defined(CONFIG_440EP)
-#define UART0_PHYS_IO_BASE	0xe0000000
+#elif defined(CONFIG_440EP) || defined(CONFIG_440GR) || \
+      defined(CONFIG_440EPX) || defined(CONFIG_440GRX)
+#define UART0_PHYS_IO_BASE	0xef600300
+#if defined(CONFIG_440EPX) || defined(CONFIG_440GRX)
+#define UART0_PHYS_ERPN		1
+#endif
 #else
 #define UART0_PHYS_ERPN		1
 #define UART0_PHYS_IO_BASE	0x40000200
@@ -68,11 +72,16 @@
 #define	PPC44x_PCICFG_PAGE	0x0000000c00000000ULL
 #define	PPC44x_PCIIO_PAGE	PPC44x_PCICFG_PAGE
 #define	PPC44x_PCIMEM_PAGE	0x0000000d00000000ULL
-#elif defined(CONFIG_440EP)
+#elif defined(CONFIG_440EP) || defined(CONFIG_440GR)
 #define PPC44x_IO_PAGE		0x0000000000000000ULL
 #define PPC44x_PCICFG_PAGE	0x0000000000000000ULL
 #define PPC44x_PCIIO_PAGE	PPC44x_PCICFG_PAGE
 #define PPC44x_PCIMEM_PAGE	0x0000000000000000ULL
+#elif defined(CONFIG_440EPX) || defined(CONFIG_440GRX)
+#define PPC44x_IO_PAGE		0x0000000100000000ULL
+#define PPC44x_PCICFG_PAGE	0x0000000100000000ULL
+#define PPC44x_PCIIO_PAGE	PPC44x_PCICFG_PAGE
+#define PPC44x_PCIMEM_PAGE	0x0000000100000000ULL
 #else
 #define	PPC44x_IO_PAGE		0x0000000100000000ULL
 #define	PPC44x_PCICFG_PAGE	0x0000000200000000ULL
@@ -94,13 +103,20 @@
 #define PPC44x_PCI2CFG_HI	0x2ec00007UL
 #define PPC44x_PCIMEM_LO	0x80000000UL
 #define PPC44x_PCIMEM_HI	0xdfffffffUL
-#elif defined(CONFIG_440EP)
+#elif defined(CONFIG_440EP) || defined(CONFIG_440GR)
 #define PPC44x_IO_LO		0xef500000UL
 #define PPC44x_IO_HI		0xefffffffUL
 #define PPC44x_PCI0CFG_LO	0xeec00000UL
 #define PPC44x_PCI0CFG_HI	0xeecfffffUL
 #define PPC44x_PCIMEM_LO	0xa0000000UL
 #define PPC44x_PCIMEM_HI	0xdfffffffUL
+#elif defined(CONFIG_440EPX) || defined(CONFIG_440GRX)
+#define PPC44x_IO_LO		0xef500000UL
+#define PPC44x_IO_HI		0xefffffffUL
+#define PPC44x_PCI0CFG_LO	0xeec00000UL
+#define PPC44x_PCI0CFG_HI	0xeecfffffUL
+#define PPC44x_PCIMEM_LO	0x80000000UL
+#define PPC44x_PCIMEM_HI	0xbfffffffUL
 #else
 #define PPC44x_IO_LO		0x40000000UL
 #define PPC44x_IO_HI		0x40000fffUL
@@ -121,7 +137,7 @@
  */
 
 
-/* CPRs (440GX and 440SP/440SPe) */
+/* CPRs (440GX, 440SP/440SPe, 440EP/440EPx and 440GR/440GRx) */
 #define DCRN_CPR_CONFIG_ADDR	0xc
 #define DCRN_CPR_CONFIG_DATA	0xd
 
@@ -142,7 +158,7 @@
 	mtdcr(DCRN_CPR_CONFIG_ADDR, offset); \
 	mtdcr(DCRN_CPR_CONFIG_DATA, data);})
 
-/* SDRs (440GX and 440SP/440SPe) */
+/* SDRs (440GX, 440SP/440SPe, 440EP/440EPx and 440GR/440GRx) */
 #define DCRN_SDR_CONFIG_ADDR 	0xe
 #define DCRN_SDR_CONFIG_DATA	0xf
 #define DCRN_SDR_PFC0		0x4100
@@ -178,9 +194,11 @@
 #define DCRN_SDR_UART0		0x0120
 #define DCRN_SDR_UART1		0x0121
 
-#ifdef CONFIG_440EP
+#if defined(CONFIG_440EP) || defined(CONFIG_440GR) || \
+    defined(CONFIG_440EPX) || defined(CONFIG_440GRX)
 #define DCRN_SDR_UART2		0x0122
 #define DCRN_SDR_UART3		0x0123
+#define DCRN_SDR_USB0		0x0320
 #define DCRN_SDR_CUST0		0x4000
 #endif
 
@@ -201,7 +219,8 @@
 #define DCRNCAP_DMA_SG		1	/* have DMA scatter/gather capability */
 #define DCRN_MAL_BASE		0x180
 
-#ifdef CONFIG_440EP
+#if defined(CONFIG_440EP) || defined(CONFIG_440GR) || \
+    defined(CONFIG_440EPX) || defined(CONFIG_440GRX)
 #define DCRN_DMA2P40_BASE	0x300
 #define DCRN_DMA2P41_BASE	0x308
 #define DCRN_DMA2P42_BASE	0x310
@@ -215,16 +234,21 @@
 #define UIC0		DCRN_UIC0_BASE
 #define UIC1		DCRN_UIC1_BASE
 
-#ifdef CONFIG_440SPE
+#if defined(CONFIG_440SPE) || defined(CONFIG_440EPX) || defined(CONFIG_440GRX)
 #define DCRN_UIC2_BASE	0xe0
+#if defined(CONFIG_440SPE)
 #define DCRN_UIC3_BASE	0xf0
-#define UIC2		DCRN_UIC2_BASE
-#define UIC3		DCRN_UIC3_BASE
+#endif
 #else
 #define DCRN_UIC2_BASE	0x210
 #define DCRN_UICB_BASE	0x200
-#define UIC2		DCRN_UIC2_BASE
 #define UICB		DCRN_UICB_BASE
+#endif
+#ifdef DCRN_UIC2_BASE
+#define UIC2		DCRN_UIC2_BASE
+#endif
+#ifdef DCRN_UIC3_BASE
+#define UIC3		DCRN_UIC3_BASE
 #endif
 
 #define DCRN_UIC_SR(base)       (base + 0x0)
@@ -238,10 +262,12 @@
 
 #define UIC0_UIC1NC      	0x00000002
 
-#ifdef CONFIG_440SPE
-#define UIC0_UIC1NC      0x00000002
-#define UIC0_UIC2NC      0x00200000
-#define UIC0_UIC3NC      0x00008000
+#if defined(CONFIG_440SPE)
+#define UIC0_UIC2NC		0x00200000
+#define UIC0_UIC3NC		0x00008000
+#endif
+#if defined(CONFIG_440EPX) || defined(CONFIG_440GRX)
+#define UIC0_UIC2NC		0x00000008
 #endif
 
 #define UICB_UIC0NC		0x40000000
@@ -339,6 +365,51 @@
 #define DCRN_PLB1_BESRH		0x08b		/* PLB Error Status */
 #define DCRN_PLB1_BEARL		0x08c		/* PLB Error Address Low */
 #define DCRN_PLB1_BEARH		0x08d		/* PLB Error Address High */
+#elif defined(CONFIG_440EPX) || defined(CONFIG_440GRX)
+/* EBC error Status */
+#define DCRN_EBC0_BEAR		0x020
+#define DCRN_EBC0_BESR0		0x021
+
+/* OPB to PLB3 Bridge  DCRs */
+#define DCRN_OPB2PLB30_BSTAT	0x0A9
+
+/* PLB3 to PLB4 bridge DCRs */
+#define DCRN_P3P4BI0_BESR0	0x030
+#define DCRN_P3P4BI0_BEARL	0x032
+#define DCRN_P3P4BI0_BEARH	0x033
+#define DCRN_P3P4BI0_BESR1	0x034
+
+/* PLB4 to PLB3 bridge DCRs */
+#define DCRN_P4P3BO0_BESR0	0x020
+#define DCRN_P4P3BO0_BEARL	0x022
+#define DCRN_P4P3BO0_BEARH	0x023
+#define DCRN_P4P3BO0_BESR1	0x024
+
+/* PLB3 to OPB  bridge DCRs */
+#define DCRN_PLB32OPB0_BEAR	0x092
+#define DCRN_PLB32OPB0_BESR0	0x090
+#define DCRN_PLB32OPB0_BESR1	0x094
+
+/* PLB3 Arbiter DCRs */
+#define DCRN_PLB3A0_ACR		0x077
+#define DCRN_PLB3A0_BEAR	0x076
+#define DCRN_PLB3A0_BESR	0x074
+
+/* PLB4 to OPB1 Bridge DCRs */
+#define DCRN_PLB42OPB1_BEARH	0x0203
+#define DCRN_PLB42OPB1_BEARL	0x0202
+#define DCRN_PLB42OPB1_BESR0	0x0200
+#define DCRN_PLB42OPB1_BESR1	0x0204
+
+/* PLB4 Arbiter DCRs */
+#define DCRN_PLB4A0_ACR		0x081
+#define DCRN_PLB4A0_BEARH	0x085
+#define DCRN_PLB4A0_BEARL	0x084
+#define DCRN_PLB4A0_BESR	0x082
+#define DCRN_PLB4A1_ACR		0x089
+#define DCRN_PLB4A1_BEARH	0x08D
+#define DCRN_PLB4A1_BEARL	0x08C
+#define DCRN_PLB4A1_BESR	0x08A
 #else
 /* 440GP/GX PLB Arbiter DCRs */
 #define DCRN_PLB0_REVID		0x082		/* PLB Arbiter Revision ID */
@@ -471,8 +542,12 @@
 #define MQ0_CONFIG_SIZE_2G		0x0000c000
 #define MQ0_CONFIG_SIZE_4G		0x00008000
 
-/* Internal SRAM Controller 440GX/440SP/440SPe */
+/* Internal SRAM Controller 440GX/440SP/440SPe/440EPx/440GRx */
+#if defined(CONFIG_440EPX) || defined(CONFIG_440GRX)
+#define DCRN_SRAM0_BASE		0x360
+#else
 #define DCRN_SRAM0_BASE		0x000
+#endif
 
 #define DCRN_SRAM0_SB0CR	(DCRN_SRAM0_BASE + 0x020)
 #define DCRN_SRAM0_SB1CR	(DCRN_SRAM0_BASE + 0x021)
@@ -556,12 +631,19 @@
 #define PCIX1_CFGD		0x1ec00004UL
 #define PCIX2_CFGD		0x2ec00004UL
 
+#if defined (CONFIG_440SPE)
+#define PCIX0_IO_BASE		0x0000000C08000000ULL
+#else
 #define PCIX0_IO_BASE		0x0000000908000000ULL
 #define PCIX1_IO_BASE		0x0000000908000000ULL
 #define PCIX2_IO_BASE		0x0000000908000000ULL
+#endif
+
 #define PCIX_IO_SIZE		0x00010000
 
-#ifdef CONFIG_440SP
+#if defined (CONFIG_440SPE)
+#define PCIX0_REG_BASE		0x0000000c0ec80000ULL
+#elif defined(CONFIG_440SP)
 #define PCIX0_REG_BASE		0x000000090ec80000ULL
 #else
 #define PCIX0_REG_BASE		0x000000020ec80000ULL
@@ -659,7 +741,7 @@
 #define IIC_CLOCK		50
 
 #undef NR_UICS
-#if defined(CONFIG_440GX)
+#if defined(CONFIG_440GX) || defined(CONFIG_440EPX) || defined(CONFIG_440GRX)
 #define NR_UICS 3
 #elif defined(CONFIG_440SPE)
 #define NR_UICS 4

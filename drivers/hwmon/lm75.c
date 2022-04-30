@@ -121,6 +121,7 @@ static struct attribute *lm75_attributes[] = {
 };
 
 static const struct attribute_group lm75_group = {
+	.name  = "lm75",
 	.attrs = lm75_attributes,
 };
 

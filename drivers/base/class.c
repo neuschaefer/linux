@@ -794,7 +794,7 @@ void class_device_destroy(struct class *cls, dev_t devt)
 
 int class_device_rename(struct class_device *class_dev, char *new_name)
 {
-	int error = 0;
+	int error = 0,err;
 	char *old_class_name = NULL, *new_class_name = NULL;
 
 	class_dev = class_device_get(class_dev);
@@ -815,7 +815,7 @@ int class_device_rename(struct class_device *class_dev, char *new_name)
 	if (class_dev->dev) {
 		new_class_name = make_class_name(class_dev->class->name,
 						 &class_dev->kobj);
-		sysfs_create_link(&class_dev->dev->kobj, &class_dev->kobj,
+		err=sysfs_create_link(&class_dev->dev->kobj, &class_dev->kobj,
 				  new_class_name);
 		sysfs_remove_link(&class_dev->dev->kobj, old_class_name);
 	}

@@ -87,7 +87,7 @@ extern int __put_user_bad(void);
 
 #define __put_user_asm(err,x,ptr,bwl)				\
 	__asm__ ("move" #bwl " %0,%1"				\
-		: /* no outputs */						\
+		: /* no outputs */				\
 		:"d" (x),"m" (*__ptr(ptr)) : "memory")
 
 #define get_user(x, ptr)					\
@@ -97,12 +97,15 @@ extern int __put_user_bad(void);
     switch (sizeof(*(ptr))) {					\
     case 1:							\
 	__get_user_asm(__gu_err, __gu_val, ptr, b, "=d");	\
+	(x) = (typeof(*(ptr))) __gu_val;			\
 	break;							\
     case 2:							\
 	__get_user_asm(__gu_err, __gu_val, ptr, w, "=r");	\
+	(x) = (typeof(*(ptr))) __gu_val;			\
 	break;							\
     case 4:							\
 	__get_user_asm(__gu_err, __gu_val, ptr, l, "=r");	\
+	(x) = (typeof(*(ptr))) __gu_val;			\
 	break;							\
     case 8:							\
 	memcpy((void *) &__gu_val, ptr, sizeof (*(ptr)));	\

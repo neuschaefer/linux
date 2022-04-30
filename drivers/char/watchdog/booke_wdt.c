@@ -35,7 +35,7 @@
 #ifdef	CONFIG_FSL_BOOKE
 #define WDT_PERIOD_DEFAULT 63	/* Ex. wdt_period=28 bus=333Mhz , reset=~40sec */
 #else
-#define WDT_PERIOD_DEFAULT 4	/* Refer to the PPC40x and PPC4xx manuals */
+#define WDT_PERIOD_DEFAULT 3	/* Refer to the PPC40x and PPC4xx manuals */
 #endif				/* for timing information */
 
 u32 booke_wdt_enabled = 0;

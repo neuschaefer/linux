@@ -1,6 +1,7 @@
 /*
  *  drivers/mtd/nand/ppchameleonevb.c
  *
+ *  Copyright (C) 2005 Wolfgang Denk <wd@denx.de>
  *  Copyright (C) 2003 DAVE Srl (info@wawnet.biz)
  *
  *  Derived from drivers/mtd/nand/edb7312.c
@@ -26,11 +27,12 @@
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/module.h>
+#include <linux/delay.h>
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/nand.h>
 #include <linux/mtd/partitions.h>
 #include <asm/io.h>
-#include <platforms/PPChameleonEVB.h>
+#include <platforms/4xx/ppchameleon.h>
 
 #undef USE_READY_BUSY_PIN
 #define USE_READY_BUSY_PIN
@@ -41,8 +43,9 @@
 /* handy sizes */
 #define SZ_4M                           0x00400000
 #define NAND_SMALL_SIZE                 0x02000000
-#define NAND_MTD_NAME		"ppchameleon-nand"
-#define NAND_EVB_MTD_NAME	"ppchameleonevb-nand"
+
+#define NAND_MTD_NAME			"ppchameleon-nand"
+#define NAND_EVB_MTD_NAME		"ppchameleonevb-nand"
 
 /* GPIO pins used to drive NAND chip mounted on processor module */
 #define NAND_nCE_GPIO_PIN 		(0x80000000 >> 1)
@@ -50,10 +53,10 @@
 #define NAND_ALE_GPIO_PIN 		(0x80000000 >> 3)
 #define NAND_RB_GPIO_PIN 		(0x80000000 >> 4)
 /* GPIO pins used to drive NAND chip mounted on EVB */
-#define NAND_EVB_nCE_GPIO_PIN 	(0x80000000 >> 14)
-#define NAND_EVB_CLE_GPIO_PIN 	(0x80000000 >> 15)
-#define NAND_EVB_ALE_GPIO_PIN 	(0x80000000 >> 16)
-#define NAND_EVB_RB_GPIO_PIN 	(0x80000000 >> 31)
+#define NAND_EVB_nCE_GPIO_PIN 		(0x80000000 >> 14)
+#define NAND_EVB_CLE_GPIO_PIN 		(0x80000000 >> 15)
+#define NAND_EVB_ALE_GPIO_PIN 		(0x80000000 >> 16)
+#define NAND_EVB_RB_GPIO_PIN 		(0x80000000 >> 31)
 
 /*
  * MTD structure for PPChameleonEVB board
@@ -67,13 +70,8 @@ static struct mtd_info *ppchameleonevb_mtd = NULL;
 static unsigned long ppchameleon_fio_pbase = CFG_NAND0_PADDR;
 static unsigned long ppchameleonevb_fio_pbase = CFG_NAND1_PADDR;
 
-#ifdef MODULE
 module_param(ppchameleon_fio_pbase, ulong, 0);
 module_param(ppchameleonevb_fio_pbase, ulong, 0);
-#else
-__setup("ppchameleon_fio_pbase=", ppchameleon_fio_pbase);
-__setup("ppchameleonevb_fio_pbase=", ppchameleonevb_fio_pbase);
-#endif
 
 #ifdef CONFIG_MTD_PARTITIONS
 /*
@@ -81,7 +79,7 @@ __setup("ppchameleonevb_fio_pbase=", ppchameleonevb_fio_pbase);
  */
 static struct mtd_partition partition_info_hi[] = {
       { .name = "PPChameleon HI Nand Flash",
-	offset = 0,
+	.offset = 0,
 	.size = 128 * 1024 * 1024
       }
 };
@@ -108,33 +106,39 @@ extern int parse_cmdline_partitions(struct mtd_info *master, struct mtd_partitio
 /*
  *	hardware specific access to control-lines
  */
+/* Select the chip by setting nCE to low */
+#define NAND_CTL_SETNCE		1
+/* Deselect the chip by setting nCE to high */
+#define NAND_CTL_CLRNCE		2
+/* Select the command latch by setting CLE to high */
+#define NAND_CTL_SETCLE		3
+/* Deselect the command latch by setting CLE to low */
+#define NAND_CTL_CLRCLE		4
+/* Select the address latch by setting ALE to high */
+#define NAND_CTL_SETALE		5
+/* Deselect the address latch by setting ALE to low */
+#define NAND_CTL_CLRALE		6
+
 static void ppchameleon_hwcontrol(struct mtd_info *mtdinfo, int cmd,
 				  unsigned int ctrl)
 {
-	struct nand_chip *chip = mtd->priv;
+	struct nand_chip *chip = mtdinfo->priv;
 
 	if (ctrl & NAND_CTRL_CHANGE) {
-#error Missing headerfiles. No way to fix this. -tglx
-		switch (cmd) {
-		case NAND_CTL_SETCLE:
+		if (ctrl & NAND_CLE)
 			MACRO_NAND_CTL_SETCLE((unsigned long)CFG_NAND0_PADDR);
-			break;
-		case NAND_CTL_CLRCLE:
+		else
 			MACRO_NAND_CTL_CLRCLE((unsigned long)CFG_NAND0_PADDR);
-			break;
-		case NAND_CTL_SETALE:
+
+		if (ctrl & NAND_ALE)
 			MACRO_NAND_CTL_SETALE((unsigned long)CFG_NAND0_PADDR);
-			break;
-		case NAND_CTL_CLRALE:
+		else
 			MACRO_NAND_CTL_CLRALE((unsigned long)CFG_NAND0_PADDR);
-			break;
-		case NAND_CTL_SETNCE:
+
+		if (ctrl & NAND_NCE)
 			MACRO_NAND_ENABLE_CE((unsigned long)CFG_NAND0_PADDR);
-			break;
-		case NAND_CTL_CLRNCE:
+		else
 			MACRO_NAND_DISABLE_CE((unsigned long)CFG_NAND0_PADDR);
-			break;
-		}
 	}
 	if (cmd != NAND_CMD_NONE)
 		writeb(cmd, chip->IO_ADDR_W);
@@ -143,30 +147,23 @@ static void ppchameleon_hwcontrol(struct mtd_info *mtdinfo, int cmd,
 static void ppchameleonevb_hwcontrol(struct mtd_info *mtdinfo, int cmd,
 				     unsigned int ctrl)
 {
-	struct nand_chip *chip = mtd->priv;
+	struct nand_chip *chip = mtdinfo->priv;
 
 	if (ctrl & NAND_CTRL_CHANGE) {
-#error Missing headerfiles. No way to fix this. -tglx
-		switch (cmd) {
-		case NAND_CTL_SETCLE:
+		if (ctrl & NAND_CLE)
 			MACRO_NAND_CTL_SETCLE((unsigned long)CFG_NAND1_PADDR);
-			break;
-		case NAND_CTL_CLRCLE:
+		else
 			MACRO_NAND_CTL_CLRCLE((unsigned long)CFG_NAND1_PADDR);
-			break;
-		case NAND_CTL_SETALE:
+
+		if (ctrl & NAND_ALE)
 			MACRO_NAND_CTL_SETALE((unsigned long)CFG_NAND1_PADDR);
-			break;
-		case NAND_CTL_CLRALE:
+		else
 			MACRO_NAND_CTL_CLRALE((unsigned long)CFG_NAND1_PADDR);
-			break;
-		case NAND_CTL_SETNCE:
+
+		if (ctrl & NAND_NCE)
 			MACRO_NAND_ENABLE_CE((unsigned long)CFG_NAND1_PADDR);
-			break;
-		case NAND_CTL_CLRNCE:
+		else
 			MACRO_NAND_DISABLE_CE((unsigned long)CFG_NAND1_PADDR);
-			break;
-		}
 	}
 	if (cmd != NAND_CMD_NONE)
 		writeb(cmd, chip->IO_ADDR_W);
@@ -185,9 +182,16 @@ static int ppchameleon_device_ready(struct mtd_info *minfo)
 
 static int ppchameleonevb_device_ready(struct mtd_info *minfo)
 {
-	if (in_be32((volatile unsigned *)GPIO0_IR) & NAND_EVB_RB_GPIO_PIN)
-		return 1;
-	return 0;
+	int ret;
+
+	ret = in_be32((volatile unsigned *)GPIO0_IR) & NAND_EVB_RB_GPIO_PIN;
+
+	/*
+	 * Only 2nd chip needs a little more time
+	 */
+	udelay(10);
+
+	return ret;
 }
 #endif
 
@@ -424,9 +428,9 @@ static void __exit ppchameleonevb_cleanup(void)
 
 	/* Release iomaps */
 	this = (struct nand_chip *) &ppchameleon_mtd[1];
-	iounmap((void *) this->IO_ADDR_R;
+	iounmap((void *) this->IO_ADDR_R);
 	this = (struct nand_chip *) &ppchameleonevb_mtd[1];
-	iounmap((void *) this->IO_ADDR_R;
+	iounmap((void *) this->IO_ADDR_R);
 
 	/* Free the MTD device structure */
 	kfree (ppchameleon_mtd);
@@ -436,4 +440,4 @@ module_exit(ppchameleonevb_cleanup);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("DAVE Srl <support-ppchameleon@dave-tech.it>");
-MODULE_DESCRIPTION("MTD map driver for DAVE Srl PPChameleonEVB board");
+MODULE_DESCRIPTION("MTD NAND flash driver for DAVE Srl PPChameleonEVB board");

@@ -47,6 +47,8 @@ static void icedcc_putc(int ch)
 	asm("mcr p14, 0, %0, c0, c5, 0" : : "r" (ch));
 }
 
+
+
 #else
 
 static void icedcc_putc(int ch)
@@ -67,7 +69,10 @@ static void icedcc_putc(int ch)
 
 #define putc(ch)	icedcc_putc(ch)
 #define flush()	do { } while (0)
+#else
+#define putc(ch)	putc2(ch)
 #endif
+
 
 static void putstr(const char *ptr)
 {

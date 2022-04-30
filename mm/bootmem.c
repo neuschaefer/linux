@@ -449,7 +449,14 @@ void * __init __alloc_bootmem_node(pg_data_t *pgdat, unsigned long size,
 
 	ptr = __alloc_bootmem_core(pgdat->bdata, size, align, goal, 0);
 	if (ptr)
+	{
+		// Applying a patch for SPEAr, because we are using Page 0 for Second ARM
+		if ( (unsigned int)ptr == 0xc0000000 )
+		{
+			ptr += 0x200;
+		}
 		return ptr;
+	}
 
 	return __alloc_bootmem(size, align, goal);
 }

@@ -268,7 +268,10 @@ struct ehci_regs {
 #define PORT_CSC	(1<<1)		/* connect status change */
 #define PORT_CONNECT	(1<<0)		/* device connected */
 #define PORT_RWC_BITS   (PORT_CSC | PORT_PEC | PORT_OCC)
-} __attribute__ ((packed));
+}  __attribute__ ((aligned (4)));
+//} __attribute__ ((packed));
+
+//ASHWINI - Removing packed attribute and adding aligned
 
 /* Appendix C, Debug port ... intended for use with special "debug devices"
  * that can help if there's no serial console.  (nonstandard enumeration.)

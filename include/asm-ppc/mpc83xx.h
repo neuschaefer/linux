@@ -25,6 +25,10 @@
 #include <platforms/83xx/mpc834x_sys.h>
 #endif
 
+#ifdef CONFIG_TQM834x
+#include <platforms/83xx/tqm834x.h>
+#endif
+
 #define _IO_BASE        isa_io_base
 #define _ISA_MEM_BASE   isa_mem_base
 #ifdef CONFIG_PCI
@@ -93,6 +97,19 @@ extern unsigned char __res[];
 #define MPC83xx_IRQ_GTM5	(91 + MPC83xx_IPIC_IRQ_OFFSET)
 
 #define MPC83xx_CCSRBAR_SIZE	(1024*1024)
+
+/* system priority and configuration register */
+#define MPC83xx_SPCR            0x00000110
+#define MPC83xx_SPCR_TBEN       0x00400000
+
+/* reset protection register */
+#define MPC83xx_RPR		0x00000918
+#define MPC83xx_RPR_RSTE	0x52535445      /* "RSTE" in ASCII */
+
+/* reset control register*/
+#define MPC83xx_RCR		0x0000091c
+#define MPC83xx_RCR_SWHR	0x00000002      /* sw hard reset */
+#define MPC83xx_RCR_SWSR	0x00000001      /* sw soft reset */
 
 /* Let modules/drivers get at immrbar (physical) */
 extern phys_addr_t immrbar;

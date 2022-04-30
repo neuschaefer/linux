@@ -1,11 +1,11 @@
 /*
  * TQM85xx (40/41/55/60) board specific routines
  *
- * Copyright (c) 2005 DENX Software Engineering
+ * Copyright (c) 2005-2006 DENX Software Engineering
  * Stefan Roese <sr@denx.de>
  *
  * Based on original work by
- * 	Kumar Gala <galak@kernel.crashing.org>
+ * 	Kumar Gala <kumar.gala@freescale.com>
  *      Copyright 2004 Freescale Semiconductor Inc.
  *
  * This program is free software; you can redistribute  it and/or modify it
@@ -101,7 +101,7 @@ tqm85xx_setup_arch(void)
 	struct gianfar_platform_data *pdata;
 	struct gianfar_mdio_data *mdata;
 
-#ifdef CONFIG_MPC8560
+#ifdef CONFIG_CPM2
 	cpm2_reset();
 #endif
 
@@ -194,7 +194,7 @@ static struct irqaction cpm2_irqaction = {
 	.mask = CPU_MASK_NONE,
 	.name = "cpm2_cascade",
 };
-#endif /* CONFIG_MPC8560 */
+#endif /* CONFIG_CPM2 */
 
 void __init
 tqm85xx_init_IRQ(void)
@@ -224,7 +224,7 @@ tqm85xx_init_IRQ(void)
         cpm2_init_IRQ();
 
 	setup_irq(MPC85xx_IRQ_CPM, &cpm2_irqaction);
-#endif /* CONFIG_MPC8560 */
+#endif /* CONFIG_CPM2 */
 
 	return;
 }
@@ -343,14 +343,14 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 			  binfo->bi_immr_base, MPC85xx_CCSRBAR_SIZE, _PAGE_IO, 0);
 
 		memset(&p, 0, sizeof (p));
-		p.iotype = UPIO_MEM;
+		p.iotype = SERIAL_IO_MEM;
 		p.membase = (void *) binfo->bi_immr_base + MPC85xx_UART0_OFFSET;
 		p.uartclk = binfo->bi_busfreq;
 
 		gen550_init(0, &p);
 
 		memset(&p, 0, sizeof (p));
-		p.iotype = UPIO_MEM;
+		p.iotype = SERIAL_IO_MEM;
 		p.membase = (void *) binfo->bi_immr_base + MPC85xx_UART1_OFFSET;
 		p.uartclk = binfo->bi_busfreq;
 

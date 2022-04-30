@@ -393,6 +393,8 @@ m41t00_init(void)
 static void __exit
 m41t00_exit(void)
 {
+	ppc_md.set_rtc_time = NULL;
+	ppc_md.get_rtc_time = NULL;
 	i2c_del_driver(&m41t00_driver);
 	platform_driver_unregister(&m41t00_platform_driver);
 }

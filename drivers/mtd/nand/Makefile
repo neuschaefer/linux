@@ -22,5 +22,8 @@ obj-$(CONFIG_MTD_NAND_TS7250)		+= ts7250.o
 obj-$(CONFIG_MTD_NAND_NANDSIM)		+= nandsim.o
 obj-$(CONFIG_MTD_NAND_CS553X)		+= cs553x_nand.o
 obj-$(CONFIG_MTD_NAND_NDFC)		+= ndfc.o
+obj-$(CONFIG_MTD_NAND_TQM8272)		+= tqm8272.o
+obj-$(CONFIG_MTD_NAND_ALPR)		+= alpr_nand.o
+obj-$(CONFIG_MTD_NAND_SPEAR)		+= spr_fsmc_st_hal.o spr_nand.o
 
 nand-objs = nand_base.o nand_bbt.o

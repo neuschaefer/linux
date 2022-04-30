@@ -221,6 +221,30 @@ void platform_machine_check(struct pt_regs *regs)
 	       mfdcr(DCRN_PLB1_BEARH), mfdcr(DCRN_PLB1_BEARL),
 	       mfdcr(DCRN_PLB1_ACR), mfdcr(DCRN_PLB1_BESRH),
 	       mfdcr(DCRN_PLB1_BESRL));
+#elif defined(CONFIG_440EPX)|| defined(CONFIG_440GRX)
+     	printk("OPB to PLB3: BSTAT= 0x%08x\n",
+	       mfdcr(DCRN_OPB2PLB30_BSTAT));
+	printk("PLB3 to PLB4: BEAR=0x%08x%08x BESR0=0x%08x BESR1=0x%08x\n",
+	       mfdcr(DCRN_P3P4BI0_BEARH), mfdcr(DCRN_P3P4BI0_BEARL),
+	       mfdcr(DCRN_P3P4BI0_BESR0), mfdcr(DCRN_P3P4BI0_BESR1));
+	printk("PLB4 to PLB3: BEAR=0x%08x%08x BESR0=0x%08x BESR1=0x%08x\n",
+	       mfdcr(DCRN_P4P3BO0_BEARH), mfdcr(DCRN_P4P3BO0_BEARL),
+	       mfdcr(DCRN_P4P3BO0_BESR0), mfdcr(DCRN_P4P3BO0_BESR1));
+	printk("PLB3 to OPB: BEAR=0x%08x BESR0=0x%08x BESR1=0x%08x\n",
+	       mfdcr(DCRN_PLB32OPB0_BEAR),
+	       mfdcr(DCRN_PLB32OPB0_BESR0), mfdcr(DCRN_PLB32OPB0_BESR1));
+	printk("PLB3 arbiter: BEAR=0x%08x ACR=0x%08x BESR=0x%08x\n",
+	       mfdcr(DCRN_PLB3A0_BEAR),
+	       mfdcr(DCRN_PLB3A0_ACR),  mfdcr(DCRN_PLB3A0_BESR));
+	printk("PLB4 to OPB1: BEAR=0x%08x%08x BESR0=0x%08x BESR1=0x%08x\n",
+	       mfdcr(DCRN_PLB42OPB1_BEARH), mfdcr(DCRN_PLB42OPB1_BEARL),
+	       mfdcr(DCRN_PLB42OPB1_BESR0), mfdcr(DCRN_PLB42OPB1_BESR1));
+	printk("PLB40 Arbiter: BEAR=0x%08x%08x ACR=0x%08x BESR0=0x%08x\n",
+	       mfdcr(DCRN_PLB4A0_BEARH), mfdcr(DCRN_PLB4A0_BEARL),
+	       mfdcr(DCRN_PLB4A0_ACR), mfdcr(DCRN_PLB4A0_BESR));
+	printk("PLB41 Arbiter: BEAR=0x%08x%08x ACR=0x%08x BESR0=0x%08x\n",
+	       mfdcr(DCRN_PLB4A1_BEARH), mfdcr(DCRN_PLB4A1_BEARL),
+	       mfdcr(DCRN_PLB4A1_ACR), mfdcr(DCRN_PLB4A1_BESR));
 #else
     	printk("PLB0: BEAR=0x%08x%08x ACR=  0x%08x BESR= 0x%08x\n",
 		mfdcr(DCRN_PLB0_BEARH), mfdcr(DCRN_PLB0_BEARL),

@@ -179,9 +179,9 @@ SUBARCH := $(shell uname -m | sed -e s/i.86/i386/ -e s/sun4u/sparc64/ \
 # Default value for CROSS_COMPILE is not to prefix executables
 # Note: Some architectures assign CROSS_COMPILE in their arch/*/Makefile
 
-ARCH		?= $(SUBARCH)
-CROSS_COMPILE	?=
-
+ARCH		?= arm
+#CROSS_COMPILE	?= arm-linux-
+CROSS_COMPILE	?= arm-none-linux-gnueabi-
 # Architecture as present in compile.h
 UTS_MACHINE := $(ARCH)
 
@@ -194,8 +194,10 @@ CONFIG_SHELL := $(shell if [ -x "$$BASH" ]; then echo $$BASH; \
 
 HOSTCC       = gcc
 HOSTCXX      = g++
-HOSTCFLAGS   = -Wall -Wstrict-prototypes -O2 -fomit-frame-pointer
-HOSTCXXFLAGS = -O2
+#HOSTCFLAGS   = -Wall -Wstrict-prototypes -O2 -fomit-frame-pointer
+#HOSTCXXFLAGS = -O2
+HOSTCFLAGS   = -Wall -Wstrict-prototypes -O1 -fomit-frame-pointer
+HOSTCXXFLAGS = -O1
 
 # Decide whether to build built-in, modular, or both.
 # Normally, just do built-in.
@@ -291,7 +293,7 @@ OBJCOPY		= $(CROSS_COMPILE)objcopy
 OBJDUMP		= $(CROSS_COMPILE)objdump
 AWK		= awk
 GENKSYMS	= scripts/genksyms/genksyms
-DEPMOD		= /sbin/depmod
+DEPMOD		?= /sbin/depmod
 KALLSYMS	= scripts/kallsyms
 PERL		= perl
 CHECK		= sparse
@@ -313,8 +315,8 @@ LINUXINCLUDE    := -Iinclude \
 
 CPPFLAGS        := -D__KERNEL__ $(LINUXINCLUDE)
 
-CFLAGS          := -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
-                   -fno-strict-aliasing -fno-common
+CFLAGS          := -Wall -Werror -Wundef -Wstrict-prototypes -Wno-trigraphs \
+                   -fno-strict-aliasing -fno-common -fno-delete-null-pointer-checks
 AFLAGS          := -D__ASSEMBLY__
 
 # Read KERNELRELEASE from include/config/kernel.release (if it exists)
@@ -882,6 +884,7 @@ export CPPFLAGS_vmlinux.lds += -P -C -U$(ARCH)
 # hard to detect, but I suppose "make mrproper" is a good idea
 # before switching between archs anyway.
 
+.PHONY: include/asm
 include/asm:
 	@echo '  SYMLINK $@ -> include/asm-$(ARCH)'
 	$(Q)if [ ! -d include ]; then mkdir -p include; fi;

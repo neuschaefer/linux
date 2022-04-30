@@ -45,6 +45,7 @@ struct pt_regs;
 /* ======================================================================== */
 
 enum ppc_sys_devices {
+	MPC52xx_SDMA,	 /* Must be first device to probe, else FEC/ATA will fail */
 	MPC52xx_MSCAN1,
 	MPC52xx_MSCAN2,
 	MPC52xx_SPI,

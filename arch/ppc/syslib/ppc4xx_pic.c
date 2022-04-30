@@ -118,6 +118,35 @@ static void __init ppc4xx_pic_impl_init(void)
 }
 
 #elif NR_UICS == 3
+#if defined(CONFIG_440EPX)|| defined(CONFIG_440GRX)
+#define ACK_UIC0_PARENT
+#define ACK_UIC1_PARENT	mtdcr(DCRN_UIC_SR(UIC0), UIC0_UIC1NC);
+#define ACK_UIC2_PARENT	mtdcr(DCRN_UIC_SR(UIC0), UIC0_UIC2NC);
+UIC_HANDLERS(0);
+UIC_HANDLERS(1);
+UIC_HANDLERS(2);
+
+static int ppc4xx_pic_get_irq(struct pt_regs *regs)
+{
+	u32 uic0 = mfdcr(DCRN_UIC_MSR(UIC0));
+	if (uic0 & UIC0_UIC1NC)
+		return 64 - ffs(mfdcr(DCRN_UIC_MSR(UIC1)));
+	else if (uic0 & UIC0_UIC2NC)
+		return 96 - ffs(mfdcr(DCRN_UIC_MSR(UIC2)));
+	else
+		return uic0 ? 32 - ffs(uic0) : -1;
+}
+
+static void __init ppc4xx_pic_impl_init(void)
+{
+	/* Enable cascade interrupts in UIC0 */
+	ppc_cached_irq_mask[0] |= UIC0_UIC1NC | UIC0_UIC2NC;
+	mtdcr(DCRN_UIC_SR(UIC0), UIC0_UIC1NC | UIC0_UIC2NC );
+	mtdcr(DCRN_UIC_ER(UIC0), ppc_cached_irq_mask[0]);
+}
+
+#else /* #if defined(CONFIG_440EPX)|| defined(CONFIG_440GRX) */
+
 #define ACK_UIC0_PARENT	mtdcr(DCRN_UIC_SR(UICB), UICB_UIC0NC);
 #define ACK_UIC1_PARENT	mtdcr(DCRN_UIC_SR(UICB), UICB_UIC1NC);
 #define ACK_UIC2_PARENT	mtdcr(DCRN_UIC_SR(UICB), UICB_UIC2NC);
@@ -152,6 +181,7 @@ static void __init ppc4xx_pic_impl_init(void)
 	mtdcr(DCRN_UIC_ER(UICB), UICB_UIC0NC | UICB_UIC1NC | UICB_UIC2NC);
 }
 
+#endif /* #if defined(CONFIG_440EPX)|| defined(CONFIG_440GRX) */
 #elif NR_UICS == 2
 #define ACK_UIC0_PARENT
 #define ACK_UIC1_PARENT	mtdcr(DCRN_UIC_SR(UIC0), UIC0_UIC1NC);
