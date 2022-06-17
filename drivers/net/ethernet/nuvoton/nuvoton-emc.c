@@ -6,18 +6,19 @@
  * Copyright (C) 2022 Jonathan Neuschäfer
  * TODO:
  * - merge short functions called from _open into one function
+ *   - and/or change parameter to *priv
  * - get MAC address from DT
  * - change fields in emc_.x_desc to __le32
  * - move away from __raw_ functions maybe
  * - group members of private struct in some reasonable way
  *   - and remove some
  * - use devm_ as much as possible
- * - add reset controller support - compare with openbmc driver
  * - implement copy-less TX/RX DMA
  * - make it short, maybe 700 lines? :)
- * - use dev_err_probe
- * - less printk
+ * - less printk, better messages
  * - set DMARFC
+ * - locking??
+ * - napi
  */
 
 #include <linux/clk.h>
@@ -30,10 +31,10 @@
 #include <linux/mod_devicetable.h>
 #include <linux/module.h>
 #include <linux/netdevice.h>
-#include <linux/platform_device.h>
-#include <linux/skbuff.h>
 #include <linux/of_mdio.h>
+#include <linux/platform_device.h>
 #include <linux/reset.h>
+#include <linux/skbuff.h>
 
 #include <net/ncsi.h>
 
@@ -91,14 +92,6 @@
 #define MIIDA_MDCON		BIT(19)
 #define MIIDA_MDCCR_VAL		(0xa << 20)
 
-/* rx and tx status */
-#define TXDS_TXCP		BIT(19)
-#define RXDS_CRCE		BIT(17)
-#define RXDS_PTLE		BIT(19)
-#define RXDS_RXGD		BIT(20)
-#define RXDS_ALIE		BIT(21)
-#define RXDS_RP			BIT(22)
-
 /* MIEN - MAC Interrupt Enable Register */
 #define MIEN_RXINTR		BIT(0)
 #define MIEN_RXGD		BIT(4)
@@ -123,30 +116,38 @@
 #define MISTA_TDU		MIEN_TDU
 #define MISTA_TXBERR		MIEN_TXBERR
 
-// TODO: rename descriptor bits
-/* rx and tx owner bit */
-#define RX_OWEN_DMA		(0x01 << 31)
-#define RX_OWEN_CPU		(~(0x03 << 30))
-#define TX_OWEN_DMA		(0x01 << 31)
-#define TX_OWEN_CPU		(~(0x01 << 31))
+/* FFTCR - FIFO Threshold Control Register */
+#define FFTCR_TXTHD		(0x03 << 8)
+#define FFTCR_BLENGTH		(0x01 << 20)
 
-/* tx frame desc controller bit */
-#define MACTXINTEN		0x04
-#define CRCMODE			0x02
-#define PADDINGMODE		0x01
+/* RX/TX descriptor, owner */
+#define RX_OWNER_MASK		GENMASK(31, 30)
+#define RX_OWNER_EMC		BIT(31)
+#define TX_OWNER_MASK		BIT(31)
+#define TX_OWNER_EMC		BIT(31)
 
-/* fftcr controller bit */
-#define TXTHD			(0x03 << 8)
-#define BLENGTH			(0x01 << 20)
+/* TX descriptor, word 0 bits */
+#define TX_PADEN		BIT(0)
+#define TX_CRCAPP		BIT(1)
+#define TX_INTEN		BIT(2)
+
+/* RX descriptor, status */
+#define RX_STATUS_CRCE		BIT(17)
+#define RX_STATUS_PTLE		BIT(19)
+#define RX_STATUS_RXGD		BIT(20)
+#define RX_STATUS_ALIE		BIT(21)
+#define RX_STATUS_RP		BIT(22)
+
+/* TX descriptor, status */
+#define TX_STATUS_TXCP		BIT(19)
 
 /* global setting for driver */
-#define RX_DESC_SIZE		50
+#define RX_DESC_SIZE		50  /* TODO: rename; SIZE doesn't quite fit */
 #define TX_DESC_SIZE		10
-#define MAX_RBUFF_SZ		0x600
+#define MAX_RBUFF_SZ		0x600 /* TODO: MAX_RX_FRAME or something */
 #define MAX_TBUFF_SZ		0x600
 #define TX_TIMEOUT		(HZ/2)
-#define DELAY			1000
-#define CAM0			0x0
+#define MDIO_RETRIES		1000
 
 /* Receive buffer descriptor */
 struct emc_rx_desc {
@@ -175,14 +176,16 @@ struct emc_tx_descs {
 };
 
 struct emc_priv {
+	/* subsystem relations */
 	struct platform_device *pdev;
-	struct resource *res;
-	struct clk *clk;
-	struct clk *rmiiclk;
+	struct clk *clk_main;
+	struct clk *clk_rmii;
 	struct reset_control *reset;
 	struct mii_bus *mdio;
 	struct phy_device *phy;
 	struct ncsi_dev *ncsi;
+	int rxirq;
+	int txirq;
 
 	/* hardware details */
 	void __iomem *reg;
@@ -190,15 +193,9 @@ struct emc_priv {
 	struct emc_tx_descs *tx_descs;
 	dma_addr_t rx_descs_phys;
 	dma_addr_t tx_descs_phys;
-	int rxirq;
-	int txirq;
 	unsigned int cur_tx;
 	unsigned int cur_rx;
 	unsigned int finish_tx;
-	unsigned int rx_packets;
-	unsigned int rx_bytes;
-	unsigned int start_tx_ptr;
-	unsigned int start_rx_ptr;
 };
 
 static void emc_link_change(struct net_device *netdev)
@@ -237,25 +234,24 @@ static void emc_set_link_mode_for_ncsi(struct net_device *netdev)
 
 
 static void emc_write_cam(struct net_device *netdev,
-				unsigned int x, const unsigned char *pval)
+				unsigned int index, const unsigned char *addr)
 {
 	struct emc_priv *priv = netdev_priv(netdev);
 	unsigned int msw, lsw;
 
-	msw = (pval[0] << 24) | (pval[1] << 16) | (pval[2] << 8) | pval[3];
+	msw = (addr[0] << 24) | (addr[1] << 16) | (addr[2] << 8) | addr[3];
+	lsw = (addr[4] << 24) | (addr[5] << 16);
 
-	lsw = (pval[4] << 24) | (pval[5] << 16);
-
-	__raw_writel(lsw, priv->reg + REG_CAML_BASE + x * CAM_ENTRY_SIZE);
-	__raw_writel(msw, priv->reg + REG_CAMM_BASE + x * CAM_ENTRY_SIZE);
+	__raw_writel(msw, priv->reg + REG_CAMM_BASE + index * CAM_ENTRY_SIZE);
+	__raw_writel(lsw, priv->reg + REG_CAML_BASE + index * CAM_ENTRY_SIZE);
 }
 
 static int emc_init_desc(struct net_device *netdev)
 {
 	struct emc_priv *priv = netdev_priv(netdev);
+	struct platform_device *pdev = priv->pdev;
 	struct emc_tx_desc *tx_desc;
 	struct emc_rx_desc *rx_desc;
-	struct platform_device *pdev = priv->pdev;
 	unsigned int i;
 
 	priv->tx_descs = dma_alloc_coherent(&pdev->dev, sizeof(struct emc_tx_descs),
@@ -288,8 +284,6 @@ static int emc_init_desc(struct net_device *netdev)
 		tx_desc->mode = 0;
 	}
 
-	priv->start_tx_ptr = priv->tx_descs_phys;
-
 	for (i = 0; i < RX_DESC_SIZE; i++) {
 		unsigned int offset;
 
@@ -301,12 +295,10 @@ static int emc_init_desc(struct net_device *netdev)
 			offset = offsetof(struct emc_rx_descs, desclist[i + 1]);
 
 		rx_desc->next = priv->rx_descs_phys + offset;
-		rx_desc->sl = RX_OWEN_DMA;
+		rx_desc->sl = RX_OWNER_EMC;
 		rx_desc->buffer = priv->rx_descs_phys +
 			offsetof(struct emc_rx_descs, buf[i]);
 	}
-
-	priv->start_rx_ptr = priv->rx_descs_phys;
 
 	return 0;
 }
@@ -316,10 +308,12 @@ static void emc_set_fifo_threshold(struct net_device *netdev)
 	struct emc_priv *priv = netdev_priv(netdev);
 	unsigned int val;
 
-	val = TXTHD | BLENGTH;
+	val = FFTCR_TXTHD | FFTCR_BLENGTH;
 	__raw_writel(val, priv->reg + REG_FFTCR);
 }
 
+// TODO: rename
+// it's the software reset triggering routine.
 static void emc_return_default_idle(struct net_device *netdev)
 {
 	struct emc_priv *priv = netdev_priv(netdev);
@@ -328,6 +322,8 @@ static void emc_return_default_idle(struct net_device *netdev)
 	val = __raw_readl(priv->reg + REG_MCMDR);
 	val |= MCMDR_SWR;
 	__raw_writel(val, priv->reg + REG_MCMDR);
+
+	// TODO: wait for completion of reset
 }
 
 static void emc_trigger_rx(struct net_device *netdev)
@@ -364,6 +360,7 @@ static void emc_get_and_clear_int(struct net_device *netdev,
 	__raw_writel(*val, priv->reg + REG_MISTA);
 }
 
+// TODO: rename or merge
 static void emc_set_global_maccmd(struct net_device *netdev)
 {
 	struct emc_priv *priv = netdev_priv(netdev);
@@ -374,18 +371,20 @@ static void emc_set_global_maccmd(struct net_device *netdev)
 	__raw_writel(val, priv->reg + REG_MCMDR);
 }
 
+// TODO: rename s/enable/init
 static void emc_enable_cam(struct net_device *netdev)
 {
 	struct emc_priv *priv = netdev_priv(netdev);
 	unsigned int val;
 
-	emc_write_cam(netdev, CAM0, netdev->dev_addr);
+	emc_write_cam(netdev, 0, netdev->dev_addr);
 
 	val = __raw_readl(priv->reg + REG_CAMEN);
 	val |= CAMEN_CAM0EN;
 	__raw_writel(val, priv->reg + REG_CAMEN);
 }
 
+// TODO: merge into above
 static void emc_enable_cam_command(struct net_device *netdev)
 {
 	struct emc_priv *priv = netdev_priv(netdev);
@@ -395,7 +394,7 @@ static void emc_enable_cam_command(struct net_device *netdev)
 	__raw_writel(val, priv->reg + REG_CAMCMR);
 }
 
-static void emc_enable_tx(struct net_device *netdev, unsigned int enable)
+static void emc_enable_tx(struct net_device *netdev, bool enable)
 {
 	struct emc_priv *priv = netdev_priv(netdev);
 	unsigned int val;
@@ -410,7 +409,8 @@ static void emc_enable_tx(struct net_device *netdev, unsigned int enable)
 	__raw_writel(val, priv->reg + REG_MCMDR);
 }
 
-static void emc_enable_rx(struct net_device *netdev, unsigned int enable)
+// TODO: merge with above
+static void emc_enable_rx(struct net_device *netdev, bool enable)
 {
 	struct emc_priv *priv = netdev_priv(netdev);
 	unsigned int val;
@@ -425,16 +425,18 @@ static void emc_enable_rx(struct net_device *netdev, unsigned int enable)
 	__raw_writel(val, priv->reg + REG_MCMDR);
 }
 
+// TODO: rename, i have no idea what curdest means
+// curd, curder, the curdest
 static void emc_set_curdest(struct net_device *netdev)
 {
 	struct emc_priv *priv = netdev_priv(netdev);
 
-	__raw_writel(priv->start_rx_ptr, priv->reg + REG_RXDLSA);
-	__raw_writel(priv->start_tx_ptr, priv->reg + REG_TXDLSA);
+	__raw_writel(priv->rx_descs_phys, priv->reg + REG_RXDLSA);
+	__raw_writel(priv->tx_descs_phys, priv->reg + REG_TXDLSA);
 }
 
 // TODO: consider (1) MCMDR.SWR (software reset), (2) reset controller based reset
-// TOOD: rename to reinit or something, don't do a full reset here
+// TODO: rename to reinit or something, don't do a full reset here
 static void emc_reset_mac(struct net_device *netdev)
 {
 	struct emc_priv *priv = netdev_priv(netdev);
@@ -450,8 +452,8 @@ static void emc_reset_mac(struct net_device *netdev)
 	val |= MCMDR_ENMDC;
 	__raw_writel(val, priv->reg + REG_MCMDR);
 
-	emc_enable_tx(netdev, 0);
-	emc_enable_rx(netdev, 0);
+	emc_enable_tx(netdev, false);
+	emc_enable_rx(netdev, false);
 	emc_set_fifo_threshold(netdev);
 	emc_return_default_idle(netdev);
 
@@ -469,8 +471,8 @@ static void emc_reset_mac(struct net_device *netdev)
 	emc_enable_cam(netdev);
 	emc_enable_cam_command(netdev);
 	emc_enable_mac_interrupt(netdev);
-	emc_enable_tx(netdev, 1);
-	emc_enable_rx(netdev, 1);
+	emc_enable_tx(netdev, true);
+	emc_enable_rx(netdev, true);
 	emc_trigger_tx(netdev);
 	emc_trigger_rx(netdev);
 
@@ -488,7 +490,7 @@ static int emc_set_mac_address(struct net_device *netdev, void *addr)
 		return -EADDRNOTAVAIL;
 
 	dev_addr_set(netdev, address->sa_data);
-	emc_write_cam(netdev, CAM0, netdev->dev_addr);
+	emc_write_cam(netdev, 0, netdev->dev_addr);
 
 	return 0;
 }
@@ -500,20 +502,20 @@ static int emc_close(struct net_device *netdev)
 
 	pdev = priv->pdev;
 
-	dma_free_coherent(&pdev->dev, sizeof(struct emc_rx_descs),
-					priv->rx_descs, priv->rx_descs_phys);
-	dma_free_coherent(&pdev->dev, sizeof(struct emc_tx_descs),
-					priv->tx_descs, priv->tx_descs_phys);
-
-	netif_stop_queue(netdev);
-
 	if (priv->phy)
 		phy_stop(priv->phy);
 	else if (priv->ncsi)
 		ncsi_stop_dev(priv->ncsi);
 
-	clk_disable_unprepare(priv->rmiiclk);
-	clk_disable_unprepare(priv->clk);
+	netif_stop_queue(netdev);
+
+	dma_free_coherent(&pdev->dev, sizeof(struct emc_rx_descs),
+					priv->rx_descs, priv->rx_descs_phys);
+	dma_free_coherent(&pdev->dev, sizeof(struct emc_tx_descs),
+					priv->tx_descs, priv->tx_descs_phys);
+
+	clk_disable_unprepare(priv->clk_rmii);
+	clk_disable_unprepare(priv->clk_main);
 
 	free_irq(priv->txirq, netdev);
 	free_irq(priv->rxirq, netdev);
@@ -535,32 +537,32 @@ static int emc_send_frame(struct net_device *netdev,
 	tx_desc = &priv->tx_descs->desclist[priv->cur_tx];
 	buffer = priv->tx_descs->buf[priv->cur_tx];
 
+	// TODO: wrong place for a magic number
+	// TODO: test how large a frame can actually get here
 	if (length > 1514) {
 		dev_err(&pdev->dev, "send data %d bytes, check it\n", length);
 		length = 1514;
 	}
 
-	tx_desc->sl = length & 0xFFFF;
-
 	memcpy(buffer, data, length);
 
-	tx_desc->mode = TX_OWEN_DMA | PADDINGMODE | CRCMODE | MACTXINTEN;
+	tx_desc->sl = length & 0xFFFF;
+	tx_desc->mode = TX_OWNER_EMC | TX_PADEN | TX_CRCAPP | TX_INTEN;
 
-	emc_enable_tx(netdev, 1);
-
+	emc_enable_tx(netdev, true); // TODO: here?
 	emc_trigger_tx(netdev);
 
 	if (++priv->cur_tx >= TX_DESC_SIZE)
 		priv->cur_tx = 0;
 
 	tx_desc = &priv->tx_descs->desclist[priv->cur_tx];
-
-	if (tx_desc->mode & TX_OWEN_DMA)
+	if ((tx_desc->mode & TX_OWNER_MASK) == TX_OWNER_EMC)
 		netif_stop_queue(netdev);
 
 	return 0;
 }
 
+// TODO: merge with previous function
 static int emc_start_xmit(struct sk_buff *skb, struct net_device *netdev)
 {
 	if (!(emc_send_frame(netdev, skb->data, skb->len))) {
@@ -570,6 +572,12 @@ static int emc_start_xmit(struct sk_buff *skb, struct net_device *netdev)
 	return -EAGAIN;
 }
 
+// TODO: simplify logic.
+//   - get interrupts
+//     - print stuff
+//     - resume netif
+//   - at reclaim head in TX queue:
+//     - while reclaimable: reclaim, next
 static irqreturn_t emc_tx_interrupt(int irq, void *dev_id)
 {
 	struct emc_priv *priv;
@@ -594,7 +602,7 @@ static irqreturn_t emc_tx_interrupt(int irq, void *dev_id)
 		if (++priv->finish_tx >= TX_DESC_SIZE)
 			priv->finish_tx = 0;
 
-		if (tx_desc->sl & TXDS_TXCP) {
+		if (tx_desc->sl & TX_STATUS_TXCP) {
 			netdev->stats.tx_packets++;
 			netdev->stats.tx_bytes += tx_desc->sl & 0xFFFF;
 		} else {
@@ -624,6 +632,16 @@ static irqreturn_t emc_tx_interrupt(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
+// TODO: simplify logic
+//   - get interrupts
+//     - print stuff?
+//   - at read head:
+//     - while CPU-owned:
+//       - get frame desc
+//         - update stats
+//         - process packet
+//           - DMA foo? avoid copy?
+//       - next
 static void emc_netdev_rx(struct net_device *netdev)
 {
 	struct emc_priv *priv;
@@ -650,7 +668,7 @@ static void emc_netdev_rx(struct net_device *netdev)
 		status = rx_desc->sl;
 		length = status & 0xFFFF;
 
-		if (status & RXDS_RXGD) {
+		if (status & RX_STATUS_RXGD) {
 			data = priv->rx_descs->buf[priv->cur_rx];
 			skb = netdev_alloc_skb(netdev, length + 2);
 			if (!skb) {
@@ -668,22 +686,22 @@ static void emc_netdev_rx(struct net_device *netdev)
 		} else {
 			netdev->stats.rx_errors++;
 
-			if (status & RXDS_RP) {
+			if (status & RX_STATUS_RP) {
 				dev_err(&pdev->dev, "rx runt err\n");
 				netdev->stats.rx_length_errors++;
-			} else if (status & RXDS_CRCE) {
+			} else if (status & RX_STATUS_CRCE) {
 				dev_err(&pdev->dev, "rx crc err\n");
 				netdev->stats.rx_crc_errors++;
-			} else if (status & RXDS_ALIE) {
+			} else if (status & RX_STATUS_ALIE) {
 				dev_err(&pdev->dev, "rx alignment err\n");
 				netdev->stats.rx_frame_errors++;
-			} else if (status & RXDS_PTLE) {
+			} else if (status & RX_STATUS_PTLE) {
 				dev_err(&pdev->dev, "rx longer err\n");
 				netdev->stats.rx_over_errors++;
 			}
 		}
 
-		rx_desc->sl = RX_OWEN_DMA;
+		rx_desc->sl = RX_OWNER_EMC;
 		rx_desc->reserved = 0x0;
 
 		if (++priv->cur_rx >= RX_DESC_SIZE)
@@ -694,6 +712,13 @@ static void emc_netdev_rx(struct net_device *netdev)
 	} while (1);
 }
 
+// TODO: centralize/fix list of RX interrupt bits
+// TODO: test RX/TX interrupt bits with loopback mode
+//       -  doc says:
+//         - The RXINTR is logic OR result of the bits 1~14 in MISTA register
+//           do logic AND with the corresponding bits in MIEN register.
+//         - The TXINTR is logic OR result of the bits 17~24 in MISTA register
+//           do logic AND with the corresponding bits in MIEN register.
 static irqreturn_t emc_rx_interrupt(int irq, void *dev_id)
 {
 	struct net_device *netdev;
@@ -725,9 +750,12 @@ static int emc_open(struct net_device *netdev)
 {
 	struct emc_priv *priv = netdev_priv(netdev);
 	struct platform_device *pdev = priv->pdev;
+	int err;
 
-	clk_prepare_enable(priv->rmiiclk);
-	clk_prepare_enable(priv->clk);
+	clk_prepare_enable(priv->clk_main);
+	clk_prepare_enable(priv->clk_rmii);
+
+	// TODO: deal with duplication between emc_reset_mac and emc_open
 
 	emc_reset_mac(netdev);
 	emc_set_fifo_threshold(netdev);
@@ -736,10 +764,7 @@ static int emc_open(struct net_device *netdev)
 	emc_enable_cam_command(netdev);
 	emc_enable_mac_interrupt(netdev);
 	emc_set_global_maccmd(netdev);
-	emc_enable_rx(netdev, 1);
-
-	priv->rx_packets = 0x0;
-	priv->rx_bytes = 0x0;
+	emc_enable_rx(netdev, true);
 
 	if (request_irq(priv->txirq, emc_tx_interrupt, 0x0, pdev->name, netdev)) {
 		dev_err(&pdev->dev, "register irq tx failed\n");
@@ -761,7 +786,7 @@ static int emc_open(struct net_device *netdev)
 		emc_set_link_mode_for_ncsi(netdev);
 		netif_carrier_on(netdev);
 
-		int err = ncsi_start_dev(priv->ncsi);
+		err = ncsi_start_dev(priv->ncsi);
 		if (err)
 			pr_warn("NC/SI failed, %d\n", err);
 	}
@@ -769,6 +794,7 @@ static int emc_open(struct net_device *netdev)
 	return 0;
 }
 
+// TODO: explain in comments
 static void emc_set_multicast_list(struct net_device *netdev)
 {
 	struct emc_priv *priv;
@@ -800,11 +826,13 @@ static const struct net_device_ops emc_netdev_ops = {
 	.ndo_open		= emc_open,
 	.ndo_stop		= emc_close,
 	.ndo_start_xmit		= emc_start_xmit,
+	// TODO: what's with the names?
 	.ndo_set_rx_mode	= emc_set_multicast_list,
 	.ndo_set_mac_address	= emc_set_mac_address,
 };
 
 // TODO: use device_get_ethdev_address
+// TODO: rename
 static void get_mac_address(struct net_device *netdev)
 {
 	struct emc_priv *priv = netdev_priv(netdev);
@@ -831,7 +859,7 @@ static int emc_mdio_write(struct mii_bus *mdio, int phy_id, int reg, u16 data)
 	struct emc_priv *priv = mdio->priv;
 	unsigned int val, i;
 
-	clk_prepare_enable(priv->clk);
+	clk_prepare_enable(priv->clk_main);
 
 	__raw_writel(data, priv->reg + REG_MIID);
 
@@ -839,15 +867,15 @@ static int emc_mdio_write(struct mii_bus *mdio, int phy_id, int reg, u16 data)
 	val |= MIIDA_BUSY | MIIDA_PHYWR | MIIDA_MDCCR_VAL;
 	__raw_writel(val, priv->reg + REG_MIIDA);
 
-	for (i = 0; i < DELAY; i++) {
+	for (i = 0; i < MDIO_RETRIES; i++) {
 		if ((__raw_readl(priv->reg + REG_MIIDA) & MIIDA_BUSY) == 0)
 			break;
 	}
 
-	if (i == DELAY)
+	if (i == MDIO_RETRIES)
 		dev_warn(&mdio->dev, "mdio write timed out\n");
 
-	clk_disable_unprepare(priv->clk);
+	clk_disable_unprepare(priv->clk_main);
 
 	return 0;
 }
@@ -857,29 +885,31 @@ static int emc_mdio_read(struct mii_bus *mdio, int phy_id, int reg)
 	struct emc_priv *priv = mdio->priv;
 	unsigned int val, i, data;
 
-	clk_prepare_enable(priv->clk);
+	clk_prepare_enable(priv->clk_main);
 
 	val = (phy_id << 0x08) | reg;
 	val |= MIIDA_BUSY | MIIDA_MDCCR_VAL;
 	__raw_writel(val, priv->reg + REG_MIIDA);
 
-	for (i = 0; i < DELAY; i++) {
+	for (i = 0; i < MDIO_RETRIES; i++) {
 		if ((__raw_readl(priv->reg + REG_MIIDA) & MIIDA_BUSY) == 0)
 			break;
 	}
 
-	if (i == DELAY) {
+	if (i == MDIO_RETRIES) {
 		dev_warn(&mdio->dev, "mdio read timed out\n");
 		data = 0xffff;
 	} else {
 		data = __raw_readl(priv->reg + REG_MIID);
 	}
 
-	clk_disable_unprepare(priv->clk);
+	clk_disable_unprepare(priv->clk_main);
 
 	return data;
 }
 
+// TODO: rename
+// TODO: merge into _probe?
 static int emc_setup(struct net_device *netdev)
 {
 	struct emc_priv *priv = netdev_priv(netdev);
@@ -887,12 +917,14 @@ static int emc_setup(struct net_device *netdev)
 	netdev->netdev_ops = &emc_netdev_ops;
 	netdev->ethtool_ops = &emc_ethtool_ops;
 
+	// TODO: really? 16??
 	netdev->tx_queue_len = 16;
-	netdev->dma = 0x0;
 	netdev->watchdog_timeo = TX_TIMEOUT;
 
 	get_mac_address(netdev);
 
+	// TODO: rename fields to make more sense; add diagram
+	// TODO: let kzalloc handle this
 	priv->cur_tx = 0x0;
 	priv->cur_rx = 0x0;
 	priv->finish_tx = 0x0;
@@ -957,8 +989,10 @@ static int emc_probe(struct platform_device *pdev)
 	if (!netdev)
 		return -ENOMEM;
 	netdev->dev.parent = &pdev->dev;
+	platform_set_drvdata(pdev, netdev);
 
 	priv = netdev_priv(netdev);
+	priv->pdev = pdev;
 
 	priv->reg = devm_of_iomap(&pdev->dev, np, 0, &reg_size);
 	if (IS_ERR(priv->reg))
@@ -976,21 +1010,18 @@ static int emc_probe(struct platform_device *pdev)
 	if (priv->rxirq < 0)
 		return dev_err_probe(&pdev->dev, priv->rxirq, "failed to get ether rx irq\n");
 
-	platform_set_drvdata(pdev, netdev);
+	// TODO: NULL? or rather a name?
+	priv->clk_main = devm_clk_get(&pdev->dev, NULL);
+	if (IS_ERR(priv->clk_main))
+		return dev_err_probe(&pdev->dev, PTR_ERR(priv->clk_main), "failed to get ether clock\n");
 
-	priv->clk = devm_clk_get(&pdev->dev, NULL);
-	if (IS_ERR(priv->clk))
-		return dev_err_probe(&pdev->dev, PTR_ERR(priv->clk), "failed to get ether clock\n");
-
-	priv->rmiiclk = devm_clk_get(&pdev->dev, "RMII");
-	if (IS_ERR(priv->rmiiclk))
-		return dev_err_probe(&pdev->dev, PTR_ERR(priv->rmiiclk), "failed to get RMII clock\n");
+	priv->clk_rmii = devm_clk_get(&pdev->dev, "RMII");
+	if (IS_ERR(priv->clk_rmii))
+		return dev_err_probe(&pdev->dev, PTR_ERR(priv->clk_rmii), "failed to get RMII clock\n");
 
 	priv->reset = devm_reset_control_get_optional(&pdev->dev, NULL);
 	if (IS_ERR(priv->reset))
 		return dev_err_probe(&pdev->dev, PTR_ERR(priv->reset), "failed to get reset control\n");
-
-	priv->pdev = pdev;
 
 	emc_setup(netdev);
 
