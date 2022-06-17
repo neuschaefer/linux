@@ -272,6 +272,7 @@ struct ncsi_request {
 	struct nlmsghdr      nlhdr;       /* netlink message header          */
 };
 
+/* Minor device states. For major states see include/net/ncsi.h. */
 enum {
 	ncsi_dev_state_major		= 0xff00,
 	ncsi_dev_state_minor		= 0x00ff,

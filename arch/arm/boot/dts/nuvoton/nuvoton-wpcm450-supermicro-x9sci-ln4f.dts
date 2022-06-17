@@ -103,6 +103,11 @@
 	phy-handle = <&phy>;
 };
 
+&ethernet1 {
+	status = "okay";
+	use-ncsi;
+};
+
 &mdio0 {
 	phy: phy@5 {
 		compatible = "ethernet-phy-ieee802.3-c22";

@@ -437,6 +437,8 @@ static void ncsi_request_timeout(struct timer_list *t)
 	struct ncsi_channel *nc;
 	unsigned long flags;
 
+	pr_info("NC/SI request timeout\n");
+
 	/* If the request already had associated response,
 	 * let the response handler to release it.
 	 */
