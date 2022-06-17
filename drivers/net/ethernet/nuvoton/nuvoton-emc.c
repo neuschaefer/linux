@@ -61,60 +61,69 @@
 #define REG_CRXDSA		0xd4	/* Current Receive Descriptor Start Address Register */
 #define REG_CRXBSA		0xd8	/* Current Receive Buffer Start Address Register */
 
-/* mac controller bit */
-#define MCMDR_RXON		0x01
-#define MCMDR_ACP		(0x01 << 3)
-#define MCMDR_SPCRC		(0x01 << 5)
-#define MCMDR_TXON		(0x01 << 8)
-#define MCMDR_FDUP		(0x01 << 18)
-#define MCMDR_ENMDC		(0x01 << 19)
-#define MCMDR_OPMOD		(0x01 << 20)
-#define SWR			(0x01 << 24)
+/* CAMCMR - CAM Command Regiser */
+#define CAMCMR_AUP		BIT(0)
+#define CAMCMR_AMP		BIT(1)
+#define CAMCMR_ABP		BIT(2)
+#define CAMCMR_CCAM		BIT(3)
+#define CAMCMR_ECMP		BIT(4)
 
-/* cam command regiser */
-#define CAMCMR_AUP		0x01
-#define CAMCMR_AMP		(0x01 << 1)
-#define CAMCMR_ABP		(0x01 << 2)
-#define CAMCMR_CCAM		(0x01 << 3)
-#define CAMCMR_ECMP		(0x01 << 4)
-#define CAM0EN			0x01
+/* CAMEN - CAM Enable Register */
+#define CAMEN_CAM0EN		BIT(0)
 
-/* mac mii controller bit */
-#define MDCCR			(0x0a << 20)
-#define PHYAD			(0x01 << 8)
-#define PHYWR			(0x01 << 16)
-#define PHYBUSY			(0x01 << 17)
-#define PHYPRESP		(0x01 << 18)
 #define CAM_ENTRY_SIZE		0x08
 
+/* MCMDR - MAC Command Register */
+#define MCMDR_RXON		BIT(0)
+#define MCMDR_ACP		BIT(3)
+#define MCMDR_SPCRC		BIT(5)
+#define MCMDR_TXON		BIT(8)
+#define MCMDR_FDUP		BIT(18)
+#define MCMDR_ENMDC		BIT(19)
+#define MCMDR_OPMOD		BIT(20)
+#define MCMDR_SWR		BIT(24)
+
+/* MIIDA - MII Management Control and Address Register */
+#define MIIDA_PHYAD		BIT(8)
+#define MIIDA_PHYWR		BIT(16)
+#define MIIDA_BUSY		BIT(17)
+#define MIIDA_PRESP		BIT(18)
+#define MIIDA_MDCON		BIT(19)
+#define MIIDA_MDCCR_VAL		(0xa << 20)
+
 /* rx and tx status */
-#define TXDS_TXCP		(0x01 << 19)
-#define RXDS_CRCE		(0x01 << 17)
-#define RXDS_PTLE		(0x01 << 19)
-#define RXDS_RXGD		(0x01 << 20)
-#define RXDS_ALIE		(0x01 << 21)
-#define RXDS_RP			(0x01 << 22)
+#define TXDS_TXCP		BIT(19)
+#define RXDS_CRCE		BIT(17)
+#define RXDS_PTLE		BIT(19)
+#define RXDS_RXGD		BIT(20)
+#define RXDS_ALIE		BIT(21)
+#define RXDS_RP			BIT(22)
 
-/* mac interrupt status*/
-#define MISTA_EXDEF		(0x01 << 19)
-#define MISTA_TXBERR		(0x01 << 24)
-#define MISTA_TDU		(0x01 << 23)
-#define MISTA_RDU		(0x01 << 10)
-#define MISTA_RXBERR		(0x01 << 11)
+/* MIEN - MAC Interrupt Enable Register */
+#define MIEN_RXINTR		BIT(0)
+#define MIEN_RXGD		BIT(4)
+#define MIEN_RDU		BIT(10)
+#define MIEN_RXBERR		BIT(11)
+#define MIEN_TXINTR		BIT(16)
+#define MIEN_TXCP		BIT(18)
+#define MIEN_EXDEF		BIT(19)
+#define MIEN_TXABT		BIT(21)
+#define MIEN_TDU		BIT(23)
+#define MIEN_TXBERR		BIT(24)
 
-// unprefixed bits, highly questionable!
-#define ENSTART			0x01
-#define ENRXINTR		0x01
-#define ENRXGD			(0x01 << 4)
-#define ENRXBERR		(0x01 << 11)
-#define ENTXINTR		(0x01 << 16)
-#define ENTXCP			(0x01 << 18)
-#define ENTXABT			(0x01 << 21)
-#define ENTXBERR		(0x01 << 24)
-#define ENMDC			(0x01 << 19)
-#define PHYBUSY			(0x01 << 17)
-#define MDCCR_VAL		0xa00000
+/* MISTA - MAC Interrupt Status Register */
+#define MISTA_RXINTR		MIEN_RXINTR
+#define MISTA_RXGD		MIEN_RXGD
+#define MISTA_RDU		MIEN_RDU
+#define MISTA_RXBERR		MIEN_RXBERR
+#define MISTA_TXINTR		MIEN_TXINTR
+#define MISTA_TXCP		MIEN_TXCP
+#define MISTA_EXDEF		MIEN_EXDEF
+#define MISTA_TXABT		MIEN_TXABT
+#define MISTA_TDU		MIEN_TDU
+#define MISTA_TXBERR		MIEN_TXBERR
 
+// TODO: rename descriptor bits
 /* rx and tx owner bit */
 #define RX_OWEN_DMA		(0x01 << 31)
 #define RX_OWEN_CPU		(~(0x03 << 30))
@@ -127,7 +136,7 @@
 #define PADDINGMODE		0x01
 
 /* fftcr controller bit */
-#define TXTHD 			(0x03 << 8)
+#define TXTHD			(0x03 << 8)
 #define BLENGTH			(0x01 << 20)
 
 /* global setting for driver */
@@ -303,7 +312,7 @@ static void emc_return_default_idle(struct net_device *netdev)
 	unsigned int val;
 
 	val = __raw_readl(priv->reg + REG_MCMDR);
-	val |= SWR;
+	val |= MCMDR_SWR;
 	__raw_writel(val, priv->reg + REG_MCMDR);
 }
 
@@ -311,14 +320,14 @@ static void emc_trigger_rx(struct net_device *netdev)
 {
 	struct emc_priv *priv = netdev_priv(netdev);
 
-	__raw_writel(ENSTART, priv->reg + REG_RSDR);
+	__raw_writel(1, priv->reg + REG_RSDR);
 }
 
 static void emc_trigger_tx(struct net_device *netdev)
 {
 	struct emc_priv *priv = netdev_priv(netdev);
 
-	__raw_writel(ENSTART, priv->reg + REG_TSDR);
+	__raw_writel(1, priv->reg + REG_TSDR);
 }
 
 static void emc_enable_mac_interrupt(struct net_device *netdev)
@@ -326,8 +335,8 @@ static void emc_enable_mac_interrupt(struct net_device *netdev)
 	struct emc_priv *priv = netdev_priv(netdev);
 	unsigned int val;
 
-	val = ENTXINTR | ENRXINTR | ENRXGD | ENTXCP;
-	val |= ENTXBERR | ENRXBERR | ENTXABT;
+	val = MIEN_TXINTR | MIEN_RXINTR | MIEN_RXGD | MIEN_TXCP;
+	val |= MIEN_TXBERR | MIEN_RXBERR | MIEN_TXABT;
 
 	__raw_writel(val, priv->reg + REG_MIEN);
 }
@@ -349,7 +358,7 @@ static void emc_set_global_maccmd(struct net_device *netdev)
 	unsigned int val;
 
 	val = __raw_readl(priv->reg + REG_MCMDR);
-	val |= MCMDR_SPCRC | MCMDR_ENMDC | MCMDR_ACP | ENMDC;
+	val |= MCMDR_SPCRC | MCMDR_ENMDC | MCMDR_ACP;
 	__raw_writel(val, priv->reg + REG_MCMDR);
 }
 
@@ -361,7 +370,7 @@ static void emc_enable_cam(struct net_device *netdev)
 	emc_write_cam(netdev, CAM0, netdev->dev_addr);
 
 	val = __raw_readl(priv->reg + REG_CAMEN);
-	val |= CAM0EN;
+	val |= CAMEN_CAM0EN;
 	__raw_writel(val, priv->reg + REG_CAMEN);
 }
 
@@ -426,7 +435,7 @@ static void emc_reset_mac(struct net_device *netdev)
 
 	// TODO: rm hack
 	u32 val = __raw_readl(priv->reg + REG_MCMDR);
-	val |= ENMDC;
+	val |= MCMDR_ENMDC;
 	__raw_writel(val, priv->reg + REG_MCMDR);
 
 	emc_enable_tx(netdev, 0);
@@ -782,6 +791,7 @@ static const struct net_device_ops emc_netdev_ops = {
 	.ndo_set_mac_address	= emc_set_mac_address,
 };
 
+// TODO: use device_get_ethdev_address
 static void get_mac_address(struct net_device *netdev)
 {
 	struct emc_priv *priv = netdev_priv(netdev);
@@ -813,11 +823,11 @@ static int emc_mdio_write(struct mii_bus *mdio, int phy_id, int reg, u16 data)
 	__raw_writel(data, priv->reg + REG_MIID);
 
 	val = (phy_id << 0x08) | reg;
-	val |= PHYBUSY | PHYWR | MDCCR_VAL;
+	val |= MIIDA_BUSY | MIIDA_PHYWR | MIIDA_MDCCR_VAL;
 	__raw_writel(val, priv->reg + REG_MIIDA);
 
 	for (i = 0; i < DELAY; i++) {
-		if ((__raw_readl(priv->reg + REG_MIIDA) & PHYBUSY) == 0)
+		if ((__raw_readl(priv->reg + REG_MIIDA) & MIIDA_BUSY) == 0)
 			break;
 	}
 
@@ -837,11 +847,11 @@ static int emc_mdio_read(struct mii_bus *mdio, int phy_id, int reg)
 	clk_prepare_enable(priv->clk);
 
 	val = (phy_id << 0x08) | reg;
-	val |= PHYBUSY | MDCCR_VAL;
+	val |= MIIDA_BUSY | MIIDA_MDCCR_VAL;
 	__raw_writel(val, priv->reg + REG_MIIDA);
 
 	for (i = 0; i < DELAY; i++) {
-		if ((__raw_readl(priv->reg + REG_MIIDA) & PHYBUSY) == 0)
+		if ((__raw_readl(priv->reg + REG_MIIDA) & MIIDA_BUSY) == 0)
 			break;
 	}
 
@@ -902,7 +912,7 @@ static int emc_init_mdio(struct emc_priv *priv, struct device_node *np)
 
 	// TODO: rm hack
 	u32 val = __raw_readl(priv->reg + REG_MCMDR);
-	val |= ENMDC;
+	val |= MCMDR_ENMDC;
 	__raw_writel(val, priv->reg + REG_MCMDR);
 
 	res = of_mdiobus_register(mdio, np);
@@ -938,64 +948,48 @@ static int emc_probe(struct platform_device *pdev)
 	priv = netdev_priv(netdev);
 
 	priv->reg = devm_of_iomap(&pdev->dev, np, 0, &reg_size);
-	if (IS_ERR(priv->reg)) {
-		dev_err(&pdev->dev, "failed to map registers: %pe\n", priv->reg);
-		return PTR_ERR(priv->reg);
-	}
-	if (reg_size < 0x100) {
-		dev_err(&pdev->dev, "register window is too small: %#x bytes\n", reg_size);
-		return -EINVAL;
-	}
+	if (IS_ERR(priv->reg))
+		return dev_err_probe(&pdev->dev, PTR_ERR(priv->reg),
+				     "failed to map registers: %pe\n", priv->reg);
+
+	if (reg_size < 0x100)
+		return dev_err_probe(&pdev->dev, -EINVAL, "register window is too small: %#x bytes\n", reg_size);
 
 	priv->txirq = platform_get_irq(pdev, 0);
-	if (priv->txirq < 0) {
-		dev_err(&pdev->dev, "failed to get ether tx irq\n");
-		return -ENXIO;
-	}
+	if (priv->txirq < 0)
+		return dev_err_probe(&pdev->dev, priv->txirq, "failed to get ether tx irq\n");
 
 	priv->rxirq = platform_get_irq(pdev, 1);
-	if (priv->rxirq < 0) {
-		dev_err(&pdev->dev, "failed to get ether rx irq\n");
-		return -ENXIO;
-	}
+	if (priv->rxirq < 0)
+		return dev_err_probe(&pdev->dev, priv->rxirq, "failed to get ether rx irq\n");
 
 	platform_set_drvdata(pdev, netdev);
 
 	priv->clk = devm_clk_get(&pdev->dev, NULL);
-	if (IS_ERR(priv->clk)) {
-		dev_err(&pdev->dev, "failed to get ether clock\n");
-		return PTR_ERR(priv->clk);
-	}
+	if (IS_ERR(priv->clk))
+		return dev_err_probe(&pdev->dev, PTR_ERR(priv->clk), "failed to get ether clock\n");
 
 	priv->rmiiclk = devm_clk_get(&pdev->dev, "RMII");
-	if (IS_ERR(priv->rmiiclk)) {
-		dev_err(&pdev->dev, "failed to get RMII clock\n");
-		return PTR_ERR(priv->rmiiclk);
-	}
+	if (IS_ERR(priv->rmiiclk))
+		return dev_err_probe(&pdev->dev, PTR_ERR(priv->rmiiclk), "failed to get RMII clock\n");
 
 	priv->reset = devm_reset_control_get_optional(&pdev->dev, NULL);
-	if (IS_ERR(priv->reset)) {
-		dev_err(&pdev->dev, "failed to get reset control\n");
-		return PTR_ERR(priv->reset);
-	}
+	if (IS_ERR(priv->reset))
+		return dev_err_probe(&pdev->dev, PTR_ERR(priv->reset), "failed to get reset control\n");
 
 	priv->pdev = pdev;
 
 	emc_setup(netdev);
 
 	error = devm_register_netdev(&pdev->dev, netdev);
-	if (error != 0) {
-		dev_err(&pdev->dev, "Registering Nuvoton EMC FAILED\n");
-		return -ENODEV;
-	}
+	if (error != 0)
+		return dev_err_probe(&pdev->dev, error, "Registering Nuvoton EMC FAILED\n");
 
 	emc_init_mdio(priv, of_get_child_by_name(np, "mdio"));
 
 	if (np && of_get_property(np, "use-ncsi", NULL)) {
-		if (!IS_ENABLED(CONFIG_NET_NCSI)) {
-			dev_err(&pdev->dev, "NCSI stack not enabled\n");
-			return -EINVAL;
-		}
+		if (!IS_ENABLED(CONFIG_NET_NCSI))
+			return dev_err_probe(&pdev->dev, -EINVAL, "NCSI stack not enabled\n");
 
 		dev_info(&pdev->dev, "Using NCSI interface\n");
 		priv->ncsi = ncsi_register_dev(netdev, emc_ncsi_handler);
