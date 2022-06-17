@@ -390,6 +390,7 @@ found:
 void ncsi_free_request(struct ncsi_request *nr)
 {
 	struct ncsi_dev_priv *ndp = nr->ndp;
+	struct ncsi_dev *nd = &ndp->ndev;
 	struct sk_buff *cmd, *rsp;
 	unsigned long flags;
 	bool driven;
@@ -408,8 +409,10 @@ void ncsi_free_request(struct ncsi_request *nr)
 	driven = !!(nr->flags & NCSI_REQ_FLAG_EVENT_DRIVEN);
 	spin_unlock_irqrestore(&ndp->lock, flags);
 
-	if (driven && cmd && --ndp->pending_req_num == 0)
+	if (driven && cmd && --ndp->pending_req_num == 0) {
+		pr_info("%s: schedule_work, state=%#x, cmd=%p, pending_req_num=%d\n", __func__, nd->state, cmd, ndp->pending_req_num);
 		schedule_work(&ndp->work);
+	}
 
 	/* Release command and response */
 	consume_skb(cmd);
@@ -1050,8 +1053,10 @@ static void ncsi_configure_channel(struct ncsi_dev_priv *ndp)
 			nca.type = NCSI_PKT_CMD_OEM;
 			ret = ncsi_gma_handler(&nca, nc->version.mf_id);
 		}
-		if (ret < 0)
+		if (ret < 0) {
+			pr_info("%s: schedule_work, state=%#x\n", __func__, nd->state);
 			schedule_work(&ndp->work);
+		}
 
 		break;
 	case ncsi_dev_state_config_clear_vids:
@@ -1074,6 +1079,7 @@ static void ncsi_configure_channel(struct ncsi_dev_priv *ndp)
 			ret = clear_one_vid(ndp, nc, &nca);
 			if (ret) {
 				nd->state = ncsi_dev_state_config_svf;
+				pr_info("%s: schedule_work, state=%#x\n", __func__, nd->state);
 				schedule_work(&ndp->work);
 				break;
 			}
@@ -1084,6 +1090,7 @@ static void ncsi_configure_channel(struct ncsi_dev_priv *ndp)
 			ret = set_one_vid(ndp, nc, &nca);
 			if (ret) {
 				nd->state = ncsi_dev_state_config_ev;
+				pr_info("%s: schedule_work, state=%#x\n", __func__, nd->state);
 				schedule_work(&ndp->work);
 				break;
 			}
@@ -1391,6 +1398,7 @@ static void ncsi_probe_channel(struct ncsi_dev_priv *ndp)
 		if (!ndp->active_package) {
 			/* No response */
 			nd->state = ncsi_dev_state_probe_dp;
+			pr_info("%s: schedule_work, state=%#x\n", __func__, nd->state);
 			schedule_work(&ndp->work);
 			break;
 		}
@@ -1399,6 +1407,7 @@ static void ncsi_probe_channel(struct ncsi_dev_priv *ndp)
 		    ndp->mlx_multi_host)
 			nd->state = ncsi_dev_state_probe_mlx_gma;
 
+		pr_info("%s: schedule_work, state=%#x\n", __func__, nd->state);
 		schedule_work(&ndp->work);
 		break;
 	case ncsi_dev_state_probe_mlx_gma:
@@ -1530,6 +1539,9 @@ static void ncsi_dev_work(struct work_struct *work)
 	struct ncsi_dev *nd = &ndp->ndev;
 
 	switch (nd->state & ncsi_dev_state_major) {
+	case ncsi_dev_state_functional:
+		/* nothing to do. */
+		break;
 	case ncsi_dev_state_probe:
 		ncsi_probe_channel(ndp);
 		break;
@@ -1817,6 +1829,7 @@ int ncsi_start_dev(struct ncsi_dev *nd)
 		ndp->package_probe_id = 0;
 		nd->state = ncsi_dev_state_probe;
 		schedule_work(&ndp->work);
+		pr_info("%s: schedule_work, state=%#x\n", __func__, nd->state);
 		return 0;
 	}
 
@@ -1938,6 +1951,7 @@ int ncsi_reset_dev(struct ncsi_dev *nd)
 	spin_unlock_irqrestore(&ndp->lock, flags);
 
 	nd->state = ncsi_dev_state_suspend;
+	pr_info("%s: schedule_work, state=%#x\n", __func__, nd->state);
 	schedule_work(&ndp->work);
 	return 0;
 }

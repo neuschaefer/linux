@@ -786,6 +786,7 @@ static int ncsi_rsp_handler_gvi(struct ncsi_request *nr)
 	for (i = 0; i < ARRAY_SIZE(ncv->pci_ids); i++)
 		ncv->pci_ids[i] = ntohs(rsp->pci_ids[i]);
 	ncv->mf_id = ntohl(rsp->mf_id);
+	pr_info("%s: got mfid=%#x\n", __func__, ncv->mf_id);
 
 	return 0;
 }

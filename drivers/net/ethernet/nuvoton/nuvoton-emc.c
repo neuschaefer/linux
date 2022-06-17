@@ -222,6 +222,20 @@ static void emc_link_change(struct net_device *netdev)
 	__raw_writel(val, priv->reg + REG_MCMDR);
 }
 
+static void emc_set_link_mode_for_ncsi(struct net_device *netdev)
+{
+	struct emc_priv *priv = netdev_priv(netdev);
+	unsigned int val;
+
+	val = __raw_readl(priv->reg + REG_MCMDR);
+
+	/* Force 100 Mbit/s and full duplex */
+	val |= MCMDR_OPMOD | MCMDR_FDUP;
+
+	__raw_writel(val, priv->reg + REG_MCMDR);
+}
+
+
 static void emc_write_cam(struct net_device *netdev,
 				unsigned int x, const unsigned char *pval)
 {
@@ -342,13 +356,11 @@ static void emc_enable_mac_interrupt(struct net_device *netdev)
 }
 
 static void emc_get_and_clear_int(struct net_device *netdev,
-							unsigned int *val)
+				  unsigned int mask, unsigned int *val)
 {
 	struct emc_priv *priv = netdev_priv(netdev);
 
-	// TODO: clear interrupts selectively, so we don't clear TX interrupts in the RX ISR
-	//       (add mask param)
-	*val = __raw_readl(priv->reg + REG_MISTA);
+	*val = __raw_readl(priv->reg + REG_MISTA) & mask;
 	__raw_writel(*val, priv->reg + REG_MISTA);
 }
 
@@ -569,7 +581,7 @@ static irqreturn_t emc_tx_interrupt(int irq, void *dev_id)
 	priv = netdev_priv(netdev);
 	pdev = priv->pdev;
 
-	emc_get_and_clear_int(netdev, &status);
+	emc_get_and_clear_int(netdev, MISTA_TXBERR | MISTA_TDU | MISTA_TXCP, &status);
 
 	cur_entry = __raw_readl(priv->reg + REG_CTXDSA);
 
@@ -693,7 +705,7 @@ static irqreturn_t emc_rx_interrupt(int irq, void *dev_id)
 	priv = netdev_priv(netdev);
 	pdev = priv->pdev;
 
-	emc_get_and_clear_int(netdev, &status);
+	emc_get_and_clear_int(netdev, MISTA_RXGD, &status);
 
 	if (status & MISTA_RDU) {
 		emc_netdev_rx(netdev);
@@ -746,6 +758,7 @@ static int emc_open(struct net_device *netdev)
 	if (priv->phy)
 		phy_start(priv->phy);
 	else if (priv->ncsi) {
+		emc_set_link_mode_for_ncsi(netdev);
 		netif_carrier_on(netdev);
 
 		int err = ncsi_start_dev(priv->ncsi);
@@ -915,7 +928,7 @@ static int emc_init_mdio(struct emc_priv *priv, struct device_node *np)
 	val |= MCMDR_ENMDC;
 	__raw_writel(val, priv->reg + REG_MCMDR);
 
-	res = of_mdiobus_register(mdio, np);
+	res = devm_of_mdiobus_register(&pdev->dev, mdio, np);
 	if (res) {
 		dev_info(&pdev->dev, "failed to register MDIO bus: %d\n", res);
 		return res;
