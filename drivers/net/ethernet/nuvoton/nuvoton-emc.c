@@ -48,9 +48,8 @@
 
 /*
  * TODO:
- * - move away from __raw_ functions maybe
  * - implement copy-less TX/RX DMA
- * - less printk, better messages
+ * - less dev_*, better messages
  * - set DMARFC
  * - locking??
  * - napi
@@ -245,7 +244,7 @@ static void emc_link_change(struct net_device *netdev)
 	struct phy_device *phydev = netdev->phydev;
 	unsigned int val;
 
-	val = __raw_readl(priv->reg + REG_MCMDR);
+	val = readl(priv->reg + REG_MCMDR);
 
 	if (phydev->speed == 100)
 		val |= MCMDR_OPMOD;
@@ -257,19 +256,19 @@ static void emc_link_change(struct net_device *netdev)
 	else
 		val &= ~MCMDR_FDUP;
 
-	__raw_writel(val, priv->reg + REG_MCMDR);
+	writel(val, priv->reg + REG_MCMDR);
 }
 
 static void emc_set_link_mode_for_ncsi(struct emc_priv *priv)
 {
 	unsigned int val;
 
-	val = __raw_readl(priv->reg + REG_MCMDR);
+	val = readl(priv->reg + REG_MCMDR);
 
 	/* Force 100 Mbit/s and full duplex */
 	val |= MCMDR_OPMOD | MCMDR_FDUP;
 
-	__raw_writel(val, priv->reg + REG_MCMDR);
+	writel(val, priv->reg + REG_MCMDR);
 }
 
 static void emc_write_cam(struct emc_priv *priv,
@@ -280,8 +279,8 @@ static void emc_write_cam(struct emc_priv *priv,
 	msw = (addr[0] << 24) | (addr[1] << 16) | (addr[2] << 8) | addr[3];
 	lsw = (addr[4] << 24) | (addr[5] << 16);
 
-	__raw_writel(msw, priv->reg + REG_CAMM_BASE + index * CAM_ENTRY_SIZE);
-	__raw_writel(lsw, priv->reg + REG_CAML_BASE + index * CAM_ENTRY_SIZE);
+	writel(msw, priv->reg + REG_CAMM_BASE + index * CAM_ENTRY_SIZE);
+	writel(lsw, priv->reg + REG_CAML_BASE + index * CAM_ENTRY_SIZE);
 }
 
 static int emc_init_desc(struct emc_priv *priv)
@@ -345,7 +344,7 @@ static void emc_set_fifo_threshold(struct emc_priv *priv)
 	unsigned int val;
 
 	val = FFTCR_TXTHD | FFTCR_BLENGTH;
-	__raw_writel(val, priv->reg + REG_FFTCR);
+	writel(val, priv->reg + REG_FFTCR);
 }
 
 static void emc_reset(struct emc_priv *priv)
@@ -353,23 +352,23 @@ static void emc_reset(struct emc_priv *priv)
 	unsigned int val;
 
 	/* Trigger reset */
-	val = __raw_readl(priv->reg + REG_MCMDR);
+	val = readl(priv->reg + REG_MCMDR);
 	val |= MCMDR_SWR;
-	__raw_writel(val, priv->reg + REG_MCMDR);
+	writel(val, priv->reg + REG_MCMDR);
 
 	/* Wait for completion */
-	while (__raw_readl(priv->reg + REG_MCMDR) & MCMDR_SWR)
+	while (readl(priv->reg + REG_MCMDR) & MCMDR_SWR)
 		;
 }
 
 static void emc_trigger_rx(struct emc_priv *priv)
 {
-	__raw_writel(1, priv->reg + REG_RSDR);
+	writel(1, priv->reg + REG_RSDR);
 }
 
 static void emc_trigger_tx(struct emc_priv *priv)
 {
-	__raw_writel(1, priv->reg + REG_TSDR);
+	writel(1, priv->reg + REG_TSDR);
 }
 
 static void emc_enable_interrupts(struct emc_priv *priv)
@@ -379,35 +378,35 @@ static void emc_enable_interrupts(struct emc_priv *priv)
 	val = MIEN_TXINTR | MIEN_RXINTR | MIEN_RXGD | MIEN_TXCP;
 	val |= MIEN_TXBERR | MIEN_RXBERR | MIEN_TXABT;
 
-	__raw_writel(val, priv->reg + REG_MIEN);
+	writel(val, priv->reg + REG_MIEN);
 }
 
 static void emc_get_and_clear_int(struct emc_priv *priv,
 				  unsigned int mask, unsigned int *val)
 {
-	*val = __raw_readl(priv->reg + REG_MISTA) & mask;
-	__raw_writel(*val, priv->reg + REG_MISTA);
+	*val = readl(priv->reg + REG_MISTA) & mask;
+	writel(*val, priv->reg + REG_MISTA);
 }
 
 static void emc_init_mcmdr(struct emc_priv *priv)
 {
 	unsigned int val;
 
-	val = __raw_readl(priv->reg + REG_MCMDR);
+	val = readl(priv->reg + REG_MCMDR);
 	val |= MCMDR_SPCRC | MCMDR_ACP;
-	__raw_writel(val, priv->reg + REG_MCMDR);
+	writel(val, priv->reg + REG_MCMDR);
 }
 
 static void emc_enable_mdio(struct emc_priv *priv, bool enable)
 {
 	unsigned int val;
 
-	val = __raw_readl(priv->reg + REG_MCMDR);
+	val = readl(priv->reg + REG_MCMDR);
 	if (enable)
 		val |= MCMDR_ENMDC;
 	else
 		val &= ~MCMDR_ENMDC;
-	__raw_writel(val, priv->reg + REG_MCMDR);
+	writel(val, priv->reg + REG_MCMDR);
 }
 
 static void emc_init_cam(struct net_device *netdev)
@@ -417,32 +416,32 @@ static void emc_init_cam(struct net_device *netdev)
 
 	emc_write_cam(priv, 0, netdev->dev_addr);
 
-	val = __raw_readl(priv->reg + REG_CAMEN);
+	val = readl(priv->reg + REG_CAMEN);
 	val |= CAMEN_CAM0EN;
-	__raw_writel(val, priv->reg + REG_CAMEN);
+	writel(val, priv->reg + REG_CAMEN);
 
 	val = CAMCMR_ECMP | CAMCMR_ABP | CAMCMR_AMP;
-	__raw_writel(val, priv->reg + REG_CAMCMR);
+	writel(val, priv->reg + REG_CAMCMR);
 }
 
 static void emc_enable_rxtx(struct emc_priv *priv, bool enable)
 {
 	unsigned int val;
 
-	val = __raw_readl(priv->reg + REG_MCMDR);
+	val = readl(priv->reg + REG_MCMDR);
 
 	if (enable)
 		val |= MCMDR_RXON | MCMDR_TXON;
 	else
 		val &= ~(MCMDR_RXON | MCMDR_TXON);
 
-	__raw_writel(val, priv->reg + REG_MCMDR);
+	writel(val, priv->reg + REG_MCMDR);
 }
 
 static void emc_set_descriptors(struct emc_priv *priv)
 {
-	__raw_writel(priv->rx_queue_phys, priv->reg + REG_RXDLSA);
-	__raw_writel(priv->tx_queue_phys, priv->reg + REG_TXDLSA);
+	writel(priv->rx_queue_phys, priv->reg + REG_RXDLSA);
+	writel(priv->tx_queue_phys, priv->reg + REG_TXDLSA);
 }
 
 static int emc_set_mac_address(struct net_device *netdev, void *addr)
@@ -549,7 +548,7 @@ static irqreturn_t emc_tx_interrupt(int irq, void *dev_id)
 
 	emc_get_and_clear_int(priv, MISTA_TX_MASK, &status);
 
-	cur_entry = __raw_readl(priv->reg + REG_CTXDSA);
+	cur_entry = readl(priv->reg + REG_CTXDSA);
 
 	entry = priv->tx_queue_phys +
 		offsetof(struct emc_tx_queue, desclist[priv->finish_tx]);
@@ -614,7 +613,7 @@ static void emc_netdev_rx(struct net_device *netdev)
 	rx_desc = &priv->rx_queue->desclist[priv->cur_rx];
 
 	do {
-		val = __raw_readl(priv->reg + REG_CRXDSA);
+		val = readl(priv->reg + REG_CRXDSA);
 
 		entry = priv->rx_queue_phys +
 			offsetof(struct emc_rx_queue, desclist[priv->cur_rx]);
@@ -780,7 +779,7 @@ static void emc_set_rx_mode(struct net_device *netdev)
 		 */
 		rx_mode = CAMCMR_ECMP | CAMCMR_ABP;
 	}
-	__raw_writel(rx_mode, priv->reg + REG_CAMCMR);
+	writel(rx_mode, priv->reg + REG_CAMCMR);
 }
 
 static void emc_get_drvinfo(struct net_device *netdev,
@@ -821,14 +820,14 @@ static int emc_mdio_write(struct mii_bus *mdio, int phy_id, int reg, u16 data)
 	clk_prepare_enable(priv->clk_main);
 	emc_enable_mdio(priv, true);
 
-	__raw_writel(data, priv->reg + REG_MIID);
+	writel(data, priv->reg + REG_MIID);
 
 	val = (phy_id << 0x08) | reg;
 	val |= MIIDA_BUSY | MIIDA_PHYWR | MIIDA_MDCCR_VAL;
-	__raw_writel(val, priv->reg + REG_MIIDA);
+	writel(val, priv->reg + REG_MIIDA);
 
 	for (i = 0; i < MDIO_RETRIES; i++) {
-		if ((__raw_readl(priv->reg + REG_MIIDA) & MIIDA_BUSY) == 0)
+		if ((readl(priv->reg + REG_MIIDA) & MIIDA_BUSY) == 0)
 			break;
 	}
 
@@ -851,10 +850,10 @@ static int emc_mdio_read(struct mii_bus *mdio, int phy_id, int reg)
 
 	val = (phy_id << 0x08) | reg;
 	val |= MIIDA_BUSY | MIIDA_MDCCR_VAL;
-	__raw_writel(val, priv->reg + REG_MIIDA);
+	writel(val, priv->reg + REG_MIIDA);
 
 	for (i = 0; i < MDIO_RETRIES; i++) {
-		if ((__raw_readl(priv->reg + REG_MIIDA) & MIIDA_BUSY) == 0)
+		if ((readl(priv->reg + REG_MIIDA) & MIIDA_BUSY) == 0)
 			break;
 	}
 
@@ -862,7 +861,7 @@ static int emc_mdio_read(struct mii_bus *mdio, int phy_id, int reg)
 		dev_warn(&mdio->dev, "MDIO read timed out\n");
 		data = 0xffff;
 	} else {
-		data = __raw_readl(priv->reg + REG_MIID);
+		data = readl(priv->reg + REG_MIID);
 	}
 
 	emc_enable_mdio(priv, false);
