@@ -51,6 +51,13 @@
 		clock-div = <2>;
 	};
 
+	rmii_clk: clock-50mhz {
+		/* 50 MHz oscillator for RMII */
+		compatible = "fixed-clock";
+		clock-frequency = <50000000>;
+		#clock-cells = <0>;
+	};
+
 	soc {
 		compatible = "simple-bus";
 		#address-cells = <1>;
@@ -70,6 +77,42 @@
 			clock-names = "ref";
 			#clock-cells = <1>;
 			#reset-cells = <1>;
+		};
+
+		ethernet0: ethernet@b0002000 {
+			compatible = "nuvoton,wpcm450-emc";
+			reg = <0xb0002000 0x1000>;
+			pinctrl-names = "default";
+			pinctrl-0 = <&r1err_pins>, <&r1md_pins>;
+			interrupts = <16 IRQ_TYPE_LEVEL_HIGH>,
+				     <15 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&clk WPCM450_CLK_EMC0>, <&rmii_clk>;
+			clock-names = "main", "RMII";
+			resets = <&clk WPCM450_RESET_EMC0>;
+			status = "disabled";
+
+			mdio0: mdio {
+				#address-cells = <1>;
+				#size-cells = <0>;
+			};
+		};
+
+		ethernet1: ethernet@b0003000 {
+			compatible = "nuvoton,wpcm450-emc";
+			reg = <0xb0003000 0x1000>;
+			pinctrl-names = "default";
+			pinctrl-0 = <&r2err_pins>, <&r2md_pins>;
+			interrupts = <18 IRQ_TYPE_LEVEL_HIGH>,
+				     <17 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&clk WPCM450_CLK_EMC1>, <&rmii_clk>;
+			clock-names = "main", "RMII";
+			resets = <&clk WPCM450_RESET_EMC1>;
+			status = "disabled";
+
+			mdio1: mdio {
+				#address-cells = <1>;
+				#size-cells = <0>;
+			};
 		};
 
 		serial0: serial@b8000000 {
