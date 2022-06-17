@@ -48,8 +48,6 @@
 
 /*
  * TODO:
- * - merge short functions called from _open into one function
- *   - and/or change parameter to *priv
  * - change fields in emc_.x_desc to __le32
  * - move away from __raw_ functions maybe
  * - implement copy-less TX/RX DMA
@@ -449,36 +447,6 @@ static void emc_set_descriptors(struct emc_priv *priv)
 	__raw_writel(priv->tx_queue_phys, priv->reg + REG_TXDLSA);
 }
 
-static void emc_init_mac(struct net_device *netdev)
-{
-	struct emc_priv *priv = netdev_priv(netdev);
-
-	emc_enable_rxtx(priv, false);
-	emc_set_fifo_threshold(priv);
-	emc_reset(priv);
-
-	if (!netif_queue_stopped(netdev))
-		netif_stop_queue(netdev);
-
-	emc_init_desc(priv);
-
-	netif_trans_update(netdev); /* prevent tx timeout */
-	priv->cur_tx = 0x0;
-	priv->finish_tx = 0x0;
-	priv->cur_rx = 0x0;
-
-	emc_set_descriptors(priv);
-	emc_init_cam(netdev);
-	emc_enable_interrupts(priv);
-	emc_enable_rxtx(priv, true);
-	emc_trigger_rx(priv);
-
-	netif_trans_update(netdev); /* prevent tx timeout */
-
-	if (netif_queue_stopped(netdev))
-		netif_wake_queue(netdev);
-}
-
 static int emc_set_mac_address(struct net_device *netdev, void *addr)
 {
 	struct emc_priv *priv = netdev_priv(netdev);
@@ -545,7 +513,6 @@ static int emc_send_frame(struct net_device *netdev,
 	tx_desc->sl = length & 0xffff;
 	tx_desc->mode = TX_OWNER_EMC | TX_PADEN | TX_CRCAPP | TX_INTEN;
 
-	//emc_enable_tx(netdev, true); // TODO: enable in open/reset
 	emc_trigger_tx(priv);
 
 	if (++priv->cur_tx >= TX_QUEUE_SIZE)
@@ -619,7 +586,6 @@ static irqreturn_t emc_tx_interrupt(int irq, void *dev_id)
 		dev_err(&pdev->dev, "emc defer exceed interrupt\n");
 	} else if (status & MISTA_TXBERR) {
 		dev_err(&pdev->dev, "TX bus error!\n");
-		emc_init_mac(netdev);
 	}
 
 	return IRQ_HANDLED;
@@ -728,7 +694,6 @@ static irqreturn_t emc_rx_interrupt(int irq, void *dev_id)
 		return IRQ_HANDLED;
 	} else if (status & MISTA_RXBERR) {
 		dev_err(&pdev->dev, "RX bus error!\n");
-		emc_init_mac(netdev);
 	}
 
 	emc_netdev_rx(netdev);
@@ -744,14 +709,17 @@ static int emc_open(struct net_device *netdev)
 	clk_prepare_enable(priv->clk_main);
 	clk_prepare_enable(priv->clk_rmii);
 
-	// TODO: deal with duplication between emc_init_mac and emc_open
+	priv->cur_tx = 0x0;
+	priv->finish_tx = 0x0;
+	priv->cur_rx = 0x0;
 
-	emc_init_mac(netdev);
+	emc_reset(priv);
+	emc_init_desc(priv);
 	emc_set_fifo_threshold(priv);
 	emc_set_descriptors(priv);
 	emc_init_cam(netdev);
-	emc_enable_interrupts(priv);
 	emc_init_mcmdr(priv);
+	emc_enable_interrupts(priv);
 	emc_enable_rxtx(priv, true);
 
 	if (request_irq(priv->txirq, emc_tx_interrupt, 0x0, pdev->name, netdev)) {
