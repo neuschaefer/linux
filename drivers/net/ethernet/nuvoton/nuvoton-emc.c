@@ -48,10 +48,8 @@
 
 /*
  * TODO:
- * - change fields in emc_.x_desc to __le32
  * - move away from __raw_ functions maybe
  * - implement copy-less TX/RX DMA
- * - make it short, maybe 700 lines? :)
  * - less printk, better messages
  * - set DMARFC
  * - locking??
@@ -192,18 +190,18 @@
 
 /* Receive buffer descriptor */
 struct emc_rx_desc {
-	unsigned int sl;
-	unsigned int buffer;
-	unsigned int reserved;
-	unsigned int next;
+	__le32 sl;
+	__le32 buffer;
+	__le32 reserved;
+	__le32 next;
 };
 
 /* Transmit buffer descriptor */
 struct emc_tx_desc {
-	unsigned int mode;
-	unsigned int buffer;
-	unsigned int sl;
-	unsigned int next;
+	__le32 mode;
+	__le32 buffer;
+	__le32 sl;
+	__le32 next;
 };
 
 /* Hardware queue (RX) */
@@ -316,11 +314,11 @@ static int emc_init_desc(struct emc_priv *priv)
 		else
 			offset = offsetof(struct emc_tx_queue, desclist[i + 1]);
 
-		tx_desc->next = priv->tx_queue_phys + offset;
-		tx_desc->buffer = priv->tx_queue_phys +
-			offsetof(struct emc_tx_queue, buf[i]);
-		tx_desc->sl = 0;
-		tx_desc->mode = TX_OWNER_CPU;
+		tx_desc->next = cpu_to_le32(priv->tx_queue_phys + offset);
+		tx_desc->buffer = cpu_to_le32(priv->tx_queue_phys +
+			offsetof(struct emc_tx_queue, buf[i]));
+		tx_desc->sl = cpu_to_le32(0);
+		tx_desc->mode = cpu_to_le32(TX_OWNER_CPU);
 	}
 
 	for (i = 0; i < RX_QUEUE_SIZE; i++) {
@@ -333,10 +331,10 @@ static int emc_init_desc(struct emc_priv *priv)
 		else
 			offset = offsetof(struct emc_rx_queue, desclist[i + 1]);
 
-		rx_desc->next = priv->rx_queue_phys + offset;
-		rx_desc->sl = RX_OWNER_EMC;
-		rx_desc->buffer = priv->rx_queue_phys +
-			offsetof(struct emc_rx_queue, buf[i]);
+		rx_desc->next = cpu_to_le32(priv->rx_queue_phys + offset);
+		rx_desc->sl = cpu_to_le32(RX_OWNER_EMC);
+		rx_desc->buffer = cpu_to_le32(priv->rx_queue_phys +
+			offsetof(struct emc_rx_queue, buf[i]));
 	}
 
 	return 0;
@@ -510,8 +508,8 @@ static int emc_send_frame(struct net_device *netdev,
 
 	memcpy(buffer, data, length);
 
-	tx_desc->sl = length & 0xffff;
-	tx_desc->mode = TX_OWNER_EMC | TX_PADEN | TX_CRCAPP | TX_INTEN;
+	tx_desc->sl = cpu_to_le32(length & 0xffff);
+	tx_desc->mode = cpu_to_le32(TX_OWNER_EMC | TX_PADEN | TX_CRCAPP | TX_INTEN);
 
 	emc_trigger_tx(priv);
 
@@ -519,7 +517,7 @@ static int emc_send_frame(struct net_device *netdev,
 		priv->cur_tx = 0;
 
 	tx_desc = &priv->tx_queue->desclist[priv->cur_tx];
-	if ((tx_desc->mode & TX_OWNER_MASK) == TX_OWNER_EMC)
+	if ((le32_to_cpu(tx_desc->mode) & TX_OWNER_MASK) == TX_OWNER_EMC)
 		netif_stop_queue(netdev);
 
 	return 0;
@@ -562,9 +560,9 @@ static irqreturn_t emc_tx_interrupt(int irq, void *dev_id)
 		if (++priv->finish_tx >= TX_QUEUE_SIZE)
 			priv->finish_tx = 0;
 
-		if (tx_desc->sl & TX_STATUS_TXCP) {
+		if (le32_to_cpu(tx_desc->sl) & TX_STATUS_TXCP) {
 			netdev->stats.tx_packets++;
-			netdev->stats.tx_bytes += tx_desc->sl & 0xffff;
+			netdev->stats.tx_bytes += le32_to_cpu(tx_desc->sl) & 0xffff;
 		} else {
 			netdev->stats.tx_errors++;
 		}
@@ -624,7 +622,7 @@ static void emc_netdev_rx(struct net_device *netdev)
 		if (val == entry)
 			break;
 
-		status = rx_desc->sl;
+		status = le32_to_cpu(rx_desc->sl);
 		length = status & 0xffff;
 
 		if (status & RX_STATUS_RXGD) {
@@ -660,8 +658,8 @@ static void emc_netdev_rx(struct net_device *netdev)
 			}
 		}
 
-		rx_desc->sl = RX_OWNER_EMC;
-		rx_desc->reserved = 0x0;
+		rx_desc->sl = cpu_to_le32(RX_OWNER_EMC);
+		rx_desc->reserved = cpu_to_le32(0);
 
 		if (++priv->cur_rx >= RX_QUEUE_SIZE)
 			priv->cur_rx = 0;
@@ -744,7 +742,7 @@ static int emc_open(struct net_device *netdev)
 
 		err = ncsi_start_dev(priv->ncsi);
 		if (err)
-			pr_warn("NC/SI failed, %d\n", err);
+			dev_warn(&pdev->dev, "NC/SI failed, %d\n", err);
 	}
 
 	return 0;
