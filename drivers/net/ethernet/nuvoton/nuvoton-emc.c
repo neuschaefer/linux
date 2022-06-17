@@ -142,8 +142,8 @@
 #define TX_STATUS_TXCP		BIT(19)
 
 /* global setting for driver */
-#define RX_DESC_SIZE		50  /* TODO: rename; SIZE doesn't quite fit */
-#define TX_DESC_SIZE		10
+#define RX_QUEUE_SIZE		50
+#define TX_QUEUE_SIZE		10
 #define MAX_RBUFF_SZ		0x600 /* TODO: MAX_RX_FRAME or something */
 #define MAX_TBUFF_SZ		0x600
 #define TX_TIMEOUT		(HZ/2)
@@ -165,14 +165,16 @@ struct emc_tx_desc {
 	unsigned int next;
 };
 
-struct emc_rx_descs {
-	struct emc_rx_desc desclist[RX_DESC_SIZE];
-	char buf[RX_DESC_SIZE][MAX_RBUFF_SZ];
+/* Hardware queue (RX) */
+struct emc_rx_queue {
+	struct emc_rx_desc desclist[RX_QUEUE_SIZE];
+	char buf[RX_QUEUE_SIZE][MAX_RBUFF_SZ];
 };
 
-struct emc_tx_descs {
-	struct emc_tx_desc desclist[TX_DESC_SIZE];
-	char buf[TX_DESC_SIZE][MAX_TBUFF_SZ];
+/* Hardware queue (TX) */
+struct emc_tx_queue {
+	struct emc_tx_desc desclist[TX_QUEUE_SIZE];
+	char buf[TX_QUEUE_SIZE][MAX_TBUFF_SZ];
 };
 
 struct emc_priv {
@@ -189,10 +191,10 @@ struct emc_priv {
 
 	/* hardware details */
 	void __iomem *reg;
-	struct emc_rx_descs *rx_descs;
-	struct emc_tx_descs *tx_descs;
-	dma_addr_t rx_descs_phys;
-	dma_addr_t tx_descs_phys;
+	struct emc_rx_queue *rx_queue;
+	struct emc_tx_queue *tx_queue;
+	dma_addr_t rx_queue_phys;
+	dma_addr_t tx_queue_phys;
 	unsigned int cur_tx;
 	unsigned int cur_rx;
 	unsigned int finish_tx;
@@ -251,50 +253,50 @@ static int emc_init_desc(struct emc_priv *priv)
 	struct emc_rx_desc *rx_desc;
 	unsigned int i;
 
-	priv->tx_descs = dma_alloc_coherent(&pdev->dev, sizeof(struct emc_tx_descs),
-					  &priv->tx_descs_phys, GFP_KERNEL);
-	if (!priv->tx_descs)
+	priv->tx_queue = dma_alloc_coherent(&pdev->dev, sizeof(struct emc_tx_queue),
+					  &priv->tx_queue_phys, GFP_KERNEL);
+	if (!priv->tx_queue)
 		return -ENOMEM;
 
-	priv->rx_descs = dma_alloc_coherent(&pdev->dev, sizeof(struct emc_rx_descs),
-					  &priv->rx_descs_phys, GFP_KERNEL);
-	if (!priv->rx_descs) {
-		dma_free_coherent(&pdev->dev, sizeof(struct emc_tx_descs),
-				  priv->tx_descs, priv->tx_descs_phys);
+	priv->rx_queue = dma_alloc_coherent(&pdev->dev, sizeof(struct emc_rx_queue),
+					  &priv->rx_queue_phys, GFP_KERNEL);
+	if (!priv->rx_queue) {
+		dma_free_coherent(&pdev->dev, sizeof(struct emc_tx_queue),
+				  priv->tx_queue, priv->tx_queue_phys);
 		return -ENOMEM;
 	}
 
-	for (i = 0; i < TX_DESC_SIZE; i++) {
+	for (i = 0; i < TX_QUEUE_SIZE; i++) {
 		unsigned int offset;
 
-		tx_desc = &(priv->tx_descs->desclist[i]);
+		tx_desc = &(priv->tx_queue->desclist[i]);
 
-		if (i == TX_DESC_SIZE - 1)
-			offset = offsetof(struct emc_tx_descs, desclist[0]);
+		if (i == TX_QUEUE_SIZE - 1)
+			offset = offsetof(struct emc_tx_queue, desclist[0]);
 		else
-			offset = offsetof(struct emc_tx_descs, desclist[i + 1]);
+			offset = offsetof(struct emc_tx_queue, desclist[i + 1]);
 
-		tx_desc->next = priv->tx_descs_phys + offset;
-		tx_desc->buffer = priv->tx_descs_phys +
-			offsetof(struct emc_tx_descs, buf[i]);
+		tx_desc->next = priv->tx_queue_phys + offset;
+		tx_desc->buffer = priv->tx_queue_phys +
+			offsetof(struct emc_tx_queue, buf[i]);
 		tx_desc->sl = 0;
 		tx_desc->mode = 0;
 	}
 
-	for (i = 0; i < RX_DESC_SIZE; i++) {
+	for (i = 0; i < RX_QUEUE_SIZE; i++) {
 		unsigned int offset;
 
-		rx_desc = &(priv->rx_descs->desclist[i]);
+		rx_desc = &(priv->rx_queue->desclist[i]);
 
-		if (i == RX_DESC_SIZE - 1)
-			offset = offsetof(struct emc_rx_descs, desclist[0]);
+		if (i == RX_QUEUE_SIZE - 1)
+			offset = offsetof(struct emc_rx_queue, desclist[0]);
 		else
-			offset = offsetof(struct emc_rx_descs, desclist[i + 1]);
+			offset = offsetof(struct emc_rx_queue, desclist[i + 1]);
 
-		rx_desc->next = priv->rx_descs_phys + offset;
+		rx_desc->next = priv->rx_queue_phys + offset;
 		rx_desc->sl = RX_OWNER_EMC;
-		rx_desc->buffer = priv->rx_descs_phys +
-			offsetof(struct emc_rx_descs, buf[i]);
+		rx_desc->buffer = priv->rx_queue_phys +
+			offsetof(struct emc_rx_queue, buf[i]);
 	}
 
 	return 0;
@@ -392,8 +394,8 @@ static void emc_enable_rxtx(struct emc_priv *priv, bool enable)
 // curd, curder, the curdest
 static void emc_set_curdest(struct emc_priv *priv)
 {
-	__raw_writel(priv->rx_descs_phys, priv->reg + REG_RXDLSA);
-	__raw_writel(priv->tx_descs_phys, priv->reg + REG_TXDLSA);
+	__raw_writel(priv->rx_queue_phys, priv->reg + REG_RXDLSA);
+	__raw_writel(priv->tx_queue_phys, priv->reg + REG_TXDLSA);
 }
 
 // TODO: consider (1) MCMDR.SWR (software reset), (2) reset controller based reset
@@ -467,10 +469,10 @@ static int emc_close(struct net_device *netdev)
 
 	netif_stop_queue(netdev);
 
-	dma_free_coherent(&pdev->dev, sizeof(struct emc_rx_descs),
-					priv->rx_descs, priv->rx_descs_phys);
-	dma_free_coherent(&pdev->dev, sizeof(struct emc_tx_descs),
-					priv->tx_descs, priv->tx_descs_phys);
+	dma_free_coherent(&pdev->dev, sizeof(struct emc_rx_queue),
+					priv->rx_queue, priv->rx_queue_phys);
+	dma_free_coherent(&pdev->dev, sizeof(struct emc_tx_queue),
+					priv->tx_queue, priv->tx_queue_phys);
 
 	clk_disable_unprepare(priv->clk_rmii);
 	clk_disable_unprepare(priv->clk_main);
@@ -492,8 +494,8 @@ static int emc_send_frame(struct net_device *netdev,
 	priv = netdev_priv(netdev);
 	pdev = priv->pdev;
 
-	tx_desc = &priv->tx_descs->desclist[priv->cur_tx];
-	buffer = priv->tx_descs->buf[priv->cur_tx];
+	tx_desc = &priv->tx_queue->desclist[priv->cur_tx];
+	buffer = priv->tx_queue->buf[priv->cur_tx];
 
 	// TODO: wrong place for a magic number
 	// TODO: test how large a frame can actually get here
@@ -510,10 +512,10 @@ static int emc_send_frame(struct net_device *netdev,
 	//emc_enable_tx(netdev, true); // TODO: enable in open/reset
 	emc_trigger_tx(priv);
 
-	if (++priv->cur_tx >= TX_DESC_SIZE)
+	if (++priv->cur_tx >= TX_QUEUE_SIZE)
 		priv->cur_tx = 0;
 
-	tx_desc = &priv->tx_descs->desclist[priv->cur_tx];
+	tx_desc = &priv->tx_queue->desclist[priv->cur_tx];
 	if ((tx_desc->mode & TX_OWNER_MASK) == TX_OWNER_EMC)
 		netif_stop_queue(netdev);
 
@@ -548,13 +550,13 @@ static irqreturn_t emc_tx_interrupt(int irq, void *dev_id)
 
 	cur_entry = __raw_readl(priv->reg + REG_CTXDSA);
 
-	entry = priv->tx_descs_phys +
-		offsetof(struct emc_tx_descs, desclist[priv->finish_tx]);
+	entry = priv->tx_queue_phys +
+		offsetof(struct emc_tx_queue, desclist[priv->finish_tx]);
 
 	while (entry != cur_entry) {
-		tx_desc = &priv->tx_descs->desclist[priv->finish_tx];
+		tx_desc = &priv->tx_queue->desclist[priv->finish_tx];
 
-		if (++priv->finish_tx >= TX_DESC_SIZE)
+		if (++priv->finish_tx >= TX_QUEUE_SIZE)
 			priv->finish_tx = 0;
 
 		if (tx_desc->sl & TX_STATUS_TXCP) {
@@ -570,8 +572,8 @@ static irqreturn_t emc_tx_interrupt(int irq, void *dev_id)
 		if (netif_queue_stopped(netdev))
 			netif_wake_queue(netdev);
 
-		entry = priv->tx_descs_phys +
-			offsetof(struct emc_tx_descs, desclist[priv->finish_tx]);
+		entry = priv->tx_queue_phys +
+			offsetof(struct emc_tx_queue, desclist[priv->finish_tx]);
 	}
 
 	if (status & MISTA_EXDEF) {
@@ -609,13 +611,13 @@ static void emc_netdev_rx(struct net_device *netdev)
 	priv = netdev_priv(netdev);
 	pdev = priv->pdev;
 
-	rx_desc = &priv->rx_descs->desclist[priv->cur_rx];
+	rx_desc = &priv->rx_queue->desclist[priv->cur_rx];
 
 	do {
 		val = __raw_readl(priv->reg + REG_CRXDSA);
 
-		entry = priv->rx_descs_phys +
-			offsetof(struct emc_rx_descs, desclist[priv->cur_rx]);
+		entry = priv->rx_queue_phys +
+			offsetof(struct emc_rx_queue, desclist[priv->cur_rx]);
 
 		if (val == entry)
 			break;
@@ -624,7 +626,7 @@ static void emc_netdev_rx(struct net_device *netdev)
 		length = status & 0xFFFF;
 
 		if (status & RX_STATUS_RXGD) {
-			data = priv->rx_descs->buf[priv->cur_rx];
+			data = priv->rx_queue->buf[priv->cur_rx];
 			skb = netdev_alloc_skb(netdev, length + 2);
 			if (!skb) {
 				netdev->stats.rx_dropped++;
@@ -659,10 +661,10 @@ static void emc_netdev_rx(struct net_device *netdev)
 		rx_desc->sl = RX_OWNER_EMC;
 		rx_desc->reserved = 0x0;
 
-		if (++priv->cur_rx >= RX_DESC_SIZE)
+		if (++priv->cur_rx >= RX_QUEUE_SIZE)
 			priv->cur_rx = 0;
 
-		rx_desc = &priv->rx_descs->desclist[priv->cur_rx];
+		rx_desc = &priv->rx_queue->desclist[priv->cur_rx];
 
 	} while (1);
 }
