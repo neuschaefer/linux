@@ -1,24 +1,64 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+ * Nuvoton Ethernet MAC Controller (EMC) driver.
+ *
  * Copyright (c) 2008-2009 Nuvoton technology corporation.
  * Wan ZongShun <mcuos.com@gmail.com>
  *
  * Copyright (C) 2022 Jonathan Neuschäfer
+ */
+
+/*
+ * Theory of operation:
+ *
+ * The driver maintains two queues in memory, one for RX and one for TX,
+ * which are traversed by the hardware as packets are transmitted/received.
+ * Each queue is a cyclical linked list of descriptors, that are owned either
+ * by the CPU or the EMC.
+ *
+ * TX queue:
+ *     tx_tail                                            tx_head
+ *     v                                                  v
+ *    .-----------.    .-----------.    .-----------.    .-----------.
+ * .->| OWNER_CPU | .->| OWNER_EMC | .->| OWNER_EMC | .->| OWNER_CPU |
+ * |  | buf       | |  | buf       | |  | buf       | |  | buf       |
+ * |  | next------|-'  | next------|-'  | next------|-'  | next------|-.
+ * |  '-----------'    '-----------'    '-----------'    '-----------' |
+ * |                                                                   |
+ * '-------------------------------------------------------------------'
+ *
+ * CPU-owned TX descriptors are checked in the TX ISR and the TX tail pointer
+ * is advanced. New TX descriptors are assigned to the EMC at the TX head, when
+ * new frames are to be advanced.
+ *
+ *
+ * RX queue:            rx_tail
+ *                      v
+ *    .-----------.    .-----------.    .-----------.    .-----------.
+ * .->| OWNER_EMC | .->| OWNER_CPU | .->| OWNER_CPU | .->| OWNER_EMC |
+ * |  | buf       | |  | buf       | |  | buf       | |  | buf       |
+ * |  | next------|-'  | next------|-'  | next------|-'  | next------|-.
+ * |  '-----------'    '-----------'    '-----------'    '-----------' |
+ * |                                                                   |
+ * '-------------------------------------------------------------------'
+ *
+ * CPU-owned RX descriptors are processed in the RX ISR. They correspond to
+ * received frames.
+ */
+
+/*
  * TODO:
  * - merge short functions called from _open into one function
  *   - and/or change parameter to *priv
- * - get MAC address from DT
  * - change fields in emc_.x_desc to __le32
  * - move away from __raw_ functions maybe
- * - group members of private struct in some reasonable way
- *   - and remove some
- * - use devm_ as much as possible
  * - implement copy-less TX/RX DMA
  * - make it short, maybe 700 lines? :)
  * - less printk, better messages
  * - set DMARFC
  * - locking??
  * - napi
+ * - research DMA view of main memory
  */
 
 #include <linux/clk.h>
@@ -115,6 +155,8 @@
 #define MISTA_TXABT		MIEN_TXABT
 #define MISTA_TDU		MIEN_TDU
 #define MISTA_TXBERR		MIEN_TXBERR
+#define MISTA_RX_MASK		0x0000ffff
+#define MISTA_TX_MASK		0xffff0000
 
 /* FFTCR - FIFO Threshold Control Register */
 #define FFTCR_TXTHD		(0x03 << 8)
@@ -125,6 +167,7 @@
 #define RX_OWNER_EMC		BIT(31)
 #define TX_OWNER_MASK		BIT(31)
 #define TX_OWNER_EMC		BIT(31)
+#define TX_OWNER_CPU		0
 
 /* TX descriptor, word 0 bits */
 #define TX_PADEN		BIT(0)
@@ -141,7 +184,7 @@
 /* TX descriptor, status */
 #define TX_STATUS_TXCP		BIT(19)
 
-/* global setting for driver */
+/* Global settings for driver */
 #define RX_QUEUE_SIZE		50
 #define TX_QUEUE_SIZE		10
 #define MAX_RBUFF_SZ		0x600 /* TODO: MAX_RX_FRAME or something */
@@ -195,7 +238,7 @@ struct emc_priv {
 	struct emc_tx_queue *tx_queue;
 	dma_addr_t rx_queue_phys;
 	dma_addr_t tx_queue_phys;
-	unsigned int cur_tx;
+	unsigned int cur_tx; // TODO: rename
 	unsigned int cur_rx;
 	unsigned int finish_tx;
 };
@@ -232,7 +275,6 @@ static void emc_set_link_mode_for_ncsi(struct emc_priv *priv)
 
 	__raw_writel(val, priv->reg + REG_MCMDR);
 }
-
 
 static void emc_write_cam(struct emc_priv *priv,
 			  unsigned int index, const unsigned char *addr)
@@ -280,7 +322,7 @@ static int emc_init_desc(struct emc_priv *priv)
 		tx_desc->buffer = priv->tx_queue_phys +
 			offsetof(struct emc_tx_queue, buf[i]);
 		tx_desc->sl = 0;
-		tx_desc->mode = 0;
+		tx_desc->mode = TX_OWNER_CPU;
 	}
 
 	for (i = 0; i < RX_QUEUE_SIZE; i++) {
@@ -310,17 +352,18 @@ static void emc_set_fifo_threshold(struct emc_priv *priv)
 	__raw_writel(val, priv->reg + REG_FFTCR);
 }
 
-// TODO: rename
-// it's the software reset triggering routine.
-static void emc_return_default_idle(struct emc_priv *priv)
+static void emc_reset(struct emc_priv *priv)
 {
 	unsigned int val;
 
+	/* Trigger reset */
 	val = __raw_readl(priv->reg + REG_MCMDR);
 	val |= MCMDR_SWR;
 	__raw_writel(val, priv->reg + REG_MCMDR);
 
-	// TODO: wait for completion of reset
+	/* Wait for completion */
+	while (__raw_readl(priv->reg + REG_MCMDR) & MCMDR_SWR)
+		;
 }
 
 static void emc_trigger_rx(struct emc_priv *priv)
@@ -333,7 +376,7 @@ static void emc_trigger_tx(struct emc_priv *priv)
 	__raw_writel(1, priv->reg + REG_TSDR);
 }
 
-static void emc_enable_mac_interrupt(struct emc_priv *priv)
+static void emc_enable_interrupts(struct emc_priv *priv)
 {
 	unsigned int val;
 
@@ -350,17 +393,27 @@ static void emc_get_and_clear_int(struct emc_priv *priv,
 	__raw_writel(*val, priv->reg + REG_MISTA);
 }
 
-// TODO: rename or merge
-static void emc_set_global_maccmd(struct emc_priv *priv)
+static void emc_init_mcmdr(struct emc_priv *priv)
 {
 	unsigned int val;
 
 	val = __raw_readl(priv->reg + REG_MCMDR);
-	val |= MCMDR_SPCRC | MCMDR_ENMDC | MCMDR_ACP;
+	val |= MCMDR_SPCRC | MCMDR_ACP;
 	__raw_writel(val, priv->reg + REG_MCMDR);
 }
 
-// TODO: rename s/enable/init
+static void emc_enable_mdio(struct emc_priv *priv, bool enable)
+{
+	unsigned int val;
+
+	val = __raw_readl(priv->reg + REG_MCMDR);
+	if (enable)
+		val |= MCMDR_ENMDC;
+	else
+		val &= ~MCMDR_ENMDC;
+	__raw_writel(val, priv->reg + REG_MCMDR);
+}
+
 static void emc_init_cam(struct net_device *netdev)
 {
 	struct emc_priv *priv = netdev_priv(netdev);
@@ -390,34 +443,19 @@ static void emc_enable_rxtx(struct emc_priv *priv, bool enable)
 	__raw_writel(val, priv->reg + REG_MCMDR);
 }
 
-// TODO: rename, i have no idea what curdest means
-// curd, curder, the curdest
-static void emc_set_curdest(struct emc_priv *priv)
+static void emc_set_descriptors(struct emc_priv *priv)
 {
 	__raw_writel(priv->rx_queue_phys, priv->reg + REG_RXDLSA);
 	__raw_writel(priv->tx_queue_phys, priv->reg + REG_TXDLSA);
 }
 
-// TODO: consider (1) MCMDR.SWR (software reset), (2) reset controller based reset
-// TODO: rename to reinit or something, don't do a full reset here
-static void emc_reset_mac(struct net_device *netdev)
+static void emc_init_mac(struct net_device *netdev)
 {
 	struct emc_priv *priv = netdev_priv(netdev);
 
-	// move to probe, add fallback on MCMDR.SWR
-	if (priv->reset && false) {
-		reset_control_assert(priv->reset);
-		reset_control_deassert(priv->reset);
-	}
-
-	// TODO: rm hack
-	u32 val = __raw_readl(priv->reg + REG_MCMDR);
-	val |= MCMDR_ENMDC;
-	__raw_writel(val, priv->reg + REG_MCMDR);
-
 	emc_enable_rxtx(priv, false);
 	emc_set_fifo_threshold(priv);
-	emc_return_default_idle(priv);
+	emc_reset(priv);
 
 	if (!netif_queue_stopped(netdev))
 		netif_stop_queue(netdev);
@@ -429,9 +467,9 @@ static void emc_reset_mac(struct net_device *netdev)
 	priv->finish_tx = 0x0;
 	priv->cur_rx = 0x0;
 
-	emc_set_curdest(priv);
+	emc_set_descriptors(priv);
 	emc_init_cam(netdev);
-	emc_enable_mac_interrupt(priv);
+	emc_enable_interrupts(priv);
 	emc_enable_rxtx(priv, true);
 	emc_trigger_rx(priv);
 
@@ -458,9 +496,7 @@ static int emc_set_mac_address(struct net_device *netdev, void *addr)
 static int emc_close(struct net_device *netdev)
 {
 	struct emc_priv *priv = netdev_priv(netdev);
-	struct platform_device *pdev;
-
-	pdev = priv->pdev;
+	struct platform_device *pdev = priv->pdev;
 
 	if (priv->phy)
 		phy_stop(priv->phy);
@@ -498,7 +534,7 @@ static int emc_send_frame(struct net_device *netdev,
 	buffer = priv->tx_queue->buf[priv->cur_tx];
 
 	// TODO: wrong place for a magic number
-	// TODO: test how large a frame can actually get here
+	// TODO: test how large a frame the hardware can actually handle
 	if (length > 1514) {
 		dev_err(&pdev->dev, "send data %d bytes, check it\n", length);
 		length = 1514;
@@ -506,7 +542,7 @@ static int emc_send_frame(struct net_device *netdev,
 
 	memcpy(buffer, data, length);
 
-	tx_desc->sl = length & 0xFFFF;
+	tx_desc->sl = length & 0xffff;
 	tx_desc->mode = TX_OWNER_EMC | TX_PADEN | TX_CRCAPP | TX_INTEN;
 
 	//emc_enable_tx(netdev, true); // TODO: enable in open/reset
@@ -546,7 +582,7 @@ static irqreturn_t emc_tx_interrupt(int irq, void *dev_id)
 	unsigned int cur_entry, entry, status;
 	struct emc_tx_desc *tx_desc;
 
-	emc_get_and_clear_int(priv, MISTA_TXBERR | MISTA_TDU | MISTA_TXCP, &status);
+	emc_get_and_clear_int(priv, MISTA_TX_MASK, &status);
 
 	cur_entry = __raw_readl(priv->reg + REG_CTXDSA);
 
@@ -561,7 +597,7 @@ static irqreturn_t emc_tx_interrupt(int irq, void *dev_id)
 
 		if (tx_desc->sl & TX_STATUS_TXCP) {
 			netdev->stats.tx_packets++;
-			netdev->stats.tx_bytes += tx_desc->sl & 0xFFFF;
+			netdev->stats.tx_bytes += tx_desc->sl & 0xffff;
 		} else {
 			netdev->stats.tx_errors++;
 		}
@@ -576,14 +612,14 @@ static irqreturn_t emc_tx_interrupt(int irq, void *dev_id)
 			offsetof(struct emc_tx_queue, desclist[priv->finish_tx]);
 	}
 
-	if (status & MISTA_EXDEF) {
-		dev_err(&pdev->dev, "emc defer exceed interrupt\n");
-	} else if (status & MISTA_TXBERR) {
-		dev_err(&pdev->dev, "emc bus error interrupt\n");
-		emc_reset_mac(netdev);
-	} else if (status & MISTA_TDU) {
+	if (status & MISTA_TDU) {
 		if (netif_queue_stopped(netdev))
 			netif_wake_queue(netdev);
+	} else if (status & MISTA_EXDEF) {
+		dev_err(&pdev->dev, "emc defer exceed interrupt\n");
+	} else if (status & MISTA_TXBERR) {
+		dev_err(&pdev->dev, "TX bus error!\n");
+		emc_init_mac(netdev);
 	}
 
 	return IRQ_HANDLED;
@@ -623,7 +659,7 @@ static void emc_netdev_rx(struct net_device *netdev)
 			break;
 
 		status = rx_desc->sl;
-		length = status & 0xFFFF;
+		length = status & 0xffff;
 
 		if (status & RX_STATUS_RXGD) {
 			data = priv->rx_queue->buf[priv->cur_rx];
@@ -683,7 +719,7 @@ static irqreturn_t emc_rx_interrupt(int irq, void *dev_id)
 	struct platform_device *pdev = priv->pdev;
 	unsigned int status;
 
-	emc_get_and_clear_int(priv, MISTA_RXGD, &status);
+	emc_get_and_clear_int(priv, MISTA_RX_MASK, &status);
 
 	if (status & MISTA_RDU) {
 		emc_netdev_rx(netdev);
@@ -691,8 +727,8 @@ static irqreturn_t emc_rx_interrupt(int irq, void *dev_id)
 
 		return IRQ_HANDLED;
 	} else if (status & MISTA_RXBERR) {
-		dev_err(&pdev->dev, "emc rx bus error\n");
-		emc_reset_mac(netdev);
+		dev_err(&pdev->dev, "RX bus error!\n");
+		emc_init_mac(netdev);
 	}
 
 	emc_netdev_rx(netdev);
@@ -708,14 +744,14 @@ static int emc_open(struct net_device *netdev)
 	clk_prepare_enable(priv->clk_main);
 	clk_prepare_enable(priv->clk_rmii);
 
-	// TODO: deal with duplication between emc_reset_mac and emc_open
+	// TODO: deal with duplication between emc_init_mac and emc_open
 
-	emc_reset_mac(netdev);
+	emc_init_mac(netdev);
 	emc_set_fifo_threshold(priv);
-	emc_set_curdest(priv);
+	emc_set_descriptors(priv);
 	emc_init_cam(netdev);
-	emc_enable_mac_interrupt(priv);
-	emc_set_global_maccmd(priv);
+	emc_enable_interrupts(priv);
+	emc_init_mcmdr(priv);
 	emc_enable_rxtx(priv, true);
 
 	if (request_irq(priv->txirq, emc_tx_interrupt, 0x0, pdev->name, netdev)) {
@@ -746,20 +782,38 @@ static int emc_open(struct net_device *netdev)
 	return 0;
 }
 
-// TODO: explain in comments
-static void emc_set_multicast_list(struct net_device *netdev)
+static void emc_set_rx_mode(struct net_device *netdev)
 {
 	struct emc_priv *priv;
 	unsigned int rx_mode;
 
 	priv = netdev_priv(netdev);
 
-	if (netdev->flags & IFF_PROMISC)
+	if (netdev->flags & IFF_PROMISC) {
+		/*
+		 * Promiscuous mode:
+		 *
+		 * Receive all unicast, multicast, broadcast packets, and
+		 * packets for own own unicast address.
+		 */
 		rx_mode = CAMCMR_AUP | CAMCMR_AMP | CAMCMR_ABP | CAMCMR_ECMP;
-	else if ((netdev->flags & IFF_ALLMULTI) || !netdev_mc_empty(netdev))
+	} else if ((netdev->flags & IFF_ALLMULTI) || !netdev_mc_empty(netdev)) {
+		/*
+		 * "Receive all multicast packets" mode:
+		 *
+		 * Receive all multicast, broadcast packets, and packets for
+		 * own own unicast address.
+		 */
 		rx_mode = CAMCMR_AMP | CAMCMR_ABP | CAMCMR_ECMP;
-	else
+	} else {
+		/*
+		 * Default mode:
+		 *
+		 * Receive all broadcast packets, and packets for own own
+		 * unicast address.
+		 */
 		rx_mode = CAMCMR_ECMP | CAMCMR_ABP;
+	}
 	__raw_writel(rx_mode, priv->reg + REG_CAMCMR);
 }
 
@@ -778,32 +832,19 @@ static const struct net_device_ops emc_netdev_ops = {
 	.ndo_open		= emc_open,
 	.ndo_stop		= emc_close,
 	.ndo_start_xmit		= emc_start_xmit,
-	// TODO: what's with the names?
-	.ndo_set_rx_mode	= emc_set_multicast_list,
+	.ndo_set_rx_mode	= emc_set_rx_mode,
 	.ndo_set_mac_address	= emc_set_mac_address,
 };
 
-// TODO: use device_get_ethdev_address
-// TODO: rename
-static void get_mac_address(struct net_device *netdev)
+static void emc_init_mac_address(struct net_device *netdev)
 {
 	struct emc_priv *priv = netdev_priv(netdev);
-	struct platform_device *pdev;
-	char addr[ETH_ALEN];
+	struct platform_device *pdev = priv->pdev;
 
-	pdev = priv->pdev;
+	if (device_get_ethdev_address(&pdev->dev, netdev))
+		eth_hw_addr_random(netdev);
 
-	addr[0] = 0x00;
-	addr[1] = 0x02;
-	addr[2] = 0xac;
-	addr[3] = 0x55;
-	addr[4] = 0x88;
-	addr[5] = 0xa8;
-
-	if (is_valid_ether_addr(addr))
-		dev_addr_set(netdev, addr);
-	else
-		dev_err(&pdev->dev, "invalid mac address\n");
+	emc_write_cam(priv, 0, netdev->dev_addr);
 }
 
 static int emc_mdio_write(struct mii_bus *mdio, int phy_id, int reg, u16 data)
@@ -812,6 +853,7 @@ static int emc_mdio_write(struct mii_bus *mdio, int phy_id, int reg, u16 data)
 	unsigned int val, i;
 
 	clk_prepare_enable(priv->clk_main);
+	emc_enable_mdio(priv, true);
 
 	__raw_writel(data, priv->reg + REG_MIID);
 
@@ -825,8 +867,9 @@ static int emc_mdio_write(struct mii_bus *mdio, int phy_id, int reg, u16 data)
 	}
 
 	if (i == MDIO_RETRIES)
-		dev_warn(&mdio->dev, "mdio write timed out\n");
+		dev_warn(&mdio->dev, "MDIO write timed out\n");
 
+	emc_enable_mdio(priv, false);
 	clk_disable_unprepare(priv->clk_main);
 
 	return 0;
@@ -838,6 +881,7 @@ static int emc_mdio_read(struct mii_bus *mdio, int phy_id, int reg)
 	unsigned int val, i, data;
 
 	clk_prepare_enable(priv->clk_main);
+	emc_enable_mdio(priv, true);
 
 	val = (phy_id << 0x08) | reg;
 	val |= MIIDA_BUSY | MIIDA_MDCCR_VAL;
@@ -849,39 +893,16 @@ static int emc_mdio_read(struct mii_bus *mdio, int phy_id, int reg)
 	}
 
 	if (i == MDIO_RETRIES) {
-		dev_warn(&mdio->dev, "mdio read timed out\n");
+		dev_warn(&mdio->dev, "MDIO read timed out\n");
 		data = 0xffff;
 	} else {
 		data = __raw_readl(priv->reg + REG_MIID);
 	}
 
+	emc_enable_mdio(priv, false);
 	clk_disable_unprepare(priv->clk_main);
 
 	return data;
-}
-
-// TODO: rename
-// TODO: merge into _probe?
-static int emc_setup(struct net_device *netdev)
-{
-	struct emc_priv *priv = netdev_priv(netdev);
-
-	netdev->netdev_ops = &emc_netdev_ops;
-	netdev->ethtool_ops = &emc_ethtool_ops;
-
-	// TODO: really? 16??
-	netdev->tx_queue_len = 16;
-	netdev->watchdog_timeo = TX_TIMEOUT;
-
-	get_mac_address(netdev);
-
-	// TODO: rename fields to make more sense; add diagram
-	// TODO: let kzalloc handle this
-	priv->cur_tx = 0x0;
-	priv->cur_rx = 0x0;
-	priv->finish_tx = 0x0;
-
-	return 0;
 }
 
 static int emc_init_mdio(struct emc_priv *priv, struct device_node *np)
@@ -907,11 +928,6 @@ static int emc_init_mdio(struct emc_priv *priv, struct device_node *np)
 	for (i = 0; i < PHY_MAX_ADDR; i++)
 		mdio->irq[i] = PHY_POLL;
 
-	// TODO: rm hack
-	u32 val = __raw_readl(priv->reg + REG_MCMDR);
-	val |= MCMDR_ENMDC;
-	__raw_writel(val, priv->reg + REG_MCMDR);
-
 	res = devm_of_mdiobus_register(&pdev->dev, mdio, np);
 	if (res) {
 		dev_info(&pdev->dev, "failed to register MDIO bus: %d\n", res);
@@ -921,12 +937,12 @@ static int emc_init_mdio(struct emc_priv *priv, struct device_node *np)
 	return 0;
 }
 
-static void emc_ncsi_handler(struct ncsi_dev *nd)
+static void emc_ncsi_handler(struct ncsi_dev *ncsi)
 {
-	if (unlikely(nd->state != ncsi_dev_state_functional))
+	if (unlikely(ncsi->state != ncsi_dev_state_functional))
 		return;
 
-	netdev_dbg(nd->dev, "NCSI interface %s\n", nd->link_up ? "up" : "down");
+	netdev_dbg(ncsi->dev, "NCSI interface %s\n", ncsi->link_up ? "up" : "down");
 }
 
 static int emc_probe(struct platform_device *pdev)
@@ -975,7 +991,16 @@ static int emc_probe(struct platform_device *pdev)
 	if (IS_ERR(priv->reset))
 		return dev_err_probe(&pdev->dev, PTR_ERR(priv->reset), "failed to get reset control\n");
 
-	emc_setup(netdev);
+	if (priv->reset) {
+		reset_control_assert(priv->reset);
+		reset_control_deassert(priv->reset);
+	}
+
+	netdev->netdev_ops = &emc_netdev_ops;
+	netdev->ethtool_ops = &emc_ethtool_ops;
+	netdev->tx_queue_len = TX_QUEUE_SIZE;
+	netdev->watchdog_timeo = TX_TIMEOUT;
+	emc_init_mac_address(netdev);
 
 	error = devm_register_netdev(&pdev->dev, netdev);
 	if (error != 0)
