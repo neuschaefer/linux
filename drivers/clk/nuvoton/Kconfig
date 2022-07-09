@@ -3,7 +3,7 @@
 
 config COMMON_CLK_NUVOTON
 	bool "Nuvoton clock controller common support"
-	depends on ARCH_MA35 || COMPILE_TEST
+	depends on ARCH_MA35 || ARCH_NPCM || COMPILE_TEST
 	default y
 	help
 	  Say y here to enable common clock controller for Nuvoton platforms.
@@ -15,5 +15,13 @@ config CLK_MA35D1
 	default y
 	help
 	  Build the clock controller driver for MA35D1 SoC.
+
+config CLK_WPCM450
+	bool "Nuvoton WPCM450 clock/reset controller support"
+	default y
+	select RESET_CONTROLLER
+	select RESET_SIMPLE
+	help
+	  Build the clock and reset controller driver for the WPCM450 SoC.
 
 endif
