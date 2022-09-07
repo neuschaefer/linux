@@ -1,0 +1,18 @@
+image: debian:11
+
+.common:
+  before_script:
+    - apt-get update
+    - apt-get install -y git pkg-config python3-pip yamllint libyaml-dev build-essential gcc-arm-linux-gnueabi flex bison bc lzop libssl-dev swig
+    - pip3 install git+https://github.com/devicetree-org/dt-schema.git@main
+  script:
+    - make ARCH=arm W=1 CROSS_COMPILE=arm-linux-gnueabi- wpcm450_defconfig
+    - make ARCH=arm W=1 CROSS_COMPILE=arm-linux-gnueabi- ${TARGET} -j$(nproc || echo 1)
+
+build:
+  extends: .common
+
+binding-check:
+  extends: .common
+  variables:
+    TARGET: dt_binding_check

@@ -1,0 +1,20 @@
+name: build
+on: [push]
+jobs:
+  dt-binding-check:
+    runs-on: ubuntu-latest
+    steps:
+      - run: sudo apt-get update
+      - run: sudo apt-get install -y libyaml-dev
+      - run: pip3 install git+https://github.com/devicetree-org/dt-schema.git@main
+      - uses: actions/checkout@v2
+      - run: make ARCH=arm W=1 wpcm450_defconfig
+      - run: make ARCH=arm W=1 dt_binding_check -j$(nproc || echo 1)
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: sudo apt-get update
+      - run: sudo apt-get install -y gcc-arm-linux-gnueabi
+      - uses: actions/checkout@v2
+      - run: make ARCH=arm W=1 CROSS_COMPILE=arm-linux-gnueabi- wpcm450_defconfig
+      - run: make ARCH=arm W=1 CROSS_COMPILE=arm-linux-gnueabi- -j$(nproc || echo 1)
