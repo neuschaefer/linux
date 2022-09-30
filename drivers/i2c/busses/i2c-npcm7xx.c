@@ -2301,8 +2301,8 @@ static int npcm_i2c_probe_bus(struct platform_device *pdev)
 	}
 
 	bus->num = of_alias_get_id(pdev->dev.of_node, "i2c");
-	/* core clk must be acquired to calculate module timing settings */
-	i2c_clk = devm_clk_get(&pdev->dev, NULL);
+	/* core clk must be acquired to calculate module timing settings, and potentially enable a clock gate */
+	i2c_clk = devm_clk_get_enabled(&pdev->dev, NULL);
 	if (IS_ERR(i2c_clk))
 		return PTR_ERR(i2c_clk);
 	bus->apb_clk = clk_get_rate(i2c_clk);
