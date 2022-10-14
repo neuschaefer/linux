@@ -163,6 +163,10 @@ static int pipe_handler_send_created_ind(struct sock *sk)
 		PN_PIPE_SB_NEGOTIATED_FC, pep_sb_size(2),
 		pn->tx_fc, pn->rx_fc,
 	};
+#ifdef CONFIG_BCM_KF_PHONET
+	PEP_PRINTK(
+	    "pipe_handler_send_created_ind : send PNS_PIPE_CREATED_IND\n");
+#endif
 
 	return pep_indicate(sk, PNS_PIPE_CREATED_IND, 1 /* sub-blocks */,
 				data, 4, GFP_ATOMIC);
@@ -183,6 +187,9 @@ static int pep_accept_conn(struct sock *sk, struct sk_buff *skb)
 			PN_LEGACY_FLOW_CONTROL,
 			PAD,
 	};
+#ifdef CONFIG_BCM_KF_PHONET
+	PEP_PRINTK("pep_accept_conn : send PN_PIPE_NO_ERROR\n");
+#endif
 
 	might_sleep();
 	return pep_reply(sk, skb, PN_PIPE_NO_ERROR, data, sizeof(data),
@@ -229,6 +236,10 @@ static int pep_ctrlreq_error(struct sock *sk, struct sk_buff *oskb, u8 code,
 static int pipe_snd_status(struct sock *sk, u8 type, u8 status, gfp_t priority)
 {
 	u8 data[4] = { type, PAD, PAD, status };
+#ifdef CONFIG_BCM_KF_PHONET
+	PEP_PRINTK("pipe_snd_status : PNS_PEP_STATUS_IND type=%d status=%d\n",
+		   type, status);
+#endif
 
 	return pep_indicate(sk, PNS_PEP_STATUS_IND, PN_PEP_TYPE_COMMON,
 				data, 4, priority);
@@ -279,18 +290,33 @@ static int pipe_rcv_status(struct sock *sk, struct sk_buff *skb)
 
 	switch (hdr->data[1]) {
 	case PN_PEP_IND_FLOW_CONTROL:
+#ifdef CONFIG_BCM_KF_PHONET
+		PEP_PRINTK("pipe_rcv_status : PN_PEP_IND_FLOW_CONTROL\n");
+#endif
 		switch (pn->tx_fc) {
 		case PN_LEGACY_FLOW_CONTROL:
 			switch (hdr->data[4]) {
 			case PEP_IND_BUSY:
+#ifdef CONFIG_BCM_KF_PHONET
+				PEP_PRINTK(
+				    "pipe_rcv_status : PN_LEGACY_FLOW_CONTROL / PEP_IND_BUSY\n");
+#endif
 				atomic_set(&pn->tx_credits, 0);
 				break;
 			case PEP_IND_READY:
+#ifdef CONFIG_BCM_KF_PHONET
+				PEP_PRINTK(
+				    "pipe_rcv_status : PN_LEGACY_FLOW_CONTROL / PEP_IND_READY\n");
+#endif
 				atomic_set(&pn->tx_credits, wake = 1);
 				break;
 			}
 			break;
 		case PN_ONE_CREDIT_FLOW_CONTROL:
+#ifdef CONFIG_BCM_KF_PHONET
+			PEP_PRINTK(
+			    "pipe_rcv_status : ONE_CREDIT_FLOW_CONTROL\n");
+#endif
 			if (hdr->data[4] == PEP_IND_READY)
 				atomic_set(&pn->tx_credits, wake = 1);
 			break;
@@ -298,6 +324,10 @@ static int pipe_rcv_status(struct sock *sk, struct sk_buff *skb)
 		break;
 
 	case PN_PEP_IND_ID_MCFC_GRANT_CREDITS:
+#ifdef CONFIG_BCM_KF_PHONET
+		PEP_PRINTK(
+		    "pipe_rcv_status : PN_PEP_IND_ID_MCFC_GRANT_CREDITS\n");
+#endif
 		if (pn->tx_fc != PN_MULTI_CREDIT_FLOW_CONTROL)
 			break;
 		atomic_add(wake = hdr->data[4], &pn->tx_credits);
@@ -319,6 +349,9 @@ static int pipe_rcv_created(struct sock *sk, struct sk_buff *skb)
 	struct pnpipehdr *hdr = pnp_hdr(skb);
 	u8 n_sb = hdr->data[0];
 
+#ifdef CONFIG_BCM_KF_PHONET
+	PEP_PRINTK("pipe_rcv_created\n");
+#endif
 	pn->rx_fc = pn->tx_fc = PN_LEGACY_FLOW_CONTROL;
 	__skb_pull(skb, sizeof(*hdr));
 	while (n_sb > 0) {
@@ -353,10 +386,16 @@ static int pipe_do_rcv(struct sock *sk, struct sk_buff *skb)
 
 	switch (hdr->message_id) {
 	case PNS_PEP_CONNECT_REQ:
+#ifdef CONFIG_BCM_KF_PHONET
+		PEP_PRINTK("pipe_do_rcv : PNS_PEP_CONNECT_REQ\n");
+#endif
 		pep_reject_conn(sk, skb, PN_PIPE_ERR_PEP_IN_USE, GFP_ATOMIC);
 		break;
 
 	case PNS_PEP_DISCONNECT_REQ:
+#ifdef CONFIG_BCM_KF_PHONET
+		PEP_PRINTK("pipe_do_rcv : PNS_PEP_DISCONNECT_REQ\n");
+#endif
 		pep_reply(sk, skb, PN_PIPE_NO_ERROR, NULL, 0, GFP_ATOMIC);
 		sk->sk_state = TCP_CLOSE_WAIT;
 		if (!sock_flag(sk, SOCK_DEAD))
@@ -364,6 +403,9 @@ static int pipe_do_rcv(struct sock *sk, struct sk_buff *skb)
 		break;
 
 	case PNS_PEP_ENABLE_REQ:
+#ifdef CONFIG_BCM_KF_PHONET
+		PEP_PRINTK("pipe_do_rcv : PNS_PEP_ENABLE_REQ\n");
+#endif
 		/* Wait for PNS_PIPE_(ENABLED|REDIRECTED)_IND */
 		pep_reply(sk, skb, PN_PIPE_NO_ERROR, NULL, 0, GFP_ATOMIC);
 		break;
@@ -371,9 +413,17 @@ static int pipe_do_rcv(struct sock *sk, struct sk_buff *skb)
 	case PNS_PEP_RESET_REQ:
 		switch (hdr->state_after_reset) {
 		case PN_PIPE_DISABLE:
+#ifdef CONFIG_BCM_KF_PHONET
+			PEP_PRINTK(
+			    "pipe_do_rcv : PNS_PEP_RESET_REQ / PN_PIPE_DISABLE\n");
+#endif
 			pn->init_enable = 0;
 			break;
 		case PN_PIPE_ENABLE:
+#ifdef CONFIG_BCM_KF_PHONET
+			PEP_PRINTK(
+			    "pipe_do_rcv : PNS_PEP_RESET_REQ / PN_PIPE_ENABLE\n");
+#endif
 			pn->init_enable = 1;
 			break;
 		default: /* not allowed to send an error here!? */
@@ -382,11 +432,17 @@ static int pipe_do_rcv(struct sock *sk, struct sk_buff *skb)
 		}
 		/* fall through */
 	case PNS_PEP_DISABLE_REQ:
+#ifdef CONFIG_BCM_KF_PHONET
+		PEP_PRINTK("pipe_do_rcv : PNS_PEP_DISABLE_REQ\n");
+#endif
 		atomic_set(&pn->tx_credits, 0);
 		pep_reply(sk, skb, PN_PIPE_NO_ERROR, NULL, 0, GFP_ATOMIC);
 		break;
 
 	case PNS_PEP_CTRL_REQ:
+#ifdef CONFIG_BCM_KF_PHONET
+		PEP_PRINTK("pipe_do_rcv : PNS_PEP_CTRL_REQ\n");
+#endif
 		if (skb_queue_len(&pn->ctrlreq_queue) >= PNPIPE_CTRLREQ_MAX) {
 			atomic_inc(&sk->sk_drops);
 			break;
@@ -396,9 +452,15 @@ static int pipe_do_rcv(struct sock *sk, struct sk_buff *skb)
 		goto queue;
 
 	case PNS_PIPE_ALIGNED_DATA:
+#ifdef CONFIG_BCM_KF_PHONET
+		PEP_PRINTK("pipe_do_rcv : PNS_PIPE_ALIGNED_DATA\n");
+#endif
 		__skb_pull(skb, 1);
 		/* fall through */
 	case PNS_PIPE_DATA:
+#ifdef CONFIG_BCM_KF_PHONET
+		PEP_PRINTK("pipe_do_rcv : PNS_PIPE_DATA\n");
+#endif
 		__skb_pull(skb, 3); /* Pipe data header */
 		if (!pn_flow_safe(pn->rx_fc)) {
 			err = sock_queue_rcv_skb(sk, skb);
@@ -418,23 +480,38 @@ static int pipe_do_rcv(struct sock *sk, struct sk_buff *skb)
 		goto queue;
 
 	case PNS_PEP_STATUS_IND:
+#ifdef CONFIG_BCM_KF_PHONET
+		PEP_PRINTK("pipe_do_rcv : PNS_PEP_STATUS_IND\n");
+#endif
 		pipe_rcv_status(sk, skb);
 		break;
 
 	case PNS_PIPE_REDIRECTED_IND:
+#ifdef CONFIG_BCM_KF_PHONET
+		PEP_PRINTK("pipe_do_rcv : PNS_PIPE_REDIRECTED_IND\n");
+#endif
 		err = pipe_rcv_created(sk, skb);
 		break;
 
 	case PNS_PIPE_CREATED_IND:
+#ifdef CONFIG_BCM_KF_PHONET
+		PEP_PRINTK("pipe_do_rcv : PNS_PIPE_CREATED_IND\n");
+#endif
 		err = pipe_rcv_created(sk, skb);
 		if (err)
 			break;
 		/* fall through */
 	case PNS_PIPE_RESET_IND:
+#ifdef CONFIG_BCM_KF_PHONET
+		PEP_PRINTK("pipe_do_rcv : PNS_PIPE_RESET_IND\n");
+#endif
 		if (!pn->init_enable)
 			break;
 		/* fall through */
 	case PNS_PIPE_ENABLED_IND:
+#ifdef CONFIG_BCM_KF_PHONET
+		PEP_PRINTK("pipe_do_rcv : PNS_PIPE_ENABLED_IND\n");
+#endif
 		if (!pn_flow_safe(pn->tx_fc)) {
 			atomic_set(&pn->tx_credits, 1);
 			sk->sk_write_space(sk);
@@ -446,6 +523,9 @@ static int pipe_do_rcv(struct sock *sk, struct sk_buff *skb)
 		break;
 
 	case PNS_PIPE_DISABLED_IND:
+#ifdef CONFIG_BCM_KF_PHONET
+		PEP_PRINTK("pipe_do_rcv : PNS_PIPE_DISABLED_IND\n");
+#endif
 		sk->sk_state = TCP_SYN_RECV;
 		pn->rx_credits = 0;
 		break;
@@ -496,7 +576,9 @@ static int pep_connresp_rcv(struct sock *sk, struct sk_buff *skb)
 	struct pep_sock *pn = pep_sk(sk);
 	struct pnpipehdr *hdr;
 	u8 n_sb;
-
+#ifdef CONFIG_BCM_KF_PHONET
+	PEP_PRINTK("pep_connresp_rcv\n");
+#endif
 	if (!pskb_pull(skb, sizeof(*hdr) + 4))
 		return -EINVAL;
 
@@ -566,9 +648,15 @@ static int pipe_handler_do_rcv(struct sock *sk, struct sk_buff *skb)
 
 	switch (hdr->message_id) {
 	case PNS_PIPE_ALIGNED_DATA:
+#ifdef CONFIG_BCM_KF_PHONET
+		PEP_PRINTK("pipe_handler_do_rcv: PNS_PIPE_ALIGNED_DATA\n");
+#endif
 		__skb_pull(skb, 1);
 		/* fall through */
 	case PNS_PIPE_DATA:
+#ifdef CONFIG_BCM_KF_PHONET
+		PEP_PRINTK("pipe_handler_do_rcv: PNS_PIPE_DATA\n");
+#endif
 		__skb_pull(skb, 3); /* Pipe data header */
 		if (!pn_flow_safe(pn->rx_fc)) {
 			err = sock_queue_rcv_skb(sk, skb);
@@ -592,11 +680,29 @@ static int pipe_handler_do_rcv(struct sock *sk, struct sk_buff *skb)
 		return NET_RX_SUCCESS;
 
 	case PNS_PEP_CONNECT_RESP:
+#ifdef CONFIG_BCM_KF_PHONET
+		PEP_PRINTK("pipe_handler_do_rcv: PNS_PEP_CONNECT_RESP\n");
+		if (sk->sk_state != TCP_SYN_SENT) {
+			PEP_PRINTK(
+			    "PNS_PEP_CONNECT_RESP sk->sk_state != TCP_SYN_SENT\n");
+			break;
+		}
+		if (!sock_flag(sk, SOCK_DEAD)) {
+			sk->sk_state_change(sk);
+			PEP_PRINTK(
+			    "PNS_PEP_CONNECT_RESP sock flag != SOCK_DEAD\n");
+		}
+#else
 		if (sk->sk_state != TCP_SYN_SENT)
 			break;
 		if (!sock_flag(sk, SOCK_DEAD))
 			sk->sk_state_change(sk);
+#endif
 		if (pep_connresp_rcv(sk, skb)) {
+#ifdef CONFIG_BCM_KF_PHONET
+			PEP_PRINTK(
+			    "PNS_PEP_CONNECT_RESP pep_connresp_rcv failed\n");
+#endif
 			sk->sk_state = TCP_CLOSE_WAIT;
 			break;
 		}
@@ -622,10 +728,16 @@ static int pipe_handler_do_rcv(struct sock *sk, struct sk_buff *skb)
 		break;
 
 	case PNS_PEP_DISCONNECT_RESP:
+#ifdef CONFIG_BCM_KF_PHONET
+		PEP_PRINTK("pipe_handler_do_rcv: PNS_PEP_DISCONNECT_RESP\n");
+#endif
 		/* sock should already be dead, nothing to do */
 		break;
 
 	case PNS_PEP_STATUS_IND:
+#ifdef CONFIG_BCM_KF_PHONET
+		PEP_PRINTK("pipe_handler_do_rcv: PNS_PEP_DISCONNECT_RESP\n");
+#endif
 		pipe_rcv_status(sk, skb);
 		break;
 	}
@@ -671,6 +783,9 @@ static int pep_do_rcv(struct sock *sk, struct sk_buff *skb)
 	struct sockaddr_pn dst;
 	u8 pipe_handle;
 
+#ifdef CONFIG_BCM_KF_PHONET
+	PEP_PRINTK("pep_do_rcv\n");
+#endif
 	if (!pskb_may_pull(skb, sizeof(*hdr)))
 		goto drop;
 
@@ -688,7 +803,14 @@ static int pep_do_rcv(struct sock *sk, struct sk_buff *skb)
 
 	switch (hdr->message_id) {
 	case PNS_PEP_CONNECT_REQ:
+#ifdef CONFIG_BCM_KF_PHONET
+		PEP_PRINTK("pep_do_rcv: PNS_PEP_CONNECT_REQ\n");
+#endif
 		if (sk->sk_state != TCP_LISTEN || sk_acceptq_is_full(sk)) {
+#ifdef CONFIG_BCM_KF_PHONET
+			PEP_PRINTK(
+			    "pep_do_rcv: PNS_PEP_CONNECT_REQ reject PN_PIPE_ERR_PEP_IN_USE\n");
+#endif
 			pep_reject_conn(sk, skb, PN_PIPE_ERR_PEP_IN_USE,
 					GFP_ATOMIC);
 			break;
@@ -700,10 +822,16 @@ static int pep_do_rcv(struct sock *sk, struct sk_buff *skb)
 		return NET_RX_SUCCESS;
 
 	case PNS_PEP_DISCONNECT_REQ:
+#ifdef CONFIG_BCM_KF_PHONET
+		PEP_PRINTK("pep_do_rcv: PNS_PEP_DISCONNECT_REQ\n");
+#endif
 		pep_reply(sk, skb, PN_PIPE_NO_ERROR, NULL, 0, GFP_ATOMIC);
 		break;
 
 	case PNS_PEP_CTRL_REQ:
+#ifdef CONFIG_BCM_KF_PHONET
+		PEP_PRINTK("pep_do_rcv: PNS_PEP_CTRL_REQ\n");
+#endif
 		pep_ctrlreq_error(sk, skb, PN_PIPE_INVALID_HANDLE, GFP_ATOMIC);
 		break;
 
@@ -896,6 +1024,9 @@ static int pep_sock_connect(struct sock *sk, struct sockaddr *addr, int len)
 	int err;
 	u8 data[4] = { 0 /* sub-blocks */, PAD, PAD, PAD };
 
+#ifdef CONFIG_BCM_KF_PHONET
+	PEP_PRINTK("pep_sock_connect\n");
+#endif
 	if (pn->pipe_handle == PN_PIPE_INVALID_HANDLE)
 		pn->pipe_handle = 1; /* anything but INVALID_HANDLE */
 
@@ -969,6 +1100,9 @@ static int pep_init(struct sock *sk)
 {
 	struct pep_sock *pn = pep_sk(sk);
 
+#ifdef CONFIG_BCM_KF_PHONET
+	PEP_PRINTK("pep_init\n");
+#endif
 	sk->sk_destruct = pipe_destruct;
 	INIT_HLIST_HEAD(&pn->hlist);
 	pn->listener = NULL;
@@ -1357,6 +1491,10 @@ static struct phonet_protocol pep_pn_proto = {
 
 static int __init pep_register(void)
 {
+#ifdef CONFIG_BCM_KF_PHONET
+	PEP_PRINTK("== initialization\n");
+	pr_debug("PEP initialization\n");
+#endif
 	return phonet_proto_register(PN_PROTO_PIPE, &pep_pn_proto);
 }
 

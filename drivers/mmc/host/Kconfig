@@ -265,6 +265,18 @@ config MMC_SDHCI_SPEAR
 
 	  If unsure, say N.
 
+config MMC_SDHCI_BCM63xx
+	tristate "SDHCI support on Broadcom DSL/PON CPE device"
+	depends on BCM_KF_EMMC
+	depends on MMC_SDHCI && MMC_SDHCI_PLTFM
+	help
+	  This selects the Secure Digital Host Controller Interface (SDHCI)
+	  for the EMMC block on Broadcom DSL/PON SoCs
+
+	  If you have a controller with this interface, say Y or M here.
+
+	  If unsure, say N.
+	  
 config MMC_SDHCI_S3C_DMA
 	bool "DMA support on S3C SDHCI"
 	depends on MMC_SDHCI_S3C

@@ -758,7 +758,48 @@ config ARCH_OMAP1
 	help
 	  Support for older TI OMAP1 (omap7xx, omap15xx or omap16xx)
 
+config ARCH_BCM63XX
+	bool "Broadcom 63XX Architecture"
+	depends on BCM_KF_ARM_BCM963XX
+	select NO_GENERIC_PCI_IOPORT_MAP
+        select USE_OF
+	help
+	  Support for Broadcome 63XX series architecture
+
 endchoice
+
+if BCM_KF_ARM_BCM963XX
+
+config CPU_LITTLE_ENDIAN
+	bool "Build little-endian kernel"
+
+config CPU_BIG_ENDIAN
+	bool "Build big-endian kernel"
+
+config BUZZZ
+	bool "Broadcom BUZZZ Tool Framework"
+	default n
+	help
+	  Enable kernel tools framework: event/performance/function call tracing
+
+config BUZZZ_FUNC
+	bool "Broadcom BUZZZ Func Tool"
+	default n
+	help
+	  Enable Function tracing tool
+
+config BUZZZ_PMON
+	bool "Broadcom BUZZZ PMON Tool"
+	default n
+	help
+	  Enable performance monitoring tool
+
+config BUZZZ_KEVT
+	bool "Broadcom BUZZZ Kernel Event Tracing Tool"
+	default n
+	help
+	  Enable Kernel Event Tracing tool
+endif
 
 menu "Multiple platform selection"
 	depends on ARCH_MULTIPLATFORM
@@ -835,6 +876,10 @@ source "arch/arm/mach-at91/Kconfig"
 source "arch/arm/mach-axxia/Kconfig"
 
 source "arch/arm/mach-bcm/Kconfig"
+
+if BCM_KF_ARM_BCM963XX
+source "arch/arm/plat-bcm63xx/Kconfig"
+endif
 
 source "arch/arm/mach-berlin/Kconfig"
 

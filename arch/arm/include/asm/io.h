@@ -131,6 +131,9 @@ static inline u32 __raw_readl(const volatile void __iomem *addr)
 #define MT_DEVICE_NONSHARED	1
 #define MT_DEVICE_CACHED	2
 #define MT_DEVICE_WC		3
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX) && defined(CONFIG_PLAT_BCM63XX_ACP)
+#define MT_DEVICE_NONSECURED	15
+#endif /* CONFIG_BCM_KF_ARM_BCM963XX && CONFIG_PLAT_BCM63XX_ACP */
 /*
  * types 4 onwards can be found in asm/mach/map.h and are undefined
  * for ioremap
@@ -336,6 +339,9 @@ extern void _memset_io(volatile void __iomem *, int, size_t);
 #define ioremap_nocache(cookie,size)	__arm_ioremap((cookie), (size), MT_DEVICE)
 #define ioremap_cache(cookie,size)	__arm_ioremap((cookie), (size), MT_DEVICE_CACHED)
 #define ioremap_wc(cookie,size)		__arm_ioremap((cookie), (size), MT_DEVICE_WC)
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX) && defined(CONFIG_PLAT_BCM63XX_ACP)
+#define ioremap_nonsecured(cookie,size)	__arm_ioremap((cookie), (size), MT_DEVICE_NONSECURED)
+#endif /* CONFIG_BCM_KF_ARM_BCM963XX && CONFIG_PLAT_BCM63XX_ACP */
 #define iounmap				__arm_iounmap
 
 /*

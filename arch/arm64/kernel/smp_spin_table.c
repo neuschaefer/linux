@@ -27,6 +27,9 @@
 #include <asm/cputype.h>
 #include <asm/io.h>
 #include <asm/smp_plat.h>
+#ifdef CONFIG_BCM_KF_OPTEE
+#include <asm/system_misc.h> // FIXME after OPTEE matures
+#endif
 
 extern void secondary_holding_pen(void);
 volatile unsigned long secondary_holding_pen_release = INVALID_HWID;
@@ -104,6 +107,130 @@ static int smp_spin_table_cpu_prepare(unsigned int cpu)
 	return 0;
 }
 
+#if defined CONFIG_BCM_KF_ARM64_BCM963XX && defined CONFIG_HOTPLUG_CPU
+
+# ifdef CONFIG_BCM94908
+# include "bcm_map_part.h"
+
+static int smp_spin_table_cpu_boot(unsigned int cpu)
+{
+	if (BIUCTRL->cpu_pwr_zone_ctrl[cpu] & BIU_CPU_CTRL_PWR_ZONE_CTRL_ZONE_RESET) {
+		BIUCTRL->power_cfg |= BIU_CPU_CTRL_PWR_CFG_CPU0_BPCM_INIT_ON << cpu;
+		BIUCTRL->cpu_pwr_zone_ctrl[cpu] = BIU_CPU_CTRL_PWR_ZONE_CTRL_PWR_UP_REQ |
+			(BIUCTRL->cpu_pwr_zone_ctrl[cpu] & ~BIU_CPU_CTRL_PWR_ZONE_CTRL_PWR_DN_REQ);
+
+		udelay(100); // wait for cpu to come out of reset
+	}
+
+	/*
+	 * Update the pen release flag.
+	 */
+	write_pen_release(cpu_logical_map(cpu));
+
+	/*
+	 * Send an event, causing the secondaries to read pen_release.
+	 */
+	sev();
+
+	return 0;
+}
+
+static void smp_spin_table_cpu_die(unsigned int cpu)
+{
+	wmb();
+	cpu_cache_off();
+	flush_cache_all();
+
+	udelay(10); // delay after cache flush
+
+#ifdef CONFIG_BCM_KF_OPTEE
+	write_pen_release(INVALID_HWID);
+	soft_restart(__pa(secondary_holding_pen));
+#else
+	BIUCTRL->power_cfg &= ~(BIU_CPU_CTRL_PWR_CFG_CPU0_BPCM_INIT_ON << cpu);
+	BIUCTRL->cpu_pwr_zone_ctrl[cpu] = BIU_CPU_CTRL_PWR_ZONE_CTRL_PWR_DN_REQ |
+		(BIUCTRL->cpu_pwr_zone_ctrl[cpu] & ~BIU_CPU_CTRL_PWR_ZONE_CTRL_PWR_UP_REQ);
+
+	while (1) cpu_do_idle();
+#endif
+	/*NOTREACHED*/
+}
+
+#define smp_spin_table_cpu_kill 0
+
+# elif (defined (CONFIG_BCM96858) || defined(CONFIG_BCM963158))
+# include "pmc_drv.h"
+# include "BPCM.h"
+
+static struct completion cpu_flush[NR_CPUS];
+
+static const unsigned int pmb[] = {
+	PMB_ADDR_ORION_CPU0, PMB_ADDR_ORION_CPU1,
+	PMB_ADDR_ORION_CPU2, PMB_ADDR_ORION_CPU3,
+};
+
+static int smp_spin_table_cpu_boot(unsigned int cpu)
+{
+	BPCM_PWR_ZONE_N_CONTROL zctl;
+	int rc;
+
+	rc = ReadZoneRegister(pmb[cpu], 0, BPCMZoneOffset(control), &zctl.Reg32);
+	if (rc == 0 && zctl.Bits.reset_state) {
+		PowerOnZone(pmb[cpu], 0);
+
+		udelay(100); // wait for cpu to come out of reset
+	}
+
+	/*
+	 * Update the pen release flag.
+	 */
+	write_pen_release(cpu_logical_map(cpu));
+
+	/*
+	 * Send an event, causing the secondaries to read pen_release.
+	 */
+	sev();
+
+	return 0;
+}
+
+static void smp_spin_table_cpu_die(unsigned int cpu)
+{
+	init_completion(&cpu_flush[cpu]);
+	wmb();
+
+//	cpu_cache_off();
+	flush_cache_all();
+
+	complete(&cpu_flush[cpu]);
+	wmb();
+
+#ifdef CONFIG_BCM_KF_OPTEE
+	write_pen_release(INVALID_HWID);
+	soft_restart(__pa(secondary_holding_pen));
+#else
+	while (1) cpu_do_idle();
+#endif
+	/*NOTREACHED*/
+}
+
+static int smp_spin_table_cpu_kill(unsigned int cpu)
+{
+	if (wait_for_completion_timeout(&cpu_flush[cpu], msecs_to_jiffies(10)) == 0)
+		return 0;
+
+	udelay(10); // delay after cache flush
+
+#ifdef CONFIG_BCM_KF_OPTEE
+	return 1; // do not power off that cpu if OPTEE is configured
+#else
+	return PowerOffZone(pmb[cpu], 0) == kPMC_NO_ERROR; // XXX repower flag ignored
+#endif 
+}
+
+# endif
+
+#else
 static int smp_spin_table_cpu_boot(unsigned int cpu)
 {
 	/*
@@ -118,10 +245,15 @@ static int smp_spin_table_cpu_boot(unsigned int cpu)
 
 	return 0;
 }
+#endif
 
 const struct cpu_operations smp_spin_table_ops = {
 	.name		= "spin-table",
 	.cpu_init	= smp_spin_table_cpu_init,
 	.cpu_prepare	= smp_spin_table_cpu_prepare,
 	.cpu_boot	= smp_spin_table_cpu_boot,
+#if defined CONFIG_BCM_KF_ARM64_BCM963XX && defined CONFIG_HOTPLUG_CPU
+	.cpu_kill	= smp_spin_table_cpu_kill,
+	.cpu_die	= smp_spin_table_cpu_die,
+#endif
 };

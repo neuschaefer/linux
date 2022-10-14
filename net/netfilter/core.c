@@ -27,6 +27,16 @@
 
 #include "nf_internals.h"
 
+#if defined(CONFIG_BCM_KF_RUNNER)
+#if defined(CONFIG_BCM_RDPA) || defined(CONFIG_BCM_RDPA_MODULE)
+#if defined(CONFIG_BCM_RUNNER_RG) || defined(CONFIG_BCM_RUNNER_RG_MODULE)
+#include <net/bl_ops.h>
+struct bl_ops_t *bl_ops = NULL;
+EXPORT_SYMBOL(bl_ops);
+#endif /* CONFIG_BCM_RUNNER_RG || CONFIG_BCM_RUNNER_RG_MODULE */
+#endif /* CONFIG_BCM_RUNNER */
+#endif /* CONFIG_BCM_KF_RUNNER */
+
 static DEFINE_MUTEX(afinfo_mutex);
 
 const struct nf_afinfo __rcu *nf_afinfo[NFPROTO_NUMPROTO] __read_mostly;
@@ -179,9 +189,11 @@ next_hook:
 		ret = NF_DROP_GETERR(verdict);
 		if (ret == 0)
 			ret = -EPERM;
-	} else if ((verdict & NF_VERDICT_MASK) == NF_QUEUE) {
+	} else if ((verdict & NF_VERDICT_MASK) == NF_QUEUE ||
+		(verdict & NF_VERDICT_MASK) == NF_IMQ_QUEUE) {
 		int err = nf_queue(skb, elem, state,
-				   verdict >> NF_VERDICT_QBITS);
+				   verdict >> NF_VERDICT_QBITS,
+				  verdict & NF_VERDICT_MASK);
 		if (err < 0) {
 			if (err == -ECANCELED)
 				goto next_hook;

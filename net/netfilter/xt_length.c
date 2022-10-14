@@ -26,6 +26,13 @@ length_mt(const struct sk_buff *skb, struct xt_action_param *par)
 	const struct xt_length_info *info = par->matchinfo;
 	u_int16_t pktlen = ntohs(ip_hdr(skb)->tot_len);
 
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG_FEATURE)
+	struct sk_buff *skb_p;
+	skb_p = (struct sk_buff *)skb;
+	skb_p->ipt_check |= IPT_MATCH_LENGTH;
+	skb_p->ipt_log.u32[BLOG_MIN_LEN_INDEX] = info->min;
+	skb_p->ipt_log.u32[BLOG_MAX_LEN_INDEX] = info->max;
+#endif
 	return (pktlen >= info->min && pktlen <= info->max) ^ info->invert;
 }
 
@@ -36,6 +43,13 @@ length_mt6(const struct sk_buff *skb, struct xt_action_param *par)
 	const u_int16_t pktlen = ntohs(ipv6_hdr(skb)->payload_len) +
 				 sizeof(struct ipv6hdr);
 
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG_FEATURE)
+	struct sk_buff *skb_p;
+	skb_p = (struct sk_buff *)skb;
+	skb_p->ipt_check |= IPT_MATCH_LENGTH;
+	skb_p->ipt_log.u32[BLOG_MIN_LEN_INDEX] = info->min;
+	skb_p->ipt_log.u32[BLOG_MAX_LEN_INDEX] = info->max;
+#endif
 	return (pktlen >= info->min && pktlen <= info->max) ^ info->invert;
 }
 

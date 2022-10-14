@@ -20,24 +20,156 @@
 #include <linux/if_vlan.h>
 #include <linux/netfilter_bridge.h>
 #include "br_private.h"
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+#include <linux/blog.h>
+#endif
 
 static int deliver_clone(const struct net_bridge_port *prev,
 			 struct sk_buff *skb,
 			 void (*__packet_hook)(const struct net_bridge_port *p,
 					       struct sk_buff *skb));
 
+#if defined(CONFIG_BCM_KF_WL)
+static __inline__ int shouldBypassStp (const struct sk_buff *skb, int state) {
+	if (skb->pkt_type == PACKET_BROADCAST || skb->pkt_type == PACKET_MULTICAST)
+		return 0;
+	if (state == BR_STATE_DISABLED)
+		return 0;
+	return ( (skb->protocol == htons(0x888e) /* ETHER_TYPE_802_1X */) || 
+	         (skb->protocol == htons(0x88c7) /* ETHER_TYPE_802_1X_PREAUTH */) ||
+	         (skb->protocol == htons(0x886c) /* ETHER_TYPE_BRCM */ ) );
+}
+#endif
+
 /* Don't forward packets to originating port or forwarding disabled */
 static inline int should_deliver(const struct net_bridge_port *p,
 				 const struct sk_buff *skb)
 {
+#if defined(CONFIG_BCM_KF_WANDEV)
+#if !defined(CONFIG_BCM_WAN_2_WAN_FWD_ENABLED)
+	/*
+	* Do not forward any packets received from one WAN interface
+	* to another in multiple PVC case
+	*/
+#if 0 // for DLink quick vpn ,we have to break that rule.	
+	if( (skb->dev->priv_flags & p->dev->priv_flags) & IFF_WANDEV )
+	{
+		return 0;
+	}
+#endif	
+#endif
+
+	/* Runner can flood both US/LS and DS traffic */
+#if !defined(CONFIG_BCM_KF_RUNNER_FLOODING) && !defined(CONFIG_BCM_RUNNER_FLOODING)
+	if ((skb->dev->priv_flags & IFF_WANDEV) == 0 &&
+	     (p->dev->priv_flags   & IFF_WANDEV) == 0)
+#endif
+	{
+		struct net_device *sdev = skb->dev;
+		struct net_device *ddev = p->dev;
+
+#if defined(CONFIG_BCM_KF_NETDEV_PATH)
+		/* From LAN to LAN */
+		/* Do not forward any packets to virtual interfaces on the same
+		 * real interface of the originating virtual interface.
+		 */
+		while (!netdev_path_is_root(sdev))
+		{
+			sdev = netdev_path_next_dev(sdev);
+		}
+
+		while (!netdev_path_is_root(ddev))
+		{
+			ddev = netdev_path_next_dev(ddev);
+		}
+#endif
+
+#if defined(CONFIG_BCM_KF_LOCAL_SWITCHING_DISABLE)
+        /* Drop LAN-LAN traffic; do not drop local packets */
+        if (p->br->local_switching_disable && !(sdev->priv_flags & IFF_EBRIDGE) && !(sdev->priv_flags & ddev->priv_flags & IFF_WANDEV))
+        {
+            return 0;
+        }
+#endif
+
+		if (sdev == ddev)
+		{
+			return 0;
+		}
+
+#if defined(CONFIG_BCM_KF_RUNNER_FLOODING) && defined(CONFIG_BCM_RUNNER_FLOODING)
+		if ((skb->recycle_and_rnr_flags & SKB_RNR_FLOOD) && (ddev->priv_flags & IFF_HW_SWITCH))
+		{
+			/* Flooded by Runner */
+			return 0;
+		}
+
+#else
+
+		if (skb->pkt_type == PACKET_BROADCAST)
+		{
+#if defined(CONFIG_BCM_KF_ENET_SWITCH)
+			if (sdev->priv_flags & IFF_HW_SWITCH & ddev->priv_flags)
+			{
+				/* both source and destination are IFF_HW_SWITCH 
+				   if they are also on the same switch, reject the packet */
+				if (!((sdev->priv_flags & IFF_EXT_SWITCH) ^ (ddev->priv_flags & IFF_EXT_SWITCH)))
+				{
+					return 0;
+				}
+			}
+#endif /* CONFIG_BCM_KF_ENET_SWITCH */
+		}
+
+#endif /* CONFIG_BCM_KF_RUNNER_FLOODING */
+	}
+#endif /* CONFIG_BCM_KF_WANDEV */
+
+#if (defined(CONFIG_BCM_MCAST) || defined(CONFIG_BCM_MCAST_MODULE)) && defined(CONFIG_BCM_KF_MCAST)
+	if ( br_bcm_mcast_should_deliver != NULL )
+	{
+		if ( 0 == br_bcm_mcast_should_deliver(p->br->dev->ifindex, skb, p->dev,
+#if defined(CONFIG_BRIDGE_IGMP_SNOOPING)
+		      p->multicast_router == 2 || (p->multicast_router == 1 && timer_pending(&p->multicast_router_timer))) )
+#else
+		      false) )
+#endif
+		{
+			return 0;
+		}
+	}
+#endif
+
+#if defined(CONFIG_BCM_KF_WL)
+	return (((p->flags & BR_HAIRPIN_MODE) || skb->dev != p->dev) &&
+	        br_allowed_egress(p->br, nbp_get_vlan_info(p), skb) &&
+	        ((p->state == BR_STATE_FORWARDING) || shouldBypassStp(skb, p->state)));
+#else
 	return ((p->flags & BR_HAIRPIN_MODE) || skb->dev != p->dev) &&
 		br_allowed_egress(p->br, nbp_get_vlan_info(p), skb) &&
 		p->state == BR_STATE_FORWARDING;
+#endif
 }
+
+
+#ifdef CONFIG_BCM_KF_MISC_BACKPORTS
+static inline unsigned packet_length(const struct sk_buff *skb)
+{
+	return skb->len - (skb->protocol == htons(ETH_P_8021Q) ? VLAN_HLEN : 0);
+}
+#endif
 
 int br_dev_queue_push_xmit(struct sock *sk, struct sk_buff *skb)
 {
+#ifdef CONFIG_BCM_KF_MISC_BACKPORTS
+	/* is_skb_forwardable() is assuming skb->len already has ETH_LEN and
+	 * that is not correct here and this can cause the packets >MTU 
+	 * to be forwarded, adding proper checks
+	 */
+	if((packet_length(skb) > skb->dev->mtu ) && !skb_is_gso(skb)) {
+#else
 	if (!is_skb_forwardable(skb->dev, skb)) {
+#endif
 		kfree_skb(skb);
 	} else {
 		skb_push(skb, ETH_HLEN);
@@ -68,7 +200,15 @@ static void __br_deliver(const struct net_bridge_port *to, struct sk_buff *skb)
 	skb->dev = to->dev;
 
 	if (unlikely(netpoll_tx_running(to->br->dev))) {
+#ifdef CONFIG_BCM_KF_MISC_BACKPORTS
+		/* is_skb_forwardable() is assuming skb->len already has ETH_LEN and
+		 * that is not correct here, this can cause the packets >MTU 
+		 * to be forwarded, adding proper checks
+		 */
+		if (packet_length(skb) > skb->dev->mtu && !skb_is_gso(skb))
+#else
 		if (!is_skb_forwardable(skb->dev, skb))
+#endif
 			kfree_skb(skb);
 		else {
 			skb_push(skb, ETH_HLEN);
@@ -137,12 +277,18 @@ static int deliver_clone(const struct net_bridge_port *prev,
 					       struct sk_buff *skb))
 {
 	struct net_device *dev = BR_INPUT_SKB_CB(skb)->brdev;
-
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+	struct sk_buff *skb2 = skb;
+#endif
 	skb = skb_clone(skb, GFP_ATOMIC);
 	if (!skb) {
 		dev->stats.tx_dropped++;
 		return -ENOMEM;
 	}
+
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+	blog_clone(skb2, blog_ptr(skb));
+#endif
 
 	__packet_hook(prev, skb);
 	return 0;
@@ -180,6 +326,20 @@ static void br_flood(struct net_bridge *br, struct sk_buff *skb,
 	struct net_bridge_port *p;
 	struct net_bridge_port *prev;
 
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+	Blog_t * blog_p = blog_ptr(skb);
+
+	if (blog_p && !blog_p->rx.multicast)
+	{
+#if defined(CONFIG_BCM_KF_INTF_BRG) && defined (CONFIG_BCM_INTF_BRG_ENABLED)
+		/* Keep blog for interface-based bridging. */
+		if (!is_interface_br(br, skb))
+#endif /* CONFIG_BCM_KF_INTF_BRG && CONFIG_BCM_INTF_BRG_ENABLED */
+		{
+			blog_skip(skb, blog_skip_reason_br_flood);
+		}
+	}
+#endif
 	prev = NULL;
 
 	list_for_each_entry_rcu(p, &br->port_list, list) {

@@ -64,9 +64,6 @@ static int ip6_finish_output2(struct sock *sk, struct sk_buff *skb)
 	struct in6_addr *nexthop;
 	int ret;
 
-	skb->protocol = htons(ETH_P_IPV6);
-	skb->dev = dev;
-
 	if (ipv6_addr_is_multicast(&ipv6_hdr(skb)->daddr)) {
 		struct inet6_dev *idev = ip6_dst_idev(skb_dst(skb));
 
@@ -142,6 +139,13 @@ int ip6_output(struct sock *sk, struct sk_buff *skb)
 		kfree_skb(skb);
 		return 0;
 	}
+
+	/*
+	* IMQ-patch: moved setting skb->dev and skb->protocol from
+	* ip6_finish_output2 to fix crashing at netif_skb_features().
+	*/
+	skb->protocol = htons(ETH_P_IPV6);
+	skb->dev = dev;
 
 	return NF_HOOK_COND(NFPROTO_IPV6, NF_INET_POST_ROUTING, sk, skb,
 			    NULL, dev,
@@ -323,6 +327,35 @@ static inline int ip6_forward_finish(struct sock *sk, struct sk_buff *skb)
 	return dst_output_sk(sk, skb);
 }
 
+#if defined(CONFIG_BCM_KF_IP)
+static inline int isULA(const struct in6_addr *addr)
+{
+	__be32 st;
+
+	st = addr->s6_addr32[0];
+
+	/* RFC 4193 */
+	if ((st & htonl(0xFE000000)) == htonl(0xFC000000))
+		return	1;
+	else
+		return	0;
+}
+
+static inline int isSpecialAddr(const struct in6_addr *addr)
+{
+	__be32 st;
+
+	st = addr->s6_addr32[0];
+
+	/* RFC 5156 */
+	if (((st & htonl(0xFFFFFFFF)) == htonl(0x20010db8)) ||
+		((st & htonl(0xFFFFFFF0)) == htonl(0x20010010)))
+		return	1;
+	else
+		return	0;
+}
+#endif
+
 static unsigned int ip6_dst_mtu_forward(const struct dst_entry *dst)
 {
 	unsigned int mtu;
@@ -369,6 +402,9 @@ int ip6_forward(struct sk_buff *skb)
 	struct inet6_skb_parm *opt = IP6CB(skb);
 	struct net *net = dev_net(dst->dev);
 	u32 mtu;
+#if defined(CONFIG_BCM_KF_MAP) && (defined(CONFIG_BCM_MAP) || defined(CONFIG_BCM_MAP_MODULE))
+	int needfrag = 0;
+#endif
 
 	if (net->ipv6.devconf_all->forwarding == 0)
 		goto error;
@@ -421,6 +457,14 @@ int ip6_forward(struct sk_buff *skb)
 		kfree_skb(skb);
 		return -ETIMEDOUT;
 	}
+
+#if defined(CONFIG_BCM_KF_IP)
+    /* No traffic with ULA address should be forwarded at WAN intf */
+	if ( isULA(&hdr->daddr) || isULA(&hdr->saddr) )
+		if ((skb->dev->priv_flags & IFF_WANDEV) || 
+			(dst->dev->priv_flags & IFF_WANDEV) )
+			goto drop;
+#endif
 
 	/* XXX: idev->cnf.proxy_ndp? */
 	if (net->ipv6.devconf_all->proxy_ndp &&
@@ -476,7 +520,19 @@ int ip6_forward(struct sk_buff *skb)
 
 		/* This check is security critical. */
 		if (addrtype == IPV6_ADDR_ANY ||
+#if defined(CONFIG_BCM_KF_IP)
+			/* 
+			 * RFC 5156: IPv4 mapped addr and IPv4-compatible addr
+			 * should not appear on the Internet. In addition,
+			 * 2001:db8::/32 and 2001:10::/28 should not appear either.
+			 */
+			(addrtype & (IPV6_ADDR_MULTICAST | IPV6_ADDR_LOOPBACK | 
+				IPV6_ADDR_COMPATv4 | IPV6_ADDR_MAPPED | 
+				IPV6_ADDR_SITELOCAL)) ||
+			isSpecialAddr(&hdr->saddr))
+#else
 		    addrtype & (IPV6_ADDR_MULTICAST | IPV6_ADDR_LOOPBACK))
+#endif
 			goto error;
 		if (addrtype & IPV6_ADDR_LINKLOCAL) {
 			icmpv6_send(skb, ICMPV6_DEST_UNREACH,
@@ -490,6 +546,14 @@ int ip6_forward(struct sk_buff *skb)
 		mtu = IPV6_MIN_MTU;
 
 	if (ip6_pkt_too_big(skb, mtu)) {
+#if defined(CONFIG_BCM_KF_MAP) && (defined(CONFIG_BCM_MAP) || defined(CONFIG_BCM_MAP_MODULE))
+		/*
+		 * MAP_FORWARD_MODE2/MAP_FORWARD_MODE3 is used to fragment translated IPv6 packet
+		 * for MAP-T/MAP-E feature
+		 */
+		if (skb->map_forward != MAP_FORWARD_MODE2 && skb->map_forward != MAP_FORWARD_MODE3)
+		{
+#endif
 		/* Again, force OUTPUT device used as source address */
 		skb->dev = dst->dev;
 		icmpv6_send(skb, ICMPV6_PKT_TOOBIG, 0, mtu);
@@ -499,6 +563,15 @@ int ip6_forward(struct sk_buff *skb)
 				 IPSTATS_MIB_FRAGFAILS);
 		kfree_skb(skb);
 		return -EMSGSIZE;
+#if defined(CONFIG_BCM_KF_MAP) && (defined(CONFIG_BCM_MAP) || defined(CONFIG_BCM_MAP_MODULE))
+		}
+		else
+			needfrag = 1;
+	}
+	else if ((skb->map_forward == MAP_FORWARD_MODE2) && 
+			 (skb->len > (mtu-sizeof(struct frag_hdr)))) {
+		needfrag = 1;
+#endif
 	}
 
 	if (skb_cow(skb, dst->dev->hard_header_len)) {
@@ -512,6 +585,23 @@ int ip6_forward(struct sk_buff *skb)
 	/* Mangling hops number delayed to point after skb COW */
 
 	hdr->hop_limit--;
+
+#if defined(CONFIG_BCM_KF_WANDEV)
+#if !defined(CONFIG_BCM_WAN_2_WAN_FWD_ENABLED)
+	/* Never forward a packet from a WAN intf to the other WAN intf */
+	if( (skb->dev) && (dst->dev) && 
+		((skb->dev->priv_flags & dst->dev->priv_flags) & IFF_WANDEV) )
+		goto drop;
+#endif
+#endif
+
+#if defined(CONFIG_BCM_KF_MAP) && (defined(CONFIG_BCM_MAP) || defined(CONFIG_BCM_MAP_MODULE))
+	if (needfrag)
+	{
+		skb->ignore_df = 1;
+		return ip6_fragment(skb->sk, skb, ip6_forward_finish);
+	}
+#endif
 
 	IP6_INC_STATS_BH(net, ip6_dst_idev(dst), IPSTATS_MIB_OUTFORWDATAGRAMS);
 	IP6_ADD_STATS_BH(net, ip6_dst_idev(dst), IPSTATS_MIB_OUTOCTETS, skb->len);
@@ -551,7 +641,14 @@ int ip6_fragment(struct sock *sk, struct sk_buff *skb,
 	struct ipv6_pinfo *np = skb->sk && !dev_recursion_level() ?
 				inet6_sk(skb->sk) : NULL;
 	struct ipv6hdr *tmp_hdr;
+#if defined(CONFIG_BCM_KF_MAP) && (defined(CONFIG_BCM_MAP) || defined(CONFIG_BCM_MAP_MODULE))
+	struct iphdr *tmp_hdr2 = NULL;
+	struct iphdr *iph = NULL;
+	struct frag_hdr *fh = NULL;
+	__be16 not_last_frag = 0;
+#else
 	struct frag_hdr *fh;
+#endif
 	unsigned int mtu, hlen, left, len;
 	int hroom, troom;
 	__be32 frag_id = 0;
@@ -588,7 +685,11 @@ int ip6_fragment(struct sock *sk, struct sk_buff *skb,
 		if (np->frag_size)
 			mtu = np->frag_size;
 	}
+#if defined(CONFIG_BCM_KF_MAP) && (defined(CONFIG_BCM_MAP) || defined(CONFIG_BCM_MAP_MODULE))
+	mtu -= hlen + (skb->map_forward == MAP_FORWARD_MODE3 ? sizeof(struct iphdr) : sizeof(struct frag_hdr));
+#else
 	mtu -= hlen + sizeof(struct frag_hdr);
+#endif
 
 	if (skb_has_frag_list(skb)) {
 		int first_len = skb_pagelen(skb);
@@ -624,7 +725,19 @@ int ip6_fragment(struct sock *sk, struct sk_buff *skb,
 		skb_frag_list_init(skb);
 		/* BUILD HEADER */
 
+#if defined(CONFIG_BCM_KF_MAP) && (defined(CONFIG_BCM_MAP) || defined(CONFIG_BCM_MAP_MODULE))
+		*prevhdr = skb->map_forward == MAP_FORWARD_MODE3 ? IPPROTO_IPIP : NEXTHDR_FRAGMENT;
+		if (skb->map_forward == MAP_FORWARD_MODE3) {
+			tmp_hdr2 = kmemdup(skb_network_header(skb) + hlen, sizeof(struct iphdr), GFP_ATOMIC);
+			if (!tmp_hdr2) {
+				IP6_INC_STATS(net, ip6_dst_idev(skb_dst(skb)),
+					      IPSTATS_MIB_FRAGFAILS);
+				return -ENOMEM;
+			}
+		}
+#else
 		*prevhdr = NEXTHDR_FRAGMENT;
+#endif
 		tmp_hdr = kmemdup(skb_network_header(skb), hlen, GFP_ATOMIC);
 		if (!tmp_hdr) {
 			IP6_INC_STATS(net, ip6_dst_idev(skb_dst(skb)),
@@ -633,16 +746,39 @@ int ip6_fragment(struct sock *sk, struct sk_buff *skb,
 		}
 
 		__skb_pull(skb, hlen);
+#if defined(CONFIG_BCM_KF_MAP) && (defined(CONFIG_BCM_MAP) || defined(CONFIG_BCM_MAP_MODULE))
+		if (skb->map_forward == MAP_FORWARD_MODE3)
+			iph = (struct iphdr *)__skb_push(skb, sizeof(struct iphdr));
+		else
+#endif
 		fh = (struct frag_hdr *)__skb_push(skb, sizeof(struct frag_hdr));
 		__skb_push(skb, hlen);
 		skb_reset_network_header(skb);
 		memcpy(skb_network_header(skb), tmp_hdr, hlen);
 
+#if defined(CONFIG_BCM_KF_MAP) && (defined(CONFIG_BCM_MAP) || defined(CONFIG_BCM_MAP_MODULE))
+		if (skb->map_forward != MAP_FORWARD_MODE3)
+		{
+			if (skb->map_id)
+				fh->identification = skb->map_id;
+			else
+#endif
 		ipv6_select_ident(net, fh, rt);
 		fh->nexthdr = nexthdr;
 		fh->reserved = 0;
 		fh->frag_off = htons(IP6_MF);
 		frag_id = fh->identification;
+#if defined(CONFIG_BCM_KF_MAP) && (defined(CONFIG_BCM_MAP) || defined(CONFIG_BCM_MAP_MODULE))
+		}
+		else {
+			memcpy(skb_network_header(skb) + hlen, tmp_hdr2, sizeof(struct iphdr));
+			iph->tot_len = htons(first_len - hlen);
+			iph->frag_off = htons(IP_MF);
+			if (skb->map_id)
+				iph->id = skb->map_id;
+			ip_send_check(iph);
+		}
+#endif
 
 		first_len = skb_pagelen(skb);
 		skb->data_len = first_len - skb_headlen(skb);
@@ -658,18 +794,51 @@ int ip6_fragment(struct sock *sk, struct sk_buff *skb,
 			if (frag) {
 				frag->ip_summed = CHECKSUM_NONE;
 				skb_reset_transport_header(frag);
+#if defined(CONFIG_BCM_KF_MAP) && (defined(CONFIG_BCM_MAP) || defined(CONFIG_BCM_MAP_MODULE))
+				if (skb->map_forward == MAP_FORWARD_MODE3)
+					iph = (struct iphdr *)__skb_push(frag, sizeof(struct iphdr));
+				else
+#endif
 				fh = (struct frag_hdr *)__skb_push(frag, sizeof(struct frag_hdr));
 				__skb_push(frag, hlen);
 				skb_reset_network_header(frag);
 				memcpy(skb_network_header(frag), tmp_hdr,
 				       hlen);
+#if defined(CONFIG_BCM_KF_MAP) && (defined(CONFIG_BCM_MAP) || defined(CONFIG_BCM_MAP_MODULE))
+				if (skb->map_forward != MAP_FORWARD_MODE3)
+				{
+#endif
 				offset += skb->len - hlen - sizeof(struct frag_hdr);
 				fh->nexthdr = nexthdr;
 				fh->reserved = 0;
+#if defined(CONFIG_BCM_KF_MAP) && (defined(CONFIG_BCM_MAP) || defined(CONFIG_BCM_MAP_MODULE))
+				fh->frag_off = htons(offset+skb->map_offset);
+#else
 				fh->frag_off = htons(offset);
+#endif
 				if (frag->next)
 					fh->frag_off |= htons(IP6_MF);
+#if defined(CONFIG_BCM_KF_MAP) && (defined(CONFIG_BCM_MAP) || defined(CONFIG_BCM_MAP_MODULE))
+				else if (skb->map_mf)
+					fh->frag_off |= htons(IP6_MF);
+#endif
 				fh->identification = frag_id;
+#if defined(CONFIG_BCM_KF_MAP) && (defined(CONFIG_BCM_MAP) || defined(CONFIG_BCM_MAP_MODULE))
+				}
+				else {
+					memcpy(skb_network_header(frag) + hlen, tmp_hdr2,
+					       sizeof(struct iphdr));
+					iph->tot_len = htons(frag->len - hlen);
+					if (offset == 0)
+						ip_options_fragment(frag);
+					offset += skb->len - hlen - sizeof(struct iphdr);
+					iph->frag_off = htons(offset>>3);
+					if (frag->next)
+						iph->frag_off |= htons(IP_MF);
+					/* Ready, complete checksum */
+					ip_send_check(iph);
+				}
+#endif
 				ipv6_hdr(frag)->payload_len =
 						htons(frag->len -
 						      sizeof(struct ipv6hdr));
@@ -690,6 +859,9 @@ int ip6_fragment(struct sock *sk, struct sk_buff *skb,
 		}
 
 		kfree(tmp_hdr);
+#if defined(CONFIG_BCM_KF_MAP) && (defined(CONFIG_BCM_MAP) || defined(CONFIG_BCM_MAP_MODULE))
+		kfree(tmp_hdr2);
+#endif
 
 		if (err == 0) {
 			IP6_INC_STATS(net, ip6_dst_idev(&rt->dst),
@@ -720,14 +892,37 @@ slow_path:
 	    skb_checksum_help(skb))
 		goto fail;
 
+#if defined(CONFIG_BCM_KF_MAP) && (defined(CONFIG_BCM_MAP) || defined(CONFIG_BCM_MAP_MODULE))
+	left = skb->len - hlen - (skb->map_forward == MAP_FORWARD_MODE3 ? sizeof(struct iphdr) : 0);
+	ptr = hlen + (skb->map_forward == MAP_FORWARD_MODE3 ? sizeof(struct iphdr) : 0);
+#else
 	left = skb->len - hlen;		/* Space per frame */
 	ptr = hlen;			/* Where to start from */
+#endif
+
+#if defined(CONFIG_BCM_KF_MAP) && (defined(CONFIG_BCM_MAP) || defined(CONFIG_BCM_MAP_MODULE))
+	if (skb->map_forward == MAP_FORWARD_MODE3) {
+		tmp_hdr2 = kmemdup(skb_network_header(skb) + hlen, sizeof(struct iphdr), GFP_ATOMIC);
+		if (!tmp_hdr2) {
+			IP6_INC_STATS(net, ip6_dst_idev(skb_dst(skb)),
+				      IPSTATS_MIB_FRAGFAILS);
+			return -ENOMEM;
+		}
+		offset = (ntohs(tmp_hdr2->frag_off) & IP_OFFSET) << 3;
+		not_last_frag = tmp_hdr2->frag_off & htons(IP_MF);
+		kfree(tmp_hdr2);
+	}
+#endif
 
 	/*
 	 *	Fragment the datagram.
 	 */
 
+#if defined(CONFIG_BCM_KF_MAP) && (defined(CONFIG_BCM_MAP) || defined(CONFIG_BCM_MAP_MODULE))
+	*prevhdr = skb->map_forward == MAP_FORWARD_MODE3 ? IPPROTO_IPIP : NEXTHDR_FRAGMENT;
+#else
 	*prevhdr = NEXTHDR_FRAGMENT;
+#endif
 	hroom = LL_RESERVED_SPACE(rt->dst.dev);
 	troom = rt->dst.dev->needed_tailroom;
 
@@ -746,8 +941,13 @@ slow_path:
 		}
 
 		/* Allocate buffer */
+#if defined(CONFIG_BCM_KF_MAP) && (defined(CONFIG_BCM_MAP) || defined(CONFIG_BCM_MAP_MODULE))
+		frag = alloc_skb(len + hlen + (skb->map_forward == MAP_FORWARD_MODE3 ? sizeof(struct iphdr) : sizeof(struct frag_hdr)) +
+				 hroom + troom, GFP_ATOMIC);
+#else
 		frag = alloc_skb(len + hlen + sizeof(struct frag_hdr) +
 				 hroom + troom, GFP_ATOMIC);
+#endif
 		if (!frag) {
 			IP6_INC_STATS(net, ip6_dst_idev(skb_dst(skb)),
 				      IPSTATS_MIB_FRAGFAILS);
@@ -761,11 +961,27 @@ slow_path:
 
 		ip6_copy_metadata(frag, skb);
 		skb_reserve(frag, hroom);
+#if defined(CONFIG_BCM_KF_MAP) && (defined(CONFIG_BCM_MAP) || defined(CONFIG_BCM_MAP_MODULE))
+		skb_put(frag, len + hlen + (skb->map_forward == MAP_FORWARD_MODE3 ? sizeof(struct iphdr) : sizeof(struct frag_hdr)));
+#else
 		skb_put(frag, len + hlen + sizeof(struct frag_hdr));
+#endif
 		skb_reset_network_header(frag);
+#if defined(CONFIG_BCM_KF_MAP) && (defined(CONFIG_BCM_MAP) || defined(CONFIG_BCM_MAP_MODULE))
+		if (skb->map_forward != MAP_FORWARD_MODE3)
+		{
+#endif
 		fh = (struct frag_hdr *)(skb_network_header(frag) + hlen);
 		frag->transport_header = (frag->network_header + hlen +
 					  sizeof(struct frag_hdr));
+#if defined(CONFIG_BCM_KF_MAP) && (defined(CONFIG_BCM_MAP) || defined(CONFIG_BCM_MAP_MODULE))
+		}
+		else {
+			iph = (struct iphdr *)(skb_network_header(frag) + hlen);
+			frag->transport_header = (frag->network_header + hlen +
+						  sizeof(struct iphdr));
+		}
+#endif
 
 		/*
 		 *	Charge the memory for the fragment to any owner
@@ -777,18 +993,47 @@ slow_path:
 		/*
 		 *	Copy the packet header into the new buffer.
 		 */
+#if defined(CONFIG_BCM_KF_MAP) && (defined(CONFIG_BCM_MAP) || defined(CONFIG_BCM_MAP_MODULE))
+		skb_copy_from_linear_data(skb, skb_network_header(frag), hlen + (skb->map_forward == MAP_FORWARD_MODE3 ? sizeof(struct iphdr) : 0));
+#else
 		skb_copy_from_linear_data(skb, skb_network_header(frag), hlen);
+#endif
 
+#if defined(CONFIG_BCM_KF_MAP) && (defined(CONFIG_BCM_MAP) || defined(CONFIG_BCM_MAP_MODULE))
+		if (skb->map_forward != MAP_FORWARD_MODE3)
+		{
+#endif
 		/*
 		 *	Build fragment header.
 		 */
 		fh->nexthdr = nexthdr;
 		fh->reserved = 0;
+#if defined(CONFIG_BCM_KF_MAP) && (defined(CONFIG_BCM_MAP) || defined(CONFIG_BCM_MAP_MODULE))
+		if (skb->map_id)
+			fh->identification = skb->map_id;
+		else
+		{
+#endif
 		if (!frag_id) {
 			ipv6_select_ident(net, fh, rt);
 			frag_id = fh->identification;
 		} else
 			fh->identification = frag_id;
+#if defined(CONFIG_BCM_KF_MAP) && (defined(CONFIG_BCM_MAP) || defined(CONFIG_BCM_MAP_MODULE))
+		}
+		}
+		else {
+			/*
+			 *	Build pre-fragment/IPv4 header.
+			 */
+			iph->frag_off = htons((offset >> 3));
+			if (offset == 0)
+				ip_options_fragment(skb);
+			iph->tot_len = htons(len + sizeof(struct iphdr));
+			if (skb->map_id)
+				iph->id = skb->map_id;
+		}
+#endif
 
 		/*
 		 *	Copy a block of the IP datagram.
@@ -797,9 +1042,24 @@ slow_path:
 				     len));
 		left -= len;
 
+#if defined(CONFIG_BCM_KF_MAP) && (defined(CONFIG_BCM_MAP) || defined(CONFIG_BCM_MAP_MODULE))
+		if (skb->map_forward != MAP_FORWARD_MODE3)
+		{
+		fh->frag_off = htons(offset+skb->map_offset);
+#else
 		fh->frag_off = htons(offset);
+#endif
 		if (left > 0)
 			fh->frag_off |= htons(IP6_MF);
+#if defined(CONFIG_BCM_KF_MAP) && (defined(CONFIG_BCM_MAP) || defined(CONFIG_BCM_MAP_MODULE))
+		else if (skb->map_mf)
+			fh->frag_off |= htons(IP6_MF);
+		}
+		else {
+			if (left > 0 || not_last_frag)
+				iph->frag_off |= htons(IP_MF);
+		}
+#endif
 		ipv6_hdr(frag)->payload_len = htons(frag->len -
 						    sizeof(struct ipv6hdr));
 
@@ -809,6 +1069,10 @@ slow_path:
 		/*
 		 *	Put this fragment into the sending queue.
 		 */
+#if defined(CONFIG_BCM_KF_MAP) && (defined(CONFIG_BCM_MAP) || defined(CONFIG_BCM_MAP_MODULE))
+		if (skb->map_forward == MAP_FORWARD_MODE3)
+			ip_send_check(iph);
+#endif
 		err = output(sk, frag);
 		if (err)
 			goto fail;
@@ -827,6 +1091,9 @@ fail:
 	kfree_skb(skb);
 	return err;
 }
+#if defined(CONFIG_BCM_KF_IP)
+EXPORT_SYMBOL_GPL(ip6_fragment);
+#endif
 
 static inline int ip6_rt_check(const struct rt6key *rt_key,
 			       const struct in6_addr *fl_addr,

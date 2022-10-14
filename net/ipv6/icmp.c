@@ -453,6 +453,8 @@ static void icmp6_send(struct sk_buff *skb, u8 type, u8 code, __u32 info)
 	 */
 	if ((addr_type == IPV6_ADDR_ANY) || (addr_type & IPV6_ADDR_MULTICAST)) {
 		net_dbg_ratelimited("icmp6_send: addr_any/mcast source\n");
+#if defined(CONFIG_BCM_KF_FAP)	
+#endif				
 		return;
 	}
 
@@ -676,7 +678,11 @@ static int icmpv6_rcv(struct sk_buff *skb)
 {
 	struct net_device *dev = skb->dev;
 	struct inet6_dev *idev = __in6_dev_get(dev);
+#if defined(CONFIG_MIPS_BCM963XX) && defined(CONFIG_BCM_KF_UNALIGNED_EXCEPTION)
+	struct in6_addr saddr, daddr;
+#else
 	const struct in6_addr *saddr, *daddr;
+#endif
 	struct icmp6hdr *hdr;
 	u8 type;
 	bool success = false;
@@ -703,12 +709,22 @@ static int icmpv6_rcv(struct sk_buff *skb)
 
 	ICMP6_INC_STATS_BH(dev_net(dev), idev, ICMP6_MIB_INMSGS);
 
+#if defined(CONFIG_MIPS_BCM963XX) && defined(CONFIG_BCM_KF_UNALIGNED_EXCEPTION)
+	memcpy(&saddr, &ipv6_hdr(skb)->saddr, sizeof(struct in6_addr));
+	memcpy(&daddr, &ipv6_hdr(skb)->daddr, sizeof(struct in6_addr));
+#else
 	saddr = &ipv6_hdr(skb)->saddr;
 	daddr = &ipv6_hdr(skb)->daddr;
+#endif
 
 	if (skb_checksum_validate(skb, IPPROTO_ICMPV6, ip6_compute_pseudo)) {
+#if defined(CONFIG_MIPS_BCM963XX) && defined(CONFIG_BCM_KF_UNALIGNED_EXCEPTION)
+		net_dbg_ratelimited("ICMPv6 checksum failed [%pI6c > %pI6c]\n",
+				    &saddr, &daddr);
+#else
 		net_dbg_ratelimited("ICMPv6 checksum failed [%pI6c > %pI6c]\n",
 				    saddr, daddr);
+#endif
 		goto csum_error;
 	}
 

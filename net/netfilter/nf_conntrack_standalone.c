@@ -33,6 +33,10 @@
 #include <net/netfilter/nf_conntrack_timestamp.h>
 #include <linux/rculist_nulls.h>
 
+#if defined(CONFIG_BCM_KF_DPI) && defined(CONFIG_BCM_DPI_MODULE)
+#include <linux/dpi.h>
+#endif
+
 MODULE_LICENSE("GPL");
 
 #ifdef CONFIG_NF_CONNTRACK_PROCFS
@@ -167,6 +171,7 @@ ct_show_delta_time(struct seq_file *s, const struct nf_conn *ct)
 }
 #endif
 
+
 /* return 0 on success, 1 in case of error */
 static int ct_seq_show(struct seq_file *s, void *v)
 {
@@ -175,6 +180,10 @@ static int ct_seq_show(struct seq_file *s, void *v)
 	const struct nf_conntrack_l3proto *l3proto;
 	const struct nf_conntrack_l4proto *l4proto;
 	int ret = 0;
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BCM_KF_NETFILTER) && defined(CONFIG_BLOG)
+	BlogCtTime_t ct_time;
+	long ctExpiryVal = 0;
+#endif
 
 	NF_CT_ASSERT(ct);
 	if (unlikely(!atomic_inc_not_zero(&ct->ct_general.use)))
@@ -190,11 +199,35 @@ static int ct_seq_show(struct seq_file *s, void *v)
 	NF_CT_ASSERT(l4proto);
 
 	ret = -ENOSPC;
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BCM_KF_NETFILTER) && defined(CONFIG_BLOG)
+	if (timer_pending(&ct->timeout))
+	{
+		memset(&ct_time, 0, sizeof(ct_time));
+		blog_lock();
+		if (ct->blog_key[BLOG_PARAM1_DIR_ORIG] != BLOG_KEY_FC_INVALID || 
+				ct->blog_key[BLOG_PARAM1_DIR_REPLY] != BLOG_KEY_FC_INVALID) {
+			blog_query(QUERY_FLOWTRACK, (void*)ct, 
+					ct->blog_key[BLOG_PARAM1_DIR_ORIG],
+					ct->blog_key[BLOG_PARAM1_DIR_REPLY], (unsigned long) &ct_time);
+
+			ctExpiryVal = (long)(ct->extra_jiffies)/HZ - ct_time.idle;
+
+		} else 
+			ctExpiryVal = (long)(ct->timeout.expires - jiffies)/HZ;
+
+		blog_unlock();
+	}
+	seq_printf(s, "%-8s %u %-8s %u %ld ",
+			   l3proto->name, nf_ct_l3num(ct),
+			   l4proto->name, nf_ct_protonum(ct),
+			   ctExpiryVal);
+#else
 	seq_printf(s, "%-8s %u %-8s %u %ld ",
 		   l3proto->name, nf_ct_l3num(ct),
 		   l4proto->name, nf_ct_protonum(ct),
 		   timer_pending(&ct->timeout)
 		   ? (long)(ct->timeout.expires - jiffies)/HZ : 0);
+#endif
 
 	if (l4proto->print_conntrack)
 		l4proto->print_conntrack(s, ct);
@@ -235,6 +268,24 @@ static int ct_seq_show(struct seq_file *s, void *v)
 
 	ct_show_delta_time(s, ct);
 
+#if defined(CONFIG_BCM_KF_NETFILTER)
+ 	if (seq_printf(s, "iqprio=%u ", ct->iq_prio))
+ 		goto release;
+
+	if (seq_printf(s, "swaccel=%u ", ct->sw_accel_flows))
+		goto release;
+
+	if (seq_printf(s, "hwaccel=%u ", ct->hw_accel_flows))
+		goto release;
+#endif
+
+#if defined(CONFIG_BCM_KF_XT_MATCH_LAYER7) && \
+	(defined(CONFIG_NETFILTER_XT_MATCH_LAYER7) || defined(CONFIG_NETFILTER_XT_MATCH_LAYER7_MODULE))
+	if(ct->layer7.app_proto &&
+		seq_printf(s, "l7proto=%s ", ct->layer7.app_proto))
+		return -ENOSPC;
+#endif
+	
 	seq_printf(s, "use=%u\n", atomic_read(&ct->ct_general.use));
 
 	if (seq_has_overflowed(s))
@@ -266,6 +317,125 @@ static const struct file_operations ct_file_ops = {
 	.llseek  = seq_lseek,
 	.release = seq_release_net,
 };
+
+#if defined(CONFIG_BCM_KF_DPI) && defined(CONFIG_BCM_DPI_MODULE)
+static void *ct_dpi_seq_start(struct seq_file *seq, loff_t *pos)
+	__acquires(RCU)
+{
+	struct ct_iter_state *st = seq->private;
+
+	st->time_now = ktime_to_ns(ktime_get_real());
+	rcu_read_lock();
+	if (*pos == 0)
+		return SEQ_START_TOKEN;
+
+	return ct_get_idx(seq, *pos);
+}
+
+static void *ct_dpi_seq_next(struct seq_file *s, void *v, loff_t *pos)
+{
+	if (v == SEQ_START_TOKEN)
+		return ct_get_idx(s, *pos);
+
+	(*pos)++;
+	return ct_get_next(s, v);
+}
+
+static void ct_dpi_seq_stop(struct seq_file *s, void *v)
+	__releases(RCU)
+{
+	rcu_read_unlock();
+}
+
+static int ct_dpi_seq_show(struct seq_file *s, void *v)
+{
+	struct nf_conntrack_tuple_hash *hash;
+	struct nf_conn *ct;
+	const struct nf_conntrack_l3proto *l3proto;
+	const struct nf_conntrack_l4proto *l4proto;
+	int ret = 0;
+
+	if (v == SEQ_START_TOKEN) {
+		seq_puts(s, "app_id mac dev_id us_pkt us_byte ds_pkt ds_byte status us_tuple ds_tuple\n");
+		return 0;
+	}
+
+	hash = v;
+	ct = nf_ct_tuplehash_to_ctrack(hash);
+
+	NF_CT_ASSERT(ct);
+	if (unlikely(!atomic_inc_not_zero(&ct->ct_general.use)))
+		return 0;
+
+	/* only print if app & dev exist, and only for DIR_ORIGINAL */
+	if (!ct->dpi.app || !ct->dpi.dev || NF_CT_DIRECTION(hash))
+		goto release;
+
+	ret = -ENOSPC;
+
+	l3proto = __nf_ct_l3proto_find(nf_ct_l3num(ct));
+	NF_CT_ASSERT(l3proto);
+	l4proto = __nf_ct_l4proto_find(nf_ct_l3num(ct), nf_ct_protonum(ct));
+	NF_CT_ASSERT(l4proto);
+
+	dpi_print_flow(s, ct);
+
+	if (!dpi_ct_init_from_wan(ct)) {
+		/* LAN-side */
+		conntrack_dpi_seq_print_stats(s, ct, IP_CT_DIR_ORIGINAL);
+		conntrack_dpi_seq_print_stats(s, ct, IP_CT_DIR_REPLY);
+	} else {
+		/* WAN-side */
+		conntrack_dpi_seq_print_stats(s, ct, IP_CT_DIR_REPLY);
+		conntrack_dpi_seq_print_stats(s, ct, IP_CT_DIR_ORIGINAL);
+	}
+
+	seq_printf(s, " %lX ", ct->dpi.flags);
+
+	if (!dpi_ct_init_from_wan(ct)) {
+		print_tuple(s, &ct->tuplehash[IP_CT_DIR_ORIGINAL].tuple,
+			    l3proto, l4proto);
+		print_tuple(s, &ct->tuplehash[IP_CT_DIR_REPLY].tuple,
+			    l3proto, l4proto);
+	} else {
+		print_tuple(s, &ct->tuplehash[IP_CT_DIR_REPLY].tuple,
+			    l3proto, l4proto);
+		print_tuple(s, &ct->tuplehash[IP_CT_DIR_ORIGINAL].tuple,
+			    l3proto, l4proto);
+	}
+
+	seq_puts(s, "\n");
+
+	if (seq_has_overflowed(s))
+		goto release;
+
+	ret = 0;
+release:
+	nf_ct_put(ct);
+	return ret;
+}
+
+static const struct seq_operations ct_dpi_seq_ops = {
+	.start = ct_dpi_seq_start,
+	.next  = ct_dpi_seq_next,
+	.stop  = ct_dpi_seq_stop,
+	.show  = ct_dpi_seq_show
+};
+
+static int ct_dpi_open(struct inode *inode, struct file *file)
+{
+	return seq_open_net(inode, file, &ct_dpi_seq_ops,
+			sizeof(struct ct_iter_state));
+}
+
+static const struct file_operations ct_dpi_file_ops = {
+	.owner   = THIS_MODULE,
+	.open    = ct_dpi_open,
+	.read    = seq_read,
+	.llseek  = seq_lseek,
+	.release = seq_release_net,
+};
+#endif /* defined(CONFIG_BCM_KF_DPI) && defined(CONFIG_BCM_DPI_MODULE) */
 
 static void *ct_cpu_seq_start(struct seq_file *seq, loff_t *pos)
 {
@@ -372,8 +542,19 @@ static int nf_conntrack_standalone_init_proc(struct net *net)
 			  &ct_cpu_seq_fops);
 	if (!pde)
 		goto out_stat_nf_conntrack;
+#if defined(CONFIG_BCM_KF_DPI) && defined(CONFIG_BCM_DPI_MODULE)
+	pde = proc_create("nf_conntrack_dpi", 0440, net->proc_net,
+			  &ct_dpi_file_ops);
+	if (!pde)
+		goto out_nf_conntrack_dpi;
+#endif
+
 	return 0;
 
+#if defined(CONFIG_BCM_KF_DPI) && defined(CONFIG_BCM_DPI_MODULE)
+out_nf_conntrack_dpi:
+	remove_proc_entry("nf_conntrack", net->proc_net_stat);
+#endif
 out_stat_nf_conntrack:
 	remove_proc_entry("nf_conntrack", net->proc_net);
 out_nf_conntrack:
@@ -382,6 +563,9 @@ out_nf_conntrack:
 
 static void nf_conntrack_standalone_fini_proc(struct net *net)
 {
+#if defined(CONFIG_BCM_KF_DPI) && defined(CONFIG_BCM_DPI_MODULE)
+	remove_proc_entry("nf_conntrack_dpi", net->proc_net);
+#endif
 	remove_proc_entry("nf_conntrack", net->proc_net_stat);
 	remove_proc_entry("nf_conntrack", net->proc_net);
 }
@@ -515,6 +699,42 @@ static void nf_conntrack_standalone_fini_sysctl(struct net *net)
 }
 #endif /* CONFIG_SYSCTL */
 
+
+#if 1
+static int clear_all_nf(struct nf_conn *i, void *data)
+{
+	return 1;
+}
+
+static int reset_nf_conntrack_net_ops(struct file *f, char *buf, size_t cnt, loff_t *pos)
+{
+    struct net *net = &init_net;
+
+    printk("###%s;%d;###\n", __FUNCTION__, __LINE__);
+    local_bh_disable();
+    nf_ct_iterate_cleanup(net, clear_all_nf, NULL, 0, 0);
+    local_bh_enable();
+    return 0;
+}
+
+static struct file_operations nf_clear_fops = {
+    .owner   = THIS_MODULE,
+    .read    = reset_nf_conntrack_net_ops,
+};
+
+
+struct proc_dir_entry *proc_clearconntrack;               
+void add_nf_clear_allconntrack(struct net *net)
+{
+    proc_clearconntrack = proc_create( "nf_clear_allconntrack", S_IRUGO, net->proc_net, &nf_clear_fops);
+}
+
+void remove_nf_clear_allconntrack(struct net *net)
+{
+    remove_proc_entry("nf_clear_allconntrack",net->proc_net);
+}
+#endif
+
 static int nf_conntrack_pernet_init(struct net *net)
 {
 	int ret;
@@ -533,6 +753,10 @@ static int nf_conntrack_pernet_init(struct net *net)
 	if (ret < 0)
 		goto out_sysctl;
 
+#if 1
+    add_nf_clear_allconntrack(net);
+#endif  
+
 	return 0;
 
 out_sysctl:
@@ -540,6 +764,10 @@ out_sysctl:
 out_proc:
 	nf_conntrack_cleanup_net(net);
 out_init:
+
+#if 1
+    remove_nf_clear_allconntrack(net);
+#endif   
 	return ret;
 }
 

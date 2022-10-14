@@ -214,8 +214,73 @@ void __irq_entry smp_call_function_interrupt(void)
 	irq_exit();
 }
 
+#if defined(CONFIG_BCM_KF_MIPS_BCM963XX) && defined(CONFIG_MIPS_BCM963XX)
+
+// yeah, I know, this won't work if numcpus>2, but its good enough for now
+int other_cpu_stopped=0;
+EXPORT_SYMBOL(other_cpu_stopped);
+
+void stop_other_cpu(void)
+{
+	int count=0;
+	smp_send_stop();
+
+	// make sure the other CPU is really stopped
+	do
+	{
+		udelay(1000);
+		count++;
+		if (count % 4000 == 0)
+		{
+			printk(KERN_WARNING "still waiting for other cpu to stop, "
+			                    "jiffies=%lu\n", jiffies);
+		}
+	} while (!other_cpu_stopped);
+}
+EXPORT_SYMBOL(stop_other_cpu);
+
+#endif /* CONFIG_MIPS_BCM963XX */
+
+
 static void stop_this_cpu(void *dummy)
 {
+#if defined(CONFIG_BCM_KF_MIPS_BCM963XX) && defined(CONFIG_MIPS_BCM963XX)
+        printk(KERN_INFO "\nstopping CPU %d\n", smp_processor_id());
+    
+        /*
+         * Do not allow any more processing of any kind on this CPU.
+         * interrupts may trigger processing, so disable it.
+         * Hmm, this may cause us problems.  If there are any threads on this
+         * CPU which is holding a mutex or spinlock which does not block
+         * interrupts, and this mutex or spinlock is needed by the other
+         * processor (e.g. to write the firmware image), we will deadlock.
+         * PROBABLY should be very rare.....
+         */
+        local_irq_disable();
+    	 /* Remove this CPU. Be a bit slow here and
+	 * set the bits for every online CPU so we don't miss
+	 * any IPI whilst taking this VPE down.
+	 */
+
+	cpumask_copy(&cpu_foreign_map, cpu_online_mask);
+
+	/* Make it visible to every other CPU */
+	smp_mb();
+
+        /*
+         * Remove this CPU:
+         */
+        set_cpu_online(smp_processor_id(), false); 
+    	calculate_cpu_foreign_map();
+        other_cpu_stopped=1;
+    
+        /*
+         * just spin, do not call cpu_wait because some implementations,
+         * namely, brcm_wait, will re-enable interrupts.
+         */
+        for (;;) {
+        }
+#else
 	/*
 	 * Remove this CPU. Be a bit slow here and
 	 * set the bits for every online CPU so we don't miss
@@ -231,6 +296,7 @@ static void stop_this_cpu(void *dummy)
 	calculate_cpu_foreign_map();
 	local_irq_disable();
 	while (1);
+#endif /* CONFIG_BCM_KF_MIPS_BCM963XX */
 }
 
 void smp_send_stop(void)

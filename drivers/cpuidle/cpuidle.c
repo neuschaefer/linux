@@ -34,6 +34,15 @@ LIST_HEAD(cpuidle_detected_devices);
 static int enabled_devices;
 static int off __read_mostly;
 static int initialized __read_mostly;
+#if defined(CONFIG_BCM_KF_POWER_SAVE) && defined(CONFIG_BCM963138)
+/*
+ * On 63138, gathering time statistics can affect performance
+ * Add /sys/module/cpuidle/parameter/time_stats_enable, disabled by default
+ * This only works if there is only one cpuidle state to chose from since
+ * this change makes the statistics unavailable (last_residency = 0)
+ */
+static int time_stats_enable __read_mostly;
+#endif
 
 int cpuidle_disabled(void)
 {
@@ -171,10 +180,16 @@ int cpuidle_enter_state(struct cpuidle_device *dev, struct cpuidle_driver *drv,
 		return -EBUSY;
 
 	trace_cpu_idle_rcuidle(index, dev->cpu);
+#if defined(CONFIG_BCM_KF_POWER_SAVE) && defined(CONFIG_BCM963138)
+	if (time_stats_enable)
+#endif
 	time_start = ktime_get();
 
 	entered_state = target_state->enter(dev, drv, index);
 
+#if defined(CONFIG_BCM_KF_POWER_SAVE) && defined(CONFIG_BCM963138)
+	if (time_stats_enable)
+#endif
 	time_end = ktime_get();
 	trace_cpu_idle_rcuidle(PWR_EVENT_EXIT, dev->cpu);
 
@@ -188,11 +203,19 @@ int cpuidle_enter_state(struct cpuidle_device *dev, struct cpuidle_driver *drv,
 	if (!cpuidle_state_is_coupled(drv, index))
 		local_irq_enable();
 
+#if defined(CONFIG_BCM_KF_POWER_SAVE) && defined(CONFIG_BCM963138)
+	if (time_stats_enable) {
+#endif
 	diff = ktime_to_us(ktime_sub(time_end, time_start));
 	if (diff > INT_MAX)
 		diff = INT_MAX;
 
 	dev->last_residency = (int) diff;
+#if defined(CONFIG_BCM_KF_POWER_SAVE) && defined(CONFIG_BCM963138)
+	} else {
+		dev->last_residency = 0;
+	}
+#endif
 
 	if (entered_state >= 0) {
 		/* Update cpuidle counters */
@@ -631,5 +654,8 @@ static int __init cpuidle_init(void)
 	return 0;
 }
 
+#if defined(CONFIG_BCM_KF_POWER_SAVE) && defined(CONFIG_BCM963138)
+module_param(time_stats_enable, int, 0644);
+#endif
 module_param(off, int, 0444);
 core_initcall(cpuidle_init);

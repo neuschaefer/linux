@@ -36,6 +36,12 @@ extern struct processor {
 	 * Set up any processor specifics
 	 */
 	void (*_proc_init)(void);
+#if defined(CONFIG_BCM_KF_SPECTRE_PATCH) && defined(CONFIG_BCM_SPECTRE_PATCH_ENABLE)
+	/*
+	 * Check for processor bugs
+	 */
+	void (*check_bugs)(void);
+#endif
 	/*
 	 * Disable any processor specifics
 	 */

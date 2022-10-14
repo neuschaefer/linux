@@ -100,6 +100,10 @@
  */
 #define CRYPTO_ALG_INTERNAL		0x00002000
 
+#if defined(CONFIG_BLOG) && defined(CONFIG_BCM_KF_BLOG)
+#define CRYPTO_ALG_BLOG			0x80000000
+#endif
+
 /*
  * Transform masks and values (for crt_flags).
  */
@@ -109,6 +113,9 @@
 #define CRYPTO_TFM_REQ_WEAK_KEY		0x00000100
 #define CRYPTO_TFM_REQ_MAY_SLEEP	0x00000200
 #define CRYPTO_TFM_REQ_MAY_BACKLOG	0x00000400
+#if defined(CONFIG_BLOG) && defined(CONFIG_BCM_KF_BLOG)
+#define CRYPTO_TFM_REQ_MAY_BLOG		0x00080000
+#endif
 #define CRYPTO_TFM_RES_WEAK_KEY		0x00100000
 #define CRYPTO_TFM_RES_BAD_KEY_LEN   	0x00200000
 #define CRYPTO_TFM_RES_BAD_KEY_SCHED 	0x00400000
@@ -197,7 +204,15 @@ struct aead_request {
 	struct scatterlist *assoc;
 	struct scatterlist *src;
 	struct scatterlist *dst;
-
+#if defined(CONFIG_BCM_KF_SPU) && (defined(CONFIG_BCM_SPU) || defined(CONFIG_BCM_SPU_MODULE))
+#if defined(CONFIG_BCM_RDPA) || defined(CONFIG_BCM_RDPA_MODULE)
+	unsigned int data_offset;
+	u8           next_hdr;
+#else
+	int alloc_buff_spu;
+	int headerLen;
+#endif
+#endif
 	void *__ctx[] CRYPTO_MINALIGN_ATTR;
 };
 

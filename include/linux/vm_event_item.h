@@ -12,6 +12,9 @@
 #else
 #define DMA32_ZONE(xx)
 #endif
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX) && defined(CONFIG_BCM_ZONE_ACP)
+#define ACP_ZONE(xx) xx##_ACP,
+#endif
 
 #ifdef CONFIG_HIGHMEM
 #define HIGHMEM_ZONE(xx) , xx##_HIGH
@@ -19,7 +22,11 @@
 #define HIGHMEM_ZONE(xx)
 #endif
 
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX) && defined(CONFIG_BCM_ZONE_ACP)
+#define FOR_ALL_ZONES(xx) DMA_ZONE(xx) DMA32_ZONE(xx) ACP_ZONE(xx) xx##_NORMAL HIGHMEM_ZONE(xx) , xx##_MOVABLE
+#else
 #define FOR_ALL_ZONES(xx) DMA_ZONE(xx) DMA32_ZONE(xx) xx##_NORMAL HIGHMEM_ZONE(xx) , xx##_MOVABLE
+#endif
 
 enum vm_event_item { PGPGIN, PGPGOUT, PSWPIN, PSWPOUT,
 		FOR_ALL_ZONES(PGALLOC),

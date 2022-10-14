@@ -410,6 +410,15 @@ static rx_handler_result_t macvlan_handle_frame(struct sk_buff **pskb)
 	int ret;
 	rx_handler_result_t handle_res;
 
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+    if (blog_ptr(skb)) 
+    {
+        blog_lock();
+        blog_link( IF_DEVICE, blog_ptr(skb), (void*)skb->dev, DIR_RX, skb->len );
+        blog_unlock();
+    }
+#endif
+
 	port = macvlan_port_get_rcu(skb->dev);
 	if (is_multicast_ether_addr(eth->h_dest)) {
 		skb = ip_check_defrag(skb, IP_DEFRAG_MACVLAN);
@@ -513,6 +522,14 @@ static netdev_tx_t macvlan_start_xmit(struct sk_buff *skb,
 	int ret;
 	struct macvlan_dev *vlan = netdev_priv(dev);
 
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+    if (blog_ptr(skb)) 
+    {
+        blog_lock();
+        blog_link( IF_DEVICE, blog_ptr(skb), (void*)dev, DIR_TX, skb->len );
+        blog_unlock();
+    }
+#endif
 	if (unlikely(netpoll_tx_running(dev)))
 		return macvlan_netpoll_send_skb(vlan, skb);
 
@@ -1060,6 +1077,9 @@ void macvlan_common_setup(struct net_device *dev)
 	dev->destructor		= free_netdev;
 	dev->header_ops		= &macvlan_hard_header_ops;
 	dev->ethtool_ops	= &macvlan_ethtool_ops;
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+    dev->blog_stats_flags |= BLOG_DEV_STAT_FLAG_INCLUDE_ALL;
+#endif
 }
 EXPORT_SYMBOL_GPL(macvlan_common_setup);
 

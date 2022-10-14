@@ -30,6 +30,9 @@
 
 struct inet_bind_bucket;
 struct tcp_congestion_ops;
+#if defined(CONFIG_BCM_MPTCP) && defined(CONFIG_BCM_KF_MPTCP)
+struct tcp_options_received;
+#endif
 
 /*
  * Pointers to address related TCP functions
@@ -258,6 +261,11 @@ inet_csk_rto_backoff(const struct inet_connection_sock *icsk,
 
 struct sock *inet_csk_accept(struct sock *sk, int flags, int *err);
 
+#if defined(CONFIG_BCM_MPTCP) && defined(CONFIG_BCM_KF_MPTCP)
+u32 inet_synq_hash(const __be32 raddr, const __be16 rport, const u32 rnd,
+		   const u32 synq_hsize);
+
+#endif
 struct request_sock *inet_csk_search_req(struct sock *sk,
 					 const __be16 rport,
 					 const __be32 raddr,

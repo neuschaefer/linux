@@ -27,6 +27,10 @@ int inet6_csk_bind_conflict(const struct sock *sk,
 
 struct dst_entry *inet6_csk_route_req(struct sock *sk, struct flowi6 *fl6,
 				      const struct request_sock *req);
+#if defined(CONFIG_BCM_MPTCP) && defined(CONFIG_BCM_KF_MPTCP)
+u32 inet6_synq_hash(const struct in6_addr *raddr, const __be16 rport,
+		    const u32 rnd, const u32 synq_hsize);
+#endif
 
 struct request_sock *inet6_csk_search_req(struct sock *sk,
 					  const __be16 rport,

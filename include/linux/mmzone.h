@@ -301,6 +301,12 @@ enum zone_type {
 	 */
 	ZONE_DMA32,
 #endif
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX) && defined(CONFIG_BCM_ZONE_ACP)
+	/*
+	 * a specific memory zone allocated for ACP purpose in BCM63xx platform
+	 */
+	ZONE_ACP,
+#endif
 	/*
 	 * Normal addressable memory is in ZONE_NORMAL. DMA operations can be
 	 * performed on pages in ZONE_NORMAL if the DMA devices support
@@ -880,6 +886,12 @@ static inline int is_highmem(struct zone *zone)
 	return 0;
 #endif
 }
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX) && defined(CONFIG_BCM_ZONE_ACP)
+static inline int is_acp(struct zone *zone)
+{
+	return zone == zone->zone_pgdat->node_zones + ZONE_ACP;
+}
+#endif
 
 /* These two functions are used to setup the per zone pages min values */
 struct ctl_table;

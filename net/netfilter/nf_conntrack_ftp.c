@@ -27,6 +27,13 @@
 #include <net/netfilter/nf_conntrack_helper.h>
 #include <linux/netfilter/nf_conntrack_ftp.h>
 
+#if defined(CONFIG_BCM_KF_RUNNER)
+#if defined(CONFIG_BCM_RDPA) || defined(CONFIG_BCM_RDPA_MODULE)
+#include <net/bl_ops.h>
+#endif /* CONFIG_BCM_RUNNER */
+#endif /* CONFIG_BCM_KF_RUNNER */
+
+
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Rusty Russell <rusty@rustcorp.com.au>");
 MODULE_DESCRIPTION("ftp connection tracking helper");
@@ -35,6 +42,9 @@ MODULE_ALIAS_NFCT_HELPER("ftp");
 
 /* This is slow, but it's simple. --RR */
 static char *ftp_buffer;
+#if defined(CONFIG_BCM_KF_NETFILTER)
+static char *ftp_big_buffer = NULL;
+#endif
 
 static DEFINE_SPINLOCK(nf_ftp_lock);
 
@@ -391,7 +401,11 @@ static int help(struct sk_buff *skb,
 	const struct tcphdr *th;
 	struct tcphdr _tcph;
 	const char *fb_ptr;
+#if defined(CONFIG_BCM_KF_NETFILTER)
+	int ret = NF_ACCEPT;
+#else
 	int ret;
+#endif
 	u32 seq;
 	int dir = CTINFO2DIR(ctinfo);
 	unsigned int uninitialized_var(matchlen), uninitialized_var(matchoff);
@@ -424,6 +438,17 @@ static int help(struct sk_buff *skb,
 	datalen = skb->len - dataoff;
 
 	spin_lock_bh(&nf_ftp_lock);
+#if defined(CONFIG_BCM_KF_NETFILTER)
+	/* In worst case, the packet size will increase by 20 bytes after
+	 * NAT modification */
+	if (datalen > NF_ALG_BUFFER_SIZE - 20) {
+		ftp_big_buffer = kmalloc(datalen + 20, GFP_ATOMIC);
+		if (!ftp_big_buffer)
+			goto out;
+		fb_ptr = skb_header_pointer(skb, dataoff, datalen,
+					    ftp_big_buffer);
+	} else
+#endif
 	fb_ptr = skb_header_pointer(skb, dataoff, datalen, ftp_buffer);
 	BUG_ON(fb_ptr == NULL);
 
@@ -541,7 +566,14 @@ skip_nl_seq:
 			nf_ct_helper_log(skb, ct, "cannot add expectation");
 			ret = NF_DROP;
 		} else
+#if defined(CONFIG_BCM_KF_RUNNER) && (defined(CONFIG_BCM_RDPA) || defined(CONFIG_BCM_RDPA_MODULE))
+		{
+			BL_OPS(net_netfilter_nf_conntrack_ftp(ct, ctinfo, exp, search[dir][i].ftptype));
 			ret = NF_ACCEPT;
+		}
+#else /* CONFIG_BCM_KF_RUNNER && CONFIG_BCM_RUNNER */
+			ret = NF_ACCEPT;
+#endif /* CONFIG_BCM_KF_RUNNER && CONFIG_BCM_RUNNER */
 	}
 
 out_put_expect:
@@ -553,6 +585,12 @@ out_update_nl:
 	if (ends_in_nl)
 		update_nl_seq(ct, seq, ct_ftp_info, dir, skb);
  out:
+#if defined(CONFIG_BCM_KF_NETFILTER)
+ 	if (ftp_big_buffer) {
+		kfree(ftp_big_buffer);
+		ftp_big_buffer = NULL;
+	}
+#endif
 	spin_unlock_bh(&nf_ftp_lock);
 	return ret;
 }
@@ -600,7 +638,11 @@ static int __init nf_conntrack_ftp_init(void)
 {
 	int i, j = -1, ret = 0;
 
+#if defined(CONFIG_BCM_KF_NETFILTER)
+	ftp_buffer = kmalloc(NF_ALG_BUFFER_SIZE, GFP_KERNEL);
+#else
 	ftp_buffer = kmalloc(65536, GFP_KERNEL);
+#endif
 	if (!ftp_buffer)
 		return -ENOMEM;
 

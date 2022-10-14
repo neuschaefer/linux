@@ -23,6 +23,9 @@
 
 #define MIDR_CORTEX_A53 MIDR_CPU_PART(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A53)
 #define MIDR_CORTEX_A57 MIDR_CPU_PART(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A57)
+#if defined CONFIG_BCM_KF_ARM64_BCM963XX
+#define MIDR_CORTEX_B53 MIDR_CPU_PART(ARM_CPU_IMP_BRCM, ARM_CPU_PART_CORTEX_B53)
+#endif
 
 #define CPU_MODEL_MASK (MIDR_IMPLEMENTOR_MASK | MIDR_PARTNUM_MASK | \
 			MIDR_ARCHITECTURE_MASK)
@@ -81,6 +84,14 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
 		.capability = ARM64_WORKAROUND_845719,
 		MIDR_RANGE(MIDR_CORTEX_A53, 0x00, 0x04),
 	},
+#if defined CONFIG_BCM_KF_ARM64_BCM963XX
+	{
+	/* Cortex-B53 based on r0p4.Need this errata */
+		.desc = "ARM erratum 845719",
+		.capability = ARM64_WORKAROUND_845719,
+		MIDR_RANGE(MIDR_CORTEX_B53, 0x00, 0x04),
+	},
+#endif
 #endif
 	{
 	}

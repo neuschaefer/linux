@@ -48,6 +48,9 @@
 #include <linux/nodemask.h>
 #include <linux/moduleparam.h>
 #include <linux/uaccess.h>
+#if defined(CONFIG_BCM_KF_BUZZZ) && defined(CONFIG_BUZZZ_KEVT)
+#include <linux/buzzz.h>
+#endif
 
 #include "workqueue_internal.h"
 
@@ -1460,6 +1463,9 @@ bool queue_work_on(int cpu, struct workqueue_struct *wq,
 	local_irq_save(flags);
 
 	if (!test_and_set_bit(WORK_STRUCT_PENDING_BIT, work_data_bits(work))) {
+#if defined(CONFIG_BCM_KF_BUZZZ) && defined(CONFIG_BUZZZ_KEVT)
+		BUZZZ_KNL3(WORKQ_SCHED, cpu, work->func);
+#endif
 		__queue_work(cpu, wq, work);
 		ret = true;
 	}
@@ -2068,7 +2074,13 @@ __acquires(&pool->lock)
 	lock_map_acquire_read(&pwq->wq->lockdep_map);
 	lock_map_acquire(&lockdep_map);
 	trace_workqueue_execute_start(work);
+#if defined(CONFIG_BCM_KF_BUZZZ) && defined(CONFIG_BUZZZ_KEVT)
+	BUZZZ_KNL3(WORKQ_ENT, 0, work->func);
+#endif
 	worker->current_func(work);
+#if defined(CONFIG_BCM_KF_BUZZZ) && defined(CONFIG_BUZZZ_KEVT)
+	BUZZZ_KNL3(WORKQ_EXT, 0, work->func);
+#endif
 	/*
 	 * While we must be careful to not use "work" after this, the trace
 	 * point will only record its address.

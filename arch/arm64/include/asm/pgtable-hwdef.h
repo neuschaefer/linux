@@ -100,7 +100,11 @@
 #define PTE_TABLE_BIT		(_AT(pteval_t, 1) << 1)
 #define PTE_USER		(_AT(pteval_t, 1) << 6)		/* AP[1] */
 #define PTE_RDONLY		(_AT(pteval_t, 1) << 7)		/* AP[2] */
+#if defined(CONFIG_BCM_KF_GLB_COHERENCY) && defined(CONFIG_BCM_GLB_COHERENCY)
+#define PTE_SHARED		(_AT(pteval_t, 2) << 8)		/* SH[1:0], outer shareable */
+#else
 #define PTE_SHARED		(_AT(pteval_t, 3) << 8)		/* SH[1:0], inner shareable */
+#endif
 #define PTE_AF			(_AT(pteval_t, 1) << 10)	/* Access Flag */
 #define PTE_NG			(_AT(pteval_t, 1) << 11)	/* nG */
 #define PTE_PXN			(_AT(pteval_t, 1) << 53)	/* Privileged XN */
@@ -158,7 +162,12 @@
 #define TCR_ORGN_WT		((UL(2) << 10) | (UL(2) << 26))
 #define TCR_ORGN_WBnWA		((UL(3) << 10) | (UL(3) << 26))
 #define TCR_ORGN_MASK		((UL(3) << 10) | (UL(3) << 26))
+#if defined(CONFIG_BCM_KF_GLB_COHERENCY) && defined(CONFIG_BCM_GLB_COHERENCY)
+/* SH0: Outer Shareable, SH1: Outer Shareable */
+#define TCR_SHARED		((UL(2) << 12) | (UL(2) << 28))
+#else
 #define TCR_SHARED		((UL(3) << 12) | (UL(3) << 28))
+#endif
 #define TCR_TG0_4K		(UL(0) << 14)
 #define TCR_TG0_64K		(UL(1) << 14)
 #define TCR_TG0_16K		(UL(2) << 14)

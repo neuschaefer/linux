@@ -311,7 +311,9 @@ int ovl_copy_up_one(struct dentry *parent, struct dentry *dentry,
 	struct dentry *upperdir;
 	struct dentry *upperdentry;
 	const struct cred *old_cred;
+#if !defined(CONFIG_BCM_KF_OVERLAYFS_BACKPORTS)
 	struct cred *override_cred;
+#endif
 	char *link = NULL;
 
 	if (WARN_ON(!workdir))
@@ -330,6 +332,9 @@ int ovl_copy_up_one(struct dentry *parent, struct dentry *dentry,
 			return PTR_ERR(link);
 	}
 
+#if defined(CONFIG_BCM_KF_OVERLAYFS_BACKPORTS)
+	old_cred = ovl_override_creds(dentry->d_sb);
+#else
 	err = -ENOMEM;
 	override_cred = prepare_creds();
 	if (!override_cred)
@@ -352,6 +357,7 @@ int ovl_copy_up_one(struct dentry *parent, struct dentry *dentry,
 	cap_raise(override_cred->cap_effective, CAP_CHOWN);
 	cap_raise(override_cred->cap_effective, CAP_MKNOD);
 	old_cred = override_creds(override_cred);
+#endif
 
 	err = -EIO;
 	if (lock_rename(workdir, upperdir) != NULL) {
@@ -381,9 +387,10 @@ out_unlock:
 	unlock_rename(workdir, upperdir);
 out_put_cred:
 	revert_creds(old_cred);
+#if !defined(CONFIG_BCM_KF_OVERLAYFS_BACKPORTS)
 	put_cred(override_cred);
-
 out_free_link:
+#endif
 	if (link)
 		free_page((unsigned long) link);
 

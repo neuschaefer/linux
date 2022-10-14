@@ -48,6 +48,10 @@
 #include <net/netprio_cgroup.h>
 
 #include <linux/netdev_features.h>
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+#include <linux/blog.h>
+#include <linux/bcm_dslcpe_wlan_info.h>
+#endif
 #include <linux/neighbour.h>
 #include <uapi/linux/netdevice.h>
 #include <uapi/linux/if_bonding.h>
@@ -178,6 +182,16 @@ struct net_device_stats {
 	unsigned long	tx_window_errors;
 	unsigned long	rx_compressed;
 	unsigned long	tx_compressed;
+#if defined(CONFIG_BCM_KF_EXTSTATS)
+	unsigned long   tx_multicast_packets;  /* multicast packets transmitted */
+	unsigned long   rx_multicast_bytes;  /* multicast bytes recieved */ 
+	unsigned long   tx_multicast_bytes;  /* multicast bytes transmitted */
+	unsigned long   rx_broadcast_packets;  /* broadcast packets recieved */
+	unsigned long   tx_broadcast_packets;  /* broadcast packets transmitted */
+	/* NOTE: Unicast packets are not counted but are instead calculated as needed
+		using total - (broadcast + multicast) */
+	unsigned long   rx_unknown_packets;  /* unknown protocol packets recieved */
+#endif
 };
 
 
@@ -1050,6 +1064,10 @@ struct net_device_ops {
 	int			(*ndo_stop)(struct net_device *dev);
 	netdev_tx_t		(*ndo_start_xmit) (struct sk_buff *skb,
 						   struct net_device *dev);
+#if defined(CONFIG_BCM_KF_DPI) && defined(CONFIG_BCM_DPI_QOS_CPU)
+        int                     (*ndo_dpi_enqueue)(struct sk_buff *skb,
+                                                   struct net_device *dev);
+#endif
 	u16			(*ndo_select_queue)(struct net_device *dev,
 						    struct sk_buff *skb,
 						    void *accel_priv,
@@ -1210,6 +1228,34 @@ struct net_device_ops {
 	int			(*ndo_get_iflink)(const struct net_device *dev);
 };
 
+#if defined(CONFIG_BCM_KF_NETDEV_PATH)
+#define NETDEV_PATH_HW_SUBPORTS_MAX  CONFIG_BCM_MAX_GEM_PORTS
+struct netdev_path
+{
+        /* this pointer is used to create lists of interfaces that belong
+           to the same interface path in Linux. It points to the next
+           interface towards the physical interface (the root interface) */
+        struct net_device *next_dev;
+        /* this reference counter indicates the number of interfaces
+           referencing this interface */
+        int refcount;
+        /* indicates the RX hardware port number associated to the
+           interface */
+        unsigned int hw_port;
+        /* indicates the TX hardware port number associated to the
+           interface */
+        unsigned int hw_tx_port;
+        /* hardware port type, must be set to one of the types defined in
+           BlogPhy_t  */
+        unsigned int hw_port_type;
+        /* some device drivers support virtual subports within a hardware
+		   port. hw_subport_mcast is used to map a multicast hw subport
+		   to a hw port. */
+        unsigned int hw_subport_mcast_idx;
+};
+#endif
+
+
 /**
  * enum net_device_priv_flags - &struct net_device priv_flags
  *
@@ -1271,6 +1317,28 @@ enum netdev_priv_flags {
 	IFF_XMIT_DST_RELEASE_PERM	= 1<<22,
 	IFF_IPVLAN_MASTER		= 1<<23,
 	IFF_IPVLAN_SLAVE		= 1<<24,
+#if defined(CONFIG_BCM_KF_WL)
+	IFF_BCM_WLANDEV			= 1<<25,            /* Broadcom WLAN Interface */
+#endif
+#if defined(CONFIG_BCM_KF_WANDEV)
+	IFF_WANDEV			= 1<<26,            /* avoid WAN bridge traffic leaking */
+#endif
+#if defined(CONFIG_BCM_KF_VLAN)
+	IFF_BCM_VLAN			= 1<<27,            /* Broadcom VLAN Interface */
+#endif
+#if defined(CONFIG_BCM_KF_PPP)
+	IFF_PPP				=1<<28,            /* PPP Interface */
+#endif
+#if defined(CONFIG_BCM_KF_RUNNER)
+	IFF_RNR			    =1<<29,            /* Interface operated by Runner.  */
+#endif
+#if defined(CONFIG_BCM_KF_ENET_SWITCH)  
+	IFF_HW_SWITCH			=1<<30,
+	IFF_EXT_SWITCH			=1<<31,             /* Indicates the interface is an external switch interface */
+
+#endif /* CONFIG_BCM_KF_ENET_SWITCH */
+
+
 };
 
 #define IFF_802_1Q_VLAN			IFF_802_1Q_VLAN
@@ -1554,6 +1622,36 @@ struct net_device {
 	int			group;
 
 	struct net_device_stats	stats;
+
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+	BlogStats_t blog_stats; /* Cummulative stats of accelerated flows */
+	unsigned int blog_stats_flags; /* Blog stats collection property for the device */
+
+#define BLOG_DEV_STAT_FLAG_INCLUDE_SW_UC    (1<<0) /* Include SW accelerated Unicast stats */
+#define BLOG_DEV_STAT_FLAG_INCLUDE_HW_UC    (1<<1) /* Include HW accelerated Unicast stats */
+#define BLOG_DEV_STAT_FLAG_INCLUDE_SW_MC    (1<<2) /* Include SW accelerated Multicast stats */
+#define BLOG_DEV_STAT_FLAG_INCLUDE_HW_MC    (1<<3) /* Include HW accelerated Multicast stats */
+#define BLOG_DEV_STAT_FLAG_INCLUDE_SW       (BLOG_DEV_STAT_FLAG_INCLUDE_SW_UC|BLOG_DEV_STAT_FLAG_INCLUDE_SW_MC)
+#define BLOG_DEV_STAT_FLAG_INCLUDE_HW       (BLOG_DEV_STAT_FLAG_INCLUDE_HW_UC|BLOG_DEV_STAT_FLAG_INCLUDE_HW_MC)
+#define BLOG_DEV_STAT_FLAG_INCLUDE_ALL      (BLOG_DEV_STAT_FLAG_INCLUDE_SW|BLOG_DEV_STAT_FLAG_INCLUDE_HW)
+
+	/* Clear the stats information */
+	void (*clr_stats)(struct net_device *dev_p); /* This should not be tied to BLOG anymore ?*/
+
+	/* CAUTION : put_stats and get_stats_pointer MUST only be used by WLAN */
+	/* Update the bstats */
+	void (*put_stats)(struct net_device *dev_p, BlogStats_t * bStats_p);
+	/* Get stats pointer by type */
+	void* (*get_stats_pointer)(struct net_device *dev_p, char type);
+
+	/* runner multicast acceleration hook,to be enclosed in different MACRO??? */
+	wlan_client_get_info_t  wlan_client_get_info;
+#endif
+
+
+#if defined(CONFIG_BCM_KF_NETDEV_PATH)
+    struct netdev_path path;
+#endif
 
 	atomic_long_t		rx_dropped;
 	atomic_long_t		tx_dropped;
@@ -2914,6 +3012,21 @@ static inline int netif_set_real_num_rx_queues(struct net_device *dev,
 }
 #endif
 
+#if (defined(CONFIG_BCM_KF_FAP_GSO_LOOPBACK) && defined(CONFIG_BCM_FAP_GSO_LOOPBACK))
+typedef enum {
+BCM_GSO_LOOPBACK_NONE=0, /*null device for error protection*/
+BCM_GSO_LOOPBACK_WL0,   /* wlan interface 0 */
+BCM_GSO_LOOPBACK_WL1,   /* wlan interface 1 */
+BCM_GSO_LOOPBACK_WL2,   /* wlan interface 2 */
+BCM_GSO_LOOPBACK_MAXDEVS
+} gso_loopback_devids;
+
+extern int (*bcm_gso_loopback_hw_offload)(struct sk_buff *skb,  unsigned int txDevId);
+extern inline unsigned int bcm_is_gso_loopback_dev(void *dev);
+extern unsigned int bcm_gso_loopback_devptr2devid(void *dev);
+extern struct net_device * bcm_gso_loopback_devid2devptr(unsigned int devId);
+#endif
+
 #ifdef CONFIG_SYSFS
 static inline unsigned int get_netdev_rx_queue_index(
 		struct netdev_rx_queue *queue)
@@ -2935,6 +3048,15 @@ enum skb_free_reason {
 };
 
 void __dev_kfree_skb_irq(struct sk_buff *skb, enum skb_free_reason reason);
+
+#if defined(CONFIG_BCM_KF_SKB_DEFINES) && defined(CONFIG_SMP)
+/* put the skb on a queue, and wake up the skbfreeTask to free it later,
+ * to save some cyles now
+ */
+extern void dev_kfree_skb_thread(struct sk_buff *skb);
+#endif
+
+
 void __dev_kfree_skb_any(struct sk_buff *skb, enum skb_free_reason reason);
 
 /*
@@ -3316,6 +3438,19 @@ static inline void netif_tx_unlock_bh(struct net_device *dev)
 		__netif_tx_unlock(txq);			\
 	}						\
 }
+
+#define HARD_TX_LOCK_BH(dev, txq) {           \
+    if ((dev->features & NETIF_F_LLTX) == 0) {  \
+        __netif_tx_lock_bh(txq);      \
+    }                       \
+}
+
+#define HARD_TX_UNLOCK_BH(dev, txq) {          \
+    if ((dev->features & NETIF_F_LLTX) == 0) {  \
+        __netif_tx_unlock_bh(txq);         \
+    }                       \
+}
+
 
 static inline void netif_tx_disable(struct net_device *dev)
 {
@@ -3829,6 +3964,65 @@ static inline void netif_keep_dst(struct net_device *dev)
 }
 
 extern struct pernet_operations __net_initdata loopback_net_ops;
+
+#if defined(CONFIG_BCM_KF_NETDEV_PATH)
+
+/* Returns TRUE when _dev is a member of a path, otherwise FALSE */
+#define netdev_path_is_linked(_dev) ( (_dev)->path.next_dev != NULL )
+
+/* Returns TRUE when _dev is the leaf in a path, otherwise FALSE */
+#define netdev_path_is_leaf(_dev) ( (_dev)->path.refcount == 0 )
+
+/* Returns TRUE when _dev is the root of a path, otherwise FALSE. The root
+   device is the physical device */
+#define netdev_path_is_root(_dev) ( (_dev)->path.next_dev == NULL )
+
+/* Returns a pointer to the next device in a path, towards the root
+   (physical) device */
+#define netdev_path_next_dev(_dev) ( (_dev)->path.next_dev )
+
+#define netdev_path_set_hw_port(_dev, _hw_port, _hw_port_type)  \
+    do {                                                        \
+        (_dev)->path.hw_port = (_hw_port);                      \
+        (_dev)->path.hw_tx_port = (_hw_port);                   \
+        (_dev)->path.hw_port_type = (_hw_port_type);            \
+    } while(0)
+
+#define netdev_path_set_hw_port_only(_dev, _hw_port)            \
+    do {                                                        \
+        (_dev)->path.hw_port = (_hw_port);                      \
+    } while(0)
+
+#define netdev_path_set_hw_tx_port_only(_dev, _hw_port)         \
+    do {                                                        \
+        (_dev)->path.hw_tx_port = (_hw_port);                   \
+    } while(0)
+
+#define netdev_path_get_hw_port(_dev) ( (_dev)->path.hw_port )
+#define netdev_path_get_hw_tx_port(_dev) ( (_dev)->path.hw_tx_port )
+
+#define netdev_path_get_hw_port_type(_dev) ( (_dev)->path.hw_port_type )
+
+#define netdev_path_get_hw_subport_mcast_idx(_dev) ( (_dev)->path.hw_subport_mcast_idx )
+
+static inline struct net_device *netdev_path_get_root(struct net_device *dev)
+{
+    for (; !netdev_path_is_root(dev); dev = netdev_path_next_dev(dev));
+    return dev;
+}
+
+int netdev_path_add(struct net_device *new_dev, struct net_device *next_dev);
+
+int netdev_path_remove(struct net_device *dev);
+
+void netdev_path_dump(struct net_device *dev);
+
+int netdev_path_set_hw_subport_mcast_idx(struct net_device *dev,
+									 unsigned int subport_idx);
+
+#endif /* CONFIG_BCM_KF_NETDEV_PATH */
+
+
 
 /* Logging, debugging and troubleshooting/diagnostic helpers. */
 

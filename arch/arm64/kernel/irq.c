@@ -28,6 +28,9 @@
 #include <linux/irqchip.h>
 #include <linux/seq_file.h>
 #include <linux/ratelimit.h>
+#if defined CONFIG_BCM_KF_CPU_AFFINITY_HINT && defined CONFIG_HOTPLUG_CPU
+#include <bcm_intr.h>
+#endif
 
 unsigned long irq_err_count;
 
@@ -55,6 +58,9 @@ void __init init_IRQ(void)
 	irqchip_init();
 	if (!handle_arch_irq)
 		panic("No interrupt controller found.");
+#if defined CONFIG_BCM_KF_CPU_AFFINITY_HINT && defined CONFIG_HOTPLUG_CPU
+	hotcpu_notifier(bcm63xx_rehint_irqaffinity, 0);
+#endif
 }
 
 #ifdef CONFIG_HOTPLUG_CPU
@@ -73,6 +79,13 @@ static bool migrate_one_irq(struct irq_desc *desc)
 		return false;
 
 	if (cpumask_any_and(affinity, cpu_online_mask) >= nr_cpu_ids) {
+#if defined CONFIG_BCM_KF_CPU_AFFINITY_HINT
+		// affine cpu is offline; any hinted cpu online?
+		if (desc->affinity_hint &&
+		    cpumask_any_and(desc->affinity_hint, cpu_online_mask) < nr_cpu_ids)
+			affinity = desc->affinity_hint;
+		else
+#endif
 		affinity = cpu_online_mask;
 		ret = true;
 	}

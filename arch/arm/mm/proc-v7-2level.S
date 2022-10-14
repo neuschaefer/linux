@@ -19,12 +19,23 @@
 #define TTB_IRGN_WT	((1 << 0) | (0 << 6))
 #define TTB_IRGN_WB	((1 << 0) | (1 << 6))
 
+#if defined(CONFIG_BCM_KF_GLB_COHERENCY) && defined(CONFIG_BCM_GLB_COHERENCY)
+/* PTWs cacheable, inner WB shareable, outer WB shareable */
+#define TTB_FLAGS_UP	TTB_IRGN_WB|TTB_S|TTB_RGN_OC_WB
+#define PMD_FLAGS_UP	PMD_SECT_WB|PMD_SECT_S
+#else
 /* PTWs cacheable, inner WB not shareable, outer WB not shareable */
 #define TTB_FLAGS_UP	TTB_IRGN_WB|TTB_RGN_OC_WB
 #define PMD_FLAGS_UP	PMD_SECT_WB
+#endif
 
+#if defined(CONFIG_BCM_KF_GLB_COHERENCY) && defined(CONFIG_BCM_GLB_COHERENCY)
+/* PTWs cacheable, inner WBWA shareable, outer WBWA shareable */
+#define TTB_FLAGS_SMP	TTB_IRGN_WBWA|TTB_S|TTB_RGN_OC_WBWA
+#else
 /* PTWs cacheable, inner WBWA shareable, outer WBWA not shareable */
 #define TTB_FLAGS_SMP	TTB_IRGN_WBWA|TTB_S|TTB_NOS|TTB_RGN_OC_WBWA
+#endif
 #define PMD_FLAGS_SMP	PMD_SECT_WBWA|PMD_SECT_S
 
 /*
@@ -37,6 +48,13 @@
  *	It is assumed that:
  *	- we are not using split page tables
  */
+#if defined(CONFIG_BCM_KF_SPECTRE_PATCH) && defined(CONFIG_BCM_SPECTRE_PATCH_ENABLE)
+/*
+ *	Note that we always need to flush BTAC/BTB if IBE is set
+ *	even on Cortex-A8 revisions not affected by 430973.
+ *	If IBE is not set, the flush BTAC/BTB won't do anything.
+ */
+#else
 ENTRY(cpu_ca8_switch_mm)
 #ifdef CONFIG_MMU
 	mov	r2, #0
@@ -44,6 +62,7 @@ ENTRY(cpu_ca8_switch_mm)
 	mcr	p15, 0, r2, c7, c5, 6		@ flush BTAC/BTB
 #endif
 #endif
+#endif /* CONFIG_BCM_KF_SPECTRE_PATCH && CONFIG_BCM_SPECTRE_PATCH_ENABLE */
 ENTRY(cpu_v7_switch_mm)
 #ifdef CONFIG_MMU
 	mmid	r1, r1				@ get mm->context.id
@@ -64,8 +83,10 @@ ENTRY(cpu_v7_switch_mm)
 #endif
 	bx	lr
 ENDPROC(cpu_v7_switch_mm)
+#if defined(CONFIG_BCM_KF_SPECTRE_PATCH) && defined(CONFIG_BCM_SPECTRE_PATCH_ENABLE)
+#else
 ENDPROC(cpu_ca8_switch_mm)
-
+#endif
 /*
  *	cpu_v7_set_pte_ext(ptep, pte)
  *
@@ -141,8 +162,15 @@ ENDPROC(cpu_v7_set_pte_ext)
 	 *   NS1 = PRRR[19] = 1		- normal shareable property
 	 *   NOS = PRRR[24+n] = 1	- not outer shareable
 	 */
+#if defined(CONFIG_BCM_KF_GLB_COHERENCY) && defined(CONFIG_BCM_GLB_COHERENCY)
+/* All NOS - Outer Shareable, Write-Back, Write-Allocate */
+.equ	PRRR,	0xa81a8
+.equ	NMRR,	0x555540e0
+#else
 .equ	PRRR,	0xff0a81a8
 .equ	NMRR,	0x40e040e0
+#endif
+
 
 	/*
 	 * Macro for setting up the TTBRx and TTBCR registers.

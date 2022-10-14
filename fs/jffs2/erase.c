@@ -75,6 +75,46 @@ static void jffs2_erase_block(struct jffs2_sb_info *c,
 
 	((struct erase_priv_struct *)instr->priv)->jeb = jeb;
 	((struct erase_priv_struct *)instr->priv)->c = c;
+#if defined(CONFIG_BCM_KF_MTD_BCMNAND)
+	if (c->mtd->flags & MTD_NAND_NOP1)
+	{ /* check if block is empty first, may not have to erase. must do this at the time of erasing a block
+	and cannot put this in jffs2_check_nand_cleanmarker since that routine is called often, even when not
+	attempting to erase the block and even in non writeable JFFS2 partition. Do this only for NOP=1 device since
+	device is not allowed to have write to spare area only (JFFS2 clean marker inserted after erase) and thus
+	there will be an erase attempt at every boot when JFFS2 checks for erased blocks and the missing clean
+	marker. Do not do erase check for NOP > 1 devices since they are allowed to have a JFFS2 clean marker
+	inserted and by not doing the erase check this will save time */
+		struct mtd_oob_ops ops;
+		loff_t page_offset;
+		int i, dirty = 0;
+		unsigned char buf[c->mtd->writesize + c->mtd->oobsize];
+
+		for (page_offset = 0; !dirty && (page_offset < c->mtd->erasesize); page_offset += c->mtd->writesize)
+		{ // check to see that ECC is empty to determine if page is erased
+			ops.mode = MTD_OPS_RAW;
+			ops.ooblen = c->mtd->oobsize;
+			ops.oobbuf = buf + c->mtd->writesize;
+			ops.len = c->mtd->writesize;
+			ops.ooboffs = ops.retlen = ops.oobretlen = 0;
+			ops.datbuf = buf;
+
+			i = mtd_read_oob(c->mtd, jeb->offset + page_offset, &ops);
+
+			if (i || (ops.oobretlen != ops.ooblen) || (ops.retlen != ops.len))
+				dirty = 1;
+
+			for (i = 0; !dirty && (i < (c->mtd->writesize + c->mtd->oobsize)); i++)
+				if (buf[i] != 0xFF)
+					dirty = 1;
+		}
+		if (!dirty)
+		{
+			instr->state = MTD_ERASE_DONE;
+			jffs2_erase_callback(instr);
+			return;
+		}
+	}
+#endif
 
 	ret = mtd_erase(c->mtd, instr);
 	if (!ret)

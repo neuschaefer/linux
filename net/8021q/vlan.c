@@ -40,11 +40,19 @@
 #include "vlan.h"
 #include "vlanproc.h"
 
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+#include <linux/blog.h>
+#endif
+
 #define DRV_VERSION "1.8"
 
 /* Global VLAN variables */
 
 int vlan_net_id __read_mostly;
+
+#if defined(CONFIG_BCM_KF_VLAN) && (defined(CONFIG_BCM_VLAN) || defined(CONFIG_BCM_VLAN_MODULE))
+int vlan_dev_set_nfmark_to_priority(char *, int);
+#endif
 
 const char vlan_fullname[] = "802.1Q VLAN Support";
 const char vlan_version[] = DRV_VERSION;
@@ -116,6 +124,7 @@ void unregister_vlan_dev(struct net_device *dev, struct list_head *head)
 	/* Get rid of the vlan's reference to real_dev */
 	dev_put(real_dev);
 }
+
 
 int vlan_check_real_dev(struct net_device *real_dev,
 			__be16 protocol, u16 vlan_id)
@@ -250,6 +259,11 @@ static int register_vlan_device(struct net_device *real_dev, u16 vlan_id)
 
 	if (new_dev == NULL)
 		return -ENOBUFS;
+
+#if defined(CONFIG_BCM_KF_VLAN) && (defined(CONFIG_BCM_VLAN) || defined(CONFIG_BCM_VLAN_MODULE))
+    /* If real device is a hardware switch port, the vlan device must also be */
+    new_dev->priv_flags |= real_dev->priv_flags;
+#endif
 
 	dev_net_set(new_dev, net);
 	/* need 4 bytes for extra VLAN header info,
@@ -553,6 +567,13 @@ static int vlan_ioctl_handler(struct net *net, void __user *arg)
 						   args.u.skb_priority,
 						   args.vlan_qos);
 		break;
+
+#if defined(CONFIG_BCM_KF_VLAN) && (defined(CONFIG_BCM_VLAN) || defined(CONFIG_BCM_VLAN_MODULE))
+	case SET_VLAN_NFMARK_TO_PRIORITY_CMD:
+		err = vlan_dev_set_nfmark_to_priority(args.device1,
+						   args.u.nfmark_to_priority);
+		break;
+#endif  
 
 	case SET_VLAN_FLAG_CMD:
 		err = -EPERM;

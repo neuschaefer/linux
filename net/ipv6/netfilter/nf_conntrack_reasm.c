@@ -634,6 +634,9 @@ ret_orig:
 	kfree_skb(clone);
 	return skb;
 }
+#if defined(CONFIG_BCM_KF_MAP) && (defined(CONFIG_BCM_MAP) || defined(CONFIG_BCM_MAP_MODULE))
+EXPORT_SYMBOL_GPL(nf_ct_frag6_gather);
+#endif
 
 void nf_ct_frag6_consume_orig(struct sk_buff *skb)
 {
@@ -646,6 +649,9 @@ void nf_ct_frag6_consume_orig(struct sk_buff *skb)
 		s = s2;
 	}
 }
+#if defined(CONFIG_BCM_KF_MAP) && (defined(CONFIG_BCM_MAP) || defined(CONFIG_BCM_MAP_MODULE))
+EXPORT_SYMBOL_GPL(nf_ct_frag6_consume_orig);
+#endif
 
 static int nf_ct_net_init(struct net *net)
 {

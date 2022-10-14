@@ -35,6 +35,10 @@ void br_log_state(const struct net_bridge_port *p)
 	br_info(p->br, "port %u(%s) entered %s state\n",
 		(unsigned int) p->port_no, p->dev->name,
 		br_port_state_names[p->state]);
+
+#if defined(CONFIG_BCM_KF_BRIDGE_STP)
+	br_stp_notify_state_port(p);
+#endif   
 }
 
 void br_set_state(struct net_bridge_port *p, unsigned int state)

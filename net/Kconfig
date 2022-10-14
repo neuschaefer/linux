@@ -76,10 +76,63 @@ config INET
 
 	  Short answer: say Y.
 
+config BLOG
+	bool "Enable Network Buffer Logging"
+	depends on BCM_KF_BLOG
+	---help---
+	  Debug logging of protocol header information of a network packet
+	  buffer as it traverses the Linux networking stack.
+
+	  Say N unless you wish to debug kernel networking stack.
+
+config BLOG_IPV6
+	bool "Enable Network Buffer Logging of IPv6 packets"
+	depends on BCM_KF_BLOG
+	---help---
+	  Debug logging of IPv6 protocol header information of a network packet
+	  buffer as it traverses the Linux networking stack.
+
+	  Say N unless you wish to debug IPv6 kernel networking stack.
+
+config BLOG_MCAST
+	bool "Enable Network Buffer Logging support for Multicast packets"
+	depends on BCM_KF_BLOG
+	---help---
+	  Debug logging of Multicast packet replication in Linux networking stack.
+
+	  Say N unless you wish to debug Multicast in networking stack.
+
+config BLOG_GRE
+	bool "Enable GRE support"
+	depends on BCM_KF_BLOG
+	---help---
+	  Debug logging of GRE protocol header information of a network packet
+	  buffer as it traverses the Linux networking stack.
+
+	  Say N unless you wish to debug GRE in networking stack.
+
+config BLOG_FEATURE
+	bool "Enable Per Packet Modification support for packet flow"
+	depends on BCM_KF_BLOG
+	---help---
+	  Enhance the flow cache to be able to modify the packets on the fly.
+
+config BLOG_L2TP
+	bool "Enable L2TP support"
+	depends on BCM_KF_BLOG
+	---help---
+	  Debug logging of L2TP protocol header information of a network packet
+	  buffer as it traverses the Linux networking stack.
+
+	  Say N unless you wish to debug l2TP in networking stack.
+
 if INET
 source "net/ipv4/Kconfig"
 source "net/ipv6/Kconfig"
 source "net/netlabel/Kconfig"
+#if defined(CONFIG_BCM_MPTCP) && defined(CONFIG_BCM_KF_MPTCP)
+source "net/mptcp/Kconfig"
+#endif
 
 endif # if INET
 
@@ -217,6 +270,9 @@ source "net/x25/Kconfig"
 source "net/lapb/Kconfig"
 source "net/phonet/Kconfig"
 source "net/6lowpan/Kconfig"
+if BCM_KF_MHI
+source "net/mhi/Kconfig"
+endif
 source "net/ieee802154/Kconfig"
 source "net/mac802154/Kconfig"
 source "net/sched/Kconfig"

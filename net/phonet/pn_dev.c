@@ -33,6 +33,10 @@
 #include <net/sock.h>
 #include <net/netns/generic.h>
 #include <net/phonet/pn_dev.h>
+#ifdef CONFIG_BCM_KF_PHONET
+#include <net/phonet/phonet.h>
+#include <linux/export.h>
+#endif
 
 struct phonet_routes {
 	struct mutex		lock;
@@ -270,6 +274,9 @@ static void phonet_route_autodel(struct net_device *dev)
 	struct phonet_net *pnn = phonet_pernet(dev_net(dev));
 	unsigned int i;
 	DECLARE_BITMAP(deleted, 64);
+#ifdef CONFIG_BCM_KF_PHONET
+	net_dbg_ratelimited(KERN_WARNING "phonet_route_autodel : %s\n", dev->name);
+#endif
 
 	/* Remove left-over Phonet routes */
 	bitmap_zero(deleted, 64);
@@ -298,7 +305,11 @@ static int phonet_device_notify(struct notifier_block *me, unsigned long what,
 
 	switch (what) {
 	case NETDEV_REGISTER:
+#if defined(CONFIG_BCM_KF_PHONET) && defined(CONFIG_BCM_KF_MHI)
+		if ((dev->type == ARPHRD_PHONET) || (dev->type == ARPHRD_MHI))
+#else
 		if (dev->type == ARPHRD_PHONET)
+#endif
 			phonet_device_autoconf(dev);
 		break;
 	case NETDEV_UNREGISTER:
@@ -380,12 +391,19 @@ int phonet_route_add(struct net_device *dev, u8 daddr)
 	mutex_unlock(&routes->lock);
 	return err;
 }
+#ifdef CONFIG_BCM_KF_PHONET
+EXPORT_SYMBOL(phonet_route_add);
+#endif
 
 int phonet_route_del(struct net_device *dev, u8 daddr)
 {
 	struct phonet_net *pnn = phonet_pernet(dev_net(dev));
 	struct phonet_routes *routes = &pnn->routes;
 
+#ifdef CONFIG_BCM_KF_PHONET
+	net_dbg_ratelimited(KERN_WARNING "phonet_route_del : %s  addr %x\n",
+		       dev->name, daddr);
+#endif
 	daddr = daddr >> 2;
 	mutex_lock(&routes->lock);
 	if (rcu_access_pointer(routes->table[daddr]) == dev)
@@ -400,6 +418,9 @@ int phonet_route_del(struct net_device *dev, u8 daddr)
 	dev_put(dev);
 	return 0;
 }
+#ifdef CONFIG_BCM_KF_PHONET
+EXPORT_SYMBOL(phonet_route_del);
+#endif
 
 struct net_device *phonet_route_get_rcu(struct net *net, u8 daddr)
 {
@@ -425,7 +446,17 @@ struct net_device *phonet_route_output(struct net *net, u8 daddr)
 		dev_hold(dev);
 	rcu_read_unlock();
 
+#ifdef CONFIG_BCM_KF_PHONET
+	if (!dev) {
+		/* avoid to send message on the default route
+		 * if no route fond skb is dropped */
+		//dev = phonet_device_get(net); /* Default route */
+		net_dbg_ratelimited(KERN_ERR
+			       "phonet_route_output : no route found !!!\n");
+	}
+#else
 	if (!dev)
 		dev = phonet_device_get(net); /* Default route */
+#endif
 	return dev;
 }

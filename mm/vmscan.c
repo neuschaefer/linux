@@ -3369,6 +3369,11 @@ static int kswapd(void *p)
 	};
 	const struct cpumask *cpumask = cpumask_of_node(pgdat->node_id);
 
+#if defined(CONFIG_BCM_KF_VMSCAN_OPT)
+	/* Lower the priority to prevent lock up when running low on memory */
+	set_user_nice(current, 10);
+#endif
+
 	lockdep_set_current_reclaim_state(GFP_KERNEL);
 
 	if (!cpumask_empty(cpumask))
@@ -3463,6 +3468,17 @@ void wakeup_kswapd(struct zone *zone, int order, enum zone_type classzone_idx)
 
 	if (!cpuset_zone_allowed(zone, GFP_KERNEL | __GFP_HARDWALL))
 		return;
+		
+#if defined(CONFIG_BCM_KF_VMSCAN_OPT)
+	/* Cap the order at 128k blocks to relax fragmentation standard, so kswapd won't be   
+	 * running constantly without much progress in our small swapless system. Big blocks
+	 * should be allocated with vmalloc or kmalloc at boot time for our system 
+	 */
+	if (order > 5) {
+		order = 5;
+	}
+#endif
+
 	pgdat = zone->zone_pgdat;
 	if (pgdat->kswapd_max_order < order) {
 		pgdat->kswapd_max_order = order;
@@ -3610,7 +3626,15 @@ int zone_reclaim_mode __read_mostly;
  * of a node considered for each zone_reclaim. 4 scans 1/16th of
  * a zone.
  */
+
+#if defined(CONFIG_BCM_KF_VMSCAN_OPT)
+/* Start from a higher priority (lower value) for more optimized memory
+ * scanning, see DEF_PRIORITY 
+ */
+#define ZONE_RECLAIM_PRIORITY 2
+#else
 #define ZONE_RECLAIM_PRIORITY 4
+#endif
 
 /*
  * Percentage of pages in a zone that must be unmapped for zone_reclaim to

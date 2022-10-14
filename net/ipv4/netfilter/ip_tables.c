@@ -31,6 +31,12 @@
 #include <net/netfilter/nf_log.h>
 #include "../../netfilter/xt_repldata.h"
 
+#if defined(CONFIG_BCM_KF_RUNNER)
+#if defined(CONFIG_BCM_RDPA) || defined(CONFIG_BCM_RDPA_MODULE)
+#include <net/bl_ops.h>
+#endif /* CONFIG_BCM_RUNNER */
+#endif /* CONFIG_BCM_KF_RUNNER */
+
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Netfilter Core Team <coreteam@netfilter.org>");
 MODULE_DESCRIPTION("IPv4 packet filter");
@@ -72,7 +78,13 @@ EXPORT_SYMBOL_GPL(ipt_alloc_initial_table);
 /* Returns whether matches rule or not. */
 /* Performance critical - called for every packet */
 static inline bool
+
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG_FEATURE)
+ip_packet_match(struct sk_buff *skb,
+		const struct iphdr *ip,
+#else
 ip_packet_match(const struct iphdr *ip,
+#endif
 		const char *indev,
 		const char *outdev,
 		const struct ipt_ip *ipinfo,
@@ -81,6 +93,13 @@ ip_packet_match(const struct iphdr *ip,
 	unsigned long ret;
 
 #define FWINV(bool, invflg) ((bool) ^ !!(ipinfo->invflags & (invflg)))
+
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG_FEATURE)
+		if ( ipinfo->proto == IPPROTO_TCP )
+			skb->ipt_check |= IPT_MATCH_TCP;
+		else if ( ipinfo->proto == IPPROTO_UDP )
+			skb->ipt_check |= IPT_MATCH_UDP;
+#endif
 
 	if (FWINV((ip->saddr&ipinfo->smsk.s_addr) != ipinfo->src.s_addr,
 		  IPT_INV_SRCIP) ||
@@ -347,9 +366,19 @@ ipt_do_table(struct sk_buff *skb,
 		const struct xt_entry_match *ematch;
 
 		IP_NF_ASSERT(e);
+
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG_FEATURE)
+		skb->ipt_check = 0;
+		if (!ip_packet_match(skb, ip, indev, outdev,
+			&e->ip, acpar.fragoff)) {
+#else
 		if (!ip_packet_match(ip, indev, outdev,
 		    &e->ip, acpar.fragoff)) {
+#endif
+
+#if !defined(CONFIG_BCM_KF_BLOG) || !defined(CONFIG_BLOG_FEATURE)
  no_match:
+#endif
 			e = ipt_next_entry(e);
 			continue;
 		}
@@ -358,7 +387,11 @@ ipt_do_table(struct sk_buff *skb,
 			acpar.match     = ematch->u.kernel.match;
 			acpar.matchinfo = ematch->data;
 			if (!acpar.match->match(skb, &acpar))
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG_FEATURE)
+				skb->ipt_check |= IPT_TARGET_CHECK;
+#else
 				goto no_match;
+#endif
 		}
 
 		ADD_COUNTER(e->counters, skb->len, 1);
@@ -417,6 +450,50 @@ ipt_do_table(struct sk_buff *skb,
 		verdict = t->u.kernel.target->target(skb, &acpar);
 		/* Target might have changed stuff. */
 		ip = ip_hdr(skb);
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG_FEATURE)
+        /* Use default policy of the chain */
+		if ( skb->ipt_check & IPT_TARGET_CHECK )
+			verdict = t->u.kernel.target->target(skb, &acpar);
+
+		if ( skb->blog_p ) {
+			if ( (skb->ipt_check & IPT_MATCH_LENGTH) &&
+				(skb->ipt_check & IPT_MATCH_TCP) &&
+				(skb->ipt_check & IPT_TARGET_MARK) &&
+				!(skb->blog_p->isWan) ) {
+				skb->blog_p->preMod = 1;
+				skb->blog_p->postMod = 1;
+				skb->blog_p->preHook = &blog_pre_mod_hook;
+				skb->blog_p->postHook = &blog_post_mod_hook;
+			}
+			if ( (skb->ipt_check & IPT_MATCH_LENGTH) &&
+				(skb->ipt_check & IPT_TARGET_MARK) ) {
+				blog_set_len_tbl(skb->ipt_log.u32);
+				skb->blog_p->preMod = 1;
+				skb->blog_p->postMod = 1;
+				skb->blog_p->lenPrior = 1;
+				skb->blog_p->preHook = &blog_pre_mod_hook;
+				skb->blog_p->postHook = &blog_post_mod_hook;
+			}
+			if ( (skb->ipt_check & IPT_MATCH_DSCP) &&
+				(skb->ipt_check & IPT_TARGET_DSCP) ) {
+				blog_set_dscp_tbl(skb->ipt_log.u8[BLOG_MATCH_DSCP_INDEX], skb->ipt_log.u8[BLOG_TARGET_DSCP_INDEX]);
+				skb->blog_p->preMod = 1;
+				skb->blog_p->postMod = 1;
+				skb->blog_p->dscpMangl = 1;
+				skb->blog_p->preHook = &blog_pre_mod_hook;
+				skb->blog_p->postHook = &blog_post_mod_hook;
+			}
+			if ( (skb->ipt_check & IPT_MATCH_TOS) &&
+				(skb->ipt_check & IPT_TARGET_TOS) ) {
+				blog_set_tos_tbl(skb->ipt_log.u8[BLOG_MATCH_TOS_INDEX], skb->ipt_log.u8[BLOG_TARGET_DSCP_INDEX]);
+				skb->blog_p->preMod = 1;
+				skb->blog_p->postMod = 1;
+				skb->blog_p->tosMangl = 1;
+				skb->blog_p->preHook = &blog_pre_mod_hook;
+				skb->blog_p->postHook = &blog_post_mod_hook;
+			}
+		}
+#endif
 		if (verdict == XT_CONTINUE)
 			e = ipt_next_entry(e);
 		else
@@ -587,6 +664,12 @@ check_match(struct xt_entry_match *m, struct xt_mtchk_param *par)
 		duprintf("check failed for `%s'.\n", par->match->name);
 		return ret;
 	}
+
+#if defined(CONFIG_BCM_KF_RUNNER)
+#if defined(CONFIG_BCM_RDPA) || defined(CONFIG_BCM_RDPA_MODULE)
+	BL_OPS(net_ipv4_netfilter_ip_tables_check_match(m, par, ip));
+#endif /* CONFIG_BCM_RUNNER */
+#endif /* CONFIG_BCM_KF_RUNNER */
 	return 0;
 }
 
@@ -1227,6 +1310,12 @@ __do_replace(struct net *net, const char *name, unsigned int valid_hooks,
 	    (newinfo->number <= oldinfo->initial_entries))
 		module_put(t->me);
 
+#if defined(CONFIG_BCM_KF_RUNNER)
+#if defined(CONFIG_BCM_RDPA) || defined(CONFIG_BCM_RDPA_MODULE)
+        BL_OPS(net_ipv4_netfilter_ip_tables___do_replace(oldinfo, newinfo));
+#endif /* CONFIG_BCM_RUNNER */
+#endif /* CONFIG_BCM_KF_RUNNER */
+
 	/* Get the old counters, and synchronize with replace */
 	get_counters(oldinfo, counters);
 
@@ -1285,6 +1374,13 @@ do_replace(struct net *net, const void __user *user, unsigned int len)
 		ret = -EFAULT;
 		goto free_newinfo;
 	}
+
+#if defined(CONFIG_BCM_KF_RUNNER)
+#if defined(CONFIG_BCM_RDPA) || defined(CONFIG_BCM_RDPA_MODULE)
+		BL_OPS(net_ipv4_netfilter_ip_tables_do_replace(&tmp));
+#endif /* CONFIG_BCM_RUNNER */
+#endif /* CONFIG_BCM_KF_RUNNER */
+
 
 	ret = translate_table(net, newinfo, loc_cpu_entry, &tmp);
 	if (ret != 0)

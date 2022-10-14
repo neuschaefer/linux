@@ -639,10 +639,14 @@ static inline void local_r4k_flush_data_cache_page(void * addr)
 
 static void r4k_flush_data_cache_page(unsigned long addr)
 {
+#if defined(CONFIG_BCM_KF_DCACHE_SHARED) && defined(CONFIG_BCM_DCACHE_SHARED)
+        local_r4k_flush_data_cache_page((void *) addr);
+#else
 	if (in_atomic())
 		local_r4k_flush_data_cache_page((void *)addr);
 	else
 		r4k_on_each_cpu(local_r4k_flush_data_cache_page, (void *) addr);
+#endif
 }
 
 struct flush_icache_range_args {

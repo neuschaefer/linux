@@ -661,6 +661,9 @@ static void igmpv3_send_cr(struct in_device *in_dev)
 	/* change recs */
 	for_each_pmc_rcu(in_dev, pmc) {
 		spin_lock_bh(&pmc->lock);
+#if defined(CONFIG_BCM_KF_MCAST_GR_SUPPRESSION)
+		if ( pmc->osfmode == pmc->sfmode ) {
+#endif
 		if (pmc->sfcount[MCAST_EXCLUDE]) {
 			type = IGMPV3_BLOCK_OLD_SOURCES;
 			dtype = IGMPV3_ALLOW_NEW_SOURCES;
@@ -670,15 +673,29 @@ static void igmpv3_send_cr(struct in_device *in_dev)
 		}
 		skb = add_grec(skb, pmc, type, 0, 0);
 		skb = add_grec(skb, pmc, dtype, 0, 1);	/* deleted sources */
+#if defined(CONFIG_BCM_KF_MCAST_GR_SUPPRESSION)
+		}
+#endif
 
 		/* filter mode changes */
 		if (pmc->crcount) {
+#if defined(CONFIG_BCM_KF_MCAST_GR_SUPPRESSION)
+			if ( pmc->osfmode != pmc->sfmode ) {
+#endif
 			if (pmc->sfmode == MCAST_EXCLUDE)
 				type = IGMPV3_CHANGE_TO_EXCLUDE;
 			else
 				type = IGMPV3_CHANGE_TO_INCLUDE;
 			skb = add_grec(skb, pmc, type, 0, 0);
+#if defined(CONFIG_BCM_KF_MCAST_GR_SUPPRESSION)
+			}
+#endif
 			pmc->crcount--;
+#if defined(CONFIG_BCM_KF_MCAST_GR_SUPPRESSION)
+			if ( pmc->crcount == 0 ) {
+				pmc->osfmode = pmc->sfmode;
+			}
+#endif
 		}
 		spin_unlock_bh(&pmc->lock);
 	}
@@ -1210,6 +1227,12 @@ static void igmp_group_dropped(struct ip_mc_list *im)
 	if (im->multiaddr == IGMP_ALL_HOSTS)
 		return;
 
+#if defined(CONFIG_BCM_KF_IGMP_RIP_ROUTER)
+	/* do not send leave for RIP */
+	if (im->multiaddr == htonl(0xE0000009L))
+		return;
+#endif
+
 	reporter = im->reporter;
 	igmp_stop_timer(im);
 
@@ -1342,6 +1365,9 @@ void ip_mc_inc_group(struct in_device *in_dev, __be32 addr)
 	im->multiaddr = addr;
 	/* initial mode is (EX, empty) */
 	im->sfmode = MCAST_EXCLUDE;
+#if defined(CONFIG_BCM_KF_MCAST_GR_SUPPRESSION)
+	im->osfmode = MCAST_INCLUDE;
+#endif
 	im->sfcount[MCAST_EXCLUDE] = 1;
 	atomic_set(&im->refcnt, 1);
 	spin_lock_init(&im->lock);

@@ -10,6 +10,7 @@
 #include <linux/module.h>
 #include <asm/io.h>
 
+#if !defined(CONFIG_BCM_KF_KERN_WARNING) || defined(CONFIG_NO_GENERIC_PCI_IOPORT_MAP)
 void __iomem *__pci_ioport_map(struct pci_dev *dev,
 			       unsigned long port, unsigned int nr)
 {
@@ -39,6 +40,7 @@ void __iomem *__pci_ioport_map(struct pci_dev *dev,
 
 	return (void __iomem *) (ctrl->io_map_base + port);
 }
+#endif
 
 void pci_iounmap(struct pci_dev *dev, void __iomem * addr)
 {

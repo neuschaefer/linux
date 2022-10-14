@@ -30,3 +30,6 @@ proc-$(CONFIG_PROC_KCORE)	+= kcore.o
 proc-$(CONFIG_PROC_VMCORE)	+= vmcore.o
 proc-$(CONFIG_PRINTK)	+= kmsg.o
 proc-$(CONFIG_PROC_PAGE_MONITOR)	+= page.o
+ifdef BCM_KF # defined(CONFIG_BCM_KF_PROC_BCM)
+proc-$(CONFIG_BCM_KF_PROC_BCM)	+= proc_brcm.o
+endif # BCM_KF

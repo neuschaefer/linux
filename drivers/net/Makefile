@@ -10,6 +10,7 @@ obj-$(CONFIG_IPVLAN) += ipvlan/
 obj-$(CONFIG_DUMMY) += dummy.o
 obj-$(CONFIG_EQUALIZER) += eql.o
 obj-$(CONFIG_IFB) += ifb.o
+obj-$(CONFIG_IMQ) += imq.o
 obj-$(CONFIG_MACVLAN) += macvlan.o
 obj-$(CONFIG_MACVTAP) += macvtap.o
 obj-$(CONFIG_MII) += mii.o
@@ -49,6 +50,9 @@ obj-$(CONFIG_PPP_SYNC_TTY) += ppp/
 obj-$(CONFIG_PPPOE) += ppp/
 obj-$(CONFIG_PPPOL2TP) += ppp/
 obj-$(CONFIG_PPTP) += ppp/
+ifdef BCM_KF # defined CONFIG_BCM_KF_ACCEL_PPTP
+#obj-$(CONFIG_ACCEL_PPTP) += accel-pptp/
+endif # BCM_KF # defined CONFIG_BCM_KF_ACCEL_PPTP
 obj-$(CONFIG_SLIP) += slip/
 obj-$(CONFIG_SLHC) += slip/
 obj-$(CONFIG_NET_SB1000) += sb1000.o

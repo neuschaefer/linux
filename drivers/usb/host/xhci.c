@@ -355,6 +355,8 @@ static void xhci_cleanup_msix(struct xhci_hcd *xhci)
 	return;
 }
 
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX)
+#ifdef CONFIG_PM
 static void __maybe_unused xhci_msix_sync_irqs(struct xhci_hcd *xhci)
 {
 	int i;
@@ -364,6 +366,18 @@ static void __maybe_unused xhci_msix_sync_irqs(struct xhci_hcd *xhci)
 			synchronize_irq(xhci->msix_entries[i].vector);
 	}
 }
+#endif
+#else
+static void __maybe_unused xhci_msix_sync_irqs(struct xhci_hcd *xhci)
+{
+	int i;
+
+	if (xhci->msix_entries) {
+		for (i = 0; i < xhci->msix_count; i++)
+			synchronize_irq(xhci->msix_entries[i].vector);
+	}
+}
+#endif
 
 static int xhci_try_enable_msi(struct usb_hcd *hcd)
 {
@@ -505,6 +519,18 @@ static void compliance_mode_recovery_timer_init(struct xhci_hcd *xhci)
 static bool xhci_compliance_mode_recovery_timer_quirk_check(void)
 {
 	const char *dmi_product_name, *dmi_sys_vendor;
+
+#if defined(CONFIG_BCM_KF_USB_HOSTS) && ( defined(CONFIG_BCM963138) || \
+	defined(CONFIG_BCM963148) || defined(CONFIG_BCM96858) || \
+	defined(CONFIG_BCM94908) || \
+	defined(CONFIG_BCM963158) || defined(CONFIG_BCM96856))
+	
+	/* some bad USB3.0 devices are driving USB3.0 ports into compliance mode
+	* and makin gthe port unusable(till a reboot), this work around helps to
+	* avoid reboot by doing a warm reset.
+	*/
+        return true;
+#endif
 
 	dmi_product_name = dmi_get_system_info(DMI_PRODUCT_NAME);
 	dmi_sys_vendor = dmi_get_system_info(DMI_SYS_VENDOR);

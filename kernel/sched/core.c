@@ -90,6 +90,10 @@
 #define CREATE_TRACE_POINTS
 #include <trace/events/sched.h>
 
+#if defined(CONFIG_BCM_KF_BUZZZ) && defined(CONFIG_BUZZZ_KEVT)
+#include <linux/buzzz.h>
+#endif
+
 void start_bandwidth_timer(struct hrtimer *period_timer, ktime_t period)
 {
 	unsigned long delta;
@@ -296,7 +300,11 @@ const_debug unsigned int sysctl_sched_time_avg = MSEC_PER_SEC;
  * period over which we measure -rt task cpu usage in us.
  * default: 1s
  */
+#if defined(CONFIG_BCM_KF_SCHED_RT) && defined(CONFIG_BCM_SCHED_RT_PERIOD)
+unsigned int sysctl_sched_rt_period = CONFIG_BCM_SCHED_RT_PERIOD;
+#else
 unsigned int sysctl_sched_rt_period = 1000000;
+#endif
 
 __read_mostly int scheduler_running;
 
@@ -304,7 +312,12 @@ __read_mostly int scheduler_running;
  * part of the period that we allow rt tasks to run in us.
  * default: 0.95s
  */
+#if defined(CONFIG_BCM_KF_SCHED_RT) && defined(CONFIG_BCM_SCHED_RT_RUNTIME)
+/* RT task takes 100% of time */
+int sysctl_sched_rt_runtime = CONFIG_BCM_SCHED_RT_RUNTIME;
+#else
 int sysctl_sched_rt_runtime = 950000;
+#endif
 
 /* cpus with isolated domains */
 cpumask_var_t cpu_isolated_map;
@@ -344,6 +357,9 @@ static enum hrtimer_restart hrtick(struct hrtimer *timer)
 	struct rq *rq = container_of(timer, struct rq, hrtick_timer);
 
 	WARN_ON_ONCE(cpu_of(rq) != smp_processor_id());
+#if defined(CONFIG_BCM_KF_BUZZZ) && defined(CONFIG_BUZZZ_KEVT)
+	BUZZZ_KNL3(SCHED_HRTICK, 0, 0);
+#endif
 
 	raw_spin_lock(&rq->lock);
 	update_rq_clock(rq);
@@ -1308,6 +1324,11 @@ static int select_fallback_rq(int cpu, struct task_struct *p)
 	const struct cpumask *nodemask = NULL;
 	enum { cpuset, possible, fail } state = cpuset;
 	int dest_cpu;
+#if defined(CONFIG_BCM_KF_CPU_AFFINITY_HINT) && \
+	defined(CONFIG_BCM_PROC_CPU_AFFINITY_HINT)
+	struct cpumask cpus_valid;
+	int v;
+#endif
 
 	/*
 	 * If the node that the cpu is on has been offlined, cpu_to_node()
@@ -1317,6 +1338,36 @@ static int select_fallback_rq(int cpu, struct task_struct *p)
 	if (nid != -1) {
 		nodemask = cpumask_of_node(nid);
 
+#if defined(CONFIG_BCM_KF_CPU_AFFINITY_HINT) && \
+	defined(CONFIG_BCM_PROC_CPU_AFFINITY_HINT)
+		/*
+		 * As cpu_active_mask is always a subset of cpu_online_mask,
+		 * any CPU on this node which is also active and allowed could
+		 * be selected as the dest_cpu. We prefer such CPU which is
+		 * in addition hinted, if it exists. 
+		 *
+		 *   valid = (node & active & allowed);
+		 *   if (valid) {
+		 *       if (valid & hint) {
+		 *           recover allowed as hint;
+		 *           return dest_cpu = any_of(valid & hint);
+		 *       }
+		 *       return dest_cpu = any_of(valid);
+		 *   }
+		 *   goto try_other_nodes;
+		 */
+		v = cpumask_and(&cpus_valid, nodemask, cpu_active_mask) &&
+		    cpumask_and(&cpus_valid, &cpus_valid, tsk_cpus_allowed(p));
+		if (v) {
+			dest_cpu = cpumask_any_and(&cpus_valid, &p->cpus_hint);
+			if (dest_cpu < nr_cpu_ids) {
+				do_set_cpus_allowed(p, &p->cpus_hint);
+				return dest_cpu;
+			}
+
+			return cpumask_any(&cpus_valid);
+		}
+#else
 		/* Look for allowed, online CPU in same node. */
 		for_each_cpu(dest_cpu, nodemask) {
 			if (!cpu_online(dest_cpu))
@@ -1326,9 +1377,41 @@ static int select_fallback_rq(int cpu, struct task_struct *p)
 			if (cpumask_test_cpu(dest_cpu, tsk_cpus_allowed(p)))
 				return dest_cpu;
 		}
+#endif
 	}
 
 	for (;;) {
+#if defined(CONFIG_BCM_KF_CPU_AFFINITY_HINT) && \
+	defined(CONFIG_BCM_PROC_CPU_AFFINITY_HINT)
+		if (p->flags & PF_KTHREAD) {
+			/*
+			 * Kernel threads can be scheduled to run on online
+			 * CPUs, even if the CPU is not active.
+			 *
+			 *   valid = (allowed & online);
+			 */
+			v = cpumask_and(&cpus_valid, tsk_cpus_allowed(p),
+					cpu_online_mask);
+		} else {
+			/*
+			 * User-space threads must be scheduled to active CPUs.
+			 *
+			 *   valid = (allowed & active);
+			 */
+			v = cpumask_and(&cpus_valid, tsk_cpus_allowed(p),
+					cpu_active_mask);
+		}
+		dest_cpu = v ? cpumask_any_and(&cpus_valid, &p->cpus_hint)
+			     : nr_cpu_ids;
+		if (dest_cpu < nr_cpu_ids) {
+			/* recover allowed as hint; */
+			do_set_cpus_allowed(p, &p->cpus_hint);
+			goto out; /* return dest_cpu = any_of(valid & hint); */
+		}
+		dest_cpu = v ? cpumask_any(&cpus_valid) : nr_cpu_ids;
+		if (dest_cpu < nr_cpu_ids)
+			goto out; /* return dest_cpu = any_of(valid); */
+#else
 		/* Any allowed, online CPU? */
 		for_each_cpu(dest_cpu, tsk_cpus_allowed(p)) {
 			if (!cpu_online(dest_cpu))
@@ -1337,6 +1420,7 @@ static int select_fallback_rq(int cpu, struct task_struct *p)
 				continue;
 			goto out;
 		}
+#endif
 
 		switch (state) {
 		case cpuset:
@@ -1372,6 +1456,43 @@ out:
 	return dest_cpu;
 }
 
+#if defined(CONFIG_BCM_KF_CPU_AFFINITY_HINT) && \
+	defined(CONFIG_BCM_PROC_CPU_AFFINITY_HINT)
+/*
+ * Called by select_task_rq() when the selected cpu is allowed and online to
+ * decide whether select_fallback_rq() should be called to replace the
+ * selected allowed online cpu with some active/online allowed hinted CPU.
+ *
+ * Return 0 (i.e., no need to try to replace the selected allowed online cpu)
+ * if:
+ *     1. no active/online hinted CPU, or 
+ *     2. the selected cpu is one of the active/online hinted CPUs, or
+ *     3. all the active/online hinted CPUs are not allowed now. 
+ *
+ * Condition 3 exists because do_set_cpus_allowed() is also called by
+ * cpuset_cpus_allowed_fallback() in kernel/cpuset.c and __kthread_bind() in
+ * kernel/kthread.c, except for cases in this kernel/sched/core.c. It may be
+ * called at more places in the future kernels too. However, only for the case
+ * of set_cpus_allowed_ptr(), we copy cpus_allowed into cpus_hint after
+ * calling do_set_cpus_allowed().
+ */
+static int try_valid_cpu_hint(int cpu, struct task_struct *p)
+{
+	struct cpumask cpus_valid;
+	int v;
+
+	if (p->flags & PF_KTHREAD)
+		v = cpumask_and(&cpus_valid, &p->cpus_hint,
+				cpu_online_mask);
+	else
+		v = cpumask_and(&cpus_valid, &p->cpus_hint,
+				cpu_active_mask);
+	if (!v || cpumask_test_cpu(cpu, &cpus_valid))
+	       return 0;
+
+	return cpumask_intersects(&cpus_valid, tsk_cpus_allowed(p));
+}
+#endif
 /*
  * The caller (fork, wakeup) owns p->pi_lock, ->cpus_allowed is stable.
  */
@@ -1380,6 +1501,11 @@ int select_task_rq(struct task_struct *p, int cpu, int sd_flags, int wake_flags)
 {
 	if (p->nr_cpus_allowed > 1)
 		cpu = p->sched_class->select_task_rq(p, cpu, sd_flags, wake_flags);
+#if defined(CONFIG_BCM_KF_CPU_AFFINITY_HINT) && \
+	defined(CONFIG_BCM_PROC_CPU_AFFINITY_HINT)
+	else	/* This improvement is back-ported from recent kernel. */
+		cpu = cpumask_any(tsk_cpus_allowed(p));
+#endif
 
 	/*
 	 * In order not to call set_task_cpu() on a blocking task we need
@@ -1392,7 +1518,12 @@ int select_task_rq(struct task_struct *p, int cpu, int sd_flags, int wake_flags)
 	 *   not worry about this generic constraint ]
 	 */
 	if (unlikely(!cpumask_test_cpu(cpu, tsk_cpus_allowed(p)) ||
+#if defined(CONFIG_BCM_KF_CPU_AFFINITY_HINT) && \
+	defined(CONFIG_BCM_PROC_CPU_AFFINITY_HINT)
+		     !cpu_online(cpu) || try_valid_cpu_hint(cpu, p)))
+#else
 		     !cpu_online(cpu)))
+#endif
 		cpu = select_fallback_rq(task_cpu(p), p);
 
 	return cpu;
@@ -2520,6 +2651,9 @@ void scheduler_tick(void)
 	struct rq *rq = cpu_rq(cpu);
 	struct task_struct *curr = rq->curr;
 
+#if defined(CONFIG_BCM_KF_BUZZZ) && defined(CONFIG_BUZZZ_KEVT)
+	BUZZZ_KNL3(SCHED_TICK, jiffies, 0);
+#endif
 	sched_clock_tick();
 
 	raw_spin_lock(&rq->lock);
@@ -2823,7 +2957,10 @@ static void __sched __schedule(void)
 		rq->nr_switches++;
 		rq->curr = next;
 		++*switch_count;
-
+#if defined(CONFIG_BCM_KF_BUZZZ) && defined(CONFIG_BUZZZ_KEVT)
+		BUZZZ_KNL3(TASK_OUT, prev->pid, prev);
+		BUZZZ_KNL3(TASK_IN,  next->pid, next);
+#endif
 		rq = context_switch(rq, prev, next); /* unlocks the rq */
 		cpu = cpu_of(rq);
 	} else
@@ -4827,6 +4964,10 @@ int set_cpus_allowed_ptr(struct task_struct *p, const struct cpumask *new_mask)
 	}
 
 	do_set_cpus_allowed(p, new_mask);
+#if defined(CONFIG_BCM_KF_CPU_AFFINITY_HINT) && \
+	defined(CONFIG_BCM_PROC_CPU_AFFINITY_HINT)
+	cpumask_copy(&p->cpus_hint, new_mask);
+#endif
 
 	/* Can the task run on the task's current CPU? If so, we're done */
 	if (cpumask_test_cpu(task_cpu(p), new_mask))

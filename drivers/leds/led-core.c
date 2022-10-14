@@ -76,7 +76,11 @@ void led_blink_set(struct led_classdev *led_cdev,
 		   unsigned long *delay_on,
 		   unsigned long *delay_off)
 {
+#if defined(CONFIG_BCM_KF_MISC_BACKPORTS)
+	del_timer_sync(&led_cdev->blink_timer);
+#else
 	led_stop_software_blink(led_cdev);
+#endif
 
 	led_cdev->flags &= ~LED_BLINK_ONESHOT;
 	led_cdev->flags &= ~LED_BLINK_ONESHOT_STOP;

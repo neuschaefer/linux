@@ -486,6 +486,11 @@ config CPU_BIG_ENDIAN
        help
          Say Y if you plan on running a kernel in big-endian mode.
 
+if BCM_KF_ARM64_BCM963XX
+config CPU_LITTLE_ENDIAN
+	bool "Build little-endian kernel"
+endif
+
 config SMP
 	bool "Symmetric Multi-Processing"
 	help
@@ -537,6 +542,7 @@ config UP_LATE_INIT
 
 config HZ
 	int
+	prompt "Timer frequency" if BCM_KF_ARM64_BCM963XX
 	default 100
 
 config ARCH_HAS_HOLES_MEMORYMODEL

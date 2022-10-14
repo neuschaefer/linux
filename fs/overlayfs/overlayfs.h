@@ -145,6 +145,9 @@ struct dentry *ovl_entry_real(struct ovl_entry *oe, bool *is_upper);
 struct ovl_dir_cache *ovl_dir_cache(struct dentry *dentry);
 void ovl_set_dir_cache(struct dentry *dentry, struct ovl_dir_cache *cache);
 struct dentry *ovl_workdir(struct dentry *dentry);
+#if defined(CONFIG_BCM_KF_OVERLAYFS_BACKPORTS)
+const struct cred *ovl_override_creds(struct super_block *sb);
+#endif
 int ovl_want_write(struct dentry *dentry);
 void ovl_drop_write(struct dentry *dentry);
 bool ovl_dentry_is_opaque(struct dentry *dentry);

@@ -1474,6 +1474,11 @@ static int console_trylock_for_printk(void)
 {
 	unsigned int cpu = smp_processor_id();
 
+#if defined(CONFIG_BCM_KF_PRINTK_INT_ENABLED) && defined(CONFIG_BCM_PRINTK_INT_ENABLED)
+	if(oops_in_progress || early_boot_irqs_disabled ||
+	   preempt_count() > 1 || irqs_disabled())
+		return 0;
+#endif
 	if (!console_trylock())
 		return 0;
 	/*
@@ -2143,11 +2148,16 @@ static void console_cont_flush(char *text, size_t size)
 		goto out;
 
 	len = cont_print_text(text, size);
+#if defined(CONFIG_BCM_KF_PRINTK_INT_ENABLED) && defined(CONFIG_BCM_PRINTK_INT_ENABLED)
+	raw_spin_unlock_irqrestore(&logbuf_lock, flags);
+	call_console_drivers(cont.level, text, len);
+#else
 	raw_spin_unlock(&logbuf_lock);
 	stop_critical_timings();
 	call_console_drivers(cont.level, text, len);
 	start_critical_timings();
 	local_irq_restore(flags);
+#endif
 	return;
 out:
 	raw_spin_unlock_irqrestore(&logbuf_lock, flags);
@@ -2246,13 +2256,17 @@ skip:
 		console_idx = log_next(console_idx);
 		console_seq++;
 		console_prev = msg->flags;
+#if defined(CONFIG_BCM_KF_PRINTK_INT_ENABLED) && defined(CONFIG_BCM_PRINTK_INT_ENABLED)
+		raw_spin_unlock_irqrestore(&logbuf_lock, flags);
+		call_console_drivers(level, text, len);
+#else
 		raw_spin_unlock(&logbuf_lock);
 
 		stop_critical_timings();	/* don't trace print latency */
 		call_console_drivers(level, text, len);
 		start_critical_timings();
 		local_irq_restore(flags);
-
+#endif
 		if (do_cond_resched)
 			cond_resched();
 	}

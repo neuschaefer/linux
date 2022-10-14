@@ -215,6 +215,12 @@ swiotlb_init(int verbose)
 	unsigned char *vstart;
 	unsigned long bytes;
 
+#if defined CONFIG_BCM_KF_ARM64_BCM963XX
+#if defined CONFIG_ARM64
+	if(!swiotlb_force && (max_pfn <= (arm64_dma_phys_limit >> PAGE_SHIFT)))
+		return;
+#endif
+#endif
 	if (!io_tlb_nslabs) {
 		io_tlb_nslabs = (default_size >> IO_TLB_SHIFT);
 		io_tlb_nslabs = ALIGN(io_tlb_nslabs, IO_TLB_SEGSIZE);
@@ -990,6 +996,12 @@ EXPORT_SYMBOL(swiotlb_dma_mapping_error);
 int
 swiotlb_dma_supported(struct device *hwdev, u64 mask)
 {
+#if defined CONFIG_BCM_KF_ARM64_BCM963XX
+#if defined CONFIG_ARM64
+	if(!swiotlb_force && (max_pfn <= (arm64_dma_phys_limit >> PAGE_SHIFT)))
+		return 1;
+#endif
+#endif
 	return phys_to_dma(hwdev, io_tlb_end - 1) <= mask;
 }
 EXPORT_SYMBOL(swiotlb_dma_supported);

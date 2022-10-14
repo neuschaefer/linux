@@ -203,7 +203,11 @@ static int xt_ct_tg_check(const struct xt_tgchk_param *par,
 		goto err1;
 
 	memset(&t, 0, sizeof(t));
+#if defined(CONFIG_BCM_KF_NETFILTER)
+	ct = nf_conntrack_alloc(par->net, info->zone, NULL, &t, &t, GFP_KERNEL);
+#else
 	ct = nf_conntrack_alloc(par->net, info->zone, &t, &t, GFP_KERNEL);
+#endif
 	ret = PTR_ERR(ct);
 	if (IS_ERR(ct))
 		goto err2;
@@ -380,6 +384,11 @@ static struct xt_target xt_ct_tg_reg[] __read_mostly = {
 static unsigned int
 notrack_tg(struct sk_buff *skb, const struct xt_action_param *par)
 {
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG_FEATURE)
+	skb->ipt_check |= IPT_TARGET_NOTRACK;
+	if ( skb->ipt_check & IPT_TARGET_CHECK )
+		return XT_CONTINUE;
+#endif
 	/* Previously seen (loopback)? Ignore. */
 	if (skb->nfct != NULL)
 		return XT_CONTINUE;

@@ -190,7 +190,12 @@ struct ax88179_int_data {
 static const struct {
 	unsigned char ctrl, timer_l, timer_h, size, ifg;
 } AX88179_BULKIN_SIZE[] =	{
+#if (defined(CONFIG_BCM_KF_USBNET) && defined(CONFIG_BCM_USBNET_THREAD))
+	/* try to reduce number of interrupts */
+	{7, 0x4f, 1,	0x12, 0xff},
+#else
 	{7, 0x4f, 0,	0x12, 0xff},
+#endif
 	{7, 0x20, 3,	0x16, 0xff},
 	{7, 0xae, 7,	0x18, 0xff},
 	{7, 0xcc, 0x4c, 0x18, 8},

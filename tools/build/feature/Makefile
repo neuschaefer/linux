@@ -67,7 +67,15 @@ test-libelf.bin:
 	$(BUILD) -lelf
 
 test-glibc.bin:
-	$(BUILD)
+ifdef BCM_KF 	
+ifneq ($(findstring _$(strip $(BRCM_CHIP))_,_6848_6838_),)	
+	$(BUILD) -DCONFIG_BCM_KF_MIPS_4350
+else
+	$(BUILD)	
+endif
+else
+    $(BUILD)
+endif
 
 test-dwarf.bin:
 	$(BUILD) -ldw

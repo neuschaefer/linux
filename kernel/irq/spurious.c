@@ -13,6 +13,9 @@
 #include <linux/interrupt.h>
 #include <linux/moduleparam.h>
 #include <linux/timer.h>
+#if defined(CONFIG_BCM_KF_BUZZZ) && defined(CONFIG_BUZZZ_KEVT)
+#include <linux/buzzz.h>
+#endif
 
 #include "internals.h"
 
@@ -37,6 +40,9 @@ static atomic_t irq_poll_active;
  */
 bool irq_wait_for_poll(struct irq_desc *desc)
 {
+#if defined(CONFIG_BCM_KF_BUZZZ) && defined(CONFIG_BUZZZ_KEVT)
+	BUZZZ_KNL3(IRQ_WAIT_POLL, desc->irq_data.irq, 0);
+#endif
 	if (WARN_ONCE(irq_poll_cpu == smp_processor_id(),
 		      "irq poll in progress on cpu %d for irq %d\n",
 		      smp_processor_id(), desc->irq_data.irq))
@@ -65,6 +71,9 @@ static int try_one_irq(int irq, struct irq_desc *desc, bool force)
 	irqreturn_t ret = IRQ_NONE;
 	struct irqaction *action;
 
+#if defined(CONFIG_BCM_KF_BUZZZ) && defined(CONFIG_BUZZZ_KEVT)
+	BUZZZ_KNL3(IRQ_MISROUTED, irq, 0);
+#endif
 	raw_spin_lock(&desc->lock);
 
 	/*

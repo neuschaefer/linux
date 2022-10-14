@@ -35,7 +35,11 @@ ENTRY(call_with_stack)
 	mov	r2, r0
 	mov	r0, r1
 
+#if defined(CONFIG_BCM_KF_SPECTRE_PATCH) && defined(CONFIG_BCM_SPECTRE_PATCH_ENABLE)
+	badr	lr, 1f
+#else
 	adr	lr, BSYM(1f)
+#endif
 	ret	r2
 
 1:	ldr	lr, [sp]

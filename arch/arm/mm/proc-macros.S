@@ -258,13 +258,20 @@
 	mcr	p15, 0, ip, c7, c10, 4		@ data write barrier
 	.endm
 
+#if defined(CONFIG_BCM_KF_SPECTRE_PATCH) && defined(CONFIG_BCM_SPECTRE_PATCH_ENABLE)
+.macro define_processor_functions name:req, dabort:req, pabort:req, nommu=0, suspend=0, bugs=0
+#else
 .macro define_processor_functions name:req, dabort:req, pabort:req, nommu=0, suspend=0
+#endif
 	.type	\name\()_processor_functions, #object
 	.align 2
 ENTRY(\name\()_processor_functions)
 	.word	\dabort
 	.word	\pabort
 	.word	cpu_\name\()_proc_init
+#if defined(CONFIG_BCM_KF_SPECTRE_PATCH) && defined(CONFIG_BCM_SPECTRE_PATCH_ENABLE)
+	.word	\bugs
+#endif
 	.word	cpu_\name\()_proc_fin
 	.word	cpu_\name\()_reset
 	.word	cpu_\name\()_do_idle
@@ -359,3 +366,11 @@ ENTRY(\name\()_tlb_fns)
 	orr	\dest, \addr, \dest, lsl #1	@ mask in the region size
 	orr	\dest, \dest, \enable
 .endm
+
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX) && defined(CONFIG_BCM_B15_MEGA_BARRIER)
+.macro issue_mega_barrier
+	stmfd	sp!,{r3,lr}
+	blx	BcmMegaBarrier
+	ldmfd	sp!,{r3,lr}
+.endm
+#endif

@@ -18,6 +18,9 @@
 
 ENTRY(memset)
 UNWIND( .fnstart         )
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX)
+        and     r1, r1, #255            @ mask upper bits, per c99 definition
+#endif
 	ands	r3, r0, #3		@ 1 unaligned?
 	mov	ip, r0			@ preserve r0 as return value
 	bne	6f			@ 1

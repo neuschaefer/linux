@@ -11,8 +11,30 @@ struct vm_area_struct;
 
 /* Plain integer GFP bitmasks. Do not use this directly. */
 #define ___GFP_DMA		0x01u
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX) && defined(CONFIG_BCM_ZONE_ACP)
+/* due to the way kernel only supports up to 4 ZONEs and some tricks
+ * defined in this header file, in order to introduce a new GFP_ACP
+ * flag in to GFP, there are some if-defs implemented to adjust
+ * GFP values. GFP_ACP will use one of the GFP_HIGHMEM or GFP_DMA32
+ * value if they are not used.  If all 3 are enabled, then compilation
+ * will fail. */
+#ifndef CONFIG_ZONE_DMA32
+/* if DMA32 is not defined, then GFP_ACP will share value with GFP_DMA32 */
 #define ___GFP_HIGHMEM		0x02u
 #define ___GFP_DMA32		0x04u
+#define ___GFP_ACP		0x04u
+#elif !defined(CONFIG_HIGHMEM)
+/* if HIGHMEM is not defined, then GFP_ACP will share value with GFP_HIGHMEM */
+#define ___GFP_HIGHMEM		0x02u
+#define ___GFP_ACP		0x02u
+#define ___GFP_DMA32		0x04u
+#else
+#error gfp.h -- cannot have all ACP, DMA32, highmem enabled
+#endif
+#else
+#define ___GFP_HIGHMEM		0x02u
+#define ___GFP_DMA32		0x04u
+#endif
 #define ___GFP_MOVABLE		0x08u
 #define ___GFP_WAIT		0x10u
 #define ___GFP_HIGH		0x20u
@@ -50,7 +72,12 @@ struct vm_area_struct;
 #define __GFP_HIGHMEM	((__force gfp_t)___GFP_HIGHMEM)
 #define __GFP_DMA32	((__force gfp_t)___GFP_DMA32)
 #define __GFP_MOVABLE	((__force gfp_t)___GFP_MOVABLE)  /* Page is movable */
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX) && defined(CONFIG_BCM_ZONE_ACP)
+#define __GFP_ACP	((__force gfp_t)___GFP_ACP)
+#define GFP_ZONEMASK	(__GFP_DMA|__GFP_HIGHMEM|__GFP_ACP|__GFP_DMA32|__GFP_MOVABLE)
+#else
 #define GFP_ZONEMASK	(__GFP_DMA|__GFP_HIGHMEM|__GFP_DMA32|__GFP_MOVABLE)
+#endif
 /*
  * Action modifiers - doesn't change the zoning
  *
@@ -136,7 +163,17 @@ struct vm_area_struct;
 #define GFP_CONSTRAINT_MASK (__GFP_HARDWALL|__GFP_THISNODE)
 
 /* Do not use these with a slab allocator */
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX) && defined(CONFIG_BCM_ZONE_ACP)
+#ifndef CONFIG_ZONE_DMA32
+#define GFP_SLAB_BUG_MASK (__GFP_HIGHMEM|~__GFP_BITS_MASK)
+#elif !defined(CONFIG_HIGHMEM)
+#define GFP_SLAB_BUG_MASK (__GFP_DMA32|~__GFP_BITS_MASK)
+#else
+#error gfp.h -- cannot have all ACP, DMA32, highmem enabled
+#endif
+#else
 #define GFP_SLAB_BUG_MASK (__GFP_DMA32|__GFP_HIGHMEM|~__GFP_BITS_MASK)
+#endif
 
 /* Flag - indicates that the buffer will be suitable for DMA.  Ignored on some
    platforms, used as appropriate on others */
@@ -146,6 +183,9 @@ struct vm_area_struct;
 /* 4GB DMA on some platforms */
 #define GFP_DMA32	__GFP_DMA32
 
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX) && defined(CONFIG_BCM_ZONE_ACP)
+#define GFP_ACP		__GFP_ACP
+#endif
 /* Convert GFP flags to their corresponding migrate type */
 static inline int gfpflags_to_migratetype(const gfp_t gfp_flags)
 {
@@ -177,6 +217,17 @@ static inline int gfpflags_to_migratetype(const gfp_t gfp_flags)
 #define OPT_ZONE_DMA32 ZONE_NORMAL
 #endif
 
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX) && defined(CONFIG_BCM_ZONE_ACP)
+#ifndef CONFIG_ZONE_DMA32
+#undef OPT_ZONE_DMA32
+#define OPT_ZONE_DMA32 ZONE_ACP
+#elif !defined(CONFIG_HIGHMEM)
+#undef OPT_ZONE_HIGHMEM
+#define OPT_ZONE_HIGHMEM ZONE_ACP
+#else
+#error gfp.h -- cannot have all ACP, DMA32, highmem enabled
+#endif
+#endif
 /*
  * GFP_ZONE_TABLE is a word size bitstring that is used for looking up the
  * zone to use given the lowest 4 bits of gfp_t. Entries are ZONE_SHIFT long

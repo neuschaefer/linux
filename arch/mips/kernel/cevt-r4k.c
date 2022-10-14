@@ -14,6 +14,10 @@
 
 #include <asm/time.h>
 #include <asm/cevt-r4k.h>
+#if defined(CONFIG_BCM_KF_POWER_SAVE) && (defined(CONFIG_BCM_HOSTMIPS_PWRSAVE) || defined(CONFIG_BCM_DDR_SELF_REFRESH_PWRSAVE))
+extern void BcmPwrMngtCheckWaitCount(void);
+#endif
+
 
 static int mips_next_event(unsigned long delta,
 			   struct clock_event_device *evt)
@@ -81,6 +85,9 @@ irqreturn_t c0_compare_interrupt(int irq, void *dev_id)
 		cd = &per_cpu(mips_clockevent_device, cpu);
 		cd->event_handler(cd);
 
+#if defined(CONFIG_BCM_KF_POWER_SAVE) && (defined(CONFIG_BCM_HOSTMIPS_PWRSAVE) || defined(CONFIG_BCM_DDR_SELF_REFRESH_PWRSAVE))
+		BcmPwrMngtCheckWaitCount();
+#endif
 		return IRQ_HANDLED;
 	}
 

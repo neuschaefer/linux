@@ -26,6 +26,15 @@
 #include <linux/types.h>
 #include <linux/socket.h>
 
+#ifdef CONFIG_BCM_KF_PHONET
+/* Phonet media types */
+#define PN_MEDIA_ROUTING        0x00
+#define PN_MEDIA_USB            0x1B
+#define PN_MEDIA_DEFAULT        0x25
+#define PN_MEDIA_MODEM_HOST_IF  0x26
+#define PN_MEDIA_AUX_HOST_HOST_IF  0x27
+#endif /* CONFIG_BCM_KF_PHONET */
+
 /* Automatic protocol selection */
 #define PN_PROTO_TRANSPORT	0
 /* Phonet datagram socket */
@@ -44,12 +53,21 @@
 #define PNADDR_BROADCAST	0xFC
 #define PNPORT_RESOURCE_ROUTING	0
 
+#ifdef CONFIG_BCM_KF_PHONET
+/* define object for multicast */
+#define PNOBJECT_MULTICAST      0x20
+#endif /* CONFIG_BCM_KF_PHONET */
+
 /* Values for PNPIPE_ENCAP option */
 #define PNPIPE_ENCAP_NONE	0
 #define PNPIPE_ENCAP_IP		1
 
 /* ioctls */
 #define SIOCPNGETOBJECT		(SIOCPROTOPRIVATE + 0)
+#ifdef CONFIG_BCM_KF_PHONET
+#define SIOCCONFIGTYPE          (SIOCPROTOPRIVATE + 1)
+#define SIOCCONFIGSUBTYPE       (SIOCPROTOPRIVATE + 2)
+#endif
 #define SIOCPNENABLEPIPE	(SIOCPROTOPRIVATE + 13)
 #define SIOCPNADDRESOURCE	(SIOCPROTOPRIVATE + 14)
 #define SIOCPNDELRESOURCE	(SIOCPROTOPRIVATE + 15)

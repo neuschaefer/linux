@@ -11,6 +11,9 @@ struct xt_tcp {
 	__u8 flg_mask;			/* TCP flags mask byte */
 	__u8 flg_cmp;			/* TCP flags compare byte */
 	__u8 invflags;			/* Inverse flags */
+#if defined(CONFIG_BCM_KF_NETFILTER)
+	__u8 pure_ack;			/* Pure ACK packet */
+#endif
 };
 
 /* Values for "inv" field in struct ipt_tcp. */

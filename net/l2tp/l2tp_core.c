@@ -66,6 +66,11 @@
 
 #include "l2tp_core.h"
 
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+#include <linux/nbuff.h>
+#include <linux/blog.h>
+#endif
+
 #define L2TP_DRV_VERSION	"V2.0"
 
 /* L2TP header constants */
@@ -277,6 +282,57 @@ struct l2tp_session *l2tp_session_find(struct net *net, struct l2tp_tunnel *tunn
 	return NULL;
 }
 EXPORT_SYMBOL_GPL(l2tp_session_find);
+
+#if defined(CONFIG_BCM_KF_MISC_BACKPORTS)
+/* Like l2tp_session_find() but takes a reference on the returned session.
+ * Optionally calls session->ref() too if do_ref is true.
+ */
+struct l2tp_session *l2tp_session_get(struct net *net,
+				      struct l2tp_tunnel *tunnel,
+				      u32 session_id, bool do_ref)
+{
+	struct hlist_head *session_list;
+	struct l2tp_session *session;
+
+	if (!tunnel) {
+		struct l2tp_net *pn = l2tp_pernet(net);
+
+		session_list = l2tp_session_id_hash_2(pn, session_id);
+
+		rcu_read_lock_bh();
+		hlist_for_each_entry_rcu(session, session_list, global_hlist)  {
+			if (session->session_id == session_id) {
+				l2tp_session_inc_refcount(session);
+				if (do_ref && session->ref)
+					session->ref(session);
+				rcu_read_unlock_bh();
+
+				return session;
+			}
+		}
+		rcu_read_unlock_bh();
+
+		return NULL;
+	}
+
+	session_list = l2tp_session_id_hash(tunnel, session_id);
+	read_lock_bh(&tunnel->hlist_lock);
+	hlist_for_each_entry(session, session_list, hlist) {
+		if (session->session_id == session_id) {
+			l2tp_session_inc_refcount(session);
+			if (do_ref && session->ref)
+				session->ref(session);
+			read_unlock_bh(&tunnel->hlist_lock);
+
+			return session;
+		}
+	}
+	read_unlock_bh(&tunnel->hlist_lock);
+
+	return NULL;
+}
+EXPORT_SYMBOL_GPL(l2tp_session_get);
+#endif
 
 struct l2tp_session *l2tp_session_get_nth(struct l2tp_tunnel *tunnel, int nth,
 					  bool do_ref)
@@ -1836,6 +1892,30 @@ struct l2tp_session *l2tp_session_create(int priv_size, struct l2tp_tunnel *tunn
 }
 EXPORT_SYMBOL_GPL(l2tp_session_create);
 
+
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+int l2tp_rcv_check(struct net_device *dev, uint16_t tunnel_id, uint16_t session_id)
+{
+    struct net *net = dev_net(dev);
+    struct l2tp_tunnel *tunnel;
+    struct l2tp_session *session = NULL;
+    int ret = BLOG_L2TP_RCV_NO_TUNNEL;
+    
+    tunnel = l2tp_tunnel_find(net, tunnel_id);
+    if (tunnel)
+    {   //printk("*** l2tp tunnel found!!!\n"); 
+        session = l2tp_session_find(net, tunnel, session_id);
+    }   
+    if (session)
+    {   
+        //printk("*** l2tp session found!!!\n");    
+        ret = BLOG_L2TP_RCV_TUNNEL_FOUND;
+    }   
+return ret; 
+}
+EXPORT_SYMBOL(l2tp_rcv_check);
+#endif
+
 /*****************************************************************************
  * Init and cleanup
  *****************************************************************************/
@@ -1882,6 +1962,11 @@ static int __init l2tp_init(void)
 	rc = register_pernet_device(&l2tp_net_ops);
 	if (rc)
 		goto out;
+
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+    printk(KERN_INFO "L2TP core: blog_l2tp_rcv_check \n" );
+    blog_l2tp_rcv_check_fn = (blog_l2tp_rcv_check_t) l2tp_rcv_check;
+#endif 
 
 	l2tp_wq = alloc_workqueue("l2tp", WQ_UNBOUND, 0);
 	if (!l2tp_wq) {

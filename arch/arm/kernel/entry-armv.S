@@ -40,7 +40,11 @@
 #ifdef CONFIG_MULTI_IRQ_HANDLER
 	ldr	r1, =handle_arch_irq
 	mov	r0, sp
+#if defined(CONFIG_BCM_KF_SPECTRE_PATCH) && defined(CONFIG_BCM_SPECTRE_PATCH_ENABLE)
+	badr	lr, 9997f
+#else
 	adr	lr, BSYM(9997f)
+#endif
 	ldr	pc, [r1]
 #else
 	arch_irq_handler_default
@@ -273,7 +277,11 @@ __und_svc:
 	str	r4, [sp, #S_PC]
 	orr	r0, r9, r0, lsl #16
 #endif
+#if defined(CONFIG_BCM_KF_SPECTRE_PATCH) && defined(CONFIG_BCM_SPECTRE_PATCH_ENABLE)
+	badr	r9, __und_svc_finish
+#else
 	adr	r9, BSYM(__und_svc_finish)
+#endif
 	mov	r2, r4
 	bl	call_fpe
 
@@ -469,7 +477,11 @@ __und_usr:
 	@ instruction, or the more conventional lr if we are to treat
 	@ this as a real undefined instruction
 	@
+#if defined(CONFIG_BCM_KF_SPECTRE_PATCH) && defined(CONFIG_BCM_SPECTRE_PATCH_ENABLE)
+	badr	r9, ret_from_exception
+#else
 	adr	r9, BSYM(ret_from_exception)
+#endif
 
 	@ IRQs must be enabled before attempting to read the instruction from
 	@ user space since that could cause a page/translation fault if the
@@ -486,7 +498,11 @@ __und_usr:
 	@ r2 = PC value for the following instruction (:= regs->ARM_pc)
 	@ r4 = PC value for the faulting instruction
 	@ lr = 32-bit undefined instruction function
+#if defined(CONFIG_BCM_KF_SPECTRE_PATCH) && defined(CONFIG_BCM_SPECTRE_PATCH_ENABLE)
+	badr	lr, __und_usr_fault_32
+#else
 	adr	lr, BSYM(__und_usr_fault_32)
+#endif
 	b	call_fpe
 
 __und_usr_thumb:
@@ -522,7 +538,11 @@ ARM_BE8(rev16	r0, r0)				@ little endian instruction
 	add	r2, r2, #2			@ r2 is PC + 2, make it PC + 4
 	str	r2, [sp, #S_PC]			@ it's a 2x16bit instr, update
 	orr	r0, r0, r5, lsl #16
+#if defined(CONFIG_BCM_KF_SPECTRE_PATCH) && defined(CONFIG_BCM_SPECTRE_PATCH_ENABLE)
+	badr	lr, __und_usr_fault_32
+#else
 	adr	lr, BSYM(__und_usr_fault_32)
+#endif
 	@ r0 = the two 16-bit Thumb instructions which caused the exception
 	@ r2 = PC value for the following Thumb instruction (:= regs->ARM_pc)
 	@ r4 = PC value for the first 16-bit Thumb instruction
@@ -716,7 +736,11 @@ __und_usr_fault_32:
 __und_usr_fault_16:
 	mov	r1, #2
 1:	mov	r0, sp
+#if defined(CONFIG_BCM_KF_SPECTRE_PATCH) && defined(CONFIG_BCM_SPECTRE_PATCH_ENABLE)
+	badr	lr, ret_from_exception
+#else
 	adr	lr, BSYM(ret_from_exception)
+#endif
 	b	__und_fault
 ENDPROC(__und_usr_fault_32)
 ENDPROC(__und_usr_fault_16)

@@ -10,6 +10,16 @@
 #ifndef __ASM_BUGS_H
 #define __ASM_BUGS_H
 
+#if defined(CONFIG_BCM_KF_SPECTRE_PATCH) && defined(CONFIG_BCM_SPECTRE_PATCH_ENABLE)
+extern void check_writebuffer_bugs(void);
+#ifdef CONFIG_MMU
+extern void check_bugs(void);
+extern void check_other_bugs(void);
+#else
+#define check_bugs() do { } while (0)
+#define check_other_bugs() do { } while (0)
+#endif
+#else
 #ifdef CONFIG_MMU
 extern void check_writebuffer_bugs(void);
 
@@ -17,5 +27,6 @@ extern void check_writebuffer_bugs(void);
 #else
 #define check_bugs() do { } while (0)
 #endif
+#endif /* CONFIG_BCM_KF_SPECTRE_PATCH && CONFIG_BCM_SPECTRE_PATCH_ENABLE*/
 
 #endif

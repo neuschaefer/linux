@@ -114,8 +114,13 @@ struct mfc6_cache {
 #define MFC_ASSERT_THRESH (3*HZ)		/* Maximal freq. of asserts */
 
 struct rtmsg;
+#if defined(CONFIG_BCM_KF_MROUTE)
+int ip6mr_get_route(struct net *net, struct sk_buff *skb, 
+		    struct rtmsg *rtm, int nowait, int ifIndex);
+#else
 extern int ip6mr_get_route(struct net *net, struct sk_buff *skb,
 			   struct rtmsg *rtm, int nowait);
+#endif
 
 #ifdef CONFIG_IPV6_MROUTE
 extern struct sock *mroute6_socket(struct net *net, struct sk_buff *skb);

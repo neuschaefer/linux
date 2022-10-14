@@ -10,7 +10,11 @@
 	@
 	@ routine called with r0 = irq number, r1 = struct pt_regs *
 	@
+#if defined(CONFIG_BCM_KF_SPECTRE_PATCH) && defined(CONFIG_BCM_SPECTRE_PATCH_ENABLE)
+	badrne	lr, 1b
+#else
 	adrne	lr, BSYM(1b)
+#endif
 	bne	asm_do_IRQ
 
 #ifdef CONFIG_SMP
@@ -23,7 +27,11 @@
 	ALT_SMP(test_for_ipi r0, r2, r6, lr)
 	ALT_UP_B(9997f)
 	movne	r1, sp
+#if defined(CONFIG_BCM_KF_SPECTRE_PATCH) && defined(CONFIG_BCM_SPECTRE_PATCH_ENABLE)
+	badrne	lr, 1b
+#else
 	adrne	lr, BSYM(1b)
+#endif
 	bne	do_IPI
 #endif
 9997:

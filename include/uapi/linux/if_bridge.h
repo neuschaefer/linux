@@ -13,6 +13,12 @@
 #ifndef _UAPI_LINUX_IF_BRIDGE_H
 #define _UAPI_LINUX_IF_BRIDGE_H
 
+#if !defined(CONFIG_BCM_IN_KERNEL)
+#ifndef _LINUX_IF_BRIDGE_H
+#define _LINUX_IF_BRIDGE_H
+#endif
+#endif 
+
 #include <linux/types.h>
 #include <linux/if_ether.h>
 #include <linux/in6.h>
@@ -96,7 +102,11 @@ struct __fdb_entry {
 	__u32 ageing_timer_value;
 	__u8 port_hi;
 	__u8 pad0;
+#if defined(CONFIG_BCM_KF_VLAN_AGGREGATION) && defined(CONFIG_BCM_VLAN_AGGREGATION)
+	__u16 vid;
+#else
 	__u16 unused;
+#endif
 };
 
 /* Bridge Flags */

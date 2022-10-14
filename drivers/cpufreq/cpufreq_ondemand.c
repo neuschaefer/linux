@@ -19,10 +19,19 @@
 #include "cpufreq_governor.h"
 
 /* On-demand governor macros */
+#if defined(CONFIG_BCM_KF_ONDEMAND)
+#define DEF_FREQUENCY_UP_THRESHOLD		(20)
+#define DEF_SAMPLING_DOWN_FACTOR		(10)
+#else
 #define DEF_FREQUENCY_UP_THRESHOLD		(80)
 #define DEF_SAMPLING_DOWN_FACTOR		(1)
+#endif
 #define MAX_SAMPLING_DOWN_FACTOR		(100000)
+#if defined(CONFIG_BCM_KF_ONDEMAND)
+#define MICRO_FREQUENCY_UP_THRESHOLD		(40)
+#else
 #define MICRO_FREQUENCY_UP_THRESHOLD		(95)
+#endif
 #define MICRO_FREQUENCY_MIN_SAMPLE_RATE		(10000)
 #define MIN_FREQUENCY_UP_THRESHOLD		(11)
 #define MAX_FREQUENCY_UP_THRESHOLD		(100)
@@ -33,6 +42,90 @@ static struct od_ops od_ops;
 
 #ifndef CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND
 static struct cpufreq_governor cpufreq_gov_ondemand;
+#if defined(CONFIG_BCM_KF_ONDEMAND)
+// clear current frequency table indices
+static void min_request_clr(struct cpufreq_frequency_table *table)
+{
+	int idx;
+
+	for (idx = 0; table[idx].frequency != CPUFREQ_TABLE_END; idx++)
+		table[idx].driver_data = 0;
+}
+
+// change governor policy min
+static void min_request_chg(struct cpufreq_policy *policy,
+	struct cpufreq_frequency_table *table)
+{
+	unsigned freq, max = 0;
+	int idx = 0;
+
+	// find highest entry whose request count is non-zero
+	while ((freq = table[idx].frequency) != CPUFREQ_TABLE_END) {
+		if (table[idx].driver_data && freq > max)
+			max = freq;
+		idx++;
+	}
+
+	// use lowest min freq if no requests
+	if (max == 0)
+		max = table[0].frequency;
+
+	// update policy if current min != max
+	if (policy->min != max) {
+		struct cpufreq_policy new_policy = *policy;
+		new_policy.min = max;
+
+		if (policy->min < max)
+			__cpufreq_driver_target(policy, max, CPUFREQ_RELATION_L);
+		cpufreq_set_policy(policy, &new_policy);
+	}
+}
+
+// decrement request count for min freq of 'freq'
+static int min_request_dec(struct cpufreq_policy *policy,
+	struct cpufreq_frequency_table *table, unsigned freqmin)
+{
+	unsigned freq;
+	int idx = 0;
+
+	// assume table ordered by frequency; find first entry >= freqmin
+	// (cpufreq_frequency_table_target() honors current policy->min)
+	while ((freq = table[idx].frequency) != CPUFREQ_TABLE_END) {
+		if (freq != CPUFREQ_ENTRY_INVALID && freq >= freqmin) {
+			if (table[idx].driver_data && --table[idx].driver_data == 0) {
+				// expired minimum ... update policy
+				min_request_chg(policy, table);
+			}
+			return 0;
+		}
+		idx++;
+	}
+	return idx;
+}
+
+// increment request count for min freq of 'freq'
+static int min_request_inc(struct cpufreq_policy *policy,
+		struct cpufreq_frequency_table *table, unsigned freqmin)
+{
+	unsigned freq;
+	int idx = 0;
+
+	// assume table ordered by frequency; find first entry >= freqmin
+	// (cpufreq_frequency_table_target() honors current policy->min)
+	while ((freq = table[idx].frequency) != CPUFREQ_TABLE_END) {
+		if (freq != CPUFREQ_ENTRY_INVALID && freq >= freqmin) {
+			if (table[idx].driver_data++ == 0 && freq > policy->min) {
+				// higher minimum ... update policy
+				min_request_chg(policy, table);
+			}
+			return 0;
+		}
+		idx++;
+	}
+	return idx;
+}
+#endif
+
 #endif
 
 static unsigned int default_powersave_bias;
@@ -42,6 +135,9 @@ static void ondemand_powersave_bias_init_cpu(int cpu)
 	struct od_cpu_dbs_info_s *dbs_info = &per_cpu(od_cpu_dbs_info, cpu);
 
 	dbs_info->freq_table = cpufreq_frequency_get_table(cpu);
+#if defined(CONFIG_BCM_KF_ONDEMAND)
+	min_request_clr(dbs_info->freq_table);
+#endif
 	dbs_info->freq_lo = 0;
 }
 
@@ -225,9 +321,35 @@ static void od_dbs_timer(struct work_struct *work)
 	}
 
 max_delay:
+#if defined(CONFIG_BCM_KF_ONDEMAND)
+		/* 
+		 * If we're at the highest frequency we set rate_mult > 1
+		 * so we don't switch to a lower frequency for multiple
+		 * sampling_rate intervals.
+		 *
+		 * delay_for_sampling_rate() tries to align the next timer
+		 * to the next interval where (jiffy % sampling_rate == 0)
+		 *
+		 * e.g. if sampling_rate*1 is 100 jiffies, we try to align
+		 * the timer expiry on all cpus to when jiffies are evenly
+		 * divisible by 100.
+		 *
+		 * Similarly if sampling_rate*10 is 1000 jiffies, the
+		 * timer expiry would be aligned to multiples of 1000.
+		 * But if the current jiffy is 990 then the next aligned
+		 * interval would be at 1000 which is much sooner than
+		 * requested by rate_mult
+		 *
+		 * align to sampling_rate and add rate_mult-1 intervals
+		 */
+		delay = delay_for_sampling_rate(od_tuners->sampling_rate)
+			+ usecs_to_jiffies(od_tuners->sampling_rate
+				* (core_dbs_info->rate_mult - 1));
+#else
 	if (!delay)
 		delay = delay_for_sampling_rate(od_tuners->sampling_rate
 				* core_dbs_info->rate_mult);
+#endif
 
 	gov_queue_work(dbs_data, dbs_info->cdbs.cur_policy, delay, modify_all);
 	mutex_unlock(&core_dbs_info->cdbs.timer_mutex);
@@ -441,7 +563,87 @@ gov_sys_pol_attr_rw(ignore_nice_load);
 gov_sys_pol_attr_rw(powersave_bias);
 gov_sys_pol_attr_ro(sampling_rate_min);
 
+#if defined(CONFIG_BCM_KF_ONDEMAND)
+static int reservation_update(int freq)
+{
+	struct cpufreq_policy *policy;
+	struct od_cpu_dbs_info_s *dbs_info;
+	int ret, cpu;
+
+	cpu = get_cpu();
+	policy = cpufreq_cpu_get(cpu);
+	put_cpu();
+	if (!policy) return -EFAULT;
+	if (!policy->governor_enabled) return -EINVAL;
+	dbs_info = &per_cpu(od_cpu_dbs_info, policy->cpu);
+	cpufreq_cpu_put(policy);
+
+	if (freq > 0)
+		ret = min_request_inc(policy, dbs_info->freq_table, freq);
+	else
+		ret = min_request_dec(policy, dbs_info->freq_table, -freq);
+
+	return ret ? -ENOENT : 0;
+}
+
+// request to reserve minimum frequency
+static ssize_t show_reserve(struct kobject *a, struct attribute *b,
+	char *buf)
+{
+	struct cpufreq_policy *policy;
+	struct od_cpu_dbs_info_s *dbs_info;
+	unsigned count = 0;
+	unsigned freq;
+	int idx = 0;
+	int cpu;
+
+	cpu = get_cpu();
+	policy = cpufreq_cpu_get(cpu);
+	put_cpu();
+	if (!policy) return -ENOENT;
+	dbs_info = &per_cpu(od_cpu_dbs_info, policy->cpu);
+	cpufreq_cpu_put(policy);
+
+	while ((freq = dbs_info->freq_table[idx].frequency) != CPUFREQ_TABLE_END) {
+		count += sprintf(buf + count, "%u:%u ",
+			dbs_info->freq_table[idx].frequency,
+			dbs_info->freq_table[idx].driver_data);
+		idx++;
+	}
+	count += sprintf(buf + count - 1, "\n") - 1;
+	return count;
+}
+
+static ssize_t store_reserve(struct kobject *a, struct attribute *b,
+	const char *buf, size_t count)
+{
+	int freq;
+
+	if (sscanf(buf, "%d", &freq) != 1)
+		return -EINVAL;
+
+	return reservation_update(freq) ?: count;
+}
+
+define_one_global_rw(reserve);
+
+int cpufreq_minimum_reserve(int freq)
+{
+	return reservation_update(freq);
+}
+EXPORT_SYMBOL(cpufreq_minimum_reserve);
+
+int cpufreq_minimum_unreserve(int freq)
+{
+	return reservation_update(-freq);
+}
+EXPORT_SYMBOL(cpufreq_minimum_unreserve);
+#endif
+
 static struct attribute *dbs_attributes_gov_sys[] = {
+#if defined(CONFIG_BCM_KF_ONDEMAND)
+	&reserve.attr,
+#endif
 	&sampling_rate_min_gov_sys.attr,
 	&sampling_rate_gov_sys.attr,
 	&up_threshold_gov_sys.attr,

@@ -206,6 +206,9 @@ static int iproc_rng200_probe(struct platform_device *pdev)
 	priv->rng.read = iproc_rng200_read,
 	priv->rng.init = iproc_rng200_init,
 	priv->rng.cleanup = iproc_rng200_cleanup,
+#if defined(CONFIG_BCM_KF_HWRNG)
+	priv->rng.quality = 1000,
+#endif /* BCM_KF_HWRNG */
 
 	/* Register driver */
 	ret = devm_hwrng_register(dev, &priv->rng);
@@ -214,7 +217,7 @@ static int iproc_rng200_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-	dev_info(dev, "hwrng registered\n");
+	dev_info(dev,"hwrng registered\n");
 
 	return 0;
 }

@@ -27,6 +27,11 @@ nflog_tg(struct sk_buff *skb, const struct xt_action_param *par)
 	const struct xt_nflog_info *info = par->targinfo;
 	struct nf_loginfo li;
 	struct net *net = dev_net(par->in ? par->in : par->out);
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG_FEATURE)
+	skb->ipt_check |= IPT_TARGET_NFLOG;
+	if ( skb->ipt_check & IPT_TARGET_CHECK )
+		return XT_CONTINUE;
+#endif
 
 	li.type		     = NF_LOG_TYPE_ULOG;
 	li.u.ulog.copy_len   = info->len;

@@ -159,6 +159,10 @@ struct vlan_dev_priv {
 #ifdef CONFIG_NET_POLL_CONTROLLER
 	struct netpoll				*netpoll;
 #endif
+
+#if defined(CONFIG_BCM_KF_VLAN) && (defined(CONFIG_BCM_VLAN) || defined(CONFIG_BCM_VLAN_MODULE))
+    int nfmark_to_priority;
+#endif
 	unsigned int				nest_level;
 };
 
@@ -334,6 +338,11 @@ static inline struct sk_buff *vlan_insert_tag(struct sk_buff *skb,
 {
 	int err;
 
+#if defined(CONFIG_BCM_KF_NBUFF)
+#if defined(CONFIG_BCM_KF_VLAN) && (defined(CONFIG_BCM_VLAN) || defined(CONFIG_BCM_VLAN_MODULE))
+	vlan_tci |= skb->cfi_save;
+#endif
+#endif
 	err = __vlan_insert_tag(skb, vlan_proto, vlan_tci);
 	if (err) {
 		dev_kfree_skb_any(skb);

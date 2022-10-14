@@ -87,7 +87,11 @@
 
 1: 	mcount_get_lr	r1			@ lr of instrumented func
 	mcount_adjust_addr	r0, lr		@ instrumented function
+#if defined(CONFIG_BCM_KF_SPECTRE_PATCH) && defined(CONFIG_BCM_SPECTRE_PATCH_ENABLE)
+	badr	lr, 2f
+#else
 	adr	lr, BSYM(2f)
+#endif
 	mov	pc, r2
 2:	mcount_exit
 .endm

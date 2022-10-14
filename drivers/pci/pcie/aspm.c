@@ -76,6 +76,10 @@ static LIST_HEAD(link_list);
 #define POLICY_DEFAULT 0	/* BIOS default setting */
 #define POLICY_PERFORMANCE 1	/* high performance */
 #define POLICY_POWERSAVE 2	/* high power saving */
+#if defined(CONFIG_BCM_KF_POWER_SAVE)
+#define POLICY_L0SPOWERSAVE 3	/* Only do L0S */
+#define POLICY_L1POWERSAVE 4	/* Typically same savings as L1+L0s */
+#endif
 
 #ifdef CONFIG_PCIEASPM_PERFORMANCE
 static int aspm_policy = POLICY_PERFORMANCE;
@@ -89,6 +93,11 @@ static const char *policy_str[] = {
 	[POLICY_DEFAULT] = "default",
 	[POLICY_PERFORMANCE] = "performance",
 	[POLICY_POWERSAVE] = "powersave"
+#if defined(CONFIG_BCM_KF_POWER_SAVE)
+        ,
+	[POLICY_L0SPOWERSAVE] = "l0s_powersave",
+	[POLICY_L1POWERSAVE] = "l1_powersave",
+#endif
 };
 
 #define LINK_RETRAIN_TIMEOUT HZ
@@ -102,6 +111,14 @@ static int policy_to_aspm_state(struct pcie_link_state *link)
 	case POLICY_POWERSAVE:
 		/* Enable ASPM L0s/L1 */
 		return ASPM_STATE_ALL;
+#if defined(CONFIG_BCM_KF_POWER_SAVE)
+	case POLICY_L0SPOWERSAVE:
+		/* Enable ASPM L0s */
+		return ASPM_STATE_L0S;
+	case POLICY_L1POWERSAVE:
+		/* Enable ASPM L1 */
+		return ASPM_STATE_L1;
+#endif
 	case POLICY_DEFAULT:
 		return link->aspm_default;
 	}
@@ -112,9 +129,15 @@ static int policy_to_clkpm_state(struct pcie_link_state *link)
 {
 	switch (aspm_policy) {
 	case POLICY_PERFORMANCE:
+#if defined(CONFIG_BCM_KF_POWER_SAVE)
+	case POLICY_L0SPOWERSAVE:
+#endif
 		/* Disable ASPM and Clock PM */
 		return 0;
 	case POLICY_POWERSAVE:
+#if defined(CONFIG_BCM_KF_POWER_SAVE)
+	case POLICY_L1POWERSAVE:
+#endif
 		/* Disable Clock PM */
 		return 1;
 	case POLICY_DEFAULT:
@@ -172,7 +195,12 @@ static void pcie_clkpm_cap_init(struct pcie_link_state *link, int blacklist)
 	}
 	link->clkpm_enabled = enabled;
 	link->clkpm_default = enabled;
+#if defined(CONFIG_BCM_KF_POWER_SAVE)
+	// Do not enable clkpm for the moment
+	link->clkpm_capable = 0;
+#else
 	link->clkpm_capable = (blacklist) ? 0 : capable;
+#endif
 }
 
 /*
@@ -510,6 +538,25 @@ static int pcie_aspm_sanity_check(struct pci_dev *pdev)
 			dev_info(&child->dev, "disabling ASPM on pre-1.1 PCIe device.  You can enable it with 'pcie_aspm=force'\n");
 			return -EINVAL;
 		}
+#if defined(CONFIG_BCM_KF_POWER_SAVE)
+		// Only enable ASPM where thoroughly tested
+		dev_printk(KERN_DEBUG, &pdev->dev, "Checking PCIe ASPM for vendor %x device %x\n", child->vendor, child->device);
+		if ((child->vendor == 0x14e4) &&
+			(child->device != 0x4365) &&  // 4365
+			(child->device != 0x4366) &&  // 4366
+			(child->device != 0xaa90) &&  // 4366E
+			(child->device != 0xaa92) &&  // 4365E
+			(child->device != 0x4360) &&  // 4360
+			(child->device != 0x43a0) &&  // 4360
+			(child->device != 0x43a1) &&  // 4360
+			(child->device != 0x43a2) &&  // 4360
+			(child->device != 0x43a9) &&  // 43217
+			(child->device != 0xa8db))    // 43217-43227
+		{
+			dev_printk(KERN_DEBUG, &pdev->dev, "Disabling PCIe ASPM for vendor %x device %x\n", child->vendor, child->device);
+			return -EINVAL;
+		}
+#endif
 	}
 	return 0;
 }

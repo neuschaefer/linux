@@ -16,6 +16,9 @@
 #include <linux/of_platform.h>
 #include <linux/io.h>
 #include <linux/rtc/sirfsoc_rtciobrg.h>
+#if defined(CONFIG_BCM_KF_SPECTRE_PATCH) && defined(CONFIG_BCM_SPECTRE_PATCH_ENABLE)
+#include <asm/outercache.h>
+#endif
 #include <asm/suspend.h>
 #include <asm/hardware/cache-l2x0.h>
 

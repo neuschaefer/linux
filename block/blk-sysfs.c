@@ -501,6 +501,9 @@ static void blk_release_queue(struct kobject *kobj)
 	struct request_queue *q =
 		container_of(kobj, struct request_queue, kobj);
 
+#if defined(CONFIG_BCM_KF_MISC_BACKPORTS)
+	bdi_exit(&q->backing_dev_info);
+#endif
 	blkcg_exit_queue(q);
 
 	if (q->elevator) {

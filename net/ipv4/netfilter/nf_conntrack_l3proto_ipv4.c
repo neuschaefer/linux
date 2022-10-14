@@ -41,8 +41,13 @@ static bool ipv4_pkt_to_tuple(const struct sk_buff *skb, unsigned int nhoff,
 	if (ap == NULL)
 		return false;
 
+#if defined(CONFIG_MIPS_BCM963XX) && defined(CONFIG_BCM_KF_UNALIGNED_EXCEPTION)
+	memcpy(&tuple->src.u3.ip, &ap[0], sizeof(__be32));
+	memcpy(&tuple->dst.u3.ip, &ap[1], sizeof(__be32));
+#else
 	tuple->src.u3.ip = ap[0];
 	tuple->dst.u3.ip = ap[1];
+#endif
 
 	return true;
 }

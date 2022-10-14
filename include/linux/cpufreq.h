@@ -155,6 +155,14 @@ void disable_cpufreq(void);
 
 u64 get_cpu_idle_time(unsigned int cpu, u64 *wall, int io_busy);
 int cpufreq_get_policy(struct cpufreq_policy *policy, unsigned int cpu);
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX)
+int cpufreq_set_policy(struct cpufreq_policy *data, struct cpufreq_policy *policy);
+int cpufreq_set_speed(const char *govstr, int fraction);
+unsigned cpufreq_get_freq_max(unsigned *max_out);
+void cpufreq_set_freq_max(unsigned int fraction);
+int cpufreq_minimum_reserve(int freq);
+int cpufreq_minimum_unreserve(int freq);
+#endif
 int cpufreq_update_policy(unsigned int cpu);
 bool have_governor_per_policy(void);
 struct kobject *get_governor_parent_kobj(struct cpufreq_policy *policy);
@@ -271,7 +279,9 @@ struct cpufreq_driver {
 
 	/* Will be called after the driver is fully initialized */
 	void		(*ready)(struct cpufreq_policy *policy);
-
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX)
+	int	(*init_sysfs)	(struct cpufreq_policy *policy);
+#endif
 	struct freq_attr **attr;
 
 	/* platform specific boost support code */

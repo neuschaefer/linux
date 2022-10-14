@@ -45,4 +45,7 @@ void icmp_err(struct sk_buff *skb, u32 info);
 int icmp_init(void);
 void icmp_out_count(struct net *net, unsigned char type);
 
+#if defined(CONFIG_BCM_KF_MAP) && (defined(CONFIG_BCM_MAP) || defined(CONFIG_BCM_MAP_MODULE))
+void send_icmp_frag(struct sk_buff *skb_in, int type, int code, __be32 info);
+#endif
 #endif	/* _ICMP_H */

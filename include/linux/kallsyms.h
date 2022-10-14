@@ -122,7 +122,21 @@ static inline void print_symbol(const char *fmt, unsigned long addr)
 
 static inline void print_ip_sym(unsigned long ip)
 {
+#if defined(CONFIG_BCM_KF_EXTRA_DEBUG)
+#if defined(CONFIG_ARM)
+    if (((ip & 0xF0000000) == 0xc0000000))
+#elif defined (CONFIG_MIPS)
+    if (((ip & 0xF0000000) == 0x80000000))
+#else
+    if ((ip & 0xfffffff000000000) == 0xffffffc000000000 || (ip & 0xfffffff000000000) == 0xffffffb000000000)
+#endif
 	printk("[<%p>] %pS\n", (void *) ip, (void *) ip);
+    else
+    	printk("[<%p>] (suspected corrupt symbol)\n", (void *) ip);
+#else
+
+	printk("[<%p>] %pS\n", (void *) ip, (void *) ip);
+#endif
 }
 
 #endif /*_LINUX_KALLSYMS_H*/

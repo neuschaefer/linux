@@ -29,6 +29,7 @@
 
 #include <asm/uaccess.h>
 #include <asm/byteorder.h>
+#include "board.h"
 
 #include "hub.h"
 #include "otg_whitelist.h"
@@ -523,6 +524,84 @@ static void led_work (struct work_struct *work)
 	if (changed)
 		queue_delayed_work(system_power_efficient_wq,
 				&hub->leds, LED_CYCLE_PERIOD);
+}
+
+static struct semaphore usb_led_sem;
+
+/* control usb led behavior.
+parameters:
+port: usb port
+status: usb led behavior
+*/
+void usb_port_led_config(USB_CONTROL_PORT port, LED_BEH status)
+{
+    BOARD_LED_NAME led_name;
+    if(!in_interrupt())
+        down(&usb_led_sem);
+	
+    if(port == USB_PORT1) 
+    {
+        led_name = kLedUSB;
+    }else
+    {
+        led_name = kLedUSB2;
+    }
+ 
+	switch(status) {
+		case USB_LED_ON:  //usb led on
+			kerSysLedCtrl(led_name, kLedStateOn);
+			break;
+		case USB_LED_OFF: //usb led off
+			kerSysLedCtrl(led_name, kLedStateOff);
+			break;	
+		//case USB_LED_BLINKONCE: //usb have data traffic and led blink
+			//kerSysLedCtrl(led_name, kLedStateBlinkOnce);
+			//break;
+		default:
+			break;			
+	}
+    if(!in_interrupt())
+        up(&usb_led_sem);
+}
+
+/* convert usb_device struct to port number and control led behavior. our led control
+by root hub port,it's behavior don't have relation about externt hub.
+parameters:
+udev: usb_device pointer
+status: usb led behavior
+*/
+void usb_led_control(struct device *dev,LED_BEH status)
+{
+    char *ptmp = NULL;
+    char port_char=0;
+    USB_CONTROL_PORT port = USB_PORT1;
+    const char *devname=NULL ;
+    devname = dev_name(dev);
+
+	//printk("\n_|%s,%d; %s,%d  \n",__FILE__,__LINE__,devname,0);
+	
+   if((ptmp = strchr(devname, '-')))
+   {
+      printk("thought out strch add one get the port.\n");
+      port_char = *(ptmp - 1);
+   }
+   if(ptmp)
+   {
+      switch(port_char) 
+      {
+         case '5':
+            port = USB_PORT2;
+            break;
+		 case '2':	
+         case '3':
+            port = USB_PORT1;
+            break;
+         default:
+            port = USB_PORT2;
+            break;
+      }
+	  //usb_port_led_config(port,status); remove to userspace 
+   }
 }
 
 /* use a short timeout for hub/port status fetches */
@@ -2177,6 +2256,8 @@ void usb_disconnect(struct usb_device **pdev)
 		pm_runtime_put(&port_dev->dev);
 
 	hub_free_dev(udev);
+	usb_led_control(&udev->dev,USB_LED_OFF);
+	printk("USB_LED_OFF\n");	
 
 	put_device(&udev->dev);
 }
@@ -2767,8 +2848,16 @@ static int hub_port_reset(struct usb_hub *hub, int port1,
 					USB_PORT_FEAT_C_BH_PORT_RESET);
 			usb_clear_port_feature(hub->hdev, port1,
 					USB_PORT_FEAT_C_PORT_LINK_STATE);
-			usb_clear_port_feature(hub->hdev, port1,
-					USB_PORT_FEAT_C_CONNECTION);
+            
+#if defined(CONFIG_BCM_KF_USB_HOSTS)
+			/* during reboot some times warm reset is seen and clearing this bit
+			 * is causing device detection issues*/
+			if(warm)
+				printk("+++++ BRCM skipping port_feat_c_connection for warm reset\n");
+			else
+#endif
+				usb_clear_port_feature(hub->hdev, port1,
+						USB_PORT_FEAT_C_CONNECTION);
 
 			/*
 			 * If a USB 3.0 device migrates from reset to an error
@@ -4319,6 +4408,8 @@ hub_port_init (struct usb_hub *hub, struct usb_device *udev, int port1,
 				"%s %s USB device number %d using %s\n",
 				(udev->config) ? "reset" : "new", speed,
 				devnum, udev->bus->controller->driver->name);
+	usb_led_control(&udev->dev,USB_LED_ON);
+	printk("USB_LED_ON\n");	
 
 	/* Set up TT records, if needed  */
 	if (hdev->tt) {
@@ -5169,6 +5260,9 @@ static struct usb_driver hub_driver = {
 
 int usb_hub_init(void)
 {
+	init_MUTEX(&usb_led_sem);
+	usb_port_led_config(USB_PORT1, USB_LED_OFF);
+	usb_port_led_config(USB_PORT2, USB_LED_OFF);
 	if (usb_register(&hub_driver) < 0) {
 		printk(KERN_ERR "%s: can't register hub driver\n",
 			usbcore_name);
@@ -5710,3 +5804,6 @@ acpi_handle usb_get_hub_port_acpi_handle(struct usb_device *hdev,
 	return ACPI_HANDLE(&hub->ports[port1 - 1]->dev);
 }
 #endif
+
+EXPORT_SYMBOL(usb_port_led_config);
+EXPORT_SYMBOL(usb_led_control);

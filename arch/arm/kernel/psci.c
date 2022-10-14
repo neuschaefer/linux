@@ -80,6 +80,17 @@ static int psci_get_version(void)
 	return err;
 }
 
+#if defined(CONFIG_BCM_KF_OPTEE) && defined (CONFIG_BCM_KERNEL_CODE_PROTECTION)
+static int psci_mem_info(void)
+{
+	int err;
+	extern char _stext[], _etext[], __init_begin[];
+
+	err = invoke_psci_fn(PSCI_0_2_FN_MEM_INFO, (u32)_stext, (u32)_etext, (u32)__init_begin);
+	return err;
+}
+#endif
+
 static int psci_cpu_suspend(struct psci_power_state state,
 			    unsigned long entry_point)
 {
@@ -232,7 +243,9 @@ static int psci_0_2_init(struct device_node *np)
 	arm_pm_restart = psci_sys_reset;
 
 	pm_power_off = psci_sys_poweroff;
-
+#if defined(CONFIG_BCM_KF_OPTEE) && defined (CONFIG_BCM_KERNEL_CODE_PROTECTION)
+	psci_mem_info();
+#endif
 out_put_node:
 	of_node_put(np);
 	return err;

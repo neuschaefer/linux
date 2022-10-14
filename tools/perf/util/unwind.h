@@ -14,6 +14,10 @@ struct unwind_entry {
 
 typedef int (*unwind_entry_cb_t)(struct unwind_entry *entry, void *arg);
 
+#if defined(CONFIG_BCM_KF_MIPS_4350) && (defined(CONFIG_BCM96838) || defined(CONFIG_BCM96848))
+int libunwind__arch_reg_id(int regnum);
+#endif
+
 #ifdef HAVE_DWARF_UNWIND_SUPPORT
 int unwind__get_entries(unwind_entry_cb_t cb, void *arg,
 			struct thread *thread,

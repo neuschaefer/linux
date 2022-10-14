@@ -53,4 +53,10 @@ obj-$(CONFIG_MTD_NAND_BCM47XXNFLASH)	+= bcm47xxnflash/
 obj-$(CONFIG_MTD_NAND_SUNXI)		+= sunxi_nand.o
 obj-$(CONFIG_MTD_NAND_HISI504)	        += hisi504_nand.o
 
+ifdef BCM_KF # defined (CONFIG_BCM_KF_MTD_BCM963XX)
+obj-$(CONFIG_MTD_NAND_BRCMNAND)		+= brcmnand/
+obj-$(CONFIG_MTD_BCM_SPI_NAND)		+= bcm63xx_spinand.o
+EXTRA_CFLAGS	+= -I $(TOPDIR)/include/asm-generic -I$(INC_BRCMDRIVER_PUB_PATH)/$(BRCM_BOARD) -I$(INC_BRCMSHARED_PUB_PATH)/$(BRCM_BOARD) -I$(INC_BRCMSHARED_PUB_PATH)/../flash
+endif # BCM_KF # defined(CONFIG_BCM_KF_MTD_BCM963XX)
+
 nand-objs := nand_base.o nand_bbt.o nand_timings.o

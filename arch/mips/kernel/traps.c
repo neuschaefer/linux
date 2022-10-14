@@ -134,6 +134,34 @@ static int __init set_raw_show_trace(char *str)
 __setup("raw_show_trace", set_raw_show_trace);
 #endif
 
+#if defined(CONFIG_BCM_KF_FAP) && (defined(CONFIG_BCM_FAP) || defined(CONFIG_BCM_FAP_MODULE))
+
+long * traps_fap0DbgVals = NULL;
+long * traps_fap1DbgVals = NULL;
+EXPORT_SYMBOL(traps_fap0DbgVals);
+EXPORT_SYMBOL(traps_fap1DbgVals);
+
+static void dumpFapInfo(void)
+{
+    int i;
+    printk("FAP0: ");
+    if (traps_fap0DbgVals != NULL)
+        for (i = 0; i < 10; i++)
+        {
+            printk("[%d]:%08lx ", i, traps_fap0DbgVals[i]);
+        }
+    printk("\n");
+    
+    printk("FAP1: ");
+    if (traps_fap1DbgVals != NULL)
+        for (i = 0; i < 10; i++)
+        {
+            printk("[%d]:%08lx ", i, traps_fap1DbgVals[i]);
+        }
+    printk("\n");
+}
+#endif
+
 static void show_backtrace(struct task_struct *task, const struct pt_regs *regs)
 {
 	unsigned long sp = regs->regs[29];
@@ -147,12 +175,29 @@ static void show_backtrace(struct task_struct *task, const struct pt_regs *regs)
 		show_raw_backtrace(sp);
 		return;
 	}
+
+#if defined(CONFIG_BCM_KF_SHOW_RAW_BACKTRACE)&&defined(CONFIG_KALLSYMS)
+	/*
+	 * Always print the raw backtrace, this will be helpful
+	 * if unwind_stack fails before giving a proper decoded backtrace
+	 */ 
+	show_raw_backtrace(sp);
+	printk("\n");
+#endif
+
 	printk("Call Trace:\n");
 	do {
 		print_ip_sym(pc);
 		pc = unwind_stack(task, &sp, pc, &ra);
 	} while (pc);
 	printk("\n");
+    
+#if defined(CONFIG_BCM_KF_FAP) && (defined(CONFIG_BCM_FAP) || defined(CONFIG_BCM_FAP_MODULE))
+        printk("FAP Information:\n");
+        dumpFapInfo();
+        printk("\n");
+#endif
+    
 }
 
 /*
@@ -681,6 +726,29 @@ static int simulate_rdhwr_mm(struct pt_regs *regs, unsigned short opcode)
 	return -1;
 }
 
+#if defined(CONFIG_BCM_KF_MIPS_BCM963XX) && defined(CONFIG_MIPS_BCM963XX)
+static int simulate_edsp_cfg(struct pt_regs *regs, unsigned int opcode)
+{
+	/*
+	 * In order to run eDSP from userspace, we need to allow configuration
+	 * of the coprocessor register $22. MIPS does not allow writing to the
+	 * coprocessor from userspace without the ST0_CU0 bit set, but enabling
+	 * this bit would allow userspace to access any CP0 register. Instead,
+	 * we only need to allow the following instructions:
+	 *
+	 * mfc0 at,$22,3	(0x4001b003)
+	 * mtc0 at,$22,3	(0x4081b003)
+	 */
+	if(opcode == 0x4001b003)
+		regs->regs[1] = read_c0_brcm_edsp();
+	else if(opcode == 0x4081b003)
+		write_c0_brcm_edsp(regs->regs[1]);
+	else
+		return -1; /* Not ours. */
+
+	return 0;
+}
+#endif //defined(CONFIG_BCM_KF_MIPS_BCM963XX)
 static int simulate_sync(struct pt_regs *regs, unsigned int opcode)
 {
 	if ((opcode & OPCODE) == SPEC0 && (opcode & FUNC) == SYNC) {
@@ -1119,6 +1187,10 @@ no_r2_instr:
 		if (unlikely(get_user(opcode, epc) < 0))
 			status = SIGSEGV;
 
+#if defined(CONFIG_BCM_KF_MIPS_BCM963XX) && defined(CONFIG_MIPS_BCM963XX)
+		if (status < 0)
+			status = simulate_edsp_cfg(regs, opcode);
+#endif //defined(CONFIG_BCM_KF_MIPS_BCM963XX)
 		if (!cpu_has_llsc && status < 0)
 			status = simulate_llsc(regs, opcode);
 
@@ -1372,6 +1444,10 @@ asmlinkage void do_cpu(struct pt_regs *regs)
 			if (unlikely(get_user(opcode, epc) < 0))
 				status = SIGSEGV;
 
+#if defined(CONFIG_BCM_KF_MIPS_BCM963XX) && defined(CONFIG_MIPS_BCM963XX)
+			if (status < 0)
+				status = simulate_edsp_cfg(regs, opcode);
+#endif //defined(CONFIG_BCM_KF_MIPS_BCM963XX)
 			if (!cpu_has_llsc && status < 0)
 				status = simulate_llsc(regs, opcode);
 

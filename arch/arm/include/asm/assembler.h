@@ -177,6 +177,23 @@
 	restore_irqs_notrace \oldcpsr
 	.endm
 
+#if defined(CONFIG_BCM_KF_SPECTRE_PATCH) && defined(CONFIG_BCM_SPECTRE_PATCH_ENABLE)
+/*
+ * Assembly version of "adr rd, BSYM(sym)".  This should only be used to
+ * reference local symbols in the same assembly file which are to be
+ * resolved by the assembler.  Other usage is undefined.
+ */
+	.irp	c,,eq,ne,cs,cc,mi,pl,vs,vc,hi,ls,ge,lt,gt,le,hs,lo
+	.macro	badr\c, rd, sym
+#ifdef CONFIG_THUMB2_KERNEL
+	adr\c	\rd, \sym + 1
+#else
+	adr\c	\rd, \sym
+#endif
+	.endm
+	.endr
+#endif
+
 /*
  * Get current thread_info.
  */
@@ -326,7 +343,11 @@
 THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
 	bne	1f
 	orr	\reg, \reg, #PSR_A_BIT
+#if defined(CONFIG_BCM_KF_SPECTRE_PATCH) && defined(CONFIG_BCM_SPECTRE_PATCH_ENABLE)
+	badr	lr, 2f
+#else
 	adr	lr, BSYM(2f)
+#endif
 	msr	spsr_cxsf, \reg
 	__MSR_ELR_HYP(14)
 	__ERET
@@ -421,6 +442,16 @@ THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
 	.asciz "\string"
 	.size \name , . - \name
 	.endm
+
+#if defined(CONFIG_BCM_KF_SPECTRE_PATCH) && defined(CONFIG_BCM_SPECTRE_PATCH_ENABLE)
+	.macro	csdb
+#ifdef CONFIG_THUMB2_KERNEL
+	.inst.w	0xf3af8014
+#else
+	.inst	0xe320f014
+#endif
+	.endm
+#endif
 
 	.macro check_uaccess, addr:req, size:req, limit:req, tmp:req, bad:req
 #ifndef CONFIG_CPU_USE_DOMAINS

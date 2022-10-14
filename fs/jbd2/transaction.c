@@ -1283,11 +1283,18 @@ int jbd2_journal_dirty_metadata(handle_t *handle, struct buffer_head *bh)
 		 * of the transaction. This needs to be done
 		 * once a transaction -bzzz
 		 */
+#if !defined(CONFIG_BCM_KF_MISC_BACKPORTS) /*CVE-2018-10883*/
 		jh->b_modified = 1;
+#endif
 		if (handle->h_buffer_credits <= 0) {
 			ret = -ENOSPC;
 			goto out_unlock_bh;
 		}
+
+#if defined(CONFIG_BCM_KF_MISC_BACKPORTS)
+/*CVE-2018-10883*/
+		jh->b_modified = 1;
+#endif
 		handle->h_buffer_credits--;
 	}
 

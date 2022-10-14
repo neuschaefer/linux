@@ -203,6 +203,10 @@ struct jffs2_inode_cache {
 #define INOCACHE_HASHSIZE_MIN 128
 #define INOCACHE_HASHSIZE_MAX 1024
 
+#if defined(CONFIG_BCM_KF_JFFS)
+#define INO_FLAGS_COMPR_NONE		0x80
+#endif
+
 #define write_ofs(c) ((c)->nextblock->offset + (c)->sector_size - (c)->nextblock->free_size)
 
 /*

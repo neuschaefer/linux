@@ -121,6 +121,30 @@ static void __init arm_adjust_dma_zone(unsigned long *size, unsigned long *hole,
 }
 #endif
 
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX) && defined(CONFIG_BCM_ZONE_ACP)
+static void __init arm_adjust_acp_zone(unsigned long *size, unsigned long *hole)
+{
+	unsigned long total_size = size[ZONE_NORMAL];
+#ifndef CONFIG_ZONE_DMA
+	total_size += size[0];
+#endif
+	
+	if (total_size <= (CONFIG_BCM_ACP_MEM_SIZE << (20 - PAGE_SHIFT)))
+		return;
+
+#ifdef CONFIG_ZONE_DMA
+	size[ZONE_NORMAL] -= CONFIG_BCM_ACP_MEM_SIZE << (20 - PAGE_SHIFT);
+#else
+	size[ZONE_NORMAL] = size[0] - (CONFIG_BCM_ACP_MEM_SIZE << (20 - PAGE_SHIFT));
+#endif
+	size[ZONE_ACP] = CONFIG_BCM_ACP_MEM_SIZE << (20 - PAGE_SHIFT);
+#ifndef CONFIG_ZONE_DMA
+	hole[ZONE_NORMAL] = hole[0];
+#endif
+	hole[ZONE_ACP] = 0;
+}
+#endif
+
 void __init setup_dma_zone(const struct machine_desc *mdesc)
 {
 #ifdef CONFIG_ZONE_DMA
@@ -183,6 +207,10 @@ static void __init zone_sizes_init(unsigned long min, unsigned long max_low,
 	if (arm_dma_zone_size)
 		arm_adjust_dma_zone(zone_size, zhole_size,
 			arm_dma_zone_size >> PAGE_SHIFT);
+#endif
+
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX) && defined(CONFIG_BCM_ZONE_ACP)
+	arm_adjust_acp_zone(zone_size, zhole_size);
 #endif
 
 	free_area_init_node(0, zone_size, min, zhole_size);

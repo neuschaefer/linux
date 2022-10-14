@@ -121,9 +121,16 @@ void __weak arch_teardown_msi_irq(unsigned int irq)
 
 int __weak arch_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
 {
+#if defined(CONFIG_BCM_KF_MISC_BACKPORTS)
+	struct msi_controller *chip = pci_msi_controller(dev);
+#endif
 	struct msi_desc *entry;
 	int ret;
 
+#if defined(CONFIG_BCM_KF_MISC_BACKPORTS)
+	if (chip && chip->setup_irqs)
+		return chip->setup_irqs(chip, dev, nvec, type);
+#endif
 	/*
 	 * If an architecture wants to support multiple MSI, it needs to
 	 * override arch_setup_msi_irqs()

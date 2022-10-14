@@ -33,5 +33,8 @@
  */
 extern int watchdog_dev_register(struct watchdog_device *);
 extern int watchdog_dev_unregister(struct watchdog_device *);
+#if defined(CONFIG_BCM_KF_WDT)
+extern int watchdog_dev_force_disable( void );
+#endif
 extern int __init watchdog_dev_init(void);
 extern void __exit watchdog_dev_exit(void);

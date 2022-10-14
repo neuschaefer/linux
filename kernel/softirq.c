@@ -29,6 +29,9 @@
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/irq.h>
+#if defined(CONFIG_BCM_KF_BUZZZ) && defined(CONFIG_BUZZZ_KEVT)
+#include <linux/buzzz.h>
+#endif
 
 /*
    - No shared variables, all the data are CPU local.
@@ -270,7 +273,13 @@ restart:
 		kstat_incr_softirqs_this_cpu(vec_nr);
 
 		trace_softirq_entry(vec_nr);
+#if defined(CONFIG_BCM_KF_BUZZZ) && defined(CONFIG_BUZZZ_KEVT)
+		BUZZZ_KNL3(SIRQ_ENT, 0, h->action);
+#endif
 		h->action(h);
+#if defined(CONFIG_BCM_KF_BUZZZ) && defined(CONFIG_BUZZZ_KEVT)
+		BUZZZ_KNL3(SIRQ_EXT, 0, h->action);
+#endif
 		trace_softirq_exit(vec_nr);
 		if (unlikely(prev_count != preempt_count())) {
 			pr_err("huh, entered softirq %u %s %p with preempt_count %08x, exited with %08x?\n",

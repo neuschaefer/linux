@@ -49,7 +49,11 @@
 ENTRY(mcpm_entry_point)
 
  ARM_BE8(setend        be)
+#if defined(CONFIG_BCM_KF_SPECTRE_PATCH) && defined(CONFIG_BCM_SPECTRE_PATCH_ENABLE)
+ THUMB(	badr	r12, 1f		)
+#else
  THUMB(	adr	r12, BSYM(1f)	)
+#endif
  THUMB(	bx	r12		)
  THUMB(	.thumb			)
 1:

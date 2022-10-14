@@ -185,6 +185,9 @@ int sysctl_lowmem_reserve_ratio[MAX_NR_ZONES-1] = {
 #ifdef CONFIG_ZONE_DMA32
 	 256,
 #endif
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX) && defined(CONFIG_BCM_ZONE_ACP)
+	 1,
+#endif
 #ifdef CONFIG_HIGHMEM
 	 32,
 #endif
@@ -199,6 +202,9 @@ static char * const zone_names[MAX_NR_ZONES] = {
 #endif
 #ifdef CONFIG_ZONE_DMA32
 	 "DMA32",
+#endif
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX) && defined(CONFIG_BCM_ZONE_ACP)
+	 "ACP",
 #endif
 	 "Normal",
 #ifdef CONFIG_HIGHMEM

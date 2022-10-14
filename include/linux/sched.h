@@ -64,6 +64,7 @@ struct sched_param {
 
 #define SCHED_ATTR_SIZE_VER0	48	/* sizeof first published struct */
 
+
 /*
  * Extended scheduling parameters data structure.
  *
@@ -1342,6 +1343,10 @@ struct task_struct {
 	unsigned int policy;
 	int nr_cpus_allowed;
 	cpumask_t cpus_allowed;
+#if defined(CONFIG_BCM_KF_CPU_AFFINITY_HINT) && \
+	defined(CONFIG_BCM_PROC_CPU_AFFINITY_HINT)
+	cpumask_t cpus_hint;
+#endif
 
 #ifdef CONFIG_PREEMPT_RCU
 	int rcu_read_lock_nesting;

@@ -135,8 +135,25 @@
 #include <linux/if_macvlan.h>
 #include <linux/errqueue.h>
 #include <linux/hrtimer.h>
+#if defined(CONFIG_IMQ) || defined(CONFIG_IMQ_MODULE)
+#include <linux/imq.h>
+#endif
 
 #include "net-sysfs.h"
+
+#if defined(CONFIG_BCM_KF_SKB_DEFINES)
+#include <linux/kthread.h>
+#include <linux/bcm_realtime.h>
+#include "skb_defines.h"
+#endif
+#if defined(CONFIG_BCM_KF_LOG)
+#include "linux/bcm_log.h"
+#endif
+
+#if defined(CONFIG_BCM_KF_SW_GSO) && defined(CONFIG_BCM_SW_GSO)
+#include <linux/nbuff.h>
+#include <net/ip6_checksum.h>
+#endif
 
 /* Instead of increasing this, you should create a hash table. */
 #define MAX_GRO_SKBS 8
@@ -184,6 +201,9 @@ static unsigned int napi_gen_id;
 static DEFINE_HASHTABLE(napi_hash, 8);
 
 static seqcount_t devnet_rename_seq;
+#if defined(CONFIG_BCM_KF_SW_GSO) && defined(CONFIG_BCM_SW_GSO) && !defined(CONFIG_BCM_BPM) && !defined(CONFIG_BCM_BPM_MODULE)
+static struct kmem_cache *pktBufferCache;
+#endif
 
 static inline void dev_base_seq_inc(struct net *net)
 {
@@ -345,6 +365,80 @@ static inline void netdev_set_addr_lockdep_class(struct net_device *dev)
 {
 }
 #endif
+
+#if defined(CONFIG_BCM_KF_NETDEV_PATH)
+/* Adds a NON-ROOT device to a path. A Root device is indirectly
+   added to a path once another device points to it */
+int netdev_path_add(struct net_device *new_dev, struct net_device *next_dev)
+{
+	/* new device already in a path, fail */
+	if (netdev_path_is_linked(new_dev))
+		return -EBUSY;
+
+	netdev_path_next_dev(new_dev) = next_dev;
+
+	next_dev->path.refcount++;
+
+	return 0;
+}
+EXPORT_SYMBOL(netdev_path_add);
+
+/* Removes a device from a path */
+int netdev_path_remove(struct net_device *dev)
+{
+	/* device referenced by one or more interfaces, fail */
+	if (!netdev_path_is_leaf(dev))
+		return -EBUSY;
+
+	/* device is the first in the list */
+	/* Nothing to do */
+	if (netdev_path_is_root(dev))
+		return 0;
+
+	netdev_path_next_dev(dev)->path.refcount--;
+
+	netdev_path_next_dev(dev) = NULL;
+
+	return 0;
+}
+EXPORT_SYMBOL(netdev_path_remove);
+
+/* Prints all devices in a path */
+void netdev_path_dump(struct net_device *dev)
+{
+	printk("netdev path : ");
+
+	while (1) {
+		printk("%s", dev->name);
+
+		if (netdev_path_is_root(dev))
+			break;
+
+		printk(" -> ");
+
+		dev = netdev_path_next_dev(dev);
+	}
+
+	printk("\n");
+}
+EXPORT_SYMBOL(netdev_path_dump);
+
+int netdev_path_set_hw_subport_mcast_idx(struct net_device *dev,
+					 unsigned int subport_idx)
+{
+	if (subport_idx >= NETDEV_PATH_HW_SUBPORTS_MAX) {
+		printk(KERN_ERR "%s : Invalid subport <%u>, max <%u>",
+		       __func__, subport_idx, NETDEV_PATH_HW_SUBPORTS_MAX);
+		return -1;
+	}
+
+	dev->path.hw_subport_mcast_idx = subport_idx;
+
+	return 0;
+}
+EXPORT_SYMBOL(netdev_path_set_hw_subport_mcast_idx);
+#endif /* CONFIG_BCM_KF_NETDEV_PATH */
+
 
 /*******************************************************************************
 
@@ -970,6 +1064,33 @@ bool dev_valid_name(const char *name)
 	return true;
 }
 EXPORT_SYMBOL(dev_valid_name);
+
+#if defined(CONFIG_BCM_KF_FAP)
+/*
+ * Features changed due to FAP power up/down
+ */
+void dev_change_features(unsigned int features, unsigned int op)
+{
+	struct net *net;
+	struct net_device *dev;
+
+	write_lock_bh(&dev_base_lock);
+
+	for_each_net(net) {
+		for_each_netdev(net, dev) {
+			if (dev->priv_flags & (IFF_HW_SWITCH | IFF_EBRIDGE)) {
+				if (op)	/* FAP power up = add features */
+					dev->features |= features;
+				else	/* FAP powerdown = remove features */
+					dev->features &= ~features;
+			}
+		}
+	}
+
+	write_unlock_bh(&dev_base_lock);
+}
+EXPORT_SYMBOL(dev_change_features);
+#endif
 
 /**
  *	__dev_alloc_name - allocate a name for a device
@@ -2310,6 +2431,261 @@ void __dev_kfree_skb_irq(struct sk_buff *skb, enum skb_free_reason reason)
 }
 EXPORT_SYMBOL(__dev_kfree_skb_irq);
 
+#if defined(CONFIG_BCM_KF_SKB_DEFINES)
+static struct task_struct *skb_free_task = NULL;
+static struct sk_buff *skb_completion_queue = NULL;
+static unsigned int skb_completion_queue_cnt = 0;
+static DEFINE_SPINLOCK(skbfree_lock);
+
+/* Setting value to WDF budget + some room for SKBs
+ * freed by other threads */
+#define MAX_SKB_FREE_BUDGET 256
+
+/* the min number of skb to wake up free task */
+static unsigned int skb_free_start_budget __read_mostly;
+
+static int skb_free_thread_func(void *thread_data)
+{
+	unsigned int budget;
+	struct sk_buff *skb;
+	struct sk_buff *free_list = NULL;
+	unsigned long flags;
+	/* wake up periodically for every 20ms */
+	unsigned timeout_jiffies = msecs_to_jiffies(20);
+
+	while (!kthread_should_stop()) {
+		budget = MAX_SKB_FREE_BUDGET;
+
+update_list:
+		spin_lock_irqsave(&skbfree_lock, flags);
+		if (free_list == NULL) {
+			if (skb_completion_queue) {
+				free_list = skb_completion_queue;
+				skb_completion_queue = NULL;
+				skb_completion_queue_cnt = 0;
+			}
+		}
+		spin_unlock_irqrestore(&skbfree_lock, flags);
+
+		while (free_list && budget) {
+			skb = free_list;
+			free_list = free_list->next;
+			__kfree_skb(skb);
+			budget--;
+		}
+
+		if (free_list || skb_completion_queue) {
+			if (budget)
+				goto update_list;
+
+			/* we still have packets in Q, reschedule the task */
+			yield();
+		} else {
+			set_current_state(TASK_INTERRUPTIBLE);
+			schedule_timeout(timeout_jiffies);
+		}
+	}
+	return 0;
+}
+
+static ssize_t skb_free_thread_proc_rd_func(struct file *filep, char __user *page, size_t count, loff_t *offset)
+{
+	int len = 0;
+
+	if( *offset != 0)
+		return 0;
+
+	len += sprintf(page, "skb_completion_queue_cnt %d \n", skb_completion_queue_cnt);
+
+	*offset = len;
+
+	return len;
+
+} /* skb_free_thread_proc_rd_func */
+
+static const struct file_operations skb_free_thread_stats_fops = {
+       .owner  = THIS_MODULE,
+       .read   = skb_free_thread_proc_rd_func,
+};
+
+static struct proc_dir_entry *skb_free_thread_proc_directory, *skb_free_thread_proc_file_conf;
+
+static int skb_free_thread_proc_init(void)
+{
+    skb_free_thread_proc_directory = proc_mkdir("skb_free_thread", NULL) ;
+
+    if (!skb_free_thread_proc_directory) goto fail_dir ;
+
+    if ((skb_free_thread_proc_file_conf = proc_create("skb_free_thread/stats", 0644, NULL, &skb_free_thread_stats_fops)) == NULL) {
+        goto fail_entry;
+    }
+
+    return (0) ;
+
+fail_entry:
+    printk("%s %s: Failed to create proc entry in skb_free_thread\n", __FILE__, __FUNCTION__);
+    remove_proc_entry("skb_free_thread" ,NULL); /* remove already registered directory */
+
+fail_dir:
+    printk("%s %s: Failed to create directory skb_free_thread\n", __FILE__, __FUNCTION__) ;
+    return (-EIO) ;
+} /* skb_free_thread_proc_init */
+
+#ifndef SZ_32M
+#define SZ_32M		0x02000000
+#endif
+#ifndef SZ_64M
+#define SZ_64M		0x04000000
+#endif
+#ifndef SZ_128M
+#define SZ_128M		0x08000000
+#endif
+#ifndef SZ_256M
+#define SZ_256M		0x10000000
+#endif
+
+struct task_struct *create_skb_free_task(void)
+{
+	struct task_struct *tsk;
+	struct sched_param param;
+	struct sysinfo sinfo;
+
+	si_meminfo(&sinfo);
+
+	if (sinfo.totalram <= (SZ_32M / sinfo.mem_unit))
+		skb_free_start_budget = 16;
+	else if (sinfo.totalram <= (SZ_64M / sinfo.mem_unit))
+		skb_free_start_budget = 32;
+	else if (sinfo.totalram <= (SZ_128M / sinfo.mem_unit))
+		skb_free_start_budget = 64;
+	else if (sinfo.totalram <= (SZ_256M / sinfo.mem_unit))
+		skb_free_start_budget = 128;
+	else
+		skb_free_start_budget = 256;
+
+	tsk = kthread_create(skb_free_thread_func, NULL, "skb_free_task");
+
+	if (IS_ERR(tsk)) {
+		printk("skb_free_task creation failed\n");
+		return NULL;
+	}
+
+	/* Initialize the proc interface for debugging information */
+    if (skb_free_thread_proc_init()!=0)
+    {
+        printk("\n%s %s: skb_free_thread_proc_init() failed\n", __FILE__, __FUNCTION__) ;
+        return NULL;
+    }
+
+	param.sched_priority = BCM_RTPRIO_DATA_CONTROL;
+	sched_setscheduler(tsk, SCHED_RR, &param);
+	wake_up_process(tsk);
+
+	printk("skb_free_task created successfully with start budget %d\n", skb_free_start_budget);
+	return tsk;
+}
+
+/* queue the skb so it can be freed in thread context
+ * note: this thread is not binded to any cpu,and we rely on scheduler to
+ * run it on cpu with less load
+ */
+void dev_kfree_skb_thread(struct sk_buff *skb)
+{
+	unsigned long flags;
+
+	if (atomic_dec_and_test(&skb->users)) {
+		spin_lock_irqsave(&skbfree_lock, flags);
+		skb->next = skb_completion_queue;
+		skb_completion_queue = skb;
+		skb_completion_queue_cnt++ ;
+		spin_unlock_irqrestore(&skbfree_lock, flags);
+
+		if ((skb_free_task->state != TASK_RUNNING) &&
+				(skb_completion_queue_cnt >= skb_free_start_budget))
+			wake_up_process(skb_free_task);
+	}
+}
+EXPORT_SYMBOL(dev_kfree_skb_thread);
+
+/* bulk queue the skb so it can be freed in thread context
+ * note: this thread is not binded to any cpu,and we rely on scheduler to
+ * run it on cpu with less load
+ */
+void dev_kfree_skb_thread_bulk(struct sk_buff *skb)
+{
+	unsigned long flags;
+	struct sk_buff *skbfreelistend;
+	unsigned int skbcnt = 1;
+
+	/* locate last skb of the supplied skb list */
+	skbfreelistend = skb;
+	while (skbfreelistend->next != NULL) {
+		skbfreelistend = skbfreelistend->next;
+		/* +1 for first skb already done during init */
+		skbcnt++;
+	}
+
+	if (atomic_dec_and_test(&skb->users)) {
+		spin_lock_irqsave(&skbfree_lock, flags);
+		skbfreelistend->next = skb_completion_queue;
+		skb_completion_queue = skb;
+		skb_completion_queue_cnt += skbcnt;
+		spin_unlock_irqrestore(&skbfree_lock, flags);
+
+		if ((skb_free_task->state != TASK_RUNNING) &&
+				(skb_completion_queue_cnt >= skb_free_start_budget))
+			wake_up_process(skb_free_task);
+	}
+}
+EXPORT_SYMBOL(dev_kfree_skb_thread_bulk);
+
+#include <linux/gbpm.h>
+/* NOTE: gbpm_fap_evt_hook_g is not part of gbpm_g */
+gbpm_fap_evt_hook_t gbpm_fap_evt_hook_g = (gbpm_fap_evt_hook_t)NULL;
+EXPORT_SYMBOL(gbpm_fap_evt_hook_g);
+static int fapdrv_thread_func(void *thread_data)
+{
+	while (!kthread_should_stop()) {
+		static int scheduled = 0;
+		local_bh_disable();
+
+		if (!scheduled) {
+			printk("gbpm_do_work scheduled\n");
+			scheduled = 1;
+		}
+		if (gbpm_fap_evt_hook_g)
+			gbpm_fap_evt_hook_g();
+
+		local_bh_enable();
+
+		set_current_state(TASK_INTERRUPTIBLE);
+		schedule();
+	}
+	return 0;
+}
+
+struct task_struct *fapDrvTask = NULL;
+EXPORT_SYMBOL(fapDrvTask);
+struct task_struct *create_fapDrvTask(void)
+{
+	struct sched_param param;
+	/* Create FAP driver thread for dqm work handling */
+	fapDrvTask = kthread_create(fapdrv_thread_func, NULL, "bcmFapDrv");
+
+	if (IS_ERR(fapDrvTask)) {
+		printk("fapDrvTask creation failed\n");
+		return 0;
+	}
+
+	param.sched_priority = BCM_RTPRIO_DATA_CONTROL;
+	sched_setscheduler(fapDrvTask, SCHED_RR, &param);
+
+	wake_up_process(fapDrvTask);
+	return fapDrvTask;
+}
+
+#endif
+
 void __dev_kfree_skb_any(struct sk_buff *skb, enum skb_free_reason reason)
 {
 	if (in_irq() || irqs_disabled())
@@ -2353,7 +2729,11 @@ EXPORT_SYMBOL(netif_device_attach);
 
 static void skb_warn_bad_offload(const struct sk_buff *skb)
 {
+#if defined(CONFIG_BCM_KF_DEBUGGING_DISABLED_FIX)
+	static const netdev_features_t null_features __attribute__((unused)) = 0;
+#else
 	static const netdev_features_t null_features = 0;
+#endif
 	struct net_device *dev = skb->dev;
 	const char *driver = "";
 
@@ -2665,13 +3045,53 @@ static int xmit_one(struct sk_buff *skb, struct net_device *dev,
 {
 	unsigned int len;
 	int rc;
+#if (defined(CONFIG_BCM_KF_FAP_GSO_LOOPBACK) && defined(CONFIG_BCM_FAP_GSO_LOOPBACK))
+	unsigned int devId = bcm_is_gso_loopback_dev(dev);
+#endif
 
+#if defined(CONFIG_IMQ) || defined(CONFIG_IMQ_MODULE)
+	if ((!list_empty(&ptype_all) || !list_empty(&dev->ptype_all)) &&
+		!(skb->imq_flags & IMQ_F_ENQUEUE))
+#else
 	if (!list_empty(&ptype_all) || !list_empty(&dev->ptype_all))
+#endif
 		dev_queue_xmit_nit(skb, dev);
 
 	len = skb->len;
 	trace_net_dev_start_xmit(skb, dev);
+#if (defined(CONFIG_BCM_KF_FAP_GSO_LOOPBACK) && defined(CONFIG_BCM_FAP_GSO_LOOPBACK))
+	if (devId && bcm_gso_loopback_hw_offload) {
+		if (skb_shinfo(skb)->nr_frags ||
+		    skb_is_gso(skb) ||
+		    (skb->ip_summed == CHECKSUM_PARTIAL)) {
+			skb->xmit_more = more ? 1 : 0;
+			rc = bcm_gso_loopback_hw_offload(skb, devId);
+			if (rc == NETDEV_TX_OK)
+				txq_trans_update(txq);
+		} else if (!skb->recycle_hook) {
+			/* To avoid any outof order packets, send all the
+			 * locally generated packets through gso loop back
+			 */
+
+			/* TODO: we are classifying the traffic as local based
+			 * on recycle hook.  But cloned forwarding traffic can
+			 * also have recyle_hook as NULL, so this traffic will
+			 * make an extra trip through FAP unnecessarily.
+			 * But we don't expecet a lot of traffic in this case,
+			 * so this shoud be okay for now. Later add a flag in
+			 * skb and mark the skb as local in local_out hook.
+			 */
+			skb->xmit_more = more ? 1 : 0;
+			rc = bcm_gso_loopback_hw_offload(skb, devId);
+			if (rc == NETDEV_TX_OK)
+				txq_trans_update(txq);
+		} else
+			rc = netdev_start_xmit(skb, dev, txq, more);
+	} else
+		rc = netdev_start_xmit(skb, dev, txq, more);
+#else
 	rc = netdev_start_xmit(skb, dev, txq, more);
+#endif
 	trace_net_dev_xmit(skb, rc, dev, len);
 
 	return rc;
@@ -2704,6 +3124,7 @@ out:
 	*ret = rc;
 	return skb;
 }
+EXPORT_SYMBOL(dev_hard_start_xmit);
 
 static struct sk_buff *validate_xmit_vlan(struct sk_buff *skb,
 					  netdev_features_t features)
@@ -2792,6 +3213,7 @@ struct sk_buff *validate_xmit_skb_list(struct sk_buff *skb, struct net_device *d
 	}
 	return head;
 }
+EXPORT_SYMBOL(validate_xmit_skb_list);
 
 static void qdisc_pkt_len_init(struct sk_buff *skb)
 {
@@ -3412,6 +3834,17 @@ static int netif_rx_internal(struct sk_buff *skb)
 
 	net_timestamp_check(netdev_tstamp_prequeue, skb);
 
+#if defined(CONFIG_BCM_KF_WANDEV)
+	/* mark IFFWAN flag in skb based on dev->priv_flags */
+	if (skb->dev) {
+		unsigned int mark = skb->mark;
+		skb->mark |= SKBMARK_SET_IFFWAN_MARK(mark, ((skb->dev->priv_flags & IFF_WANDEV) ? 1:0));
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG_FEATURE)
+		if (skb->blog_p)
+			skb->blog_p->isWan = (skb->dev->priv_flags & IFF_WANDEV) ? 1 : 0;
+#endif /* defined(CONFIG_BLOG_FEATURE) */
+	}
+#endif /* CONFIG_BCM_KF_WANDEV */
 	trace_netif_rx(skb);
 #ifdef CONFIG_RPS
 	if (static_key_false(&rps_needed)) {
@@ -3639,6 +4072,18 @@ int netdev_rx_handler_register(struct net_device *dev,
 }
 EXPORT_SYMBOL_GPL(netdev_rx_handler_register);
 
+#if defined(CONFIG_BCM_KF_VLAN) && (defined(CONFIG_BCM_VLAN) || defined(CONFIG_BCM_VLAN_MODULE))
+int (*bcm_vlan_handle_frame_hook)(struct sk_buff **) = NULL;
+#endif
+#if (defined(CONFIG_BCM_MCAST) || defined(CONFIG_BCM_MCAST_MODULE)) && defined(CONFIG_BCM_KF_MCAST)
+void (*bcm_mcast_def_pri_queue_hook)(struct sk_buff *) = NULL;
+EXPORT_SYMBOL(bcm_mcast_def_pri_queue_hook);
+#endif
+#if defined(CONFIG_BCM_KF_TMS) && defined(CONFIG_BCM_TMS_MODULE)
+int (*bcm_1ag_handle_frame_check_hook)(struct sk_buff *) = NULL;
+int (*bcm_3ah_handle_frame_check_hook)(struct sk_buff *, struct net_device *) = NULL;
+#endif
+
 /**
  *	netdev_rx_handler_unregister - unregister receive handler
  *	@dev: device to unregister a handler from
@@ -3687,10 +4132,25 @@ static int __netif_receive_skb_core(struct sk_buff *skb, bool pfmemalloc)
 	bool deliver_exact = false;
 	int ret = NET_RX_DROP;
 	__be16 type;
+#if defined(CONFIG_BCM_KF_VLAN) && (defined(CONFIG_BCM_VLAN) || defined(CONFIG_BCM_VLAN_MODULE)) && defined(CONFIG_BCM_PTP_1588)
+	struct skb_shared_hwtstamps *timestamp;
+#endif
 
 	net_timestamp_check(!netdev_tstamp_prequeue, skb);
 
 	trace_netif_receive_skb(skb);
+
+#if defined(CONFIG_BCM_KF_WANDEV)
+	/* mark IFFWAN flag in skb based on dev->priv_flags */
+	if (skb->dev) {
+		unsigned int mark = skb->mark;
+		skb->mark |= SKBMARK_SET_IFFWAN_MARK(mark, ((skb->dev->priv_flags & IFF_WANDEV) ? 1:0));
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG_FEATURE)
+		if (skb->blog_p)
+			skb->blog_p->isWan = (skb->dev->priv_flags & IFF_WANDEV) ? 1 : 0;
+#endif
+	}
+#endif
 
 	orig_dev = skb->dev;
 
@@ -3701,7 +4161,44 @@ static int __netif_receive_skb_core(struct sk_buff *skb, bool pfmemalloc)
 
 	pt_prev = NULL;
 
+#if (defined(CONFIG_BCM_MCAST) || defined(CONFIG_BCM_MCAST_MODULE)) && defined(CONFIG_BCM_KF_MCAST)
+	if (bcm_mcast_def_pri_queue_hook != NULL)
+		bcm_mcast_def_pri_queue_hook(skb);
+#endif
+
+#if defined(CONFIG_BCM_KF_VLAN) && (defined(CONFIG_BCM_VLAN) || defined(CONFIG_BCM_VLAN_MODULE))
+#if defined(CONFIG_BCM_KF_TMS) && defined(CONFIG_BCM_TMS_MODULE)
+	/* Check if 802.1ag service is started. */
+	if (bcm_1ag_handle_frame_check_hook) {
+		/* We want to skip vlanctl for 1ag packet. */
+		if (bcm_1ag_handle_frame_check_hook(skb))
+			goto skip_vlanctl;
+	}
+	/* Check if 802.3ah service is started. */
+	if (bcm_3ah_handle_frame_check_hook) {
+		/* We want to skip vlanctl for 3ah packet, or for any packet
+		 * when 3ah loopback was enabled. */
+		if ((bcm_3ah_handle_frame_check_hook(skb, skb->dev)))
+			goto skip_vlanctl;
+	}
+#endif /* #if defined(CONFIG_BCM_TMS_MODULE) */
+
+#if (defined(CONFIG_BCM_PTP_1588))
+	timestamp = skb_hwtstamps(skb);
+	if (timestamp->hwtstamp.tv64 == 0)
+#endif
+
 another_round:
+	if (bcm_vlan_handle_frame_hook && (ret = bcm_vlan_handle_frame_hook(&skb)) != 0)
+		goto out;
+
+#if defined(CONFIG_BCM_KF_TMS) && defined(CONFIG_BCM_TMS_MODULE)
+skip_vlanctl:
+#endif
+#else
+another_round:
+#endif
+
 	skb->skb_iif = skb->dev->ifindex;
 
 	__this_cpu_inc(softnet_data.processed);
@@ -3761,6 +4258,23 @@ ncls:
 	}
 
 	rx_handler = rcu_dereference(skb->dev->rx_handler);
+
+#if defined(CONFIG_BCM_KF_PPP)
+	if (skb->protocol == __constant_htons(ETH_P_PPP_SES) ||
+	    skb->protocol == __constant_htons(ETH_P_PPP_DISC)) {
+		if (!memcmp(skb_mac_header(skb), skb->dev->dev_addr, ETH_ALEN))
+#if defined(CONFIG_BCM_KF_KBONDING) && defined(CONFIG_BCM_KERNEL_BONDING) && defined(CONFIG_BCM_KF_LOG)
+		{
+			bcmFun_t *bcmFun = bcmFun_get(BCM_FUN_ID_BOND_RX_HANDLER);
+			if (!bcmFun || !bcmFun(rx_handler))
+#endif
+				goto skip_rx_handler;
+#if defined(CONFIG_BCM_KF_KBONDING) && defined(CONFIG_BCM_KERNEL_BONDING) && defined(CONFIG_BCM_KF_LOG)
+		}
+#endif
+	}
+#endif
+
 	if (rx_handler) {
 		if (pt_prev) {
 			ret = deliver_skb(skb, pt_prev, orig_dev);
@@ -3788,8 +4302,16 @@ ncls:
 		 * and set skb->priority like in vlan_do_receive()
 		 * For the time being, just ignore Priority Code Point
 		 */
+#if defined(CONFIG_BCM_KF_TMS) && defined(CONFIG_BCM_TMS_MODULE)
+		if (skb->protocol != htons(ETH_P_8021AG) && skb->protocol != htons(ETH_P_8023AH) &&
+			((struct vlan_hdr *)skb->data)->h_vlan_encapsulated_proto != htons(ETH_P_8021AG))
+#endif
 		skb->vlan_tci = 0;
 	}
+
+#if defined(CONFIG_BCM_KF_PPP)
+skip_rx_handler:
+#endif
 
 	type = skb->protocol;
 
@@ -5753,7 +6275,11 @@ int __dev_change_flags(struct net_device *dev, unsigned int flags)
 
 	dev->flags = (flags & (IFF_DEBUG | IFF_NOTRAILERS | IFF_NOARP |
 			       IFF_DYNAMIC | IFF_MULTICAST | IFF_PORTSEL |
+#if !defined(CONFIG_BCM_MPTCP) || !defined(CONFIG_BCM_KF_MPTCP)
 			       IFF_AUTOMEDIA)) |
+#else
+			       IFF_AUTOMEDIA | IFF_NOMULTIPATH | IFF_MPBACKUP)) |
+#endif
 		     (dev->flags & (IFF_UP | IFF_VOLATILE | IFF_PROMISC |
 				    IFF_ALLMULTI));
 
@@ -6009,7 +6535,31 @@ EXPORT_SYMBOL(dev_get_phys_port_name);
 static int dev_new_index(struct net *net)
 {
 	int ifindex = net->ifindex;
+#if defined(CONFIG_BCM_KF_LIMITED_IFINDEX)
+	int loop = 0;
+#endif
+
 	for (;;) {
+#if defined(CONFIG_BCM_KF_LIMITED_IFINDEX)
+#define BCM_MAX_IFINDEX 128
+
+		/* On DSL CPE, xtm interfaces are created/deleted when
+		 * the link goes up/down. On a noisy dsl link that goes
+		 * down and up frequently, the xtm ifindex may get higher
+		 * and higher if we don't reuse the lower ifindex values.
+		 * that were released when the interfaces were deleted.
+		 * Therefore, we limit index value to BCM_MAX_IFINDEX,
+		 * and try reuse ifindex that had been released.
+		 */
+		WARN_ONCE((++loop > BCM_MAX_IFINDEX),
+			  "Cannot get new ifindex. All %d index values had "
+			  "been used.\n", BCM_MAX_IFINDEX);
+		/* try reuse ifindex that had been released. */
+		if (ifindex >= BCM_MAX_IFINDEX)
+			ifindex = 0;
+
+#undef BCM_MAX_IFINDEX
+#endif
 		if (++ifindex <= 0)
 			ifindex = 1;
 		if (!__dev_get_by_index(net, ifindex))
@@ -6350,6 +6900,729 @@ static int netif_alloc_netdev_queues(struct net_device *dev)
 	return 0;
 }
 
+#if defined(CONFIG_BCM_KF_SW_GSO) && defined(CONFIG_BCM_SW_GSO)
+
+#define BCM_SW_GSO_MAX_HEADERS  16
+#define BCM_SW_GSO_MAX_SEGS  64
+#define BCM_L3_PROTO_IPV4 	1
+#define BCM_L3_PROTO_IPV6 	2
+
+enum {
+	BCM_SW_GSO_SEG_TYPE_SINGLE=0,
+	BCM_SW_GSO_SEG_TYPE_FIRST,
+	BCM_SW_GSO_SEG_TYPE_MIDDLE,
+	BCM_SW_GSO_SEG_TYPE_LAST,
+	BCM_SW_GSO_SEG_TYPE_MAX
+};
+
+struct gso_hdrs{
+	void *ethhdr; /*including VLAN's */
+	void *ppphdr;
+	void *ipv4hdr;
+	void *ipv6hdr;
+	void *l4hdr;
+	union {
+		struct {
+			uint8_t ethhdrlen;/*including VLAN's */
+			uint8_t ppphdrlen;
+			uint8_t ipv4hdrlen;
+			uint8_t ipv6hdrlen;
+			uint8_t l4hdrlen;
+			uint8_t totlen;
+			uint8_t l3proto;
+			uint8_t l4proto;
+		};
+		uint64_t lenproto;
+	};
+	void *txdev;
+	HardStartXmitFuncP xmit_fn;
+	uint32_t ipv6_flowlbl;
+	uint32_t tcpseq;
+	uint32_t ipv6_fragid;
+	uint16_t ipv4_id;
+ 	uint16_t ip_fragoff;
+	uint8_t ip_fragneeded;
+	uint8_t ip_lastfrag;
+	uint8_t tcp_segtype;
+};
+
+static inline void bcm_push_hdr(FkBuff_t *fkb, void *src, unsigned int len)
+{
+	fkb->data -= len;
+	fkb->len  +=len;
+	memcpy(fkb->data, src, len);
+}
+
+static inline int bcm_add_l2hdr(FkBuff_t *fkb, struct gso_hdrs *hdrs)
+{
+	if(hdrs->ppphdrlen)
+	{
+		bcm_push_hdr(fkb, hdrs->ppphdr, hdrs->ppphdrlen);
+		/*TODO adjust ppphdr len ip +2 */
+	}
+	bcm_push_hdr(fkb, hdrs->ethhdr, hdrs->ethhdrlen);
+	return 0;
+}
+
+static inline int bcm_add_l3hdr(FkBuff_t *fkb, struct gso_hdrs *hdrs)
+{
+	if(hdrs->l3proto == BCM_L3_PROTO_IPV4){
+		struct iphdr *ipv4;
+		bcm_push_hdr(fkb, hdrs->ipv4hdr, hdrs->ipv4hdrlen);
+		ipv4 = (struct iphdr *)fkb->data;
+		/* update len   */
+		 ipv4->tot_len = htons(fkb->len);
+
+		 if(hdrs->ip_fragneeded){
+			 /* update offset */
+			 ipv4->frag_off = htons((hdrs->ip_fragoff >> 3));
+			 /* update flags */
+			 if( !hdrs->ip_lastfrag)
+				 ipv4->frag_off |= htons(IP_MF);
+		 }
+
+		/* update IPID  */
+
+		/* update csum  */
+		ipv4->check = 0;
+		ipv4->check = ip_fast_csum((unsigned char *)ipv4, ipv4->ihl);
+	}
+	else if(hdrs->l3proto == BCM_L3_PROTO_IPV6){
+		struct ipv6hdr *ipv6;
+
+		if(hdrs->ip_fragneeded){
+			struct frag_hdr fh;
+
+			fh.nexthdr = ((struct ipv6hdr *)hdrs->ipv6hdr)->nexthdr;
+			fh.reserved = 0;
+			fh.identification = hdrs->ipv6_fragid;
+			fh.frag_off = htons(hdrs->ip_fragoff);
+			bcm_push_hdr(fkb, &fh, sizeof(struct frag_hdr));
+		}
+
+		bcm_push_hdr(fkb, hdrs->ipv6hdr, hdrs->ipv6hdrlen);
+		ipv6 = (struct ipv6hdr *)fkb->data;
+
+		/* update len   */
+		ipv6->payload_len = htons( fkb->len - hdrs->ipv6hdrlen);
+
+		if(hdrs->ip_fragneeded){
+			ipv6->nexthdr =NEXTHDR_FRAGMENT;
+		}
+
+		/* update IPID  */
+	    /* update flags */
+	}
+	else{
+		printk(KERN_ERR "%s:Unsuppoerted L3 protocol %d\n", __func__, hdrs->l3proto);
+		return -1;
+	}
+	return 0;
+}
+
+static inline __sum16 bcm_sw_gso_l4_csum(struct gso_hdrs *hdrs, uint32_t len, uint16_t proto, __wsum base)
+{
+	if(hdrs->l3proto == BCM_L3_PROTO_IPV4 ){
+		struct iphdr *ipv4= hdrs->ipv4hdr;
+		return csum_tcpudp_magic(ipv4->saddr, ipv4->daddr, len, proto, base);
+	} else {
+		struct ipv6hdr *ipv6 = hdrs->ipv6hdr;
+		return csum_ipv6_magic(&ipv6->saddr, &ipv6->daddr, len, proto, base);
+	}
+}
+
+static inline void bcm_add_tcphdr(FkBuff_t *fkb, struct gso_hdrs *hdrs)
+{
+	struct tcphdr *th;
+	bcm_push_hdr(fkb, hdrs->l4hdr, hdrs->l4hdrlen);
+	/* update seq */
+	th = (struct tcphdr *)fkb->data;
+	th->seq = htonl(hdrs->tcpseq);
+
+	if(hdrs->tcp_segtype != BCM_SW_GSO_SEG_TYPE_SINGLE){
+
+		/* clear cwr in all packets except first */
+		if(hdrs->tcp_segtype != BCM_SW_GSO_SEG_TYPE_FIRST)
+			th->cwr = 0;
+
+		/* clear fin, psh in all packets except last */
+		if((hdrs->tcp_segtype != BCM_SW_GSO_SEG_TYPE_LAST))
+			th->fin = th->psh = 0;
+	}
+
+	th->check = 0;
+	th->check = bcm_sw_gso_l4_csum(hdrs, fkb->len, IPPROTO_TCP, csum_partial(fkb->data, fkb->len, 0));
+}
+
+static void bcm_sw_gso_recycle_func(void *pNBuff, unsigned long context, uint32_t flags)
+{
+#if defined(CONFIG_BCM_BPM) || defined(CONFIG_BCM_BPM_MODULE)
+	gbpm_free_buf(PFKBUFF_TO_PDATA(PNBUFF_2_PBUF(pNBuff), BCM_PKT_HEADROOM));
+#else
+	kmem_cache_free(pktBufferCache, PNBUFF_2_PBUF(pNBuff));
+#endif
+}
+
+static inline int bcm_sw_alloc_pkt_buffers(int npkts, void **buffer_pool)
+{
+#if defined(CONFIG_BCM_BPM) || defined(CONFIG_BCM_BPM_MODULE)
+	/* allocate buffers from BPM */
+	if( gbpm_alloc_mult_buf(npkts, buffer_pool) == GBPM_ERROR ){
+		return -1;
+	}
+	return 0;
+#else
+	int i;
+	void *buf; 
+	
+	for(i=0; i < npkts; i++){
+		buf = kmem_cache_alloc(pktBufferCache, GFP_ATOMIC);
+		if(buf == NULL)
+			break;
+		buffer_pool[i] = (void *)PFKBUFF_TO_PDATA((void *)(buf), BCM_PKT_HEADROOM);
+	}
+
+	/* check if we allocated all the buffers requested */
+	if( i && i != npkts){
+		printk("%s %s: Not enough memory for packet buffer allocation\n", __FILE__, __FUNCTION__);
+		npkts =i;	
+		for(i=0; i<npkts; i++)
+			kmem_cache_free(pktBufferCache, PDATA_TO_PFKBUFF(buffer_pool[i], BCM_PKT_HEADROOM));
+
+		return -1;
+	}
+	return 0;
+#endif
+}
+
+static inline int bcm_sw_gso_tcp_segment(struct sk_buff *skb, struct gso_hdrs *hdrs)
+{
+	int npkts;
+	FkBuff_t *fkb;
+	void *pbuf;
+	unsigned short bytesleft;
+	unsigned short offset;
+	unsigned short mss;
+	unsigned short payloadlen;
+	int cur_pkt=0;
+	/*TODO do kmalloc if stack size is an issue*/
+	void *buffer_pool[BCM_SW_GSO_MAX_SEGS];
+
+	/* calculate the number of packets needed to transmit this skb */
+
+	bytesleft = skb->len - hdrs->totlen;
+	offset = hdrs->totlen;
+
+	mss = skb_shinfo(skb)->gso_size;
+
+	if(mss == 0)
+	{
+		mss = bytesleft;
+		npkts =1;
+	}	
+	else
+		npkts = DIV_ROUND_UP(bytesleft, mss);
+
+	if(npkts > BCM_SW_GSO_MAX_SEGS){
+		printk(KERN_ERR "%s: npkts=%d greater than max segs(%d) \n", 
+				__func__, npkts, BCM_SW_GSO_MAX_SEGS);
+		return -1;
+	}
+
+	if( bcm_sw_alloc_pkt_buffers(npkts, buffer_pool) != 0 )
+		return -1;
+
+	hdrs->tcp_segtype = BCM_SW_GSO_SEG_TYPE_FIRST;
+
+	do {
+
+		if(cur_pkt > npkts){
+			/* we shoud never be here,if we are then most likely there is
+			 * some thing wrong with mss, allocated packets are already xmitted,
+			 * no need to free them here
+			 */ 
+			printk(KERN_ERR "%s:error pktcount =%d > allocated buffers=%d mss=%d\n",
+					__func__, cur_pkt, npkts, mss);
+			return -1;
+		}
+		/* initialize fkb */
+		pbuf = buffer_pool[cur_pkt++];
+
+		fkb = fkb_init(pbuf, BCM_PKT_HEADROOM, pbuf + hdrs->totlen, 0);
+		fkb->recycle_hook = bcm_sw_gso_recycle_func;
+		fkb->recycle_context = 0;
+		fkb->mark = skb->mark;
+		fkb->priority = skb->priority;
+
+		payloadlen = min(mss, bytesleft);
+
+		/* copy data from original skb to new packet */
+
+		/* copy tcp payload */
+		skb_copy_bits(skb, offset, fkb->data, payloadlen);
+		fkb->len += payloadlen;
+
+		offset +=payloadlen;
+		bytesleft -=payloadlen;
+
+		if(bytesleft == 0){
+			if(likely(hdrs->tcp_segtype != BCM_SW_GSO_SEG_TYPE_FIRST))
+				hdrs->tcp_segtype = BCM_SW_GSO_SEG_TYPE_LAST;
+			else
+				hdrs->tcp_segtype = BCM_SW_GSO_SEG_TYPE_SINGLE;
+		}
+
+		/* copy tcp hdr & update fields */
+		bcm_add_tcphdr(fkb, hdrs);
+
+		hdrs->tcpseq +=payloadlen;
+		hdrs->tcp_segtype = BCM_SW_GSO_SEG_TYPE_MIDDLE;
+
+		/* copy l3 hdr  */
+		bcm_add_l3hdr(fkb, hdrs);
+
+		/* copy l2 hdr  */
+		bcm_add_l2hdr(fkb,hdrs);
+
+
+		fkb->dirty_p = _to_dptr_from_kptr_(fkb->data + fkb->len);
+		/* xmit packet */
+		hdrs->xmit_fn(FKBUFF_2_PNBUFF(fkb), hdrs->txdev);
+
+	} while (bytesleft);
+
+	if(cur_pkt < npkts){
+		int i;
+		printk(KERN_ERR "%s:error pktcount =%d < allocated buffers=%d\n", __func__, cur_pkt, npkts);
+		for(i=cur_pkt; i < npkts; i++)
+			bcm_sw_gso_recycle_func(PDATA_TO_PFKBUFF(buffer_pool[i], BCM_PKT_HEADROOM), 0, 0 );
+	}
+
+	return 0;
+}
+
+static uint32_t bcm_sw_gso_gen_ipv6id(void)
+{
+	static atomic_t ipv6_fragmentation_id;
+	uint32_t old, new;
+
+	do {
+		old = atomic_read(&ipv6_fragmentation_id);
+		new = old + 1;
+		if (!new)
+			new = 1;
+	} while (atomic_cmpxchg(&ipv6_fragmentation_id, old, new) != old);
+	return new;
+}
+
+static int bcm_sw_gso_ip_fragment(struct sk_buff *skb, struct gso_hdrs *hdrs)
+{
+	int npkts;
+	FkBuff_t *fkb;
+	void *pbuf;
+	unsigned short bytesleft;
+	unsigned short offset;
+	unsigned short mss;
+	unsigned short payloadlen;
+	int cur_pkt=0;
+	/*TODO do kmalloc if stack size is an issue*/
+	void *buffer_pool[BCM_SW_GSO_MAX_SEGS];
+
+
+	/* calculate the number of packets needed to transmit this skb */
+	bytesleft = skb->len - (hdrs->totlen - hdrs->l4hdrlen);
+	offset = hdrs->totlen - hdrs->l4hdrlen;
+	
+	mss = skb_shinfo(skb)->gso_size;
+
+	if(mss == 0){
+		mss = bytesleft;
+		npkts =1;
+	}	
+	else{
+		mss = mss & ~7; /* make it multiple of 8 */
+		npkts = DIV_ROUND_UP(bytesleft, mss);
+	}
+
+	if(npkts > BCM_SW_GSO_MAX_SEGS){
+		printk(KERN_ERR "%s: npkts=%d greater than max segs(%d) \n", 
+				__func__, npkts, BCM_SW_GSO_MAX_SEGS);
+		return -1;
+	}
+
+	if( bcm_sw_alloc_pkt_buffers(npkts, buffer_pool) != 0 )
+		return -1;
+
+	hdrs->ip_fragoff = 0;
+	hdrs->ip_lastfrag = 0;
+	if(bytesleft - mss){
+		/* perform IP fragmentation */
+		hdrs->ip_fragneeded = 1;
+	}
+
+	if(hdrs->l3proto == BCM_L3_PROTO_IPV6){
+		hdrs->ipv6_fragid = htonl(bcm_sw_gso_gen_ipv6id());
+	}
+
+	/* perform UDPchecksum */
+	if( (hdrs->l4proto == IPPROTO_UDP) && (skb->ip_summed == CHECKSUM_PARTIAL))
+	{
+		struct udphdr *uh= hdrs->l4hdr;
+		uh->check = 0;
+		int csum_offset = hdrs->l4hdr - hdrs->ethhdr;
+
+		uh->check = bcm_sw_gso_l4_csum(hdrs, skb->len-csum_offset, IPPROTO_UDP,
+				skb_checksum(skb, csum_offset, skb->len-csum_offset, 0));
+	}
+
+	do{
+
+		if(cur_pkt > npkts){
+			/* we shoud never be here,if we are then most likely there is
+			 * some thing wrong with mss, allocated packets are already xmitted,
+			 * no need to free them here
+			 */ 
+			printk(KERN_ERR "%s:error pktcount =%d > allocated buffers=%d mss=%d\n",
+					__func__, cur_pkt, npkts, mss);
+			return -1;
+		}
+		/* initialize fkb */
+		pbuf = buffer_pool[cur_pkt++];
+
+		fkb = fkb_init(pbuf, BCM_PKT_HEADROOM, pbuf + hdrs->totlen, 0);
+		fkb->recycle_hook = bcm_sw_gso_recycle_func;
+		fkb->recycle_context = 0;
+		fkb->mark = skb->mark;
+		fkb->priority = skb->priority;
+
+		payloadlen = min(mss, bytesleft);
+
+		/* copy data from original skb to new packet */
+
+		/* copy tcp payload */
+		skb_copy_bits(skb, offset, fkb->data, payloadlen);
+		fkb->len += payloadlen;
+
+
+		offset +=payloadlen;
+		bytesleft -=payloadlen;
+
+		if(bytesleft == 0)
+			hdrs->ip_lastfrag = 1;
+
+		/* copy l3 hdr  */
+		bcm_add_l3hdr(fkb, hdrs);
+
+		hdrs->ip_fragoff +=payloadlen;
+
+		/* copy l2 hdr  */
+		bcm_add_l2hdr(fkb,hdrs);
+
+		fkb->dirty_p = _to_dptr_from_kptr_(fkb->data + fkb->len);
+		/* xmit packet */
+		hdrs->xmit_fn(FKBUFF_2_PNBUFF(fkb), hdrs->txdev);
+
+	}while (bytesleft);
+
+	if(cur_pkt < npkts){
+		int i;
+		printk(KERN_ERR "%s:error pktcount =%d < allocated buffers=%d\n", __func__, cur_pkt, npkts);
+		for(i=cur_pkt; i< npkts; i++)
+			bcm_sw_gso_recycle_func(PDATA_TO_PFKBUFF(buffer_pool[i], BCM_PKT_HEADROOM), 0, 0 );
+	}
+
+	return 0;
+}
+
+
+static inline int bcm_parse_gso_hdrs(struct sk_buff *skb, struct gso_hdrs *hdrs)
+{
+	struct iphdr *ipv4;
+	struct ipv6hdr *ipv6;
+	struct tcphdr *tcp_hdr;
+    int header = -1;
+	void *data = skb->data;
+	unsigned int skbheadlen = skb_headlen(skb);
+	/*assumes first header is ETH always */
+	uint16_t proto = ETH_P_802_3;
+
+    while(1)
+    {
+        header++;
+
+		if(hdrs->totlen > skbheadlen){
+			printk(KERN_ERR "%s: headers not present in linear data hdrslen=%u skbheadlen=%d \n",
+				 __func__, hdrs->totlen, skbheadlen);
+			return -1;
+		}
+
+        if (header > BCM_SW_GSO_MAX_HEADERS){
+            printk(KERN_ERR "%s:Too many headers <%d>\n", __func__, header);
+			return -1;
+        }
+
+        switch(proto)
+        {
+            case ETH_P_802_3:  /* first encap: XYZoE */
+
+                if(header != 0)
+                {
+                    return -1;
+                }
+				hdrs->ethhdr = data;
+
+				proto = ntohs(((struct ethhdr *)data)->h_proto);
+				hdrs->ethhdrlen = ETH_HLEN;
+				hdrs->totlen += ETH_HLEN;
+				data += ETH_HLEN;
+                break;
+
+            case ETH_P_8021Q: 
+            case ETH_P_8021AD: 
+
+				proto = ntohs(*((uint16_t *)(data+2)));
+				hdrs->ethhdrlen += 4;
+				hdrs->totlen += 4;
+				data += 4;
+                break;
+
+            case ETH_P_IP:
+				 
+				ipv4 = data;
+
+				hdrs->l3proto = BCM_L3_PROTO_IPV4;
+				proto = ipv4->protocol;
+
+                if ((proto == IPPROTO_TCP) || (proto == IPPROTO_UDP)){
+
+					hdrs->ipv4hdr = data;
+					hdrs->ipv4_id = ntohs(ipv4->id);
+					hdrs->ipv4hdrlen = ipv4->ihl<<2;
+					hdrs->totlen += ipv4->ihl<<2;
+					data += ipv4->ihl<<2;
+
+                } else {
+                    printk(KERN_ERR "%s Unsupported L4 type=%u \n", __func__, proto);
+                    return -1;
+                }
+				break;
+
+            case ETH_P_IPV6:
+
+				ipv6 = data;
+
+				hdrs->l3proto = BCM_L3_PROTO_IPV6;
+				proto = ipv6->nexthdr;
+
+                if ((proto == IPPROTO_TCP) || (proto == IPPROTO_UDP)){
+
+					hdrs->ipv6hdr = data;
+					hdrs->ipv6_flowlbl = ntohl(ip6_flowlabel(ipv6));
+					hdrs->ipv6hdrlen = sizeof(struct ipv6hdr);
+					hdrs->totlen += sizeof(struct ipv6hdr);
+					data += sizeof(struct ipv6hdr);
+
+                } else {
+                    printk(KERN_ERR "%s Unsupported L4 type=%u \n", __func__, proto);
+                    return -1;
+                }
+				break;
+
+			case IPPROTO_TCP :
+				tcp_hdr = data;
+
+				hdrs->l4hdr = data;
+				hdrs->l4proto = IPPROTO_TCP;
+				hdrs->l4hdrlen = tcp_hdr->doff <<2;
+				hdrs->totlen += tcp_hdr->doff <<2;
+				hdrs->tcpseq = ntohl(tcp_hdr->seq);
+				return  0 ;
+
+			case IPPROTO_UDP :
+				hdrs->l4proto = IPPROTO_UDP;
+				hdrs->l4hdr = data;
+				hdrs->l4hdrlen = sizeof(struct udphdr) ;
+				hdrs->totlen += sizeof(struct udphdr);
+				return  0 ;
+
+			/*TODO add PPP */
+
+            default :
+                printk(KERN_ERR "%s:UNSUPPORTED protocol %u ", __func__, proto);
+                return -1;
+        } /* switch (headerType) */
+    }
+	return -1;
+}
+
+
+static inline int bcm_sw_gso(struct sk_buff *skb, struct net_device *txdev, HardStartXmitFuncP xmit_fn)
+{
+	struct gso_hdrs hdrs;
+	int ret=-1;
+
+	/*check if this skb needs GSO processing*/
+	if(skb_is_gso(skb) || skb_shinfo(skb)->nr_frags)
+	{
+
+		memset(&hdrs,0, sizeof(struct gso_hdrs));
+		/* extract l2 & l3 headers and l4 proto */
+		if( bcm_parse_gso_hdrs(skb, &hdrs) < 0){
+			ret = -1;
+			goto done;
+		};
+
+		hdrs.txdev = txdev;
+		hdrs.xmit_fn =xmit_fn;
+
+		/*perform GSO and transmit packets*/
+
+		switch(hdrs.l4proto) {
+			case IPPROTO_TCP:
+				ret = bcm_sw_gso_tcp_segment(skb, &hdrs);
+				break;
+
+			case IPPROTO_UDP:
+				ret = bcm_sw_gso_ip_fragment(skb, &hdrs);
+				break;
+
+			default:
+				printk(KERN_ERR "%s:SW GSO not supported for protocol=%d \n",__func__, hdrs.l4proto); 
+				ret= -1;
+				goto done;
+		}
+	} else if((skb->ip_summed == CHECKSUM_PARTIAL)){
+		/*only csum is needed */
+		memset(&hdrs,0, sizeof(struct gso_hdrs));
+		if( bcm_parse_gso_hdrs(skb, &hdrs) < 0){
+			ret = -1;
+			goto done;
+		};
+
+		switch(hdrs.l4proto) {
+			case IPPROTO_TCP:
+			{
+			 	struct tcphdr *th= hdrs.l4hdr;
+				th->check = 0;
+				/*TODO calulate l4 len based on l3 len */
+				th->check = bcm_sw_gso_l4_csum(&hdrs, skb->len-(hdrs.l4hdr - hdrs.ethhdr),
+						IPPROTO_TCP, csum_partial(hdrs.l4hdr, skb->len-(hdrs.l4hdr - hdrs.ethhdr), 0));
+				break;
+			}
+
+			case IPPROTO_UDP:
+			{
+			 	struct udphdr *uh= hdrs.l4hdr;
+				uh->check = 0;
+				/*TODO calulate l4 len based on l3 len */
+				uh->check = bcm_sw_gso_l4_csum(&hdrs, skb->len-(hdrs.l4hdr - hdrs.ethhdr),
+						IPPROTO_UDP, csum_partial(hdrs.l4hdr, skb->len-(hdrs.l4hdr - hdrs.ethhdr), 0));
+				break;
+			}
+
+			default:
+				printk(KERN_ERR "%s:SW GSO not supported for protocol=%d \n",__func__, hdrs.l4proto); 
+				ret= -1;
+				goto done;
+		}
+
+		skb->ip_summed = CHECKSUM_NONE;
+		xmit_fn(SKBUFF_2_PNBUFF(skb), txdev);
+		return 0;
+	}else{
+		/* transmit skb as is */
+		xmit_fn(SKBUFF_2_PNBUFF(skb), txdev);
+		return 0;
+	}
+done:
+	/*free the original skb & return */
+	dev_kfree_skb_any(skb);
+	return ret;
+}
+
+int bcm_sw_gso_xmit(struct sk_buff *skb, struct net_device *txdev, HardStartXmitFuncP xmit_fn)
+{
+	return bcm_sw_gso(skb, txdev, xmit_fn);
+}
+EXPORT_SYMBOL(bcm_sw_gso_xmit);
+
+#endif /* defined(CONFIG_BCM_KF_SW_GSO) && defined(CONFIG_BCM_SW_GSO) */
+
+#if (defined(CONFIG_BCM_KF_FAP_GSO_LOOPBACK) && defined(CONFIG_BCM_FAP_GSO_LOOPBACK))
+int (*bcm_gso_loopback_hw_offload)(struct sk_buff *skb, unsigned int txDevId) = NULL;
+EXPORT_SYMBOL(bcm_gso_loopback_hw_offload);
+
+struct net_device *bcm_gso_loopback_devs[BCM_GSO_LOOPBACK_MAXDEVS];
+
+void bcm_gso_loopback_devs_init(void)
+{
+	unsigned int i;
+	for (i = 0; i < BCM_GSO_LOOPBACK_MAXDEVS; i++) {
+		bcm_gso_loopback_devs[i] = NULL;
+	}
+}
+
+static inline void bcm_gso_loopback_add_devptr(struct net_device *dev)
+{
+	if (!strcmp("wl0", dev->name))
+		bcm_gso_loopback_devs[BCM_GSO_LOOPBACK_WL0] = dev;
+	else if (!strcmp("wl1", dev->name))
+		bcm_gso_loopback_devs[BCM_GSO_LOOPBACK_WL1] = dev;
+	else if (!strcmp("wl2", dev->name))
+		bcm_gso_loopback_devs[BCM_GSO_LOOPBACK_WL2] = dev;
+	else	/* not a know device */
+		return;
+
+	printk("+++++ Added gso loopback support for dev=%s <%p>\n",
+		dev->name, dev);
+}
+
+static inline void bcm_gso_loopback_del_devptr(struct net_device *dev)
+{
+	if (!strcmp("wl0", dev->name))
+		bcm_gso_loopback_devs[BCM_GSO_LOOPBACK_WL0] = NULL;
+	else if (!strcmp("wl1", dev->name))
+		bcm_gso_loopback_devs[BCM_GSO_LOOPBACK_WL1] = NULL;
+	else if (!strcmp("wl2", dev->name))
+		bcm_gso_loopback_devs[BCM_GSO_LOOPBACK_WL2] = NULL;
+	else	/* not a know device */
+		return;
+
+	printk("------ Removed gso loopback support for dev=%s <%p>\n",
+		dev->name, dev);
+}
+
+inline unsigned int bcm_is_gso_loopback_dev(void *dev)
+{
+	int i;
+
+	for (i = 1; i < BCM_GSO_LOOPBACK_MAXDEVS; i++) {
+		if (bcm_gso_loopback_devs[i] == dev)
+			return i;
+	}
+
+	return BCM_GSO_LOOPBACK_NONE;
+}
+
+unsigned int bcm_gso_loopback_devptr2devid(void *dev)
+{
+	return bcm_is_gso_loopback_dev(dev);
+}
+EXPORT_SYMBOL(bcm_gso_loopback_devptr2devid);
+
+struct net_device *bcm_gso_loopback_devid2devptr(unsigned int devId)
+{
+	if (devId < BCM_GSO_LOOPBACK_MAXDEVS)
+		return bcm_gso_loopback_devs[devId];
+	else {
+		printk(KERN_ERR "%s: invalid devId<%d> max devs=%d\n",
+				__func__, devId, BCM_GSO_LOOPBACK_MAXDEVS);
+		return NULL;
+	}
+}
+EXPORT_SYMBOL(bcm_gso_loopback_devid2devptr);
+#endif
+
 /**
  *	register_netdevice	- register a network device
  *	@dev: device to register
@@ -6468,6 +7741,10 @@ int register_netdevice(struct net_device *dev)
 	 */
 	if (dev->addr_assign_type == NET_ADDR_PERM)
 		memcpy(dev->perm_addr, dev->dev_addr, dev->addr_len);
+
+#if (defined(CONFIG_BCM_KF_FAP_GSO_LOOPBACK) && defined(CONFIG_BCM_FAP_GSO_LOOPBACK))
+	bcm_gso_loopback_add_devptr(dev);
+#endif
 
 	/* Notify protocols, that a new device appeared. */
 	ret = call_netdevice_notifiers(NETDEV_REGISTER, dev);
@@ -6758,6 +8035,9 @@ struct rtnl_link_stats64 *dev_get_stats(struct net_device *dev,
 	}
 	storage->rx_dropped += (unsigned long)atomic_long_read(&dev->rx_dropped);
 	storage->tx_dropped += (unsigned long)atomic_long_read(&dev->tx_dropped);
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+	blog_add_dev_accelerated_stats(dev, storage);
+#endif
 	return storage;
 }
 EXPORT_SYMBOL(dev_get_stats);
@@ -6818,6 +8098,9 @@ struct net_device *alloc_netdev_mqs(int sizeof_priv, const char *name,
 	struct net_device *dev;
 	size_t alloc_size;
 	struct net_device *p;
+#if defined(CONFIG_BCM_KF_MISALIGN_MQS)
+	static int offset = 0;
+#endif
 
 	BUG_ON(strlen(name) >= sizeof(dev->name));
 
@@ -6842,13 +8125,32 @@ struct net_device *alloc_netdev_mqs(int sizeof_priv, const char *name,
 	/* ensure 32-byte alignment of whole construct */
 	alloc_size += NETDEV_ALIGN - 1;
 
+#if defined(CONFIG_BCM_KF_MISALIGN_MQS)
+	/* KU_TBD - This causes the ethernet driver to panic on boot in register_netdev
+	 * BUG_ON(dev->reg_state != NETREG_UNINITIALIZED); */
+
+	/* Add an offset to break possible alignment of dev structs in cache */
+	/* Note that "offset" is a static variable so it will retain its value */
+	/* on each call of this function */
+	alloc_size += offset;
+#endif
+
 	p = kzalloc(alloc_size, GFP_KERNEL | __GFP_NOWARN | __GFP_REPEAT);
 	if (!p)
 		p = vzalloc(alloc_size);
 	if (!p)
 		return NULL;
 
+#if defined(CONFIG_BCM_KF_MISALIGN_MQS)
+	dev = PTR_ALIGN(p, NETDEV_ALIGN) + offset;
+	/* Increment offset in preparation for the next call to this function */
+	/* but don't allow it to increment excessively to avoid wasting memory */
+	offset += NETDEV_ALIGN;
+	if (offset >= 512)
+		offset -= 512;
+#else
 	dev = PTR_ALIGN(p, NETDEV_ALIGN);
+#endif
 	dev->padded = (char *)dev - (char *)p;
 
 	dev->pcpu_refcnt = alloc_percpu(int);
@@ -7030,6 +8332,9 @@ EXPORT_SYMBOL(unregister_netdevice_many);
 void unregister_netdev(struct net_device *dev)
 {
 	rtnl_lock();
+#if (defined(CONFIG_BCM_KF_FAP_GSO_LOOPBACK) && defined(CONFIG_BCM_FAP_GSO_LOOPBACK))
+	bcm_gso_loopback_del_devptr(dev);
+#endif
 	unregister_netdevice(dev);
 	rtnl_unlock();
 }
@@ -7272,6 +8577,7 @@ static int __net_init netdev_init(struct net *net)
 	net->dev_index_head = netdev_create_hash();
 	if (net->dev_index_head == NULL)
 		goto err_idx;
+
 
 	return 0;
 
@@ -7550,9 +8856,44 @@ static int __init net_dev_init(void)
 
 	hotcpu_notifier(dev_cpu_callback, 0);
 	dst_init();
+
+#if defined(CONFIG_BCM_KF_SKB_DEFINES)
+	skb_free_task = create_skb_free_task();
+#if defined(CONFIG_BCM_FAP) || defined(CONFIG_BCM_FAP_MODULE)
+	create_fapDrvTask();
+#endif	
+#endif
+
+#if (defined(CONFIG_BCM_KF_FAP_GSO_LOOPBACK) && defined(CONFIG_BCM_FAP_GSO_LOOPBACK))
+	bcm_gso_loopback_devs_init();
+#endif
+
+#if (defined(CONFIG_BCM_KF_SW_GSO) && defined(CONFIG_BCM_SW_GSO)) && !defined(CONFIG_BCM_BPM) && !defined(CONFIG_BCM_BPM_MODULE)
+    /* create a slab cache for GSO buffers */
+    pktBufferCache = kmem_cache_create("pktBufferCache",
+                                       BCM_PKTBUF_SIZE,
+                                       0, /* align */
+                                       SLAB_HWCACHE_ALIGN, /* flags */
+                                       NULL); /* ctor */
+    if(pktBufferCache == NULL)
+    {
+        printk("%s %s: Failed to create packet buffer cache\n", __FILE__, __FUNCTION__);
+        return -ENOMEM;
+    }
+#endif    
 	rc = 0;
 out:
 	return rc;
 }
 
 subsys_initcall(net_dev_init);
+
+
+#if defined(CONFIG_BCM_KF_VLAN) && (defined(CONFIG_BCM_VLAN) || defined(CONFIG_BCM_VLAN_MODULE))
+EXPORT_SYMBOL(bcm_vlan_handle_frame_hook);
+#endif
+
+#if defined(CONFIG_BCM_KF_TMS) && defined(CONFIG_BCM_TMS_MODULE)
+EXPORT_SYMBOL(bcm_1ag_handle_frame_check_hook);
+EXPORT_SYMBOL(bcm_3ah_handle_frame_check_hook);
+#endif

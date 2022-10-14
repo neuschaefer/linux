@@ -1890,6 +1890,9 @@ struct baud_rates {
 };
 
 static const struct baud_rates baud_rates[] = {
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX) && defined(CONFIG_BCM63138_SIM)
+	{3000000, B3000000},
+#endif
 	{ 921600, B921600 },
 	{ 460800, B460800 },
 	{ 230400, B230400 },

@@ -530,6 +530,98 @@ relookup_failed:
 	return ERR_PTR(err);
 }
 
+#if defined(CONFIG_BCM_KF_MAP) && (defined(CONFIG_BCM_MAP) || defined(CONFIG_BCM_MAP_MODULE))
+/*
+ * This function is only used by MAP-T (or MAP-E) feature.
+ * If LAN IPv4 packet with DF flag set and translated IPv6 packet
+ * exceeds mtu, this function is used to send fragment needed ICMP
+ */
+void send_icmp_frag(struct sk_buff *skb_in, int type, int code, __be32 info)
+{
+	struct iphdr *iph;
+	int room;
+	struct icmp_bxm *icmp_param;
+	struct rtable *rt;
+	struct ipcm_cookie ipc;
+	struct flowi4 fl4;
+	__be32 saddr;
+	u8  tos;
+	u32 mark;
+	struct net *net;
+
+	net = dev_net(skb_in->dev);
+	iph = ip_hdr(skb_in);
+
+	if ((u8 *)iph < skb_in->head ||
+	    (skb_network_header(skb_in) + sizeof(*iph)) >
+	    skb_tail_pointer(skb_in))
+		goto out;
+
+	if (skb_in->pkt_type != PACKET_HOST)
+		goto out;
+
+	/*
+	 *	Only reply to fragment 0. We byte re-order the constant
+	 *	mask for efficiency.
+	 */
+	if (iph->frag_off & htons(IP_OFFSET))
+		goto out;
+
+	icmp_param = kmalloc(sizeof(*icmp_param), GFP_ATOMIC);
+	if (!icmp_param)
+		return;
+
+	saddr = 0;    
+
+	tos = icmp_pointers[type].error ? ((iph->tos & IPTOS_TOS_MASK) |
+					   IPTOS_PREC_INTERNETCONTROL) :
+					  iph->tos;
+	mark = skb_in->mark;
+
+	if (ip_options_echo(&icmp_param->replyopts.opt.opt, skb_in))
+		goto out_free;
+
+
+	/*
+	 *	Prepare data for ICMP header.
+	 */
+	icmp_param->data.icmph.type	 = type;
+	icmp_param->data.icmph.code	 = code;
+	icmp_param->data.icmph.un.gateway = info;
+	icmp_param->data.icmph.checksum	 = 0;
+	icmp_param->skb	  = skb_in;
+	icmp_param->offset = skb_network_offset(skb_in);
+	ipc.addr = iph->saddr;
+	ipc.opt = &icmp_param->replyopts.opt;
+	ipc.tx_flags = 0;
+	ipc.ttl = 0;
+	ipc.tos = -1;
+
+	rt = icmp_route_lookup(net, &fl4, skb_in, iph, saddr, tos, mark,
+			       type, code, icmp_param);
+	if (IS_ERR(rt))
+		goto out_free;
+
+	room = dst_mtu(&rt->dst);
+	if (room > 576)
+		room = 576;
+	room -= sizeof(struct iphdr) + icmp_param->replyopts.opt.opt.optlen;
+	room -= sizeof(struct icmphdr);
+
+	icmp_param->data_len = skb_in->len - icmp_param->offset;
+	if (icmp_param->data_len > room)
+		icmp_param->data_len = room;
+	icmp_param->head_len = sizeof(struct icmphdr);
+
+	icmp_push_reply(icmp_param, &fl4, &ipc, &rt);
+
+out_free:
+	kfree(icmp_param);
+out:;  
+}
+EXPORT_SYMBOL(send_icmp_frag);
+#endif
+
 /*
  *	Send an ICMP message in response to a situation
  *

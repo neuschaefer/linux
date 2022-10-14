@@ -23,11 +23,20 @@
 #include <net/netfilter/nf_conntrack_seqadj.h>
 #include <linux/netfilter/nf_conntrack_sip.h>
 
+#if defined(CONFIG_BCM_KF_RUNNER)
+#if defined(CONFIG_BCM_RDPA) || defined(CONFIG_BCM_RDPA_MODULE)
+#include <net/bl_ops.h>
+#endif /* CONFIG_BCM_RUNNER */
+#endif /* CONFIG_BCM_KF_RUNNER */
+
+#if defined(CONFIG_BCM_KF_NETFILTER_SIP)
+#include <linux/iqos.h>
+#endif
+
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Christian Hentschel <chentschel@arnet.com.ar>");
 MODULE_DESCRIPTION("SIP NAT helper");
 MODULE_ALIAS("ip_nat_sip");
-
 
 static unsigned int mangle_packet(struct sk_buff *skb, unsigned int protoff,
 				  unsigned int dataoff,
@@ -336,6 +345,22 @@ static void nf_nat_sip_expected(struct nf_conn *ct,
 			= ct->master->tuplehash[!exp->dir].tuple.dst.u3;
 		nf_nat_setup_info(ct, &range, NF_NAT_MANIP_SRC);
 	}
+#if defined(CONFIG_BCM_KF_NETFILTER_SIP)
+
+	/*
+	 * added iqos here
+	 */
+
+	iqos_add_L4port(IPPROTO_UDP,
+			ntohs(ct->tuplehash[IP_CT_DIR_REPLY].tuple.dst.u.udp.port),
+						IQOS_ENT_DYN, IQOS_PRIO_HIGH );
+	iqos_add_L4port( IPPROTO_UDP,
+			ntohs(ct->tuplehash[IP_CT_DIR_ORIGINAL].tuple.dst.u.udp.port),
+							 IQOS_ENT_DYN,
+							 IQOS_PRIO_HIGH );
+
+	set_bit(IPS_IQOS_BIT, &ct->status);
+#endif
 }
 
 static unsigned int nf_nat_sip_expect(struct sk_buff *skb, unsigned int protoff,
@@ -608,6 +633,12 @@ static unsigned int nf_nat_sdp_media(struct sk_buff *skb, unsigned int protoff,
 		nf_ct_helper_log(skb, ct, "cannot mangle SDP message");
 		goto err2;
 	}
+
+#if defined(CONFIG_BCM_KF_RUNNER)
+#if defined(CONFIG_BCM_RDPA) || defined(CONFIG_BCM_RDPA_MODULE)
+	BL_OPS(net_ipv4_netfilter_nf_nat_sip(ct, port, dir));   
+#endif /* CONFIG_BCM_RUNNER */
+#endif /* CONFIG_BCM_KF_RUNNER */
 
 	return NF_ACCEPT;
 

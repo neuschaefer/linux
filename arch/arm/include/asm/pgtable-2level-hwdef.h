@@ -24,6 +24,9 @@
 #define PMD_BIT4		(_AT(pmdval_t, 1) << 4)
 #define PMD_DOMAIN(x)		(_AT(pmdval_t, (x)) << 5)
 #define PMD_PROTECTION		(_AT(pmdval_t, 1) << 9)		/* v5 */
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX) && defined(CONFIG_PLAT_BCM63XX_ACP)
+#define PMD_NONSECURE		(_AT(pmdval_t, 1) << 3)
+#endif /* CONFIG_BCM_KF_ARM_BCM963XX && CONFIG_PLAT_BCM63XX_ACP */
 /*
  *   - section
  */
@@ -38,6 +41,9 @@
 #define PMD_SECT_S		(_AT(pmdval_t, 1) << 16)	/* v6 */
 #define PMD_SECT_nG		(_AT(pmdval_t, 1) << 17)	/* v6 */
 #define PMD_SECT_SUPER		(_AT(pmdval_t, 1) << 18)	/* v6 */
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX) && defined(CONFIG_PLAT_BCM63XX_ACP)
+#define PMD_SECT_NS		(_AT(pmdval_t, 1) << 19)
+#endif /* CONFIG_BCM_KF_ARM_BCM963XX && CONFIG_PLAT_BCM63XX_ACP */
 #define PMD_SECT_AF		(_AT(pmdval_t, 0))
 
 #define PMD_SECT_UNCACHED	(_AT(pmdval_t, 0))

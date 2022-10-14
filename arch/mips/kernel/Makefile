@@ -17,14 +17,40 @@ CFLAGS_REMOVE_perf_event_mipsxx.o = -pg
 endif
 
 obj-$(CONFIG_CEVT_BCM1480)	+= cevt-bcm1480.o
+
+ifdef BCM_KF # defined (CONFIG_BCM_KF_TRACE_CUSTOM)
+ifneq ($(strip $(CONFIG_BCM_KF_TRACE_CUSTOM)),)
+obj-$(CONFIG_BCM_KF_TRACE_CUSTOM)		+= bcm_tstamp.o
+endif
+endif # BCM_KF
+
+ifdef BCM_KF # defined (CONFIG_BCM_KF_POWER_SAVE)
+ifneq ($(strip $(CONFIG_BCM_HOSTMIPS_PWRSAVE_TIMERS)),)
+obj-$(CONFIG_CEVT_R4K)		+= cevt-r4k-bcm-pwr.o
+else
 obj-$(CONFIG_CEVT_R4K)		+= cevt-r4k.o
+endif
+else # BCM_KF
+obj-$(CONFIG_CEVT_R4K)		+= cevt-r4k.o
+endif # BCM_KF
+
 obj-$(CONFIG_CEVT_DS1287)	+= cevt-ds1287.o
 obj-$(CONFIG_CEVT_GT641XX)	+= cevt-gt641xx.o
 obj-$(CONFIG_CEVT_SB1250)	+= cevt-sb1250.o
 obj-$(CONFIG_CEVT_TXX9)		+= cevt-txx9.o
 obj-$(CONFIG_CSRC_BCM1480)	+= csrc-bcm1480.o
 obj-$(CONFIG_CSRC_IOASIC)	+= csrc-ioasic.o
+
+ifdef BCM_KF # defined (CONFIG_BCM_KF_POWER_SAVE)
+ifneq ($(strip $(CONFIG_BCM_HOSTMIPS_PWRSAVE_TIMERS)),)
+obj-$(CONFIG_CSRC_R4K)		+= csrc-r4k-bcm-pwr.o
+else
 obj-$(CONFIG_CSRC_R4K)		+= csrc-r4k.o
+endif
+else # BCM_KF
+obj-$(CONFIG_CSRC_R4K)		+= csrc-r4k.o
+endif # BCM_KF
+
 obj-$(CONFIG_CSRC_SB1250)	+= csrc-sb1250.o
 obj-$(CONFIG_SYNC_R4K)		+= sync-r4k.o
 
@@ -96,7 +122,7 @@ CFLAGS_cpu-bugs64.o	= $(shell if $(CC) $(KBUILD_CFLAGS) -Wa,-mdaddi -c -o /dev/n
 
 obj-$(CONFIG_HAVE_STD_PC_SERIAL_PORT)	+= 8250-platform.o
 
-obj-$(CONFIG_PERF_EVENTS)	+= perf_event.o
+obj-$(CONFIG_PERF_EVENTS)	+= perf_event.o perf_regs.o
 obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event_mipsxx.o
 
 obj-$(CONFIG_JUMP_LABEL)	+= jump_label.o

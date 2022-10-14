@@ -33,6 +33,9 @@
 #include <net/netfilter/nf_conntrack_helper.h>
 #include <net/netfilter/nf_conntrack_zones.h>
 #include <linux/netfilter/nf_conntrack_h323.h>
+#if defined(CONFIG_BCM_KF_NETFILTER)
+#include <linux/iqos.h>
+#endif
 
 /* Parameters */
 static unsigned int default_rrq_ttl __read_mostly = 300;
@@ -325,6 +328,11 @@ static int expect_rtp_rtcp(struct sk_buff *skb, struct nf_conn *ct,
 	nf_ct_expect_put(rtp_exp);
 	nf_ct_expect_put(rtcp_exp);
 
+#if defined(CONFIG_BCM_KF_NETFILTER)
+    iqos_add_L4port( IPPROTO_UDP, rtp_port, IQOS_ENT_DYN, IQOS_PRIO_HIGH );
+    iqos_add_L4port( IPPROTO_UDP, rtcp_port, IQOS_ENT_DYN, IQOS_PRIO_HIGH );
+#endif
+
 	return ret;
 }
 
@@ -376,6 +384,10 @@ static int expect_t120(struct sk_buff *skb,
 	}
 
 	nf_ct_expect_put(exp);
+
+#if defined(CONFIG_BCM_KF_NETFILTER)
+    iqos_add_L4port( IPPROTO_TCP, port, IQOS_ENT_DYN, IQOS_PRIO_HIGH );
+#endif
 
 	return ret;
 }
@@ -723,6 +735,10 @@ static int expect_h245(struct sk_buff *skb, struct nf_conn *ct,
 
 	nf_ct_expect_put(exp);
 
+#if defined(CONFIG_BCM_KF_NETFILTER)
+    iqos_add_L4port( IPPROTO_TCP, port, IQOS_ENT_DYN, IQOS_PRIO_HIGH );
+#endif
+
 	return ret;
 }
 
@@ -851,6 +867,10 @@ static int expect_callforwarding(struct sk_buff *skb,
 	}
 
 	nf_ct_expect_put(exp);
+
+#if defined(CONFIG_BCM_KF_NETFILTER)
+    iqos_add_L4port( IPPROTO_TCP, port, IQOS_ENT_DYN, IQOS_PRIO_HIGH );
+#endif
 
 	return ret;
 }
@@ -1340,6 +1360,10 @@ static int expect_q931(struct sk_buff *skb, struct nf_conn *ct,
 
 	nf_ct_expect_put(exp);
 
+#if defined(CONFIG_BCM_KF_NETFILTER)
+    iqos_add_L4port( IPPROTO_TCP, port, IQOS_ENT_DYN, IQOS_PRIO_HIGH );
+#endif
+
 	return ret;
 }
 
@@ -1402,6 +1426,10 @@ static int process_gcf(struct sk_buff *skb, struct nf_conn *ct,
 		ret = -1;
 
 	nf_ct_expect_put(exp);
+
+#if defined(CONFIG_BCM_KF_NETFILTER)
+    iqos_add_L4port( IPPROTO_UDP, port, IQOS_ENT_DYN, IQOS_PRIO_HIGH );
+#endif
 
 	return ret;
 }
@@ -1619,6 +1647,10 @@ static int process_acf(struct sk_buff *skb, struct nf_conn *ct,
 
 	nf_ct_expect_put(exp);
 
+#if defined(CONFIG_BCM_KF_NETFILTER)
+    iqos_add_L4port( IPPROTO_TCP, port, IQOS_ENT_DYN, IQOS_PRIO_HIGH );
+#endif
+
 	return ret;
 }
 
@@ -1676,6 +1708,10 @@ static int process_lcf(struct sk_buff *skb, struct nf_conn *ct,
 	nf_ct_expect_put(exp);
 
 	/* Ignore rasAddress */
+
+#if defined(CONFIG_BCM_KF_NETFILTER)
+    iqos_add_L4port( IPPROTO_TCP, port, IQOS_ENT_DYN, IQOS_PRIO_HIGH );
+#endif
 
 	return ret;
 }
@@ -1834,6 +1870,16 @@ static struct nf_conntrack_helper nf_conntrack_helper_ras[] __read_mostly = {
 /****************************************************************************/
 static void __exit nf_conntrack_h323_fini(void)
 {
+#if defined(CONFIG_BCM_KF_NETFILTER)
+        /* unregister the Q.931 ports with ingress QoS classifier */
+        iqos_rem_L4port( nf_conntrack_helper_q931[0].tuple.dst.protonum, 
+              nf_conntrack_helper_q931[0].tuple.src.u.tcp.port, IQOS_ENT_STAT );
+
+        /* unregister the RAS ports with ingress QoS classifier */
+        iqos_rem_L4port( nf_conntrack_helper_ras[0].tuple.dst.protonum, 
+            nf_conntrack_helper_ras[0].tuple.src.u.udp.port, IQOS_ENT_STAT );
+#endif
+
 	nf_conntrack_helper_unregister(&nf_conntrack_helper_ras[1]);
 	nf_conntrack_helper_unregister(&nf_conntrack_helper_ras[0]);
 	nf_conntrack_helper_unregister(&nf_conntrack_helper_q931[1]);
@@ -1867,6 +1913,17 @@ static int __init nf_conntrack_h323_init(void)
 	if (ret < 0)
 		goto err5;
 	pr_debug("nf_ct_h323: init success\n");
+#if defined(CONFIG_BCM_KF_NETFILTER)
+        /* register the Q.931 ports with ingress QoS classifier */
+        iqos_add_L4port( nf_conntrack_helper_q931[0].tuple.dst.protonum, 
+                          nf_conntrack_helper_q931[0].tuple.src.u.tcp.port,
+                          IQOS_ENT_STAT, IQOS_PRIO_HIGH );
+
+        /* register the RAS ports with ingress QoS classifier */
+        iqos_add_L4port( nf_conntrack_helper_ras[0].tuple.dst.protonum, 
+                          nf_conntrack_helper_ras[0].tuple.src.u.udp.port,
+                          IQOS_ENT_STAT, IQOS_PRIO_HIGH );
+#endif
 	return 0;
 
 err5:

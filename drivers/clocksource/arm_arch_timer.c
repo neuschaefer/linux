@@ -8,6 +8,13 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
+
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX)
+#if defined(CONFIG_BCM947189)
+#define LVCNT
+#endif
+#endif
+
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/device.h>

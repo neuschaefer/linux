@@ -1075,6 +1075,12 @@ hc_init:
 
 static void quirk_usb_early_handoff(struct pci_dev *pdev)
 {
+
+#if (defined(CONFIG_BCM_KF_MIPS_BCM963XX) && defined(CONFIG_MIPS_BCM963XX))
+    /*as 963xx chips fake USB controllers as PCI, just return from here*/
+	if(pdev->vendor == PCI_VENDOR_ID_BROADCOM)
+		return;
+#endif
 	/* Skip Netlogic mips SoC's internal PCI USB controller.
 	 * This device does not need/support EHCI/OHCI handoff
 	 */

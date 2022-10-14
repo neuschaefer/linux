@@ -79,6 +79,9 @@
 #include <linux/mroute.h>
 #include <linux/netlink.h>
 #include <linux/tcp.h>
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+#include <linux/blog.h>
+#endif
 
 int sysctl_ip_default_ttl __read_mostly = IPDEFTTL;
 EXPORT_SYMBOL(sysctl_ip_default_ttl);
@@ -312,9 +315,16 @@ int ip_mc_output(struct sock *sk, struct sk_buff *skb)
 		   ) {
 			struct sk_buff *newskb = skb_clone(skb, GFP_ATOMIC);
 			if (newskb)
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+			{
+				blog_clone(skb, blog_ptr(newskb));
+#endif
 				NF_HOOK(NFPROTO_IPV4, NF_INET_POST_ROUTING,
 					sk, newskb, NULL, newskb->dev,
 					dev_loopback_xmit);
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+			}
+#endif
 		}
 
 		/* Multicasts with ttl 0 must not go beyond the host */
@@ -518,6 +528,17 @@ int ip_fragment(struct sock *sk, struct sk_buff *skb,
 		return -EMSGSIZE;
 	}
 
+#if defined(CONFIG_BCM_KF_IP)
+   /* 
+    * Do not fragment the packets going to 4in6 tunnel:
+    * RFC2473 sec 7.2: fragmentation should happen in tunnel
+    */
+    if (strstr(dev->name, "ip6tnl"))
+    {
+        return output(sk, skb);
+    }
+#endif    
+
 	/*
 	 *	Setup starting values.
 	 */
@@ -706,6 +727,9 @@ slow_path:
 			BUG();
 		left -= len;
 
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+		blog_xfer(skb2, skb);
+#endif
 		/*
 		 *	Fill in the new header fields.
 		 */

@@ -25,6 +25,10 @@
 #include <net/netfilter/nf_conntrack_helper.h>
 #include <net/netfilter/nf_conntrack_zones.h>
 #include <linux/netfilter/nf_conntrack_sip.h>
+#if defined(CONFIG_BCM_KF_NETFILTER_SIP)
+#include <net/netfilter/nf_conntrack_tuple.h>
+#include <linux/iqos.h>
+#endif
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Christian Hentschel <chentschel@arnet.com.ar>");
@@ -790,6 +794,19 @@ static int ct_sip_parse_sdp_addr(const struct nf_conn *ct, const char *dptr,
 	return 1;
 }
 
+#if defined(CONFIG_BCM_KF_NETFILTER_SIP)
+static void release_conflicting_expect(const struct nf_conn *ct, const struct nf_conntrack_expect *expect, const enum sip_expectation_classes class)
+{
+	struct nf_conntrack_expect *exp;
+	struct net *net = nf_ct_net(ct);
+	exp = __nf_ct_expect_find(net, nf_ct_zone(ct), &expect->tuple);
+	if (exp && exp->master != ct &&
+			   nfct_help(exp->master)->helper == nfct_help(ct)->helper &&
+			   exp->class == class)
+                nf_ct_unexpect_related(exp);
+}
+#endif /* CONFIG_BCM_KF_NETFILTER_SIP */
+
 static int refresh_signalling_expectation(struct nf_conn *ct,
 					  union nf_inet_addr *addr,
 					  u8 proto, __be16 port,
@@ -838,6 +855,45 @@ static void flush_expectations(struct nf_conn *ct, bool media)
 	}
 	spin_unlock_bh(&nf_conntrack_expect_lock);
 }
+
+#if defined(CONFIG_BCM_KF_NETFILTER_SIP)
+static void bcm_sip_expectfn(struct nf_conn *ct,
+		struct nf_conntrack_expect *exp)
+{
+	iqos_add_L4port(IPPROTO_UDP,
+			ntohs(ct->tuplehash[IP_CT_DIR_REPLY].tuple.dst.u.udp.port),
+			IQOS_ENT_DYN, IQOS_PRIO_HIGH );
+	iqos_add_L4port( IPPROTO_UDP,
+			ntohs(ct->tuplehash[IP_CT_DIR_ORIGINAL].tuple.dst.u.udp.port),
+			IQOS_ENT_DYN,
+			IQOS_PRIO_HIGH );
+	set_bit(IPS_IQOS_BIT, &ct->status);
+}
+static inline unsigned int bcm_nf_sip_sdp_media(struct sk_buff *skb, unsigned int protoff,
+		unsigned int dataoff,
+		const char **dptr, unsigned int *datalen,
+		struct nf_conntrack_expect *rtp_exp,
+		struct nf_conntrack_expect *rtcp_exp,
+		unsigned int mediaoff,
+		unsigned int medialen,
+		union nf_inet_addr *rtp_addr)
+{
+	/* even when NAT is not present we need to call expectfn to add RTP&RTCP
+	 * ports to IQ table
+	 */
+	rtp_exp->expectfn = bcm_sip_expectfn;
+	rtcp_exp->expectfn = bcm_sip_expectfn;
+
+	if (nf_ct_expect_related(rtp_exp) == 0) {
+		if (nf_ct_expect_related(rtcp_exp) != 0)
+			nf_ct_unexpect_related(rtp_exp);
+		else{
+			return NF_ACCEPT;
+		}
+	}
+	return NF_DROP;
+}
+#endif
 
 static int set_expected_rtp_rtcp(struct sk_buff *skb, unsigned int protoff,
 				 unsigned int dataoff,
@@ -943,12 +999,21 @@ static int set_expected_rtp_rtcp(struct sk_buff *skb, unsigned int protoff,
 				       datalen, rtp_exp, rtcp_exp,
 				       mediaoff, medialen, daddr);
 	else {
+#if defined(CONFIG_BCM_KF_NETFILTER_SIP)
+		release_conflicting_expect(ct, rtp_exp, class);
+		release_conflicting_expect(ct, rtcp_exp, class);
+		ret = bcm_nf_sip_sdp_media(skb, protoff, dataoff, dptr,
+				datalen, rtp_exp, rtcp_exp,
+				mediaoff, medialen, daddr);
+#else
 		if (nf_ct_expect_related(rtp_exp) == 0) {
 			if (nf_ct_expect_related(rtcp_exp) != 0)
 				nf_ct_unexpect_related(rtp_exp);
 			else
 				ret = NF_ACCEPT;
 		}
+#endif
+
 	}
 	nf_ct_expect_put(rtcp_exp);
 err2:
@@ -1165,6 +1230,35 @@ static int process_bye_request(struct sk_buff *skb, unsigned int protoff,
 {
 	enum ip_conntrack_info ctinfo;
 	struct nf_conn *ct = nf_ct_get(skb, &ctinfo);
+#if defined(CONFIG_BCM_KF_NETFILTER_SIP)
+	struct nf_conntrack_helper *helper = nfct_help(ct)->helper;
+	struct nf_conn *child;
+
+	/* cdrouter_sip_60 */
+	list_for_each_entry(child, &ct->derived_connections, derived_list) {
+		struct nf_conn_help *child_help = nfct_help(child);
+
+		/* Leave signalling children alone, we need to close only media ones. */
+		if (child_help != NULL && child_help->helper == helper)
+			continue;
+
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+		blog_lock();
+		if ((child->blog_key[IP_CT_DIR_ORIGINAL] != BLOG_KEY_FC_INVALID)
+			|| (child->blog_key[IP_CT_DIR_REPLY] != BLOG_KEY_FC_INVALID)) {
+			/* remove flow from flow cache */
+			blog_notify(DESTROY_FLOWTRACK, (void*)child,
+								(uint32_t)child->blog_key[IP_CT_DIR_ORIGINAL],
+								(uint32_t)child->blog_key[IP_CT_DIR_REPLY]);
+
+			set_bit(IPS_BLOG_BIT, &child->status);  /* Enable conntrack blogging */
+		}
+		blog_unlock();
+#endif
+		child->derived_timeout = 5*HZ;
+		nf_ct_refresh(child, skb, 5*HZ);
+	}
+#endif
 
 	flush_expectations(ct, true);
 	return NF_ACCEPT;
@@ -1355,6 +1449,9 @@ static const struct sip_handler sip_handlers[] = {
 	SIP_HANDLER("ACK", process_sdp, NULL),
 	SIP_HANDLER("PRACK", process_sdp, process_prack_response),
 	SIP_HANDLER("BYE", process_bye_request, NULL),
+#if defined(CONFIG_BCM_KF_NETFILTER_SIP)
+	SIP_HANDLER("CANCEL", process_bye_request, NULL), /*cdrouter_sip_62*/
+#endif
 	SIP_HANDLER("REGISTER", process_register_request, process_register_response),
 };
 
@@ -1625,6 +1722,11 @@ static void nf_conntrack_sip_fini(void)
 				continue;
 			nf_conntrack_helper_unregister(&sip[i][j]);
 		}
+#if defined(CONFIG_BCM_KF_NETFILTER_SIP)
+		/* unregister the SIP ports with ingress QoS classifier */
+		iqos_rem_L4port( IPPROTO_UDP, ports[i], IQOS_ENT_STAT );
+		iqos_rem_L4port( IPPROTO_TCP, ports[i], IQOS_ENT_STAT );
+#endif
 	}
 }
 
@@ -1675,9 +1777,15 @@ static int __init nf_conntrack_sip_init(void)
 				return ret;
 			}
 		}
+#if defined(CONFIG_BCM_KF_NETFILTER_SIP)
+		/* register the SIP ports with ingress QoS classifier */
+		iqos_add_L4port( IPPROTO_UDP, ports[i], IQOS_ENT_STAT, IQOS_PRIO_HIGH );
+		iqos_add_L4port( IPPROTO_TCP, ports[i], IQOS_ENT_STAT, IQOS_PRIO_HIGH );
+#endif
 	}
 	return 0;
 }
 
 module_init(nf_conntrack_sip_init);
 module_exit(nf_conntrack_sip_fini);
+

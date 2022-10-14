@@ -47,6 +47,9 @@ void __handle_sysrq(int key, bool check_mask);
 int register_sysrq_key(int key, struct sysrq_key_op *op);
 int unregister_sysrq_key(int key, struct sysrq_key_op *op);
 struct sysrq_key_op *__sysrq_get_key_op(int key);
+#if defined(CONFIG_BCM_KF_CHAR_SYSRQ)
+bool sysrq_on(void);
+#endif
 
 int sysrq_toggle_support(int enable_mask);
 

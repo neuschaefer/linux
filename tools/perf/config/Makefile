@@ -47,6 +47,14 @@ ifeq ($(ARCH),arm64)
   LIBUNWIND_LIBS = -lunwind -lunwind-aarch64
 endif
 
+ifdef BCM_KF #fdef CONFIG_BCM_KF_MIPS_4350
+ifeq ($(ARCH),mips)
+  ARCH_SUPPORTS_LIBUNWIND := 1
+  NO_PERF_REGS := 0
+  LIBUNWIND_LIBS = -lunwind -lunwind-mips
+endif
+endif #BCM_KF
+
 ifeq ($(NO_PERF_REGS),0)
   $(call detected,CONFIG_PERF_REGS)
 endif

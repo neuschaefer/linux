@@ -1881,6 +1881,31 @@ extern void usb_unregister_notify(struct notifier_block *nb);
 
 /* debugfs stuff */
 extern struct dentry *usb_debug_root;
+//#define MY_USB_DEBUG
+
+#ifdef MY_USB_DEBUG
+#define MY_USB_PRINK printk
+#else
+#define MY_USB_PRINK
+#endif
+
+//usb port
+typedef enum 
+{
+    USB_PORT1 = 1,
+    USB_PORT2
+}USB_CONTROL_PORT;
+
+//usb behavior 
+typedef enum 
+{
+    USB_LED_OFF,
+    USB_LED_ON,
+    USB_LED_BLINKONCE
+}LED_BEH;
+
+extern void usb_port_led_config(USB_CONTROL_PORT port, LED_BEH status);
+extern void usb_led_control(struct device *dev,LED_BEH status);
 
 /* LED triggers */
 enum usb_led_event {

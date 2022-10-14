@@ -1095,10 +1095,17 @@ __setup_irq(unsigned int irq, struct irq_desc *desc, struct irqaction *new)
 		 * set the trigger type must match. Also all must
 		 * agree on ONESHOT.
 		 */
+#if defined(CONFIG_BCM_KF_MISC_BACKPORTS)
+#else
 		unsigned int oldtype = irqd_get_trigger_type(&desc->irq_data);
+#endif
 
 		if (!((old->flags & new->flags) & IRQF_SHARED) ||
+#if defined(CONFIG_BCM_KF_MISC_BACKPORTS)
+		    ((old->flags ^ new->flags) & IRQF_TRIGGER_MASK) ||
+#else
 		    (oldtype != (new->flags & IRQF_TRIGGER_MASK)) ||
+#endif
 		    ((old->flags ^ new->flags) & IRQF_ONESHOT))
 			goto mismatch;
 

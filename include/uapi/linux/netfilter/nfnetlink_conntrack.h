@@ -53,6 +53,9 @@ enum ctattr_type {
 	CTA_MARK_MASK,
 	CTA_LABELS,
 	CTA_LABELS_MASK,
+#if defined(CONFIG_BCM_KF_DPI) && defined(CONFIG_BCM_DPI_MODULE)
+	CTA_DPI,
+#endif
 	__CTA_MAX
 };
 #define CTA_MAX (__CTA_MAX - 1)
@@ -259,5 +262,17 @@ enum ctattr_expect_stats {
 	__CTA_STATS_EXP_MAX,
 };
 #define CTA_STATS_EXP_MAX (__CTA_STATS_EXP_MAX - 1)
+
+#if defined(CONFIG_BCM_KF_DPI) && defined(CONFIG_BCM_DPI_MODULE)
+enum ctattr_dpi {
+	CTA_DPI_UNSPEC,
+	CTA_DPI_APP_ID,
+	CTA_DPI_MAC,
+	CTA_DPI_STATUS,
+	CTA_DPI_URL,
+	__CTA_DPI_MAX,
+};
+#define CTA_DPI_MAX (__CTA_DPI_MAX - 1)
+#endif
 
 #endif /* _IPCONNTRACK_NETLINK_H */

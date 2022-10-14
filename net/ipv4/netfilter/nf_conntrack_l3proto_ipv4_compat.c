@@ -114,6 +114,7 @@ static inline void ct_show_secctx(struct seq_file *s, const struct nf_conn *ct)
 }
 #endif
 
+
 static int ct_seq_show(struct seq_file *s, void *v)
 {
 	struct nf_conntrack_tuple_hash *hash = v;
@@ -121,6 +122,9 @@ static int ct_seq_show(struct seq_file *s, void *v)
 	const struct nf_conntrack_l3proto *l3proto;
 	const struct nf_conntrack_l4proto *l4proto;
 	int ret = 0;
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BCM_KF_NETFILTER) && defined(CONFIG_BLOG)
+	long ctExpiryVal = 0;
+#endif
 
 	NF_CT_ASSERT(ct);
 	if (unlikely(!atomic_inc_not_zero(&ct->ct_general.use)))
@@ -139,11 +143,37 @@ static int ct_seq_show(struct seq_file *s, void *v)
 	NF_CT_ASSERT(l4proto);
 
 	ret = -ENOSPC;
+
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BCM_KF_NETFILTER) && defined(CONFIG_BLOG)
+	if (timer_pending(&ct->timeout))
+	{
+		BlogCtTime_t ct_time;
+		memset(&ct_time, 0, sizeof(ct_time));
+
+		blog_lock();
+		if (ct->blog_key[BLOG_PARAM1_DIR_ORIG] != BLOG_KEY_FC_INVALID || 
+				ct->blog_key[BLOG_PARAM1_DIR_REPLY] != BLOG_KEY_FC_INVALID) {
+			blog_query(QUERY_FLOWTRACK, (void*)ct, 
+					ct->blog_key[BLOG_PARAM1_DIR_ORIG],
+					ct->blog_key[BLOG_PARAM1_DIR_REPLY], (unsigned long) &ct_time);
+			
+			ctExpiryVal = (long)(ct->extra_jiffies)/HZ - ct_time.idle;
+		} else 
+			ctExpiryVal = (long)(ct->timeout.expires - jiffies)/HZ;
+
+		blog_unlock();
+	}
+	seq_printf(s, "%-8s %u %-8s %u %ld ",
+			   l3proto->name, nf_ct_l3num(ct),
+			   l4proto->name, nf_ct_protonum(ct),
+			   ctExpiryVal);
+#else
 	seq_printf(s, "%-8s %u %ld ",
 		   l4proto->name, nf_ct_protonum(ct),
 		   timer_pending(&ct->timeout)
 		   ? (long)(ct->timeout.expires - jiffies)/HZ : 0);
-
+#endif		
+      	
 	if (l4proto->print_conntrack)
 		l4proto->print_conntrack(s, ct);
 

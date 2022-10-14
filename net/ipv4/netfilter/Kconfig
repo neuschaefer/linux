@@ -298,6 +298,29 @@ config IP_NF_TARGET_REDIRECT
 
 endif # IP_NF_NAT
 
+config NF_NAT_PROTO_ESP
+	tristate
+	depends on BCM_KF_NETFILTER && NF_NAT_IPV4 && NF_CT_PROTO_ESP
+	default NF_NAT_IPV4 && NF_CT_PROTO_ESP
+
+
+config NF_NAT_IPSEC
+	tristate
+	depends on  BCM_KF_NETFILTER && NF_CONNTRACK && NF_NAT_IPV4
+	default NF_NAT_IPV4 && NF_CONNTRACK_IPSEC
+
+config NF_NAT_PT
+	tristate "Port Triggering support"
+	depends on NF_NAT_IPV4 && BCM_KF_NETFILTER
+	help
+	  Port Triggering support
+
+	  To compile it as a module, choose M here.  If unsure, say Y.
+
+config NF_NAT_RTSP
+	tristate
+	depends on BCM_KF_NETFILTER && IP_NF_IPTABLES && NF_CONNTRACK && NF_NAT_IPV4
+	default NF_NAT_IPV4 && NF_CONNTRACK_RTSP
 # mangle + specific targets
 config IP_NF_MANGLE
 	tristate "Packet mangling"

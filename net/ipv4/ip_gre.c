@@ -54,6 +54,11 @@
 #include <net/ip6_route.h>
 #endif
 
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+#include <linux/nbuff.h>
+#include <linux/blog.h>
+#endif
+
 /*
    Problems & solutions
    --------------------
@@ -217,6 +222,14 @@ static int ipgre_rcv(struct sk_buff *skb, const struct tnl_ptk_info *tpi)
 				  iph->saddr, iph->daddr, tpi->key);
 
 	if (tunnel) {
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+		blog_lock();
+		blog_link(IF_DEVICE, blog_ptr(skb), (void*)tunnel->dev, DIR_RX, 
+				skb->len);
+		blog_link(GRE_TUNL, blog_ptr(skb), (void*)tunnel, DIR_RX, 0);
+		blog_link(TOS_MODE, blog_ptr(skb), tunnel, DIR_RX, BLOG_TOS_FIXED);
+		blog_unlock();
+#endif   
 		skb_pop_mac_header(skb);
 		ip_tunnel_rcv(tunnel, skb, tpi, log_ecn_error);
 		return PACKET_RCVD;
@@ -231,11 +244,24 @@ static void __gre_xmit(struct sk_buff *skb, struct net_device *dev,
 	struct ip_tunnel *tunnel = netdev_priv(dev);
 	struct tnl_ptk_info tpi;
 
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+	blog_lock();
+	blog_link(IF_DEVICE, blog_ptr(skb), (void*)dev, DIR_TX, skb->len);
+	blog_link(GRE_TUNL, blog_ptr(skb), (void*)tunnel, DIR_TX, 0);
+	blog_link(TOS_MODE, blog_ptr(skb), tunnel, DIR_TX, tnl_params->tos);
+	blog_unlock();
+#endif   
+
 	tpi.flags = tunnel->parms.o_flags;
 	tpi.proto = proto;
 	tpi.key = tunnel->parms.o_key;
 	if (tunnel->parms.o_flags & TUNNEL_SEQ)
+#if (defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG))
+		if (!blog_gre_tunnel_accelerated())
+			tunnel->o_seqno++;
+#else
 		tunnel->o_seqno++;
+#endif
 	tpi.seq = htonl(tunnel->o_seqno);
 
 	/* Push GRE header. */
@@ -243,6 +269,9 @@ static void __gre_xmit(struct sk_buff *skb, struct net_device *dev,
 
 	skb_set_inner_protocol(skb, tpi.proto);
 
+#if (defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG))
+	skb->tunl = tunnel;
+#endif
 	ip_tunnel_xmit(skb, dev, tnl_params, tnl_params->protocol);
 }
 
@@ -469,6 +498,9 @@ static void ipgre_tunnel_setup(struct net_device *dev)
 	dev->netdev_ops		= &ipgre_netdev_ops;
 	dev->type		= ARPHRD_IPGRE;
 	ip_tunnel_setup(dev, ipgre_net_id);
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+	dev->blog_stats_flags |= BLOG_DEV_STAT_FLAG_INCLUDE_ALL;
+#endif
 }
 
 static void __gre_tunnel_init(struct net_device *dev)
@@ -696,6 +728,9 @@ static void ipgre_tap_setup(struct net_device *dev)
 	dev->netdev_ops		= &gre_tap_netdev_ops;
 	dev->priv_flags 	|= IFF_LIVE_ADDR_CHANGE;
 	ip_tunnel_setup(dev, gre_tap_net_id);
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+	dev->blog_stats_flags |= BLOG_DEV_STAT_FLAG_INCLUDE_ALL;
+#endif
 }
 
 static int ipgre_newlink(struct net *src_net, struct net_device *dev,
@@ -867,6 +902,150 @@ static struct pernet_operations ipgre_tap_net_ops = {
 	.size = sizeof(struct ip_tunnel_net),
 };
 
+
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+static inline int __bcm_gre_rcv_check(struct ip_tunnel *tunnel, struct iphdr *iph, 
+	uint16_t len, uint32_t *pkt_seqno)
+{
+	int ret = BLOG_GRE_RCV_NO_SEQNO;
+	int grehlen = 4;
+	int iph_len = iph->ihl<<2;
+	__be16 *p = (__be16*)((uint8_t *)iph+iph_len);
+	__be16 flags;
+
+	flags = p[0];
+
+	if (tunnel->parms.i_flags & TUNNEL_CSUM) {
+		uint16_t csum;
+
+		grehlen += 4;
+		csum = *(((__be16 *)p) + 2);
+
+		if (!csum)
+			goto no_csum;
+
+		csum = ip_compute_csum((void*)(iph+1), len - iph_len);
+
+		if (csum) {
+			tunnel->dev->stats.rx_crc_errors++;
+			tunnel->dev->stats.rx_errors++;
+			ret = BLOG_GRE_RCV_CHKSUM_ERR;
+			goto rcv_done;
+		}
+	}
+
+no_csum:
+	if ((tunnel->parms.i_flags & TUNNEL_KEY) && (flags&GRE_KEY))
+		grehlen += 4;
+
+	if (tunnel->parms.i_flags & TUNNEL_SEQ) {
+		uint32_t seqno = *(((__be32 *)p) + (grehlen / 4));
+		*pkt_seqno = seqno;
+		if (tunnel->i_seqno && (s32)(seqno - tunnel->i_seqno) == 0) {
+			tunnel->i_seqno = seqno + 1;
+			ret = BLOG_GRE_RCV_IN_SEQ;
+		} else if (tunnel->i_seqno && (s32)(seqno - tunnel->i_seqno) < 0) {
+			tunnel->dev->stats.rx_fifo_errors++;
+			tunnel->dev->stats.rx_errors++;
+			ret = BLOG_GRE_RCV_OOS_LT;
+		} else {
+			tunnel->i_seqno = seqno + 1;
+			ret = BLOG_GRE_RCV_OOS_GT;
+		}
+	}
+
+rcv_done:
+	return ret;
+}
+
+int bcm_gre_rcv_check(struct net_device *dev, struct iphdr *iph, 
+	uint16_t len, void **tunl, uint32_t *pkt_seqno)
+{
+	int ret = BLOG_GRE_RCV_NO_TUNNEL;
+
+	struct net *net = dev_net(dev);
+	struct ip_tunnel_net *itn;
+	struct ip_tunnel *tunnel;
+    struct tnl_ptk_info tpi;
+
+	int iph_len = iph->ihl<<2;
+	struct gre_base_hdr *greh = (struct gre_base_hdr *)((uint8_t *)iph+iph_len);
+    __be32 *options =(__be32*)(__be32 *)(greh + 1);
+
+	tpi.flags = gre_flags_to_tnl_flags(greh->flags);
+    tpi.proto = greh->protocol;
+
+	if (greh->flags & GRE_CSUM) {
+		options++;
+	}
+
+	if (greh->flags & GRE_KEY) {
+		tpi.key = *options;
+		options++;
+	} else
+		tpi.key = 0;
+
+#if 1
+	if (tpi.proto == htons(ETH_P_TEB))
+		itn = net_generic(net, gre_tap_net_id);
+	else
+#endif
+		itn = net_generic(net, ipgre_net_id);
+
+	tunnel = ip_tunnel_lookup(itn, dev->ifindex, tpi.flags,
+				  iph->saddr, iph->daddr, tpi.key);
+
+    if (tunnel) {
+        rcu_read_lock();
+        ret =  __bcm_gre_rcv_check(tunnel, iph, len, pkt_seqno);
+        rcu_read_unlock();
+    }
+
+	*tunl = (void *) tunnel;
+	return ret;
+}
+
+/* Adds the TX seqno, Key and updates the GRE checksum */
+static inline 
+void __bcm_gre_xmit_update(struct ip_tunnel *tunnel, struct iphdr *iph, 
+	uint16_t len)
+{
+	/* IPV4 Tunnel doesn't use GRE flags, uses TUNNEL flags */
+	if (tunnel->parms.o_flags&(TUNNEL_KEY|TUNNEL_CSUM|TUNNEL_SEQ)) {
+		int iph_len = iph->ihl<<2;
+		/* tunnel->encap_hlen is only used for FOU, GUE. Otherwise it's 0 */
+		__be32 *ptr = (__be32*)(((u8*)iph) + iph_len + tunnel->hlen - 4);
+
+		if (tunnel->parms.o_flags&TUNNEL_SEQ) {
+			++tunnel->o_seqno;
+			*ptr = htonl(tunnel->o_seqno);
+			ptr--;
+		}
+
+		if (tunnel->parms.o_flags&TUNNEL_KEY) {
+			*ptr = tunnel->parms.o_key;
+			ptr--;
+		}
+
+		if (tunnel->parms.o_flags&TUNNEL_CSUM) {
+			*ptr = 0;
+			*(__sum16*)ptr = ip_compute_csum((void*)(iph+1), len - iph_len);
+		}
+		cache_flush_len(ptr, tunnel->hlen);
+	}
+}
+
+/* Adds the oseqno and updates the GRE checksum */
+void bcm_gre_xmit_update(struct ip_tunnel *tunnel, struct iphdr *iph, 
+	uint16_t len)
+{
+	rcu_read_lock();
+	__bcm_gre_xmit_update(tunnel, iph, len);
+	rcu_read_unlock();
+}
+
+#endif
+
 static int __init ipgre_init(void)
 {
 	int err;
@@ -894,6 +1073,11 @@ static int __init ipgre_init(void)
 	err = rtnl_link_register(&ipgre_tap_ops);
 	if (err < 0)
 		goto tap_ops_failed;
+
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+	blog_gre_rcv_check_fn = (blog_gre_rcv_check_t) bcm_gre_rcv_check;
+	blog_gre_xmit_update_fn = (blog_gre_xmit_upd_t) bcm_gre_xmit_update;
+#endif
 
 	return 0;
 

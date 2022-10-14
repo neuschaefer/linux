@@ -40,6 +40,10 @@
 #include <net/protocol.h>
 #include <net/xfrm.h>
 
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+#include <linux/blog.h>
+#endif
+
 #define IPV6HDR_BASELEN 8
 
 struct tmp_ext {
@@ -350,6 +354,10 @@ static int ah6_output(struct xfrm_state *x, struct sk_buff *skb)
 	int sglists = 0;
 	struct scatterlist *seqhisg;
 
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+	blog_skip(skb, blog_skip_reason_unknown_proto_ah6);
+#endif
+
 	ahp = x->data;
 	ahash = ahp->ahash;
 
@@ -423,7 +431,16 @@ static int ah6_output(struct xfrm_state *x, struct sk_buff *skb)
 	ah->seq_no = htonl(XFRM_SKB_CB(skb)->seq.output.low);
 
 	sg_init_table(sg, nfrags + sglists);
+#if defined(CONFIG_BCM_KF_MISC_BACKPORTS) 
+	err =
+#endif
 	skb_to_sgvec_nomark(skb, sg, 0, skb->len);
+
+#if defined(CONFIG_BCM_KF_MISC_BACKPORTS) 
+	if(unlikely(err) < 0)
+		goto out_free;
+#endif
+
 
 	if (x->props.flags & XFRM_STATE_ESN) {
 		/* Attach seqhi sg right after packet payload */
@@ -434,6 +451,22 @@ static int ah6_output(struct xfrm_state *x, struct sk_buff *skb)
 	ahash_request_set_callback(req, 0, ah6_output_done, skb);
 
 	AH_SKB_CB(skb)->tmp = iph_base;
+
+#if defined(CONFIG_BCM_KF_SPU) && (defined(CONFIG_BCM_SPU) || defined(CONFIG_BCM_SPU_MODULE)) && !(defined(CONFIG_BCM_RDPA) || defined(CONFIG_BCM_RDPA_MODULE))
+	/* ensure there is enough headroom and tailroom for HW info */
+	if((skb_headroom(skb) < 12) ||
+	   (skb_tailroom(skb) < 20))
+	{
+		req->alloc_buff_spu = 1;
+	}
+	else
+	{
+		req->alloc_buff_spu = 0;
+	}
+
+	/* not used for output */   
+	req->headerLen = 0;
+#endif
 
 	err = crypto_ahash_digest(req);
 	if (err) {
@@ -535,6 +568,10 @@ static int ah6_input(struct xfrm_state *x, struct sk_buff *skb)
 	int sglists = 0;
 	struct scatterlist *seqhisg;
 
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+	blog_skip(skb, blog_skip_reason_unknown_proto_ah6);
+#endif
+
 	if (!pskb_may_pull(skb, sizeof(struct ip_auth_hdr)))
 		goto out;
 
@@ -601,7 +638,14 @@ static int ah6_input(struct xfrm_state *x, struct sk_buff *skb)
 	ip6h->hop_limit   = 0;
 
 	sg_init_table(sg, nfrags + sglists);
+#if defined(CONFIG_BCM_KF_MISC_BACKPORTS) 
+	err =
+#endif
 	skb_to_sgvec_nomark(skb, sg, 0, skb->len);
+#if defined(CONFIG_BCM_KF_MISC_BACKPORTS) 
+	if(unlikely(err) < 0)
+		goto out;
+#endif
 
 	if (x->props.flags & XFRM_STATE_ESN) {
 		/* Attach seqhi sg right after packet payload */
@@ -613,6 +657,22 @@ static int ah6_input(struct xfrm_state *x, struct sk_buff *skb)
 	ahash_request_set_callback(req, 0, ah6_input_done, skb);
 
 	AH_SKB_CB(skb)->tmp = work_iph;
+
+#if defined(CONFIG_BCM_KF_SPU) && (defined(CONFIG_BCM_SPU) || defined(CONFIG_BCM_SPU_MODULE)) && !(defined(CONFIG_BCM_RDPA) || defined(CONFIG_BCM_RDPA_MODULE))
+	/* ensure there is enough headroom and tailroom for HW info */
+	if((skb_headroom(skb) < 12) ||
+	   (skb_tailroom(skb) < 20))
+	{
+		req->alloc_buff_spu = 1;
+	}
+	else
+	{
+		req->alloc_buff_spu = 0;
+	}
+
+	/* offset to icv */
+	req->headerLen = &ah->auth_data[0] - skb->data;
+#endif
 
 	err = crypto_ahash_digest(req);
 	if (err) {

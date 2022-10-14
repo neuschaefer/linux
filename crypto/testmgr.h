@@ -28681,7 +28681,11 @@ static struct comp_testvec deflate_decomp_tv_template[] = {
 #define ZLIB_COMP_TEST_VECTORS 2
 #define ZLIB_DECOMP_TEST_VECTORS 2
 
+#if defined(CONFIG_BCM_KF_IP)
+static struct {
+#else
 static const struct {
+#endif
 	struct nlattr nla;
 	int val;
 } deflate_comp_params[] = {
@@ -28718,7 +28722,11 @@ static const struct {
 	}
 };
 
+#if defined(CONFIG_BCM_KF_IP)
+static struct {
+#else
 static const struct {
+#endif
 	struct nlattr nla;
 	int val;
 } deflate_decomp_params[] = {

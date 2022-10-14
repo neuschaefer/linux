@@ -40,6 +40,9 @@
 #include <net/netlink.h>
 #include <net/sch_generic.h>
 #include <net/pkt_sched.h>
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+#include <linux/blog.h>
+#endif
 
 /* HTB algorithm.
     Author: devik@cdi.cz
@@ -924,7 +927,14 @@ ok:
 			m |= 1 << prio;
 			skb = htb_dequeue_tree(q, prio, level);
 			if (likely(skb != NULL))
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+			{
+				blog_skip(skb, blog_skip_reason_sch_htb);
+#endif
 				goto ok;
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+			}
+#endif
 		}
 	}
 	qdisc_qstats_overlimit(sch);

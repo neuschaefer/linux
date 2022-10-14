@@ -13,6 +13,9 @@ endif
 
 CFLAGS_REMOVE_return_address.o = -pg
 
+CFLAGS_irq.o := -I${INC_BRCMSHARED_PUB_PATH}/bcm963xx\
+		-I${INC_BRCMDRIVER_PUB_PATH}/bcm963xx
+
 # Object file lists.
 
 obj-y		:= elf.o entry-common.o irq.o opcodes.o \
@@ -30,6 +33,9 @@ else
 obj-y		+= entry-armv.o
 endif
 
+ifdef BCM_KF # defined(CONFIG_BCM_KF_SPECTRE_PATCH) && defined(CONFIG_BCM_SPECTRE_PATCH_ENABLE)
+obj-$(CONFIG_MMU)		+= bugs.o
+endif
 obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
 obj-$(CONFIG_ISA_DMA_API)	+= dma.o
 obj-$(CONFIG_FIQ)		+= fiq.o fiqasm.o
@@ -88,6 +94,10 @@ obj-$(CONFIG_ARM_VIRT_EXT)	+= hyp-stub.o
 ifeq ($(CONFIG_ARM_PSCI),y)
 obj-y				+= psci.o psci-call.o
 obj-$(CONFIG_SMP)		+= psci_smp.o
+endif
+
+ifdef BCM_KF
+obj-$(CONFIG_HAVE_ARM_SMCCC)	+= smccc-call.o
 endif
 
 extra-y := $(head-y) vmlinux.lds

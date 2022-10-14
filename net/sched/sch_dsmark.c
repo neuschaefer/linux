@@ -16,6 +16,9 @@
 #include <net/dsfield.h>
 #include <net/inet_ecn.h>
 #include <asm/byteorder.h>
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+#include <linux/blog.h>
+#endif
 
 /*
  * classid	class		marking
@@ -306,6 +309,9 @@ static struct sk_buff *dsmark_dequeue(struct Qdisc *sch)
 		break;
 	}
 
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+	blog_skip(skb, blog_skip_reason_sch_dsmark);
+#endif
 	return skb;
 }
 

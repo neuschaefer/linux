@@ -18,6 +18,9 @@
 #include <linux/io.h>
 #include <linux/irq.h>
 #include <asm/mach-types.h>
+#if defined(CONFIG_BCM_KF_SPECTRE_PATCH) && defined(CONFIG_BCM_SPECTRE_PATCH_ENABLE)
+#include <asm/outercache.h>
+#endif
 #include <mach/hardware.h>
 #include <mach/cputype.h>
 #include <mach/addr-map.h>

@@ -140,6 +140,16 @@ config XILINX_WATCHDOG
 	  To compile this driver as a module, choose M here: the
 	  module will be called of_xilinx_wdt.
 
+config BCM96XXX_WDT
+	tristate "Broadcom BCM96xxx SOCs hardware watchdog"
+	depends on BCM_KF_WDT
+	help
+	  Watchdog driver for the built in watchdog hardware in Broadcom
+	  BCM96xxx based SoCs.
+
+	  To compile this driver as a loadable module, choose M here.
+	  The module will be called bcm96xxx_wdt.
+
 # ALPHA Architecture
 
 # ARM Architecture

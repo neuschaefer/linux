@@ -1318,6 +1318,12 @@ static int jffs2_do_read_inode_internal(struct jffs2_sb_info *c,
 	if (f->inocache->state == INO_STATE_READING)
 		jffs2_set_inocache_state(c, f->inocache, INO_STATE_PRESENT);
 
+#if defined(CONFIG_BCM_KF_JFFS)
+    /* Set a "not compressed" flag so the inode does not get compressed when moved. */
+    if( latest_node->compr == JFFS2_COMPR_NONE )
+        f->inocache->flags |= INO_FLAGS_COMPR_NONE;
+#endif
+
 	return 0;
 }
 

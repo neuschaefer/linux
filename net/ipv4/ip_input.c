@@ -378,6 +378,9 @@ int ip_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt, 
 {
 	const struct iphdr *iph;
 	u32 len;
+#if defined(CONFIG_MIPS_BCM963XX) && defined(CONFIG_BCM_KF_UNALIGNED_EXCEPTION)
+	__u8 iph_ihl, iph_version;
+#endif
 
 	/* When the interface is in promisc. mode, drop all the crap
 	 * that it receives, do not try to analyse it.
@@ -409,8 +412,14 @@ int ip_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt, 
 	 *	3.	Checksums correctly. [Speed optimisation for later, skip loopback checksums]
 	 *	4.	Doesn't have a bogus length
 	 */
+#if defined(CONFIG_MIPS_BCM963XX) && defined(CONFIG_BCM_KF_UNALIGNED_EXCEPTION)
+	iph_ihl = *(__u8 *)iph & 0xf;
+	iph_version = *(__u8 *)iph >> 4;
 
+	if (iph_ihl < 5 || iph_version != 4)
+#else
 	if (iph->ihl < 5 || iph->version != 4)
+#endif
 		goto inhdr_error;
 
 	BUILD_BUG_ON(IPSTATS_MIB_ECT1PKTS != IPSTATS_MIB_NOECTPKTS + INET_ECN_ECT_1);
@@ -420,12 +429,20 @@ int ip_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt, 
 			IPSTATS_MIB_NOECTPKTS + (iph->tos & INET_ECN_MASK),
 			max_t(unsigned short, 1, skb_shinfo(skb)->gso_segs));
 
+#if defined(CONFIG_MIPS_BCM963XX) && defined(CONFIG_BCM_KF_UNALIGNED_EXCEPTION)
+	if (!pskb_may_pull(skb, iph_ihl*4))
+#else
 	if (!pskb_may_pull(skb, iph->ihl*4))
+#endif
 		goto inhdr_error;
 
 	iph = ip_hdr(skb);
 
+#if defined(CONFIG_MIPS_BCM963XX) && defined(CONFIG_BCM_KF_UNALIGNED_EXCEPTION)
+	if (unlikely(ip_fast_csum((u8 *)iph, iph_ihl)))
+#else
 	if (unlikely(ip_fast_csum((u8 *)iph, iph->ihl)))
+#endif
 		goto csum_error;
 
 	len = ntohs(iph->tot_len);

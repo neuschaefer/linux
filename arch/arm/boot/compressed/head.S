@@ -130,7 +130,11 @@ start:
 		.endr
    ARM(		mov	r0, r0		)
    ARM(		b	1f		)
+#if defined(CONFIG_BCM_KF_SPECTRE_PATCH) && defined(CONFIG_BCM_SPECTRE_PATCH_ENABLE)
+ THUMB(		badr	r12, 1f		)
+#else
  THUMB(		adr	r12, BSYM(1f)	)
+#endif
  THUMB(		bx	r12		)
 
 		.word	_magic_sig	@ Magic numbers to help the loader
@@ -447,7 +451,11 @@ dtb_check_done:
 
 		bl	cache_clean_flush
 
+#if defined(CONFIG_BCM_KF_SPECTRE_PATCH) && defined(CONFIG_BCM_SPECTRE_PATCH_ENABLE)
+		badr	r0, restart
+#else
 		adr	r0, BSYM(restart)
+#endif
 		add	r0, r0, r6
 		mov	pc, r0
 

@@ -215,5 +215,14 @@ struct callback_head {
 /* clocksource cycle base type */
 typedef u64 cycle_t;
 
+
+#if defined(CONFIG_BCM_KF_UNALIGNED_EXCEPTION)
+#if defined(CONFIG_MIPS_BCM963XX)
+#define LINUX_NET_PACKED __attribute__((packed))
+#else
+#define LINUX_NET_PACKED 
+#endif /* CONFIG_MIPS_BCM963XX */
+#endif /* CONFIG_BCM_KF_UNALIGNED_EXCEPTION  */
+
 #endif /*  __ASSEMBLY__ */
 #endif /* _LINUX_TYPES_H */

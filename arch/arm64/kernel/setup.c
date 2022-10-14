@@ -522,7 +522,9 @@ static int c_show(struct seq_file *m, void *v)
 #ifdef CONFIG_SMP
 		seq_printf(m, "processor\t: %d\n", i);
 #endif
-
+#ifdef CONFIG_BCM_KF_ARM64_BCM963XX
+		seq_printf(m, "cpu model\t: ARM\n");
+#endif
 		seq_printf(m, "BogoMIPS\t: %lu.%02lu\n",
 			   loops_per_jiffy / (500000UL/HZ),
 			   loops_per_jiffy / (5000UL/HZ) % 100);

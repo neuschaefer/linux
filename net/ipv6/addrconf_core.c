@@ -37,7 +37,11 @@ int __ipv6_addr_type(const struct in6_addr *addr)
 {
 	__be32 st;
 
+#if defined(CONFIG_MIPS_BCM963XX) && defined(CONFIG_BCM_KF_UNALIGNED_EXCEPTION)
+	memcpy(&st, &addr->s6_addr[0], sizeof(__be32));
+#else
 	st = addr->s6_addr32[0];
+#endif
 
 	/* Consider all addresses with the first three bits different of
 	   000 and 111 as unicasts.

@@ -102,6 +102,14 @@ static bool tcp_mt(const struct sk_buff *skb, struct xt_action_param *par)
 			ntohs(th->dest),
 			!!(tcpinfo->invflags & XT_TCP_INV_DSTPT)))
 		return false;
+
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG_FEATURE)
+	if ( tcpinfo->flg_mask & 0x10 ) {
+		struct sk_buff *skb_p;
+		skb_p = (struct sk_buff *)skb;
+	}
+#endif
+
 	if (!FWINVTCP((((unsigned char *)th)[13] & tcpinfo->flg_mask)
 		      == tcpinfo->flg_cmp,
 		      XT_TCP_INV_FLAGS))
@@ -117,6 +125,30 @@ static bool tcp_mt(const struct sk_buff *skb, struct xt_action_param *par)
 				     &par->hotdrop))
 			return false;
 	}
+#if defined(CONFIG_BCM_KF_NETFILTER)
+	if (tcpinfo->pure_ack) {
+		__u32 payload_len = 0xFFFFFFFF;
+		if (par->family == NFPROTO_IPV4) {
+			const struct iphdr *ih = (struct iphdr *)skb_network_header(skb);
+			struct iphdr _iph;
+			if (!ih || ih->version != 4 || ((ih->ihl * 4) < sizeof(_iph))) {
+				par->hotdrop = true;
+				return false;
+			}
+			payload_len = ntohs(ih->tot_len) - (ih->ihl * 4) - (th->doff * 4);
+		} else if (par->family == NFPROTO_IPV6) {
+			const struct ipv6hdr *i6h = (struct ipv6hdr *)skb_network_header(skb);
+			if (!i6h || i6h->version != 6) {
+				par->hotdrop = true;
+				return false;
+			}
+			payload_len = ntohs(i6h->payload_len) - (th->doff * 4);
+		} else {
+			return false;
+		}
+		return FWINVTCP(!payload_len, XT_TCP_INV_FLAGS);
+	}
+#endif
 	return true;
 }
 

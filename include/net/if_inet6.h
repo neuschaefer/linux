@@ -120,6 +120,9 @@ struct ifmcaddr6 {
 	struct ip6_sf_list	*mca_sources;
 	struct ip6_sf_list	*mca_tomb;
 	unsigned int		mca_sfmode;
+#if defined(CONFIG_BCM_KF_MCAST_GR_SUPPRESSION)
+	unsigned int		mca_osfmode;
+#endif
 	unsigned char		mca_crcount;
 	unsigned long		mca_sfcount[2];
 	struct timer_list	mca_timer;

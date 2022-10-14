@@ -436,6 +436,11 @@ static int ext4_destroy_inline_data_nolock(handle_t *handle,
 	memset((void *)ext4_raw_inode(&is.iloc)->i_block,
 		0, EXT4_MIN_INLINE_DATA_SIZE);
 
+#if defined(CONFIG_BCM_KF_MISC_BACKPORTS)
+/*CVE-2018-10881*/
+	memset(ei->i_data, 0, EXT4_MIN_INLINE_DATA_SIZE);
+#endif
+
 	if (EXT4_HAS_INCOMPAT_FEATURE(inode->i_sb,
 				      EXT4_FEATURE_INCOMPAT_EXTENTS)) {
 		if (S_ISDIR(inode->i_mode) ||
@@ -884,11 +889,17 @@ retry_journal:
 	flags |= AOP_FLAG_NOFS;
 
 	if (ret == -ENOSPC) {
+#if defined(CONFIG_BCM_KF_MISC_BACKPORTS)
+/*CVE-2018-10883*/
+		ext4_journal_stop(handle);
+#endif
 		ret = ext4_da_convert_inline_data_to_extent(mapping,
 							    inode,
 							    flags,
 							    fsdata);
+#if !defined(CONFIG_BCM_KF_MISC_BACKPORTS)
 		ext4_journal_stop(handle);
+#endif
 		if (ret == -ENOSPC &&
 		    ext4_should_retry_alloc(inode->i_sb, &retries))
 			goto retry_journal;
@@ -1857,6 +1868,7 @@ out:
 	return (error < 0 ? error : 0);
 }
 
+#if !defined(CONFIG_BCM_KF_MISC_BACKPORTS) /*CVE-2018-10883*/
 /*
  * Called during xattr set, and if we can sparse space 'needed',
  * just create the extent tree evict the data to the outer block.
@@ -1892,6 +1904,7 @@ out:
 	brelse(iloc.bh);
 	return error;
 }
+#endif // !defined(CONFIG_BCM_KF_MISC_BACKPORTS)
 
 void ext4_inline_data_truncate(struct inode *inode, int *has_inline)
 {

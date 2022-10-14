@@ -17,8 +17,10 @@
 #include <linux/cpu.h>
 #include <linux/notifier.h>
 #include <linux/smp.h>
+#if defined(CONFIG_BCM_KF_BUZZZ) && defined(CONFIG_BUZZZ_KEVT)
+#include <linux/buzzz.h>
+#endif
 #include <asm/processor.h>
-
 
 static DEFINE_PER_CPU(struct llist_head, raised_list);
 static DEFINE_PER_CPU(struct llist_head, lazy_list);
@@ -74,6 +76,10 @@ bool irq_work_queue_on(struct irq_work *work, int cpu)
 	/* Only queue if not already pending */
 	if (!irq_work_claim(work))
 		return false;
+
+#if defined(CONFIG_BCM_KF_BUZZZ) && defined(CONFIG_BUZZZ_KEVT)
+	BUZZZ_KNL3(IRQ_WORK, cpu, work->func);
+#endif
 
 	if (llist_add(&work->llnode, &per_cpu(raised_list, cpu)))
 		arch_send_call_function_single_ipi(cpu);

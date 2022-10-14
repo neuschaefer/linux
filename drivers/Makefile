@@ -167,3 +167,6 @@ obj-$(CONFIG_RAS)		+= ras/
 obj-$(CONFIG_THUNDERBOLT)	+= thunderbolt/
 obj-$(CONFIG_CORESIGHT)		+= hwtracing/coresight/
 obj-$(CONFIG_ANDROID)		+= android/
+ifdef BCM_KF # defined(CONFIG_BCM_KF_OPTEE)
+obj-$(CONFIG_TEE)			+= tee/
+endif

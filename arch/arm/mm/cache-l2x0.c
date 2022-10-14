@@ -166,6 +166,20 @@ static void l2c_resume(void)
 	l2c_enable(l2x0_base, l2x0_saved_regs.aux_ctrl, l2x0_data->num_lock);
 }
 
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX)
+static unsigned long gb_flags;
+
+static void l2c_spin_lock_irqsave(void)
+{
+	raw_spin_lock_irqsave(&l2x0_lock, gb_flags);
+}
+
+static void l2c_spin_unlock_irqrestore(void)
+{
+	raw_spin_unlock_irqrestore(&l2x0_lock, gb_flags);
+}
+#endif
+
 /*
  * L2C-210 specific code.
  *
@@ -245,6 +259,23 @@ static void l2c210_sync(void)
 {
 	__l2c210_cache_sync(l2x0_base);
 }
+
+
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX)
+/* no debug write workaround is needed for these function because lc310 controller in 
+   63138 is r3p3 and does not have these erratum */
+static void l2c210_flush_line_no_lock(unsigned long addr)
+{
+	void __iomem *base = l2x0_base;
+	writel_relaxed(addr, base + L2X0_CLEAN_INV_LINE_PA);
+}
+
+static void l2c210_inv_line_no_lock(unsigned long addr)
+{
+	void __iomem *base = l2x0_base;
+	writel_relaxed(addr, base + L2X0_INV_LINE_PA);
+}
+#endif
 
 static const struct l2c_init_data l2c210_data __initconst = {
 	.type = "L2C-210",
@@ -771,6 +802,13 @@ static const struct l2c_init_data l2c310_init_fns __initconst = {
 		.disable = l2c310_disable,
 		.sync = l2c210_sync,
 		.resume = l2c310_resume,
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX)
+		.spin_lock_irqsave = l2c_spin_lock_irqsave,
+		.spin_unlock_irqrestore = l2c_spin_unlock_irqrestore,
+		.sync_no_lock = l2c210_sync,
+		.flush_line_no_lock = l2c210_flush_line_no_lock,
+		.inv_line_no_lock = l2c210_inv_line_no_lock,
+#endif
 	},
 };
 
@@ -1219,6 +1257,13 @@ static const struct l2c_init_data of_l2c310_data __initconst = {
 		.disable     = l2c310_disable,
 		.sync        = l2c210_sync,
 		.resume      = l2c310_resume,
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX)
+		.spin_lock_irqsave = l2c_spin_lock_irqsave,
+		.spin_unlock_irqrestore = l2c_spin_unlock_irqrestore,
+		.sync_no_lock = l2c210_sync,
+		.flush_line_no_lock = l2c210_flush_line_no_lock,
+		.inv_line_no_lock = l2c210_inv_line_no_lock,
+#endif
 	},
 };
 

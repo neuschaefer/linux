@@ -28,6 +28,9 @@
 #include <linux/irq_work.h>
 
 #include <linux/atomic.h>
+#if defined(CONFIG_BCM_KF_SPECTRE_PATCH) && defined(CONFIG_BCM_SPECTRE_PATCH_ENABLE)
+#include <asm/bugs.h>
+#endif
 #include <asm/smp.h>
 #include <asm/cacheflush.h>
 #include <asm/cpu.h>
@@ -379,6 +382,9 @@ asmlinkage void secondary_start_kernel(void)
 	 * before we continue - which happens after __cpu_up returns.
 	 */
 	set_cpu_online(cpu, true);
+#if defined(CONFIG_BCM_KF_SPECTRE_PATCH) && defined(CONFIG_BCM_SPECTRE_PATCH_ENABLE)
+	check_other_bugs();
+#endif
 	complete(&cpu_running);
 
 	local_irq_enable();

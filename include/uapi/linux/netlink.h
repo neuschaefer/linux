@@ -1,6 +1,12 @@
 #ifndef _UAPI__LINUX_NETLINK_H
 #define _UAPI__LINUX_NETLINK_H
 
+#if !defined(CONFIG_BCM_IN_KERNEL)
+/* user app includes this file directly.To avoid double inclusion of this file from the toolchain
+   version, define the same header check definition as the one from toolchain */
+#define __LINUX_NETLINK_H
+#endif 
+
 #include <linux/kernel.h>
 #include <linux/socket.h> /* for __kernel_sa_family_t */
 #include <linux/types.h>
@@ -29,6 +35,25 @@
 #define NETLINK_CRYPTO		21	/* Crypto layer */
 
 #define NETLINK_INET_DIAG	NETLINK_SOCK_DIAG
+
+#if defined(CONFIG_BCM_KF_NETFILTER) || !defined(CONFIG_BCM_IN_KERNEL)
+#define NETLINK_BRCM_MONITOR	25 /*send events to userspace monitor task(broadcom specific)*/
+#define NETLINK_BRCM_EPON	26
+#endif
+
+#if defined(CONFIG_BCM_KF_DPI) && defined(CONFIG_BCM_DPI_MODULE)
+#define NETLINK_DPI		27	/* dpicore driver */
+#define NETLINK_DPI_QOS		28	/* DPI QoS */
+#endif
+
+#if ((defined(CONFIG_BCM_MCAST) || defined(CONFIG_BCM_MCAST_MODULE)) && defined(CONFIG_BCM_KF_MCAST)) || !defined(CONFIG_BCM_IN_KERNEL)
+#define NETLINK_BCM_MCAST        30       /* for multicast */
+#endif
+
+#if defined(CONFIG_BCM_KF_WL) || !defined(CONFIG_BCM_IN_KERNEL)
+#define NETLINK_IGSC             29       /*  for multicast igs sdb listing */
+#define NETLINK_WLCSM            31       /*  for brcm wireless cfg[nvram]/statics/management extention */
+#endif
 
 #define MAX_LINKS 32		
 

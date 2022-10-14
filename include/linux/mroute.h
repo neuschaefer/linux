@@ -101,7 +101,14 @@ struct mfc_cache {
 #endif		
 
 struct rtmsg;
+#if defined(CONFIG_BCM_KF_MROUTE)
+int ipmr_get_route(struct net *net, struct sk_buff *skb,
+		   __be32 saddr, __be32 daddr,
+		   struct rtmsg *rtm, int nowait, int ifIndex);
+#else
 extern int ipmr_get_route(struct net *net, struct sk_buff *skb,
 			  __be32 saddr, __be32 daddr,
 			  struct rtmsg *rtm, int nowait);
+#endif
+
 #endif

@@ -39,6 +39,7 @@ static int dev_ifname(struct net *net, struct ifreq __user *arg)
 	return 0;
 }
 
+
 static gifconf_func_t *gifconf_list[NPROTO];
 
 /**
@@ -172,6 +173,20 @@ static int dev_ifsioc_locked(struct net *net, struct ifreq *ifr, unsigned int cm
 	case SIOCGIFTXQLEN:
 		ifr->ifr_qlen = dev->tx_queue_len;
 		return 0;
+
+#if defined(CONFIG_BCM_KF_WANDEV)
+	case SIOCDEVISWANDEV:
+		if (dev->priv_flags & IFF_WANDEV)
+			ifr->ifr_flags = 1;
+		else
+			ifr->ifr_flags = 0;
+		return 0;
+#endif
+#if defined(CONFIG_BCM_KF_MISC_IOCTLS)
+	case SIOCGIFTRANSSTART:
+		ifr->ifr_ifru.ifru_ivalue = dev->trans_start;
+		return 0;
+#endif
 
 	default:
 		/* dev_ioctl() should ensure this case
@@ -307,6 +322,38 @@ static int dev_ifsioc(struct net *net, struct ifreq *ifr, unsigned int cmd)
 		ifr->ifr_newname[IFNAMSIZ-1] = '\0';
 		return dev_change_name(dev, ifr->ifr_newname);
 
+#if defined(CONFIG_BCM_KF_MISC_IOCTLS)
+		case SIOCCIFSTATS:   /* Clear stats of a device */
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+			if ( dev->clr_stats )
+			{
+				dev->clr_stats( dev );
+			}
+			else
+#endif
+			{
+				struct net_device_stats * pStats;
+				if (dev->netdev_ops == NULL || dev->netdev_ops->ndo_get_stats == NULL)
+				{
+					printk("[%s.%d]: dev->netdev_ops->ndo_get_stats is %p (%s)\n", __func__, __LINE__, dev->netdev_ops->ndo_get_stats, dev->name);
+					return 0;
+				}
+				else
+				{
+					pStats = dev->netdev_ops->ndo_get_stats(dev);
+				}
+				if (pStats)
+				{
+					memset(pStats, 0, sizeof(struct net_device_stats));
+				}
+				else
+				{
+					printk("ERROR: [%s.%d]: could not reset stats for device %s\n", __func__, __LINE__, dev->name);
+				}
+			}
+			return 0;
+#endif
+
 	case SIOCSHWTSTAMP:
 		err = net_hwtstamp_validate(ifr);
 		if (err)
@@ -439,6 +486,12 @@ int dev_ioctl(struct net *net, unsigned int cmd, void __user *arg)
 	case SIOCGIFMAP:
 	case SIOCGIFINDEX:
 	case SIOCGIFTXQLEN:
+#if defined(CONFIG_BCM_KF_MISC_IOCTLS)
+	case SIOCGIFTRANSSTART:
+#endif
+#if defined(CONFIG_BCM_KF_WANDEV)
+	case SIOCDEVISWANDEV:
+#endif
 		dev_load(net, ifr.ifr_name);
 		rcu_read_lock();
 		ret = dev_ifsioc_locked(net, &ifr, cmd);
@@ -548,6 +601,9 @@ int dev_ioctl(struct net *net, unsigned int cmd, void __user *arg)
 	 */
 	default:
 		if (cmd == SIOCWANDEV ||
+#if defined(CONFIG_BCM_KF_MISC_IOCTLS)
+		    cmd == SIOCCIFSTATS ||
+#endif 
 		    cmd == SIOCGHWTSTAMP ||
 		    (cmd >= SIOCDEVPRIVATE &&
 		     cmd <= SIOCDEVPRIVATE + 15)) {

@@ -81,7 +81,17 @@ struct pt_regs;
  * build time, you should use BUILD_BUG to detect if it is
  * unexpectedly used.
  */
+#if defined(CONFIG_BCM_KF_BUZZZ) && defined(CONFIG_BUZZZ_FUNC) && defined(BUZZZ_O0)
+/**
+ * When compiled with -O0 to disable inlining, compile time constant evaluation
+ * (of size parameter) in several inline kernel function will result in a
+ * switch default case implemented as a BUILD_BUG().
+ * E.g. include/asm percpu.h __percpi_##op(), cmpxchg.h __xchg(), ...
+ */
+#define BUILD_BUG() do { } while (0)
+#else
 #define BUILD_BUG() BUILD_BUG_ON_MSG(1, "BUILD_BUG failed")
+#endif
 
 #endif	/* __CHECKER__ */
 

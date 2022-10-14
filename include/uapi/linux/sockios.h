@@ -128,6 +128,18 @@
 #define SIOCSHWTSTAMP	0x89b0		/* set and get config		*/
 #define SIOCGHWTSTAMP	0x89b1		/* get config			*/
 
+#if !defined(CONFIG_BCM_IN_KERNEL) || defined(CONFIG_BCM_KF_MISC_IOCTLS) || defined(CONFIG_BCM_KF_WANDEV)
+/***********************BRCM global ioctl calls*****************************/
+#define SIOC_BRCM_GLOBAL_BASE    0x89c0
+#endif
+#if !defined(CONFIG_BCM_IN_KERNEL) || defined(CONFIG_BCM_KF_MISC_IOCTLS)
+#define SIOCGIFTRANSSTART  (SIOC_BRCM_GLOBAL_BASE+0)    /* Used by SNMP */
+#define SIOCCIFSTATS       (SIOC_BRCM_GLOBAL_BASE+1)    /* Clear stats of a device */
+#endif
+#if !defined(CONFIG_BCM_IN_KERNEL) || defined(CONFIG_BCM_KF_WANDEV)
+#define SIOCDEVISWANDEV    (SIOC_BRCM_GLOBAL_BASE+2)
+#endif
+
 /* Device private ioctl calls */
 
 /*

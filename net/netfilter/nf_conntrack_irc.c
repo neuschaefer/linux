@@ -30,6 +30,9 @@ static unsigned int max_dcc_channels = 8;
 static unsigned int dcc_timeout __read_mostly = 300;
 /* This is slow, but it's simple. --RR */
 static char *irc_buffer;
+#if defined(CONFIG_BCM_KF_NETFILTER)
+static char *irc_big_buffer = NULL;
+#endif
 static DEFINE_SPINLOCK(irc_buffer_lock);
 
 unsigned int (*nf_nat_irc_hook)(struct sk_buff *skb,
@@ -141,6 +144,19 @@ static int help(struct sk_buff *skb, unsigned int protoff,
 		return NF_ACCEPT;
 
 	spin_lock_bh(&irc_buffer_lock);
+#if defined(CONFIG_BCM_KF_NETFILTER)
+	/* In worst case, the packet size will increase by 16 bytes after
+	 * NAT modification */
+	if (skb->len > NF_ALG_BUFFER_SIZE - 16) {
+		irc_big_buffer = kmalloc(skb->len - dataoff + 16,
+					 GFP_ATOMIC);
+		if (!irc_big_buffer)
+			goto out;
+		ib_ptr = skb_header_pointer(skb, dataoff,
+					    skb->len - dataoff,
+					    irc_big_buffer);
+	} else
+#endif
 	ib_ptr = skb_header_pointer(skb, dataoff, skb->len - dataoff,
 				    irc_buffer);
 	BUG_ON(ib_ptr == NULL);
@@ -223,6 +239,12 @@ static int help(struct sk_buff *skb, unsigned int protoff,
 		}
 	}
  out:
+#if defined(CONFIG_BCM_KF_NETFILTER)
+ 	if (irc_big_buffer) {
+		kfree(irc_big_buffer);
+		irc_big_buffer = NULL;
+	}
+#endif
 	spin_unlock_bh(&irc_buffer_lock);
 	return ret;
 }
@@ -244,7 +266,11 @@ static int __init nf_conntrack_irc_init(void)
 	irc_exp_policy.max_expected = max_dcc_channels;
 	irc_exp_policy.timeout = dcc_timeout;
 
+#if defined(CONFIG_BCM_KF_NETFILTER)
+	irc_buffer = kmalloc(NF_ALG_BUFFER_SIZE, GFP_KERNEL);
+#else
 	irc_buffer = kmalloc(65536, GFP_KERNEL);
+#endif
 	if (!irc_buffer)
 		return -ENOMEM;
 

@@ -98,6 +98,66 @@ static void dev_seq_printf_stats(struct seq_file *seq, struct net_device *dev)
 		   stats->tx_compressed);
 }
 
+#if defined(CONFIG_BCM_KF_EXTSTATS)
+
+static void devextstats_seq_printf_stats(struct seq_file *seq, struct net_device *dev)
+{
+	struct rtnl_link_stats64 temp;
+	const struct rtnl_link_stats64 *stats = dev_get_stats(dev, &temp);
+
+	unsigned long long rx_unicast_packets=0, tx_unicast_packets=0;  /* Calculated unicast packets */
+	
+	/* Calculate unicast packet counts as total packets less broadcast and multicast.
+	   Normalize to zero in case an error sum of multicast and broadcast packets is reported */
+	if((stats->multicast + stats->rx_broadcast_packets) < stats->rx_packets)
+		rx_unicast_packets = stats->rx_packets - (stats->multicast + stats->rx_broadcast_packets);
+	else
+		rx_unicast_packets = 0;
+	    
+	if((stats->tx_multicast_packets + stats->tx_broadcast_packets) < stats->tx_packets)
+		tx_unicast_packets = stats->tx_packets - (stats->tx_multicast_packets + stats->tx_broadcast_packets);
+	else
+		tx_unicast_packets = 0;
+	    
+/* Print basic statistics, which are identical to baseline with only a few spacing differences */
+	seq_printf(seq, "%10s:%8llu %7llu %4llu %4llu %4llu %5llu %5llu %5llu "
+		   "%8llu %7llu %4llu %4llu %4llu %4llu %4llu %5llu ",
+		   dev->name, stats->rx_bytes, stats->rx_packets,
+		   stats->rx_errors,
+		   stats->rx_dropped + stats->rx_missed_errors,
+		   stats->rx_fifo_errors,
+		   stats->rx_length_errors + stats->rx_over_errors +
+		   stats->rx_crc_errors + stats->rx_frame_errors,
+		   stats->rx_compressed, stats->multicast,
+		   stats->tx_bytes, stats->tx_packets,
+		   stats->tx_errors, stats->tx_dropped,
+		   stats->tx_fifo_errors, stats->collisions,
+		   stats->tx_carrier_errors +
+		   stats->tx_aborted_errors +
+		   stats->tx_window_errors +
+		   stats->tx_heartbeat_errors,
+		   stats->tx_compressed);    
+
+    /* Are extended stats supported? */
+	if (dev->features & NETIF_F_EXTSTATS)
+		/* Print extended statistics */ 
+		seq_printf(seq, "%6llu %6llu %6llu "  /* Multicast */
+		   "%5llu %5llu %5llu %5llu "  /* Unicast and broadcast*/
+		   "%5llu\n",  /* Unknown RX errors */                    
+		   stats->tx_multicast_packets, stats->rx_multicast_bytes, stats->tx_multicast_bytes, 
+		   rx_unicast_packets, tx_unicast_packets, stats->rx_broadcast_packets, stats->tx_broadcast_packets, 
+		   stats->rx_unknown_packets);
+	else
+		/* Print placeholder with dashes */
+		seq_printf(seq, "     -      -      - "  /* Multicast */
+		   "    -     -     -     - "  /* Unicast and broadcast*/
+		   "    -\n");  /* Unknown RX errors */     
+		
+}
+#endif
+
+
+
 /*
  *	Called from the PROCfs module. This now uses the new arbitrary sized
  *	/proc/net interface to create /proc/net/dev
@@ -114,6 +174,23 @@ static int dev_seq_show(struct seq_file *seq, void *v)
 		dev_seq_printf_stats(seq, v);
 	return 0;
 }
+
+#if defined(CONFIG_BCM_KF_EXTSTATS)
+/*
+ *	Called from the PROCfs module to create extended statistics file /proc/net/dev_extstats
+ */
+static int devextstats_seq_show(struct seq_file *seq, void *v)
+{
+	if (v == SEQ_START_TOKEN)
+		seq_puts(seq, "   Basic Statistics                                                                                         |   Extended Statistics\n"
+		              " Interface|   Receive                                       |  Transmit                                     |multicast           |unicast    |broadcast  |unkn\n"
+		              "          |  bytes    pckts errs drop fifo frame  comp multi|  bytes    pckts errs drop fifo coll carr  comp|txpckt rxbyte txbyte|   rx    tx|   rx    tx|rxerr\n");
+		   // 123456:12345678 1234567 1234 1234 1234 12345 12345 12345 12345678 1234567 1234 1234 1234 1234 1234 12345 123456 123456 123456 12345 12345 12345 12345 12345
+	else
+		devextstats_seq_printf_stats(seq, v);
+	return 0;
+}
+#endif
 
 static struct softnet_data *softnet_get_online(loff_t *pos)
 {
@@ -173,11 +250,28 @@ static const struct seq_operations dev_seq_ops = {
 	.show  = dev_seq_show,
 };
 
+#if defined(CONFIG_BCM_KF_EXTSTATS)
+static const struct seq_operations devextstats_seq_ops = {
+	.start = dev_seq_start,
+	.next  = dev_seq_next,
+	.stop  = dev_seq_stop,
+	.show  = devextstats_seq_show,
+};
+#endif
+
 static int dev_seq_open(struct inode *inode, struct file *file)
 {
 	return seq_open_net(inode, file, &dev_seq_ops,
 			    sizeof(struct seq_net_private));
 }
+
+#if defined(CONFIG_BCM_KF_EXTSTATS)
+static int devextstats_seq_open(struct inode *inode, struct file *file)
+{
+	return seq_open_net(inode, file, &devextstats_seq_ops,
+			    sizeof(struct seq_net_private));
+}
+#endif
 
 static const struct file_operations dev_seq_fops = {
 	.owner	 = THIS_MODULE,
@@ -186,6 +280,17 @@ static const struct file_operations dev_seq_fops = {
 	.llseek  = seq_lseek,
 	.release = seq_release_net,
 };
+
+#if defined(CONFIG_BCM_KF_EXTSTATS)
+static const struct file_operations devextstats_seq_fops = {
+	.owner	 = THIS_MODULE,
+	.open    = devextstats_seq_open,
+	.read    = seq_read,
+	.llseek  = seq_lseek,
+	.release = seq_release_net,
+};
+#endif
+
 
 static const struct seq_operations softnet_seq_ops = {
 	.start = softnet_seq_start,
@@ -326,9 +431,17 @@ static int __net_init dev_proc_net_init(struct net *net)
 
 	if (wext_proc_init(net))
 		goto out_ptype;
+        
+#if defined(CONFIG_BCM_KF_EXTSTATS) && defined(CONFIG_BLOG)
+	if (!proc_create("dev_extstats", S_IRUGO, net->proc_net, &devextstats_seq_fops))
+		goto out_ptype;
+        
+#endif        
+        
 	rc = 0;
 out:
 	return rc;
+    
 out_ptype:
 	remove_proc_entry("ptype", net->proc_net);
 out_softnet:

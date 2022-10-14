@@ -421,6 +421,37 @@ err:
 }
 EXPORT_SYMBOL(bdi_init);
 
+#if defined(CONFIG_BCM_KF_MISC_BACKPORTS)
+void bdi_unregister(struct backing_dev_info *bdi)
+{
+        bdi_wb_shutdown(bdi);
+        bdi_set_min_ratio(bdi, 0);
+
+        WARN_ON(!list_empty(&bdi->work_list));
+        WARN_ON(delayed_work_pending(&bdi->wb.dwork));
+
+        if (bdi->dev) {
+                bdi_debug_unregister(bdi);
+                device_unregister(bdi->dev);
+                bdi->dev = NULL;
+        }
+}
+void bdi_exit(struct backing_dev_info *bdi)
+{
+	int i;
+
+	WARN_ON_ONCE(bdi->dev);
+
+        for (i = 0; i < NR_BDI_STAT_ITEMS; i++)
+                percpu_counter_destroy(&bdi->bdi_stat[i]);
+        fprop_local_destroy_percpu(&bdi->completions);
+}
+void bdi_destroy(struct backing_dev_info *bdi)
+{
+	bdi_unregister(bdi);
+	bdi_exit(bdi);
+}
+#else
 void bdi_destroy(struct backing_dev_info *bdi)
 {
 	int i;
@@ -441,6 +472,7 @@ void bdi_destroy(struct backing_dev_info *bdi)
 		percpu_counter_destroy(&bdi->bdi_stat[i]);
 	fprop_local_destroy_percpu(&bdi->completions);
 }
+#endif
 EXPORT_SYMBOL(bdi_destroy);
 
 /*

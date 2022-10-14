@@ -479,7 +479,11 @@ static int watchdog_release(struct inode *inode, struct file *file)
 	if (err < 0) {
 		mutex_lock(&wdd->lock);
 		if (!test_bit(WDOG_UNREGISTERED, &wdd->status))
+#if defined(CONFIG_BCM_KF_WDT)		   
+			dev_dbg(wdd->dev, "watchdog did not stop!\n");
+#else
 			dev_crit(wdd->dev, "watchdog did not stop!\n");
+#endif						
 		mutex_unlock(&wdd->lock);
 		watchdog_ping(wdd);
 	}
@@ -571,12 +575,24 @@ int watchdog_dev_unregister(struct watchdog_device *watchdog)
 	mutex_unlock(&watchdog->lock);
 
 	cdev_del(&watchdog->cdev);
+		
 	if (watchdog->id == 0) {
 		misc_deregister(&watchdog_miscdev);
 		old_wdd = NULL;
 	}
 	return 0;
 }
+
+#if defined(CONFIG_BCM_KF_WDT)
+int watchdog_dev_force_disable( void )
+{
+	if( old_wdd )
+	{
+		watchdog_stop(old_wdd);
+	}
+	return 0;
+}
+#endif 
 
 /*
  *	watchdog_dev_init: init dev part of watchdog core

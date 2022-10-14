@@ -54,6 +54,11 @@
  * that the pattern and the version count are always located in the oob area
  * of the first block.
  */
+
+#if defined(CONFIG_BCM_KF_MTD_BCMNAND)
+#define BBT_NULL_PAGE (-1LL)
+#endif
+
 struct nand_bbt_descr {
 	int options;
 	int pages[NAND_MAX_CHIPS];
@@ -91,6 +96,12 @@ struct nand_bbt_descr {
  * with NAND_BBT_CREATE.
  */
 #define NAND_BBT_CREATE_EMPTY	0x00000400
+#if defined(CONFIG_BCM_KF_MTD_BCMNAND)
+/* Search good / bad pattern through all pages of a block */
+#define NAND_BBT_SCANALLPAGES   0x00000800
+/* Scan block empty during good / bad block scan */
+#define NAND_BBT_SCANEMPTY      0x00001000
+#endif
 /* Write bbt if neccecary */
 #define NAND_BBT_WRITE		0x00002000
 /* Read and write back block contents when writing bbt */

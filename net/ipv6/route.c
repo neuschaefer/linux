@@ -1012,6 +1012,17 @@ void ip6_route_input(struct sk_buff *skb)
 	const struct ipv6hdr *iph = ipv6_hdr(skb);
 	struct net *net = dev_net(skb->dev);
 	int flags = RT6_LOOKUP_F_HAS_SADDR;
+#if defined(CONFIG_MIPS_BCM963XX) && defined(CONFIG_BCM_KF_UNALIGNED_EXCEPTION)
+	struct flowi6 fl6;
+
+	fl6.flowi6_iif  = skb->dev->ifindex;
+	fl6.flowi6_mark = skb->mark;
+	fl6.flowi6_proto = iph->nexthdr;
+	fl6.daddr = iph->daddr;
+	fl6.saddr = iph->saddr;
+	memcpy(&fl6.flowlabel, iph, sizeof(__be32));
+	fl6.flowlabel &= IPV6_FLOWINFO_MASK;
+#else
 	struct flowi6 fl6 = {
 		.flowi6_iif = skb->dev->ifindex,
 		.daddr = iph->daddr,
@@ -1020,6 +1031,7 @@ void ip6_route_input(struct sk_buff *skb)
 		.flowi6_mark = skb->mark,
 		.flowi6_proto = iph->nexthdr,
 	};
+#endif
 
 	skb_dst_set(skb, ip6_route_input_lookup(net, skb->dev, &fl6, flags));
 }
@@ -1868,7 +1880,13 @@ static void rt6_do_redirect(struct dst_entry *dst, struct sock *sk, struct sk_bu
 	in6_dev = __in6_dev_get(skb->dev);
 	if (!in6_dev)
 		return;
+#if defined(CONFIG_BCM_KF_IP)
+	/* WAN interface needs to act like a host. */
+	if (((in6_dev->cnf.forwarding) && !(in6_dev->dev->priv_flags & IFF_WANDEV))
+		|| (!in6_dev->cnf.accept_redirects))
+#else
 	if (in6_dev->cnf.forwarding || !in6_dev->cnf.accept_redirects)
+#endif
 		return;
 
 	/* RFC2461 8.1:
@@ -2842,7 +2860,11 @@ static int rt6_fill_node(struct net *net,
 	if (iif) {
 #ifdef CONFIG_IPV6_MROUTE
 		if (ipv6_addr_is_multicast(&rt->rt6i_dst.addr)) {
+#if defined(CONFIG_BCM_KF_MROUTE)
+			int err = ip6mr_get_route(net, skb, rtm, nowait, iif);
+#else
 			int err = ip6mr_get_route(net, skb, rtm, nowait);
+#endif
 			if (err <= 0) {
 				if (!nowait) {
 					if (err == 0)

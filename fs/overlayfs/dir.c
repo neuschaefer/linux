@@ -405,6 +405,9 @@ static int ovl_create_or_link(struct dentry *dentry, int mode, dev_t rdev,
 		err = ovl_create_upper(dentry, inode, &stat, link, hardlink);
 	} else {
 		const struct cred *old_cred;
+#if defined(CONFIG_BCM_KF_OVERLAYFS_BACKPORTS)
+		old_cred = ovl_override_creds(dentry->d_sb);
+#else
 		struct cred *override_cred;
 
 		err = -ENOMEM;
@@ -421,12 +424,15 @@ static int ovl_create_or_link(struct dentry *dentry, int mode, dev_t rdev,
 		cap_raise(override_cred->cap_effective, CAP_DAC_OVERRIDE);
 		cap_raise(override_cred->cap_effective, CAP_FOWNER);
 		old_cred = override_creds(override_cred);
-
+#endif
 		err = ovl_create_over_whiteout(dentry, inode, &stat, link,
 					       hardlink);
 
 		revert_creds(old_cred);
+#if !defined(CONFIG_BCM_KF_OVERLAYFS_BACKPORTS)
 		put_cred(override_cred);
+#endif
+
 	}
 
 	if (!err)
@@ -657,13 +663,15 @@ static int ovl_do_remove(struct dentry *dentry, bool is_dir)
 		err = ovl_remove_upper(dentry, is_dir);
 	} else {
 		const struct cred *old_cred;
+#if defined(CONFIG_BCM_KF_OVERLAYFS_BACKPORTS)
+		old_cred = ovl_override_creds(dentry->d_sb);
+#else
 		struct cred *override_cred;
 
 		err = -ENOMEM;
 		override_cred = prepare_creds();
 		if (!override_cred)
 			goto out_drop_write;
-
 		/*
 		 * CAP_SYS_ADMIN for setting xattr on whiteout, opaque dir
 		 * CAP_DAC_OVERRIDE for create in workdir, rename
@@ -677,11 +685,14 @@ static int ovl_do_remove(struct dentry *dentry, bool is_dir)
 		cap_raise(override_cred->cap_effective, CAP_FSETID);
 		cap_raise(override_cred->cap_effective, CAP_CHOWN);
 		old_cred = override_creds(override_cred);
+#endif
 
 		err = ovl_remove_and_whiteout(dentry, is_dir);
 
 		revert_creds(old_cred);
+#if !defined(CONFIG_BCM_KF_OVERLAYFS_BACKPORTS)
 		put_cred(override_cred);
+#endif
 	}
 out_drop_write:
 	ovl_drop_write(dentry);
@@ -720,7 +731,9 @@ static int ovl_rename2(struct inode *olddir, struct dentry *old,
 	bool new_is_dir = false;
 	struct dentry *opaquedir = NULL;
 	const struct cred *old_cred = NULL;
+#if !defined(CONFIG_BCM_KF_OVERLAYFS_BACKPORTS)
 	struct cred *override_cred = NULL;
+#endif
 
 	err = -EINVAL;
 	if (flags & ~(RENAME_EXCHANGE | RENAME_NOREPLACE))
@@ -789,6 +802,10 @@ static int ovl_rename2(struct inode *olddir, struct dentry *old,
 	old_opaque = !OVL_TYPE_PURE_UPPER(old_type);
 	new_opaque = !OVL_TYPE_PURE_UPPER(new_type);
 
+#if defined(CONFIG_BCM_KF_OVERLAYFS_BACKPORTS)
+	if (old_opaque || new_opaque)
+		old_cred = ovl_override_creds(old->d_sb);
+#else
 	if (old_opaque || new_opaque) {
 		err = -ENOMEM;
 		override_cred = prepare_creds();
@@ -809,6 +826,7 @@ static int ovl_rename2(struct inode *olddir, struct dentry *old,
 		cap_raise(override_cred->cap_effective, CAP_CHOWN);
 		old_cred = override_creds(override_cred);
 	}
+#endif
 
 	if (overwrite && OVL_TYPE_MERGE_OR_LOWER(new_type) && new_is_dir) {
 		opaquedir = ovl_check_empty_and_clear(new);
@@ -941,7 +959,9 @@ out_unlock:
 out_revert_creds:
 	if (old_opaque || new_opaque) {
 		revert_creds(old_cred);
+#if !defined(CONFIG_BCM_KF_OVERLAYFS_BACKPORTS)
 		put_cred(override_cred);
+#endif
 	}
 out_drop_write:
 	ovl_drop_write(old);

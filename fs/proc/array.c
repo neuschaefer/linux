@@ -338,6 +338,13 @@ static void task_cpus_allowed(struct seq_file *m, struct task_struct *task)
 		   cpumask_pr_args(&task->cpus_allowed));
 	seq_printf(m, "Cpus_allowed_list:\t%*pbl\n",
 		   cpumask_pr_args(&task->cpus_allowed));
+#if defined(CONFIG_BCM_KF_CPU_AFFINITY_HINT) && \
+	defined(CONFIG_BCM_PROC_CPU_AFFINITY_HINT)
+	seq_printf(m, "Cpus_hint:\t%*pb\n",
+		   cpumask_pr_args(&task->cpus_hint));
+	seq_printf(m, "Cpus_hint_list:\t%*pbl\n",
+		   cpumask_pr_args(&task->cpus_hint));
+#endif
 }
 
 int proc_pid_status(struct seq_file *m, struct pid_namespace *ns,

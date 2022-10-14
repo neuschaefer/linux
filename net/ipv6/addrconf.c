@@ -173,6 +173,10 @@ static void inet6_prefix_notify(int event, struct inet6_dev *idev,
 static bool ipv6_chk_same_addr(struct net *net, const struct in6_addr *addr,
 			       struct net_device *dev);
 
+#if defined(CONFIG_BCM_KF_IP)
+static struct inet6_dev * ipv6_find_idev(struct net_device *dev);
+#endif
+
 static struct ipv6_devconf ipv6_devconf __read_mostly = {
 	.forwarding		= 0,
 	.hop_limit		= IPV6_DEFAULT_HOPLIMIT,
@@ -207,7 +211,11 @@ static struct ipv6_devconf ipv6_devconf __read_mostly = {
 	.proxy_ndp		= 0,
 	.accept_source_route	= 0,	/* we do not accept RH0 by default. */
 	.disable_ipv6		= 0,
+#if defined(CONFIG_BCM_KF_IP)
+	.accept_dad		= 2,
+#else
 	.accept_dad		= 1,
+#endif
 	.suppress_frag_ndisc	= 1,
 	.accept_ra_mtu		= 1,
 	.stable_secret		= {
@@ -249,7 +257,11 @@ static struct ipv6_devconf ipv6_devconf_dflt __read_mostly = {
 	.proxy_ndp		= 0,
 	.accept_source_route	= 0,	/* we do not accept RH0 by default. */
 	.disable_ipv6		= 0,
+#if defined(CONFIG_BCM_KF_IP)
+	.accept_dad		= 2,
+#else
 	.accept_dad		= 1,
+#endif
 	.suppress_frag_ndisc	= 1,
 	.accept_ra_mtu		= 1,
 	.stable_secret		= {
@@ -353,6 +365,19 @@ static struct inet6_dev *ipv6_add_dev(struct net_device *dev)
 
 	ndev->cnf.mtu6 = dev->mtu;
 	ndev->cnf.sysctl = NULL;
+
+#if defined(CONFIG_BCM_KF_IP)
+	/* 
+	* At bootup time, there is no interfaces attached to brX. Therefore, DAD of
+	* brX cannot take any effect and we cannot pass IPv6 ReadyLogo. We here
+	* increase DAD period of brX to 4 sec which should be long enough for our
+	* system to attach all interfaces to brX. Thus, DAD of brX can send/receive
+	* packets through attached interfaces.
+	*/
+	if ( !strncmp(dev->name, "br", 2) )
+		ndev->cnf.dad_transmits = 4;
+#endif
+
 	ndev->nd_parms = neigh_parms_alloc(dev, &nd_tbl);
 	if (!ndev->nd_parms) {
 		kfree(ndev);
@@ -431,9 +456,18 @@ static struct inet6_dev *ipv6_add_dev(struct net_device *dev)
 	/* Join all-node multicast group */
 	ipv6_dev_mc_inc(dev, &in6addr_linklocal_allnodes);
 
+#if defined(CONFIG_BCM_KF_WANDEV)
+	/* Join all-router multicast group if forwarding is set */
+	if (ndev->cnf.forwarding && (dev->flags & IFF_MULTICAST) &&
+	   !(dev->priv_flags & IFF_WANDEV))
+	{
+		ipv6_dev_mc_inc(dev, &in6addr_linklocal_allrouters);
+	}
+#else
 	/* Join all-router multicast group if forwarding is set */
 	if (ndev->cnf.forwarding && (dev->flags & IFF_MULTICAST))
 		ipv6_dev_mc_inc(dev, &in6addr_linklocal_allrouters);
+#endif 
 
 	return ndev;
 
@@ -796,6 +830,9 @@ void inet6_ifa_finish_destroy(struct inet6_ifaddr *ifp)
 
 	kfree_rcu(ifp, rcu);
 }
+#if defined(CONFIG_BCM_MPTCP) && defined(CONFIG_BCM_KF_MPTCP)
+EXPORT_SYMBOL(inet6_ifa_finish_destroy);
+#endif
 
 static void
 ipv6_link_dev_addr(struct inet6_dev *idev, struct inet6_ifaddr *ifp)
@@ -3049,6 +3086,53 @@ static void addrconf_sit_config(struct net_device *dev)
 }
 #endif
 
+#if defined(CONFIG_BCM_KF_IP)
+static int addrconf_update_lladdr(struct net_device *dev)
+{
+	struct inet6_dev *idev;
+	struct inet6_ifaddr *ifladdr = NULL;
+	struct inet6_ifaddr *ifp;
+	struct in6_addr addr6;
+	int err = -EADDRNOTAVAIL;
+
+	ASSERT_RTNL();
+
+	idev = __in6_dev_get(dev);
+	if (idev != NULL)
+	{
+		read_lock_bh(&idev->lock);
+        list_for_each_entry(ifp, &idev->addr_list, if_list) {
+			if (IFA_LINK == ifp->scope)
+			{
+				ifladdr = ifp;
+				in6_ifa_hold(ifp);
+				break;
+			}
+		}
+		read_unlock_bh(&idev->lock);
+
+		if ( ifladdr )
+		{
+			/* delete the address */
+			ipv6_del_addr(ifladdr);
+
+			/* add new LLA */ 
+			memset(&addr6, 0, sizeof(struct in6_addr));
+			addr6.s6_addr32[0] = htonl(0xFE800000);
+
+			if (0 == ipv6_generate_eui64(addr6.s6_addr + 8, dev))
+			{
+				addrconf_add_linklocal(idev, &addr6, 0);
+				err = 0;
+			}
+		}
+	}
+
+	return err;
+
+}
+#endif
+
 #if IS_ENABLED(CONFIG_NET_IPGRE)
 static void addrconf_gre_config(struct net_device *dev)
 {
@@ -3219,6 +3303,12 @@ static int addrconf_notify(struct notifier_block *this, unsigned long event,
 		}
 		break;
 
+#if defined(CONFIG_BCM_KF_IP)
+	case NETDEV_CHANGEADDR:
+		addrconf_update_lladdr(dev);
+		break;
+#endif
+
 	case NETDEV_PRE_TYPE_CHANGE:
 	case NETDEV_POST_TYPE_CHANGE:
 		addrconf_type_change(dev, event);
@@ -3379,7 +3469,16 @@ static void addrconf_rs_timer(unsigned long data)
 	if (idev->dead || !(idev->if_flags & IF_READY))
 		goto out;
 
+#if defined(CONFIG_BCM_KF_WANDEV)
+	/* WAN interface needs to act as a host. */
+	if (idev->cnf.forwarding && 
+            (!(idev->dev->priv_flags & IFF_WANDEV) ||
+            ((idev->dev->priv_flags & IFF_WANDEV) && 
+            netdev_path_is_root(idev->dev))
+        ))
+#else
 	if (!ipv6_accept_ra(idev))
+#endif
 		goto out;
 
 	/* Announcement received after solicitation was sent */
@@ -3626,7 +3725,14 @@ static void addrconf_dad_completed(struct inet6_ifaddr *ifp)
 	read_lock_bh(&ifp->idev->lock);
 	send_mld = ifp->scope == IFA_LINK && ipv6_lonely_lladdr(ifp);
 	send_rs = send_mld &&
+#if defined(CONFIG_BCM_KF_WANDEV)
+	/* WAN interface needs to act as a host. */
+		  ( (ifp->idev->cnf.forwarding == 0) || 
+		  ( (ifp->idev->dev->priv_flags & IFF_WANDEV) &&
+		  !netdev_path_is_root(ifp->idev->dev) ) ) &&
+#else
 		  ipv6_accept_ra(ifp->idev) &&
+#endif
 		  ifp->idev->cnf.rtr_solicits > 0 &&
 		  (dev->flags&IFF_LOOPBACK) == 0;
 	read_unlock_bh(&ifp->idev->lock);
@@ -5057,14 +5163,24 @@ static void __ipv6_ifa_notify(int event, struct inet6_ifaddr *ifp)
 		 */
 		if (!(ifp->rt->rt6i_node))
 			ip6_ins_rt(ifp->rt);
+#if defined(CONFIG_BCM_KF_WANDEV)
+		if (ifp->idev->cnf.forwarding && 
+			!(ifp->idev->dev->priv_flags & IFF_WANDEV))
+#else
 		if (ifp->idev->cnf.forwarding)
+#endif
 			addrconf_join_anycast(ifp);
 		if (!ipv6_addr_any(&ifp->peer_addr))
 			addrconf_prefix_route(&ifp->peer_addr, 128,
 					      ifp->idev->dev, 0, 0);
 		break;
 	case RTM_DELADDR:
+#if defined(CONFIG_BCM_KF_WANDEV)
+		if (ifp->idev->cnf.forwarding && 
+			!(ifp->idev->dev->priv_flags & IFF_WANDEV))
+#else
 		if (ifp->idev->cnf.forwarding)
+#endif
 			addrconf_leave_anycast(ifp);
 		addrconf_leave_solict(ifp->idev, &ifp->addr);
 		if (!ipv6_addr_any(&ifp->peer_addr)) {

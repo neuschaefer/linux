@@ -122,6 +122,17 @@ static int psci_get_version(void)
 	return err;
 }
 
+#if defined(CONFIG_BCM_KF_OPTEE) && defined (CONFIG_BCM_KERNEL_CODE_PROTECTION)
+static int psci_mem_info(void)
+{
+	int err;
+	extern char _stext[], _etext[], __init_begin[];
+
+	err = invoke_psci_fn(PSCI_0_2_FN_MEM_INFO, (u32)(long)_stext, (u32)(long)_etext, (u32)(long)__init_begin);
+	return err;
+}
+#endif
+
 static int psci_cpu_suspend(struct psci_power_state state,
 			    unsigned long entry_point)
 {
@@ -329,7 +340,9 @@ static int __init psci_probe(void)
 	}
 
 	psci_0_2_set_functions();
-
+#if defined(CONFIG_BCM_KF_OPTEE) && defined (CONFIG_BCM_KERNEL_CODE_PROTECTION)
+	psci_mem_info();
+#endif
 	return 0;
 }
 

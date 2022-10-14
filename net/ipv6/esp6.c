@@ -44,6 +44,10 @@
 #include <net/protocol.h>
 #include <linux/icmpv6.h>
 
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+#include <linux/blog.h>
+#endif
+
 struct esp_skb_cb {
 	struct xfrm_skb_cb xfrm;
 	void *tmp;
@@ -163,6 +167,14 @@ static int esp6_output(struct xfrm_state *x, struct sk_buff *skb)
 	u8 *iv;
 	u8 *tail;
 	__be32 *seqhi;
+#if defined(CONFIG_BCM_KF_SPU) && (defined(CONFIG_BCM_SPU) || defined(CONFIG_BCM_SPU_MODULE)) && (defined(CONFIG_BCM_RDPA) || defined(CONFIG_BCM_RDPA_MODULE))
+	u8 next_hdr;
+#endif
+
+
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+	blog_skip(skb, blog_skip_reason_unknown_proto_esp6);
+#endif
 
 	/* skb is pure payload to encrypt */
 	aead = x->data;
@@ -221,6 +233,10 @@ static int esp6_output(struct xfrm_state *x, struct sk_buff *skb)
 	} while (0);
 	tail[plen - 2] = plen - 2;
 	tail[plen - 1] = *skb_mac_header(skb);
+#if defined(CONFIG_BCM_KF_SPU) && (defined(CONFIG_BCM_SPU) || defined(CONFIG_BCM_SPU_MODULE)) && (defined(CONFIG_BCM_RDPA) || defined(CONFIG_BCM_RDPA_MODULE))
+	next_hdr = *skb_mac_header(skb);
+#endif
+
 	pskb_put(skb, trailer, clen - skb->len + alen);
 
 	skb_push(skb, -skb_network_offset(skb));
@@ -231,9 +247,17 @@ static int esp6_output(struct xfrm_state *x, struct sk_buff *skb)
 	esph->seq_no = htonl(XFRM_SKB_CB(skb)->seq.output.low);
 
 	sg_init_table(sg, nfrags);
+#if defined(CONFIG_BCM_KF_MISC_BACKPORTS) 
+	err =
+#endif
 	skb_to_sgvec(skb, sg,
 		     esph->enc_data + crypto_aead_ivsize(aead) - skb->data,
 		     clen + alen);
+#if defined(CONFIG_BCM_KF_MISC_BACKPORTS) 
+	if(unlikely(err) < 0) 
+		goto error;
+#endif
+
 
 	if ((x->props.flags & XFRM_STATE_ESN)) {
 		sg_init_table(asg, 3);
@@ -252,6 +276,26 @@ static int esp6_output(struct xfrm_state *x, struct sk_buff *skb)
 			      ((u64)XFRM_SKB_CB(skb)->seq.output.hi << 32));
 
 	ESP_SKB_CB(skb)->tmp = tmp;
+
+#if defined(CONFIG_BCM_KF_SPU) && (defined(CONFIG_BCM_SPU) || defined(CONFIG_BCM_SPU_MODULE))
+#if defined(CONFIG_BCM_RDPA) || defined(CONFIG_BCM_RDPA_MODULE)
+	req->areq.data_offset = (unsigned char *)esph - skb->data;
+	req->areq.next_hdr    = next_hdr;
+#else
+	/* ensure there is enough headroom and tailroom for HW info */
+	if((skb_headroom(skb) < 12) ||
+	   (skb_tailroom(skb) < 16))
+	{
+		req->areq.alloc_buff_spu = 1;
+	}
+	else
+	{
+		req->areq.alloc_buff_spu = 0;
+	}
+	req->areq.headerLen = esph->enc_data + crypto_aead_ivsize(aead) - skb->data;
+#endif
+#endif
+
 	err = crypto_aead_givencrypt(req);
 	if (err == -EINPROGRESS)
 		goto error;
@@ -335,6 +379,17 @@ static int esp6_input(struct xfrm_state *x, struct sk_buff *skb)
 	u8 *iv;
 	struct scatterlist *sg;
 	struct scatterlist *asg;
+#if defined(CONFIG_BCM_KF_SPU) && (defined(CONFIG_BCM_SPU) || defined(CONFIG_BCM_SPU_MODULE)) && !(defined(CONFIG_BCM_RDPA) || defined(CONFIG_BCM_RDPA_MODULE))
+	int macLen;
+#endif
+
+#if defined(CONFIG_BCM_KF_MISC_BACKPORTS) 
+	int err;
+#endif
+
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+	blog_skip(skb, blog_skip_reason_unknown_proto_esp6);
+#endif
 
 	if (!pskb_may_pull(skb, sizeof(*esph) + crypto_aead_ivsize(aead))) {
 		ret = -EINVAL;
@@ -383,7 +438,14 @@ static int esp6_input(struct xfrm_state *x, struct sk_buff *skb)
 	iv = esph->enc_data;
 
 	sg_init_table(sg, nfrags);
+#if defined(CONFIG_BCM_KF_MISC_BACKPORTS) 
+	err =
+#endif
 	skb_to_sgvec(skb, sg, sizeof(*esph) + crypto_aead_ivsize(aead), elen);
+#if defined(CONFIG_BCM_KF_MISC_BACKPORTS) 
+	if(unlikely(err) < 0) 
+		goto out;
+#endif
 
 	if ((x->props.flags & XFRM_STATE_ESN)) {
 		sg_init_table(asg, 3);
@@ -397,6 +459,28 @@ static int esp6_input(struct xfrm_state *x, struct sk_buff *skb)
 	aead_request_set_callback(req, 0, esp_input_done, skb);
 	aead_request_set_crypt(req, sg, sg, elen, iv);
 	aead_request_set_assoc(req, asg, assoclen);
+
+#if defined(CONFIG_BCM_KF_SPU) && (defined(CONFIG_BCM_SPU) || defined(CONFIG_BCM_SPU_MODULE))
+#if defined(CONFIG_BCM_RDPA) || defined(CONFIG_BCM_RDPA_MODULE)
+	req->data_offset = 0;
+	req->next_hdr    = 0;
+#else
+	/* ensure there is enough headroom and tailroom for HW info */
+	if ( (skb->data >= skb_mac_header(skb)) &&
+	     (skb_headroom(skb) >= ((skb->data - skb_mac_header(skb)) + 12)) &&
+	     (skb_tailroom(skb) >= 16))
+	{
+		macLen = skb->data - skb_mac_header(skb);
+		req->alloc_buff_spu = 0;
+	}
+	else
+	{
+		macLen = 0;
+		req->alloc_buff_spu = 1;
+	}
+	req->headerLen = sizeof(*esph) + crypto_aead_ivsize(aead) + macLen;
+#endif
+#endif
 
 	ret = crypto_aead_decrypt(req);
 	if (ret == -EINPROGRESS)

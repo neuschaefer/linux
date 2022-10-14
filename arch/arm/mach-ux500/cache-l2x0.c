@@ -7,6 +7,9 @@
 #include <linux/io.h>
 #include <linux/of.h>
 
+#if defined(CONFIG_BCM_KF_SPECTRE_PATCH) && defined(CONFIG_BCM_SPECTRE_PATCH_ENABLE)
+#include <asm/outercache.h>
+#endif
 #include <asm/hardware/cache-l2x0.h>
 
 #include "db8500-regs.h"

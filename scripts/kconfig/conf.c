@@ -110,6 +110,12 @@ static int conf_askvalue(struct symbol *sym, const char *def)
 	case oldaskconfig:
 		fflush(stdout);
 		xfgets(line, 128, stdin);
+#if defined(CONFIG_BCM_KF_FAIL_CONFIG_ON_EOF) || !defined(CONFIG_BCM_IN_KERNEL)
+		if (feof(stdin)) {
+			fprintf(stderr, "Unexpected EOF\n");
+			exit(1);
+		}
+#endif
 		if (!tty_stdio)
 			printf("\n");
 		return 1;
@@ -312,6 +318,12 @@ static int conf_choice(struct menu *menu)
 		case oldaskconfig:
 			fflush(stdout);
 			xfgets(line, 128, stdin);
+#if defined(CONFIG_BCM_KF_FAIL_CONFIG_ON_EOF) || !defined(CONFIG_BCM_IN_KERNEL)
+			if (feof(stdin)) {
+				fprintf(stderr, "Unexpected EOF\n");
+				exit(1);
+			}
+#endif
 			strip(line);
 			if (line[0] == '?') {
 				print_help(menu);

@@ -2,6 +2,11 @@
 # Makefile for the Linux TCP/IP (INET6) layer.
 #
 
+ifdef BCM_KF # defined(CONFIG_BCM_KF_BLOG)
+EXTRA_CFLAGS	+= -I$(INC_BRCMDRIVER_PUB_PATH)/$(BRCM_BOARD)
+EXTRA_CFLAGS	+= -I$(INC_BRCMSHARED_PUB_PATH)/bcm963xx
+endif # BCM_KF
+
 obj-$(CONFIG_IPV6) += ipv6.o
 
 ipv6-objs :=	af_inet6.o anycast.o ip6_output.o ip6_input.o addrconf.o \

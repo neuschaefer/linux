@@ -143,6 +143,30 @@ struct tag_memclk {
 	__u32 fmemclk;
 };
 
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX)
+/* BCM63xx, for passing board param from boot loader */
+#define ATAG_BLPARM	0x41000601
+
+struct tag_blparm {
+	char blparm[1];		/* this is the minimum size */
+};
+
+#define ATAG_RDPSIZE	0x41000602
+struct tag_rdpsize {
+	__u32 tm_size;
+	__u32 mc_size;
+};
+
+#define ATAG_DHDSIZE	0x41000603
+struct tag_dhdparm {
+	__u32 dhd_size[3];
+};
+
+
+
+#endif /* CONFIG_BCM_KF_ARM_BCM963XX */
+
+
 struct tag {
 	struct tag_header hdr;
 	union {
@@ -165,6 +189,16 @@ struct tag {
 		 * DC21285 specific
 		 */
 		struct tag_memclk	memclk;
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX)
+
+		/*
+		 * BCM63xx specific
+		 */
+		struct tag_blparm	blparm;
+		struct tag_rdpsize	rdpsize;
+		struct tag_dhdparm	dhdparm;
+#endif /* CONFIG_BCM_KF_ARM_BCM963XX */
+
 	} u;
 };
 

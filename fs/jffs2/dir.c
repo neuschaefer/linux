@@ -34,8 +34,13 @@ static int jffs2_symlink (struct inode *,struct dentry *,const char *);
 static int jffs2_mkdir (struct inode *,struct dentry *,umode_t);
 static int jffs2_rmdir (struct inode *,struct dentry *);
 static int jffs2_mknod (struct inode *,struct dentry *,umode_t,dev_t);
+#if defined(CONFIG_BCM_KF_JFFS2_OVERLAY)
 static int jffs2_rename (struct inode *, struct dentry *,
-			 struct inode *, struct dentry *);
+			struct inode *, struct dentry *, unsigned int);
+#else
+static int jffs2_rename (struct inode *, struct dentry *,
+			struct inode *, struct dentry *);
+#endif
 
 const struct file_operations jffs2_dir_operations =
 {
@@ -57,7 +62,11 @@ const struct inode_operations jffs2_dir_inode_operations =
 	.mkdir =	jffs2_mkdir,
 	.rmdir =	jffs2_rmdir,
 	.mknod =	jffs2_mknod,
+#if defined(CONFIG_BCM_KF_JFFS2_OVERLAY)
+	.rename2 =	jffs2_rename,
+#else
 	.rename =	jffs2_rename,
+#endif
 	.get_acl =	jffs2_get_acl,
 	.set_acl =	jffs2_set_acl,
 	.setattr =	jffs2_setattr,
@@ -756,21 +765,68 @@ static int jffs2_mknod (struct inode *dir_i, struct dentry *dentry, umode_t mode
 	return ret;
 }
 
+#if defined(CONFIG_BCM_KF_JFFS2_OVERLAY)
+static int jffs2_whiteout(struct inode *old_dir, struct dentry *old_dentry)
+{
+	struct dentry *wh;
+	int err;
+
+	wh = d_alloc(old_dentry->d_parent, &old_dentry->d_name);
+	if (!wh)
+		return -ENOMEM;
+
+	err = jffs2_mknod(old_dir, wh, S_IFCHR | WHITEOUT_MODE,
+			  WHITEOUT_DEV);
+	if (err)
+		return err;
+
+	d_rehash(wh);
+	return 0;
+}
+#endif
+
+#if defined(CONFIG_BCM_KF_JFFS2_OVERLAY)
 static int jffs2_rename (struct inode *old_dir_i, struct dentry *old_dentry,
-			 struct inode *new_dir_i, struct dentry *new_dentry)
+						struct inode *new_dir_i, struct dentry *new_dentry, unsigned int flags)
+#else
+static int jffs2_rename (struct inode *old_dir_i, struct dentry *old_dentry,
+						struct inode *new_dir_i, struct dentry *new_dentry)
+#endif
 {
 	int ret;
 	struct jffs2_sb_info *c = JFFS2_SB_INFO(old_dir_i->i_sb);
 	struct jffs2_inode_info *victim_f = NULL;
 	uint8_t type;
 	uint32_t now;
+#if defined(CONFIG_BCM_KF_JFFS2_OVERLAY)
+	struct inode *fst_inode = d_inode(old_dentry);
+	struct inode *snd_inode = d_inode(new_dentry);
+		
+	if (flags & ~(RENAME_WHITEOUT | RENAME_EXCHANGE))
+		return -EINVAL;
+
+	if ((flags & RENAME_EXCHANGE) && (old_dir_i != new_dir_i)) {
+		if(S_ISDIR(fst_inode->i_mode) && !S_ISDIR(snd_inode->i_mode)) {
+			inc_nlink(new_dir_i);
+			drop_nlink(old_dir_i);
+		}
+		else if(!S_ISDIR(fst_inode->i_mode) && S_ISDIR(snd_inode->i_mode)) {
+			drop_nlink(new_dir_i);
+			inc_nlink(old_dir_i);
+		}
+	}
+#endif
 
 	/* The VFS will check for us and prevent trying to rename a
 	 * file over a directory and vice versa, but if it's a directory,
 	 * the VFS can't check whether the victim is empty. The filesystem
 	 * needs to do that for itself.
 	 */
+#if defined(CONFIG_BCM_KF_JFFS2_OVERLAY)
+	if (d_really_is_positive(new_dentry) && !(flags & RENAME_EXCHANGE)) {
+#else
 	if (d_really_is_positive(new_dentry)) {
+#endif
 		victim_f = JFFS2_INODE_INFO(d_inode(new_dentry));
 		if (d_is_dir(new_dentry)) {
 			struct jffs2_full_dirent *fd;
@@ -805,7 +861,11 @@ static int jffs2_rename (struct inode *old_dir_i, struct dentry *old_dentry,
 	if (ret)
 		return ret;
 
+#if defined(CONFIG_BCM_KF_JFFS2_OVERLAY)
+	if (victim_f && !(flags & RENAME_EXCHANGE)) {
+#else
 	if (victim_f) {
+#endif
 		/* There was a victim. Kill it off nicely */
 		if (d_is_dir(new_dentry))
 			clear_nlink(d_inode(new_dentry));
@@ -825,12 +885,29 @@ static int jffs2_rename (struct inode *old_dir_i, struct dentry *old_dentry,
 
 	/* If it was a directory we moved, and there was no victim,
 	   increase i_nlink on its new parent */
+#if defined(CONFIG_BCM_KF_JFFS2_OVERLAY)
+	if (d_is_dir(old_dentry) && !victim_f && !(flags & RENAME_EXCHANGE))
+		inc_nlink(new_dir_i);
+#else
 	if (d_is_dir(old_dentry) && !victim_f)
 		inc_nlink(new_dir_i);
-
-	/* Unlink the original */
-	ret = jffs2_do_unlink(c, JFFS2_INODE_INFO(old_dir_i),
-			      old_dentry->d_name.name, old_dentry->d_name.len, NULL, now);
+#endif
+ 
+#if defined(CONFIG_BCM_KF_JFFS2_OVERLAY)
+	if (flags & RENAME_WHITEOUT) 
+ 		/* Replace with whiteout */
+ 		ret = jffs2_whiteout(old_dir_i, old_dentry);
+	else if (flags & RENAME_EXCHANGE)
+		/* Replace the original */
+		ret = jffs2_do_link(c, JFFS2_INODE_INFO(old_dir_i),
+				d_inode(new_dentry)->i_ino, type,
+				old_dentry->d_name.name, old_dentry->d_name.len,
+				now);
+ 	else 
+#endif
+ 		/* Unlink the original */
+ 		ret = jffs2_do_unlink(c, JFFS2_INODE_INFO(old_dir_i),
+							old_dentry->d_name.name, old_dentry->d_name.len, NULL, now);
 
 	/* We don't touch inode->i_nlink */
 
@@ -856,8 +933,12 @@ static int jffs2_rename (struct inode *old_dir_i, struct dentry *old_dentry,
 		new_dir_i->i_mtime = new_dir_i->i_ctime = ITIME(now);
 		return ret;
 	}
-
+ 		
+#if defined(CONFIG_BCM_KF_JFFS2_OVERLAY)
+	if (d_is_dir(old_dentry) && !(flags & RENAME_EXCHANGE))
+#else
 	if (d_is_dir(old_dentry))
+#endif
 		drop_nlink(old_dir_i);
 
 	new_dir_i->i_mtime = new_dir_i->i_ctime = old_dir_i->i_mtime = old_dir_i->i_ctime = ITIME(now);

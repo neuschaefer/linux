@@ -8,6 +8,11 @@
 #ifndef __ASM_MACH_GENERIC_IRQ_H
 #define __ASM_MACH_GENERIC_IRQ_H
 
+#if defined(CONFIG_BCM_KF_MIPS_BCM963XX) && (defined(CONFIG_BCM96838) || defined(CONFIG_BCM96848))
+#ifndef NR_IRQS
+#define NR_IRQS	256
+#endif
+#endif
 #ifndef NR_IRQS
 #define NR_IRQS 128
 #endif

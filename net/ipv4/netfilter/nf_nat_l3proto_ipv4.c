@@ -27,6 +27,109 @@
 #include <net/netfilter/nf_nat_l4proto.h>
 
 static const struct nf_nat_l3proto nf_nat_l3proto_ipv4;
+unsigned int G_ibr0_ip=0x100a8c0;
+unsigned int G_ibr0_mask=0xffffff;
+struct proc_dir_entry *ipinfo_root=NULL;
+static struct proc_dir_entry *res1=NULL;
+static struct proc_dir_entry *res2=NULL;
+unsigned int ipaddrinfo = 0xc0a80001;
+unsigned int netmaskinfo = 0xffffff00;
+
+
+static ssize_t ipaddr_proc_write(struct file *file, const char *buffer,
+		      size_t count, loff_t *pos)
+{
+      char tmpbuf[80];
+			char *token=NULL; 
+			char *s = NULL;
+			unsigned char szip[5] = {0};
+			char delim[] = "."; 
+			unsigned int i=0;
+			char   *stop  =NULL ; 
+
+      if (count < 2)
+	    return -EFAULT;
+	    
+	if (buffer && !copy_from_user(tmpbuf, buffer, 80))  {
+ 			s = tmpbuf;
+    for(token = strsep(&s, delim); token != NULL; token = strsep(&s, delim)) {    	
+    	szip[i++] = simple_strtoul(token,&stop,10);    	
+    } 
+   	ipaddrinfo = ((unsigned int)szip[0]<<24) + ((unsigned int)szip[1]<<16) + ((unsigned int)szip[2]<<8) + (unsigned int)szip[3];  
+    G_ibr0_ip = ((unsigned int)szip[3]<<24) + ((unsigned int)szip[2]<<16) + ((unsigned int)szip[1]<<8) + (unsigned int)szip[0];
+
+		return count;
+	}	
+      return -EFAULT;
+}
+
+
+static ssize_t netmask_proc_write(struct file *file, const char *buffer,
+		      size_t count, loff_t *pos)
+{
+      char tmpbuf[80];
+			char *token=NULL; 
+			char *s = NULL;
+			unsigned char sznetmask[5] = {0};
+			char delim[] = "."; 
+			unsigned int i=0;
+			char   *stop  =NULL ; 
+
+      if (count < 2)
+	    return -EFAULT;   
+	if (buffer && !copy_from_user(tmpbuf, buffer, 80))  {
+ 			s = tmpbuf;
+    for(token = strsep(&s, delim); token != NULL; token = strsep(&s, delim)) {
+    	sznetmask[i++] = simple_strtoul(token,&stop,10);
+    } 
+   
+   netmaskinfo = ((unsigned int)sznetmask[0]<<24) + ((unsigned int)sznetmask[1]<<16) + ((unsigned int)sznetmask[2]<<8) + (unsigned int)sznetmask[3];  
+    G_ibr0_mask = ((unsigned int)sznetmask[3]<<24) + ((unsigned int)sznetmask[2]<<16) + ((unsigned int)sznetmask[1]<<8) + (unsigned int)sznetmask[0];   		
+
+		return count;
+	}	
+      return -EFAULT;
+}
+
+int ipaddr_show(struct seq_file *m, void *v)
+{
+	return 0;
+}
+
+int netmask_show(struct seq_file *m, void *v)
+{
+	return 0;
+}
+
+static int ipaddr_seq_open(struct inode *inode, struct file *file)
+{
+	return single_open(file,ipaddr_show,NULL);
+}
+
+static int netmask_seq_open(struct inode *inode, struct file *file)
+{
+	return single_open(file,netmask_show,NULL);
+}
+
+static const struct file_operations ipaddr_proc_fops = {
+	.owner = THIS_MODULE,
+	.open = ipaddr_seq_open,
+ 	.read  = seq_read,
+ 	.write  = ipaddr_proc_write,
+ 	.llseek = seq_lseek,  
+ 	.release = single_release,  
+};
+
+static const struct file_operations netmask_proc_fops = {
+	.owner = THIS_MODULE,
+	.open = netmask_seq_open,
+ 	.read  = seq_read,
+ 	.write  = netmask_proc_write,
+  .llseek = seq_lseek,  
+  .release = single_release,  
+};
+
+
 
 #ifdef CONFIG_XFRM
 static void nf_nat_ipv4_decode_session(struct sk_buff *skb,
@@ -280,7 +383,29 @@ nf_nat_ipv4_fn(const struct nf_hook_ops *ops, struct sk_buff *skb,
 	 * protocol. 8) --RR
 	 */
 	if (!ct)
-		return NF_ACCEPT;
+        {
+              struct iphdr *iph;
+              iph = ip_hdr(skb);
+              //TW_get_br0_ip_mask();         
+              if((0!=G_ibr0_ip)&&(0!=G_ibr0_mask))
+              {
+  
+                    if((G_ibr0_ip & G_ibr0_mask) == (iph->saddr & G_ibr0_mask))
+                    {
+        	         //printk("--------nf_nat_fn-----NF_DROP----\n");
+                         //printk("br0 IP:0x%x--->br0 mask:0x%x\n",G_ibr0_ip,G_ibr0_mask);
+                         //printk("Src IP:0x%x--->Dst IP:0x%x\n",iph->saddr,iph->daddr);
+                         //printk("@@:0x%x--->@@:--->0x%x\n",(G_ibr0_ip & G_ibr0_mask),(iph->saddr & G_ibr0_mask));
+                         return NF_DROP;
+                     }
+                     else
+                     {
+                         return NF_ACCEPT;
+                      }
+              }
+       	      else
+                  return NF_ACCEPT;
+          }
 
 	/* Don't try to NAT if this packet is not conntracked */
 	if (nf_ct_is_untracked(ct))
@@ -460,7 +585,22 @@ static int __init nf_nat_l3proto_ipv4_init(void)
 	err = nf_nat_l3proto_register(&nf_nat_l3proto_ipv4);
 	if (err < 0)
 		goto err2;
-	return err;
+
+		ipinfo_root = proc_mkdir("ipinfo",NULL);
+		if (!ipinfo_root){
+			printk("create folder fail\n");
+			return -ENOMEM;
+		}
+		res1 = proc_create("ip_addr", 0x0644,  ipinfo_root, &ipaddr_proc_fops);
+		if (NULL==res1) {
+				return -ENOMEM;
+		}
+		
+		res2 = proc_create("net_mask", 0x0644,  ipinfo_root, &netmask_proc_fops);
+		if (NULL==res2) {
+			return -ENOMEM;
+		}	
+	return 0;
 
 err2:
 	nf_nat_l4proto_unregister(NFPROTO_IPV4, &nf_nat_l4proto_icmp);

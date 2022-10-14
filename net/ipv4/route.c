@@ -1471,7 +1471,14 @@ static int ip_route_input_mc(struct sk_buff *skb, __be32 daddr, __be32 saddr,
 			goto e_inval;
 
 	if (ipv4_is_zeronet(saddr)) {
+#if defined(CONFIG_BCM_KF_MISC_BACKPORTS)
+		/* Backporting latest kernel fix(1d2f4ebbbeb1ec055dcd3cf3dba833cfd0a84f3a)
+			to allow IGMP packets with zero source IP */
+		if (!ipv4_is_local_multicast(daddr) 
+		    && ip_hdr(skb)->protocol != IPPROTO_IGMP)
+#else
 		if (!ipv4_is_local_multicast(daddr))
+#endif
 			goto e_inval;
 	} else {
 		err = fib_validate_source(skb, saddr, 0, tos, 0, dev,
@@ -2440,9 +2447,15 @@ static int rt_fill_info(struct net *net,  __be32 dst, __be32 src,
 #ifdef CONFIG_IP_MROUTE
 		if (ipv4_is_multicast(dst) && !ipv4_is_local_multicast(dst) &&
 		    IPV4_DEVCONF_ALL(net, MC_FORWARDING)) {
+#if defined(CONFIG_BCM_KF_MROUTE)
+			int err = ipmr_get_route(net, skb,
+						 fl4->saddr, fl4->daddr,
+						 r, nowait, rt->rt_iif);
+#else
 			int err = ipmr_get_route(net, skb,
 						 fl4->saddr, fl4->daddr,
 						 r, nowait);
+#endif
 			if (err <= 0) {
 				if (!nowait) {
 					if (err == 0)

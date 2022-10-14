@@ -110,12 +110,20 @@ struct backing_dev_info {
 struct backing_dev_info *inode_to_bdi(struct inode *inode);
 
 int __must_check bdi_init(struct backing_dev_info *bdi);
+#if defined(CONFIG_BCM_KF_MISC_BACKPORTS)
+void bdi_exit(struct backing_dev_info *bdi);
+#else
 void bdi_destroy(struct backing_dev_info *bdi);
+#endif
 
 __printf(3, 4)
 int bdi_register(struct backing_dev_info *bdi, struct device *parent,
 		const char *fmt, ...);
 int bdi_register_dev(struct backing_dev_info *bdi, dev_t dev);
+#if defined(CONFIG_BCM_KF_MISC_BACKPORTS)
+void bdi_unregister(struct backing_dev_info *bdi);
+void bdi_destroy(struct backing_dev_info *bdi);
+#endif
 int __must_check bdi_setup_and_register(struct backing_dev_info *, char *);
 void bdi_start_writeback(struct backing_dev_info *bdi, long nr_pages,
 			enum wb_reason reason);

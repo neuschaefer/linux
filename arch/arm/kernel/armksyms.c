@@ -16,6 +16,9 @@
 #include <linux/syscalls.h>
 #include <linux/uaccess.h>
 #include <linux/io.h>
+#if defined(CONFIG_BCM_KF_OPTEE)
+#include <linux/arm-smccc.h>
+#endif
 
 #include <asm/checksum.h>
 #include <asm/ftrace.h>
@@ -169,3 +172,10 @@ EXPORT_SYMBOL(__gnu_mcount_nc);
 EXPORT_SYMBOL(__pv_phys_pfn_offset);
 EXPORT_SYMBOL(__pv_offset);
 #endif
+
+#if defined(CONFIG_BCM_KF_OPTEE)
+#ifdef CONFIG_HAVE_ARM_SMCCC
+EXPORT_SYMBOL(__arm_smccc_smc);
+EXPORT_SYMBOL(__arm_smccc_hvc);
+#endif
+#endif /* CONFIG_BCM_KF_OPTEE */

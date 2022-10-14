@@ -46,10 +46,41 @@ struct br_ip_list {
 #define BR_LEARNING_SYNC	BIT(9)
 #define BR_PROXYARP_WIFI	BIT(10)
 
+#if defined(CONFIG_BCM_KF_BRIDGE_PORT_ISOLATION) || defined(CONFIG_BCM_KF_BRIDGE_STP)
+enum {
+	BREVT_IF_CHANGED,
+	BREVT_STP_STATE_CHANGED
+};
+#endif
+
+#if defined(CONFIG_BCM_KF_BRIDGE_PORT_ISOLATION)
+extern struct net_device *bridge_get_next_port(char *brName, unsigned int *portNum);
+extern int register_bridge_notifier(struct notifier_block *nb);
+extern int unregister_bridge_notifier(struct notifier_block *nb);
+extern void bridge_get_br_list(char *brList, const unsigned int listSize);
+#endif
+
+#if defined(CONFIG_BCM_KF_BRIDGE_STP)
+struct stpPortInfo {
+	char portName[IFNAMSIZ];
+	unsigned char stpState;
+};
+extern int register_bridge_stp_notifier(struct notifier_block *nb);
+extern int unregister_bridge_stp_notifier(struct notifier_block *nb);
+extern void call_br_stp_notifiers(unsigned long evt, struct net_device *dev, struct stpPortInfo *ctx);
+#endif
+
 extern void brioctl_set(int (*ioctl_hook)(struct net *, unsigned int, void __user *));
 
 typedef int br_should_route_hook_t(struct sk_buff *skb);
 extern br_should_route_hook_t __rcu *br_should_route_hook;
+
+#if (defined(CONFIG_BCM_MCAST) || defined(CONFIG_BCM_MCAST_MODULE)) && defined(CONFIG_BCM_KF_MCAST)
+typedef int (*br_bcm_mcast_receive_hook)(int ifindex, struct sk_buff *skb, int is_routed);
+typedef int (*br_bcm_mcast_should_deliver_hook)(int ifindex, const struct sk_buff *skb, struct net_device *dst_dev, bool dst_mrouter);
+int br_bcm_mcast_flood_forward(struct net_device *dev, struct sk_buff *skb);
+int br_bcm_mcast_bind(br_bcm_mcast_receive_hook bcm_rx_hook, br_bcm_mcast_should_deliver_hook bcm_should_deliver_hook);
+#endif
 
 #if IS_ENABLED(CONFIG_BRIDGE) && IS_ENABLED(CONFIG_BRIDGE_IGMP_SNOOPING)
 int br_multicast_list_adjacent(struct net_device *dev,

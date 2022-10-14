@@ -15,6 +15,17 @@ struct rtnl_link_stats {
 	__u32	rx_dropped;		/* no space in linux buffers	*/
 	__u32	tx_dropped;		/* no space available in linux	*/
 	__u32	multicast;		/* multicast packets received	*/
+#if defined(CONFIG_BCM_KF_EXTSTATS)
+	__u32   tx_multicast_packets;  /* multicast packets transmitted */
+	__u32   rx_multicast_bytes;  /* multicast bytes recieved */ 
+	__u32   tx_multicast_bytes;  /* multicast bytes transmitted */
+	__u32   rx_broadcast_packets;  /* broadcast packets recieved */
+	__u32   tx_broadcast_packets;  /* broadcast packets transmitted */
+	/* NOTE: Unicast packets are not counted but are instead calculated as needed
+	using total - (broadcast + multicast) */
+	__u32   rx_unknown_packets;  /* unknown protocol packets recieved */
+#endif
+
 	__u32	collisions;
 
 	/* detailed rx_errors: */
@@ -48,6 +59,7 @@ struct rtnl_link_stats64 {
 	__u64	rx_dropped;		/* no space in linux buffers	*/
 	__u64	tx_dropped;		/* no space available in linux	*/
 	__u64	multicast;		/* multicast packets received	*/
+
 	__u64	collisions;
 
 	/* detailed rx_errors: */
@@ -68,6 +80,16 @@ struct rtnl_link_stats64 {
 	/* for cslip etc */
 	__u64	rx_compressed;
 	__u64	tx_compressed;
+#if defined(CONFIG_BCM_KF_EXTSTATS)
+        __u64   tx_multicast_packets;  /* multicast packets transmitted */
+        __u64   rx_multicast_bytes;  /* multicast bytes recieved */ 
+        __u64   tx_multicast_bytes;  /* multicast bytes transmitted */
+        __u64   rx_broadcast_packets;  /* broadcast packets recieved */
+        __u64   tx_broadcast_packets;  /* broadcast packets transmitted */
+        /* NOTE: Unicast packets are not counted but are instead calculated as needed
+        using total - (broadcast + multicast) */
+        __u64   rx_unknown_packets;  /* unknown protocol packets recieved */
+#endif
 };
 
 /* The struct should be in sync with struct ifmap */

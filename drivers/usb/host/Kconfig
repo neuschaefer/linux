@@ -33,6 +33,7 @@ config USB_XHCI_PCI
 
 config USB_XHCI_PLATFORM
 	tristate
+	prompt "xHCI platform support" if BCM_KF_USB_HOSTS
 
 config USB_XHCI_MVEBU
 	tristate "xHCI support for Marvell Armada 375/38x"

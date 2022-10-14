@@ -1150,6 +1150,13 @@ int xhci_hub_status_data(struct usb_hcd *hcd, char *buf)
 			break;
 		}
 		if ((temp & mask) != 0 ||
+#ifdef CONFIG_BCM_KF_USB_HOSTS
+			/* when in compliance mode no change events are generated
+			 * this check is needed for compliance mode quirk to bring
+			 * port out of compliance mode
+			 */
+			((temp & PORT_PLS_MASK) == USB_SS_PORT_LS_COMP_MOD) ||
+#endif
 			(bus_state->port_c_suspend & 1 << i) ||
 			(bus_state->resume_done[i] && time_after_eq(
 			    jiffies, bus_state->resume_done[i]))) {
@@ -1167,7 +1174,7 @@ int xhci_hub_status_data(struct usb_hcd *hcd, char *buf)
 	return status ? retval : 0;
 }
 
-#ifdef CONFIG_PM
+#if defined(CONFIG_PM)
 
 int xhci_bus_suspend(struct usb_hcd *hcd)
 {

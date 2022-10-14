@@ -65,3 +65,9 @@ ifdef CONFIG_PCI_MSI
 obj-$(CONFIG_CAVIUM_OCTEON_SOC) += msi-octeon.o
 obj-$(CONFIG_CPU_XLP)		+= msi-xlp.o
 endif
+
+ifdef BCM_KF # defined(CONFIG_BCM_KF_PCI_FIXUP)
+ifeq "$(CONFIG_BCM_PCI)" "y"
+EXTRA_CFLAGS += -I$(INC_BRCMDRIVER_PUB_PATH)/$(BRCM_BOARD) -I$(INC_BRCMSHARED_PUB_PATH)/$(BRCM_BOARD)
+endif
+endif # BCM_KF

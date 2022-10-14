@@ -136,6 +136,9 @@ extern int watchdog_init_timeout(struct watchdog_device *wdd,
 				  unsigned int timeout_parm, struct device *dev);
 extern int watchdog_register_device(struct watchdog_device *);
 extern void watchdog_unregister_device(struct watchdog_device *);
+#if defined(CONFIG_BCM_KF_WDT)
+extern void watchdog_force_disable( void );
+#endif
 
 #ifdef CONFIG_HARDLOCKUP_DETECTOR
 void watchdog_nmi_disable_all(void);

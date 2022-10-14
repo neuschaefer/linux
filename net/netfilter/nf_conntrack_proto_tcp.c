@@ -33,10 +33,18 @@
 #include <net/netfilter/ipv4/nf_conntrack_ipv4.h>
 #include <net/netfilter/ipv6/nf_conntrack_ipv6.h>
 
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+#include <linux/blog.h>
+#endif
+
+#if defined(CONFIG_BCM_KF_NETFILTER)
+static int nf_ct_tcp_be_liberal __read_mostly = 1;
+#else
 /* "Be conservative in what you do,
     be liberal in what you accept from others."
     If it's non-zero, we mark only out of window RST segments as INVALID. */
 static int nf_ct_tcp_be_liberal __read_mostly = 0;
+#endif
 
 /* If it is set to zero, we disable picking up already established
    connections. */
@@ -867,11 +875,28 @@ static int tcp_packet(struct nf_conn *ct,
 			 * context and we must give it a chance to terminate.
 			 */
 			if (nf_ct_kill(ct))
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+			{
+				if (del_timer(&ct->timeout)) {
+					printk("%s: delete ct right now.\n", __FUNCTION__);
+					nf_ct_delete(ct, 0, 0);
+					return NF_DROP;
+				}
 				return -NF_REPEAT;
+			}
+#else /* ! (CONFIG_BCM_KF_BLOG && CONFIG_BLOG) */
+				return -NF_REPEAT;
+#endif /* ! (CONFIG_BCM_KF_BLOG && CONFIG_BLOG) */
 			return NF_DROP;
 		}
 		/* Fall through */
 	case TCP_CONNTRACK_IGNORE:
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+		blog_lock();
+		blog_skip((struct sk_buff *)skb, blog_skip_reason_ct_tcp_state_ignore);
+		blog_unlock();
+#endif
+
 		/* Ignored packets:
 		 *
 		 * Our connection entry may be out of sync, so ignore
@@ -1051,6 +1076,7 @@ static int tcp_packet(struct nf_conn *ct,
 		 old_state, new_state);
 
 	ct->proto.tcp.state = new_state;
+
 	if (old_state != new_state
 	    && new_state == TCP_CONNTRACK_FIN_WAIT)
 		ct->proto.tcp.seen[dir].flags |= IP_CT_TCP_FLAG_CLOSE_INIT;
@@ -1065,6 +1091,51 @@ static int tcp_packet(struct nf_conn *ct,
 	else
 		timeout = timeouts[new_state];
 	spin_unlock_bh(&ct->lock);
+
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+	blog_lock();
+	if (th->fin) {
+		/* clear the flow association with blog */
+		uint32_t key_orig = BLOG_KEY_FC_INVALID;
+		uint32_t key_reply = BLOG_KEY_FC_INVALID;
+
+		if (dir == IP_CT_DIR_ORIGINAL)
+			key_orig = ct->blog_key[IP_CT_DIR_ORIGINAL];
+		else if (dir == IP_CT_DIR_REPLY)
+			key_reply = ct->blog_key[IP_CT_DIR_REPLY];
+
+		if ((key_orig != BLOG_KEY_FC_INVALID) || (key_reply != BLOG_KEY_FC_INVALID)) {
+			blog_notify(DESTROY_FLOWTRACK, (void*)ct, key_orig, key_reply);
+		}
+		clear_bit(IPS_BLOG_BIT, &ct->status);
+	} else if (th->rst) {
+		/* Abort and make this conntrack not BLOG eligible */
+		if ((ct->blog_key[IP_CT_DIR_ORIGINAL] != BLOG_KEY_FC_INVALID)
+			|| (ct->blog_key[IP_CT_DIR_REPLY] != BLOG_KEY_FC_INVALID)) {
+			blog_notify(DESTROY_FLOWTRACK, (void*)ct,
+					(uint32_t)ct->blog_key[IP_CT_DIR_ORIGINAL],
+					(uint32_t)ct->blog_key[IP_CT_DIR_REPLY]);
+		}
+	}
+	if (ct->proto.tcp.state !=  TCP_CONNTRACK_ESTABLISHED)
+		blog_skip((struct sk_buff *)skb, blog_skip_reason_ct_tcp_state_not_est);
+	else{
+		/* when connection is in established state and accelerated, we cannot
+		 * determine IP_CT_TCP_FLAG_DATA_UNACKNOWLEDGED properly, so just use the
+		 * Established state tiemout value
+		 *
+		 * Worst case scenario when connection drops with out any RST/FIN, this conntrack
+		 * will be present for 5 days(Established timeout). But with reagrdless drop
+		 * we will drop this connection if table is full, so essentially we are not
+		 * blocking any resources for this conntrack when they are needed
+		 */
+
+		if ((ct->blog_key[IP_CT_DIR_ORIGINAL] != BLOG_KEY_FC_INVALID)
+				|| (ct->blog_key[IP_CT_DIR_REPLY] != BLOG_KEY_FC_INVALID))
+			timeout = timeouts[new_state];
+	}
+	blog_unlock();
+#endif
 
 	if (new_state != old_state)
 		nf_conntrack_event_cache(IPCT_PROTOINFO, ct);
@@ -1094,6 +1165,14 @@ static int tcp_packet(struct nf_conn *ct,
 		set_bit(IPS_ASSURED_BIT, &ct->status);
 		nf_conntrack_event_cache(IPCT_ASSURED, ct);
 	}
+#if defined(CONFIG_BCM_KF_NETFILTER)
+	if (new_state == TCP_CONNTRACK_ESTABLISHED) {
+		if (ct->derived_timeout == 0xFFFFFFFF)
+			timeout = 0xFFFFFFFF - jiffies;
+		else if (ct->derived_timeout > 0)
+			timeout = ct->derived_timeout;
+	}
+#endif
 	nf_ct_refresh_acct(ct, ctinfo, skb, timeout);
 
 	return NF_ACCEPT;
@@ -1400,6 +1479,7 @@ static const struct nla_policy tcp_timeout_nla_policy[CTA_TIMEOUT_TCP_MAX+1] = {
 	[CTA_TIMEOUT_TCP_UNACK]		= { .type = NLA_U32 },
 };
 #endif /* CONFIG_NF_CT_NETLINK_TIMEOUT */
+
 
 #ifdef CONFIG_SYSCTL
 static struct ctl_table tcp_sysctl_table[] = {

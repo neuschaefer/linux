@@ -1326,6 +1326,9 @@ void pci_cfg_access_unlock(struct pci_dev *dev);
 #ifdef CONFIG_PCI_DOMAINS
 extern int pci_domains_supported;
 int pci_get_new_domain_nr(void);
+#ifdef CONFIG_BCM_KF_PCI_RESET_DOMAIN_NR
+void pci_reset_domain_nr(void);
+#endif /* CONFIG_BCM_KF_PCI_RESET_DOMAIN_NR */
 #else
 enum { pci_domains_supported = 0 };
 static inline int pci_domain_nr(struct pci_bus *bus) { return 0; }

@@ -24,9 +24,11 @@
 #include <net/netfilter/nf_nat.h>
 #include <net/netfilter/ipv4/nf_nat_masquerade.h>
 
+
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Netfilter Core Team <coreteam@netfilter.org>");
 MODULE_DESCRIPTION("Xtables: automatic-address SNAT");
+
 
 /* FIXME: Multiple targets. --RR */
 static int masquerade_tg_check(const struct xt_tgchk_param *par)
@@ -54,6 +56,11 @@ masquerade_tg(struct sk_buff *skb, const struct xt_action_param *par)
 	range.flags = mr->range[0].flags;
 	range.min_proto = mr->range[0].min;
 	range.max_proto = mr->range[0].max;
+
+#if defined(CONFIG_BCM_KF_NETFILTER)
+	range.min_addr.ip = mr->range[0].min_ip;
+	range.max_addr.ip = mr->range[0].max_ip;
+#endif
 
 	return nf_nat_masquerade_ipv4(skb, par->hooknum, &range, par->out);
 }

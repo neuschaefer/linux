@@ -88,8 +88,18 @@ static int udp_packet(struct nf_conn *ct,
 	/* If we've seen traffic both ways, this is some kind of UDP
 	   stream.  Extend timeout. */
 	if (test_bit(IPS_SEEN_REPLY_BIT, &ct->status)) {
+#if defined(CONFIG_BCM_KF_NETFILTER)
+                unsigned timeout = timeouts[UDP_CT_REPLIED];
+                if (ct->derived_timeout == 0xFFFFFFFF){
+                        timeout = 60*60*HZ;
+                } else if(ct->derived_timeout > 0) {
+                        timeout = ct->derived_timeout;
+                }
+                nf_ct_refresh_acct(ct, ctinfo, skb, timeout);
+#else
 		nf_ct_refresh_acct(ct, ctinfo, skb,
 				   timeouts[UDP_CT_REPLIED]);
+#endif
 		/* Also, more likely to be important, and not a probe */
 		if (!test_and_set_bit(IPS_ASSURED_BIT, &ct->status))
 			nf_conntrack_event_cache(IPCT_ASSURED, ct);
@@ -201,6 +211,7 @@ udp_timeout_nla_policy[CTA_TIMEOUT_UDP_MAX+1] = {
 };
 #endif /* CONFIG_NF_CT_NETLINK_TIMEOUT */
 
+
 #ifdef CONFIG_SYSCTL
 static struct ctl_table udp_sysctl_table[] = {
 	{
@@ -213,7 +224,7 @@ static struct ctl_table udp_sysctl_table[] = {
 		.procname	= "nf_conntrack_udp_timeout_stream",
 		.maxlen		= sizeof(unsigned int),
 		.mode		= 0644,
-		.proc_handler	= proc_dointvec_jiffies,
+        .proc_handler	= proc_dointvec_jiffies,
 	},
 	{ }
 };
@@ -229,7 +240,7 @@ static struct ctl_table udp_compat_sysctl_table[] = {
 		.procname	= "ip_conntrack_udp_timeout_stream",
 		.maxlen		= sizeof(unsigned int),
 		.mode		= 0644,
-		.proc_handler	= proc_dointvec_jiffies,
+        .proc_handler	= proc_dointvec_jiffies,
 	},
 	{ }
 };

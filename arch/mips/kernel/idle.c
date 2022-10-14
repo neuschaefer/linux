@@ -22,6 +22,55 @@
 #include <asm/idle.h>
 #include <asm/mipsregs.h>
 
+#if defined(CONFIG_BCM_KF_MIPS_BCM963XX) && defined(CONFIG_MIPS_BCM963XX)
+/* Bcm version minimizes the chance of an irq sneaking in between checking
+need_resched and wait instruction, or eliminates it completely (depending on 
+pipeline design). This avoids delayed processing of softirq. (The delayed 
+softirq problem can happen when preemption is disabled and softirq runs in 
+process context.) */
+
+extern void BcmPwrMngtReduceCpuSpeed(void);
+extern void BcmPwrMngtResumeFullSpeed(void);
+
+static void bcm_r4k_wait(void)
+{
+#if defined(CONFIG_BCM_HOSTMIPS_PWRSAVE) || defined(CONFIG_BCM_DDR_SELF_REFRESH_PWRSAVE)
+	BcmPwrMngtReduceCpuSpeed();
+#endif
+
+	/* Always try to treat the segment below as an atomic entity and try not 
+	to insert code or move code around */
+	/* Begin fixed safe code pattern for the particular MIPS pipleline*/
+	raw_local_irq_disable();
+	if (!need_resched() &&  !(read_c0_cause() & read_c0_status())) {
+		/* Perform SYNC, enable interrupts, then WAIT */
+		__asm__ __volatile__ (
+			".set push\n"
+			".set noreorder\n"
+			".set noat\n"
+			"sync\n"
+			"mfc0	$1, $12\n"
+			"ori $1, $1, 0x1f\n"
+			"xori	$1, $1, 0x1e\n"
+			"mtc0	$1, $12\n"
+			"nop\n"  // Recommended by MIPS team
+			"wait\n"
+			"nop\n"  // Needed to ensure next instruction is safe
+			"nop\n"  // When speed is reduced to 1/8, need one more to get DG interrupt
+			"nop\n"  // Safety net...
+			".set pop\n");
+	}
+	else {
+#if defined(CONFIG_BCM_HOSTMIPS_PWRSAVE) || defined(CONFIG_BCM_DDR_SELF_REFRESH_PWRSAVE)
+		BcmPwrMngtResumeFullSpeed();
+#endif
+		raw_local_irq_enable();
+	}
+	/* End fixed code pattern */
+}
+#endif /* CONFIG_BCM_KF_MIPS_BCM963XX */
+
+
 /*
  * Not all of the MIPS CPUs have the "wait" instruction available. Moreover,
  * the implementation of the "wait" feature differs between CPU families. This
@@ -158,7 +207,9 @@ void __init check_wait(void)
 	case CPU_25KF:
 	case CPU_PR4450:
 	case CPU_BMIPS3300:
+#if !defined(CONFIG_BCM_KF_MIPS_BCM963XX)
 	case CPU_BMIPS4350:
+#endif
 	case CPU_BMIPS4380:
 	case CPU_BMIPS5000:
 	case CPU_CAVIUM_OCTEON:
@@ -172,6 +223,11 @@ void __init check_wait(void)
 		cpu_wait = r4k_wait;
 		break;
 
+#if defined(CONFIG_BCM_KF_MIPS_BCM963XX) && defined(CONFIG_MIPS_BCM963XX)
+	case CPU_BMIPS4350:
+		cpu_wait = bcm_r4k_wait;
+		break;
+#endif
 	case CPU_RM7000:
 		cpu_wait = rm7k_wait_irqoff;
 		break;
@@ -235,6 +291,33 @@ void __init check_wait(void)
 		break;
 	}
 }
+
+#if defined(CONFIG_BCM_KF_MIPS_BCM963XX) && defined(CONFIG_MIPS_BCM963XX) && defined(CONFIG_BCM_KF_POWER_SAVE)
+/* for power management */
+static void set_cpu_r4k_wait(int enable)
+{
+	if(enable) {
+		cpu_wait = bcm_r4k_wait;
+		printk("wait instruction: enabled\n");
+    }
+	else {
+		cpu_wait = NULL;
+		printk("wait instruction: disabled\n");
+    }
+}
+
+static int get_cpu_r4k_wait(void)
+{
+	if(cpu_wait == bcm_r4k_wait)
+		return 1;
+	else
+		return 0;
+}
+
+#include <linux/module.h> // just for EXPORT_SYMBOL
+EXPORT_SYMBOL(set_cpu_r4k_wait);
+EXPORT_SYMBOL(get_cpu_r4k_wait);
+#endif 
 
 void arch_cpu_idle(void)
 {

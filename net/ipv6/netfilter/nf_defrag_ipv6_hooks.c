@@ -58,6 +58,15 @@ static unsigned int ipv6_defrag(const struct nf_hook_ops *ops,
 {
 	struct sk_buff *reasm;
 
+#if defined(CONFIG_BCM_KF_MAP) && (defined(CONFIG_BCM_MAP) || defined(CONFIG_BCM_MAP_MODULE))
+	/*
+	 * MAP_FORWARD_MODE1 indicates Fragment extension header inserted
+	 * for translated MAP-T IPv6 packet in MAP-T driver.
+	 * Netfilter should not defragment in this case.
+	 */
+	if (skb->map_forward != MAP_FORWARD_MODE1)
+	{
+#endif
 #if IS_ENABLED(CONFIG_NF_CONNTRACK)
 	/* Previously seen (loopback)?	*/
 	if (skb->nfct && !nf_ct_is_template((struct nf_conn *)skb->nfct))
@@ -78,6 +87,13 @@ static unsigned int ipv6_defrag(const struct nf_hook_ops *ops,
 	NF_HOOK_THRESH(NFPROTO_IPV6, ops->hooknum, state->sk, reasm,
 		       state->in, state->out,
 		       state->okfn, NF_IP6_PRI_CONNTRACK_DEFRAG + 1);
+#if defined(CONFIG_BCM_KF_MAP) && (defined(CONFIG_BCM_MAP) || defined(CONFIG_BCM_MAP_MODULE))
+	}
+	else
+		NF_HOOK_THRESH(NFPROTO_IPV6, ops->hooknum, state->sk, skb,
+		       state->in, state->out,
+		       state->okfn, NF_IP6_PRI_CONNTRACK_DEFRAG + 1);
+#endif
 
 	return NF_STOLEN;
 }

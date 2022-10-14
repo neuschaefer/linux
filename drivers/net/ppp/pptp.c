@@ -41,6 +41,9 @@
 #include <net/gre.h>
 
 #include <linux/uaccess.h>
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+#include <linux/blog.h>
+#endif
 
 #define PPTP_DRIVER_VERSION "0.8.5"
 
@@ -49,6 +52,12 @@
 static DECLARE_BITMAP(callid_bitmap, MAX_CALLID + 1);
 static struct pppox_sock __rcu **callid_sock;
 
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+extern int ppp_rcv_decomp_run(struct ppp_channel *);
+void pptp_xmit_update(uint16_t call_id, uint32_t seqNum, uint32_t ackNum, uint32_t daddr);
+int pptp_xmit_get(uint16_t call_id, uint32_t* seqNum, uint32_t* ackNum, uint32_t daddr);
+int pptp_rcv_check(uint16_t call_id, uint32_t *rcv_pktSeq, uint32_t rcv_pktAck, uint32_t saddr);  
+#endif
 static DEFINE_SPINLOCK(chan_lock);
 
 static struct proto pptp_sk_proto __read_mostly;
@@ -345,6 +354,10 @@ static int pptp_rcv_core(struct sock *sk, struct sk_buff *skb)
 		goto drop;
 
 	payload = skb->data + headersize;
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG) 
+    if (!blog_gre_tunnel_accelerated() || ppp_rcv_decomp_run(&po->chan))
+    {   
+#endif
 	/* check for expected sequence number */
 	if (seq < opt->seq_recv + 1 || WRAPPED(opt->seq_recv, seq)) {
 		if ((payload[0] == PPP_ALLSTATIONS) && (payload[1] == PPP_UI) &&
@@ -374,6 +387,40 @@ allow_packet:
 
 		return NET_RX_SUCCESS;
 	}
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+    }
+    else /* blog_gre_tunnel_accelerated is true, so opt->seq_recv and opt->ack_recv have been ++ by  pptp_rcv_check() */
+    {
+        /* check for expected sequence number */
+        if ( seq < opt->seq_recv || WRAPPED(opt->seq_recv, seq) )
+        {
+            if ( (payload[0] == PPP_ALLSTATIONS) && (payload[1] == PPP_UI) && (PPP_PROTOCOL(payload) == PPP_LCP) &&
+                ((payload[4] == PPP_LCP_ECHOREQ) || (payload[4] == PPP_LCP_ECHOREP)) )
+                goto allow_packet2;
+        }
+        else
+        {
+allow_packet2:         
+            //printk(" PPTP: blog_gre_tunnel_accelerated!\n");
+            skb_pull(skb,headersize);
+            if (payload[0] == PPP_ALLSTATIONS && payload[1] == PPP_UI)
+            {
+                /* chop off address/control */
+                if (skb->len < 3)
+                    goto drop;
+                skb_pull(skb,2);
+            }
+            if ((*skb->data) & 1){
+                /* protocol is compressed */
+                skb_push(skb, 1)[0] = 0;
+            }
+            skb->ip_summed=CHECKSUM_NONE;
+            skb_set_network_header(skb,skb->head-skb->data);
+            ppp_input(&po->chan,skb);
+            return NET_RX_SUCCESS;  
+        }
+    }       
+#endif
 drop:
 	kfree_skb(skb);
 	return NET_RX_DROP;
@@ -712,6 +759,12 @@ static int __init pptp_init_module(void)
 		goto out_unregister_sk_proto;
 	}
 
+
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG) 
+    blog_pptp_xmit_update_fn = (blog_pptp_xmit_upd_t) pptp_xmit_update; 
+    blog_pptp_xmit_get_fn = (blog_pptp_xmit_get_t) pptp_xmit_get;
+    blog_pptp_rcv_check_fn = (blog_pptp_rcv_check_t) pptp_rcv_check;
+#endif
 	return 0;
 
 out_unregister_sk_proto:
@@ -731,6 +784,128 @@ static void __exit pptp_exit_module(void)
 	gre_del_protocol(&gre_pptp_protocol, GREPROTO_PPTP);
 	vfree(callid_sock);
 }
+
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+void pptp_xmit_update(uint16_t call_id, uint32_t seqNum, uint32_t ackNum, uint32_t daddr)
+{
+    struct pppox_sock *sock;
+    struct pptp_opt *opt;
+    int i;
+    
+    rcu_read_lock();
+
+    for(i = find_next_bit(callid_bitmap,MAX_CALLID,1); i < MAX_CALLID; i = find_next_bit(callid_bitmap, MAX_CALLID, i + 1))
+    {
+        sock = rcu_dereference(callid_sock[i]);
+        if (!sock)
+            continue;
+            
+        opt = &sock->proto.pptp;
+        if (opt->dst_addr.call_id == call_id && opt->dst_addr.sin_addr.s_addr == daddr) 
+        {   
+            //printk(KERN_INFO "PPTP: find the channel!\n");
+            if( opt->seq_sent != seqNum && seqNum > 0)
+            {   
+                //printk(KERN_INFO "PPTP: update seq_sent!\n");
+                opt->seq_sent = seqNum;
+            }
+            if( opt->ack_sent != ackNum && ackNum > 0)
+            {   
+                //printk(KERN_INFO "PPTP: update ack_sent!\n");
+                opt->ack_sent = ackNum; 
+            }           
+            break;
+        }
+    }
+    
+    rcu_read_unlock();
+
+    return;
+}
+
+int pptp_xmit_get(uint16_t call_id, uint32_t* seqNum, uint32_t* ackNum, uint32_t daddr)
+{
+    struct pppox_sock *sock;
+    struct pptp_opt *opt;
+    int i, ack_flag = PPTP_NOT_ACK;
+    
+    rcu_read_lock();
+
+    for(i = find_next_bit(callid_bitmap,MAX_CALLID,1); i < MAX_CALLID; i = find_next_bit(callid_bitmap, MAX_CALLID, i + 1))
+    {
+        sock = rcu_dereference(callid_sock[i]);
+        if (!sock)
+            continue;
+            
+        opt = &sock->proto.pptp;
+        if (opt->dst_addr.call_id == call_id && opt->dst_addr.sin_addr.s_addr == daddr) 
+        {   
+            //printk(KERN_INFO "PPTP: seq_sent = %d, ack_sent = %d \n", opt->seq_sent, opt->ack_sent);
+            opt->seq_sent += 1;
+            *seqNum = opt->seq_sent;
+            *ackNum = opt->ack_sent;
+            
+            if (opt->ack_sent != opt->seq_recv)
+            {   
+                ack_flag = PPTP_WITH_ACK;
+                *ackNum = opt->ack_sent = opt->seq_recv;            
+            }   
+            break;
+        }
+    }
+    
+    rcu_read_unlock();
+
+    return ack_flag;
+}
+
+int pptp_rcv_check(uint16_t call_id, uint32_t *rcv_pktSeq, uint32_t rcv_pktAck, uint32_t saddr)
+{
+    struct pppox_sock *sock;
+    struct pptp_opt *opt;
+    int ret = BLOG_PPTP_RCV_NO_TUNNEL;
+    
+    rcu_read_lock();
+    sock = rcu_dereference(callid_sock[call_id]);
+    if (sock) 
+    {
+        opt=&sock->proto.pptp;
+        if (opt->dst_addr.sin_addr.s_addr!=saddr) 
+		{
+            sock=NULL;
+		}
+        else 
+        {   
+            sock_hold(sk_pppox(sock));
+            //printk(KERN_INFO "PPTP: pptp_rcv_check() current seq_recv is %d \n", opt->seq_recv);
+            if (ppp_rcv_decomp_run(&sock->chan)) {
+                ret = BLOG_PPTP_ENCRYPTED;
+                rcu_read_unlock();
+                return ret;
+            } else if (opt->seq_recv && ((*rcv_pktSeq) > opt->seq_recv)) 
+            {
+                opt->seq_recv = (*rcv_pktSeq);
+                ret = BLOG_PPTP_RCV_IN_SEQ;
+            } else if (opt->seq_recv && ((*rcv_pktSeq) - opt->seq_recv) <= 0) {
+                printk(KERN_INFO "pptp_rcv_check():[BLOG_PPTP_RCV_OOS_LT] current seq_recv is %d \n", opt->seq_recv);
+                ret = BLOG_PPTP_RCV_OOS_LT;
+            } else {
+                printk(KERN_INFO "pptp_rcv_check():[BLOG_PPTP_RCV_OOS_GT] current seq_recv is %d \n", opt->seq_recv);
+                opt->seq_recv = (*rcv_pktSeq);
+                ret = BLOG_PPTP_RCV_OOS_GT;
+            }       
+            if (rcv_pktAck > opt->ack_recv) opt->ack_recv = rcv_pktAck;    
+        }
+            
+    }          
+    rcu_read_unlock();
+    return ret;
+}
+
+EXPORT_SYMBOL(pptp_xmit_update);
+EXPORT_SYMBOL(pptp_xmit_get);
+EXPORT_SYMBOL(pptp_rcv_check);
+#endif
 
 module_init(pptp_init_module);
 module_exit(pptp_exit_module);

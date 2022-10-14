@@ -826,6 +826,40 @@ static int vif_add(struct net *net, struct mr_table *mrt,
 	return 0;
 }
 
+#if defined(CONFIG_BCM_KF_MROUTE)
+/* look for (S,G,iif) and then (*,G,iif) */
+static struct mfc_cache *ipmr_cache_find_parent(struct mr_table *mrt,
+                                                __be32           origin, 
+                                                __be32           mcastgrp,
+                                                vifi_t           vifi)
+{
+	int line = MFC_HASH(mcastgrp, origin);
+	struct mfc_cache *c;
+	list_for_each_entry_rcu(c, &mrt->mfc_cache_array[line], list) {
+		if ((c->mfc_origin == origin) && 
+		    (c->mfc_mcastgrp == mcastgrp) &&
+		    (c->mfc_parent == vifi))
+		{
+			return c;
+		}
+	}
+
+	/* for ASM multicast source does not matter so need to check
+	   for an entry with NULL origin */
+	line = MFC_HASH(mcastgrp, 0x0);
+	list_for_each_entry_rcu(c, &mrt->mfc_cache_array[line], list) {
+		if ((c->mfc_origin == 0x0) && 
+		    (c->mfc_mcastgrp == mcastgrp) &&
+		    (c->mfc_parent == vifi))
+		{
+			return c;
+		}
+	}
+
+	return NULL;
+}
+#endif
+
 /* called with rcu_read_lock() */
 static struct mfc_cache *ipmr_cache_find(struct mr_table *mrt,
 					 __be32 origin,
@@ -857,6 +891,7 @@ static struct mfc_cache *ipmr_cache_find_any_parent(struct mr_table *mrt,
 	return NULL;
 }
 
+#if !defined(CONFIG_BCM_KF_MROUTE)
 /* Look for a (*,G) entry */
 static struct mfc_cache *ipmr_cache_find_any(struct mr_table *mrt,
 					     __be32 mcastgrp, int vifi)
@@ -883,6 +918,7 @@ static struct mfc_cache *ipmr_cache_find_any(struct mr_table *mrt,
 skip:
 	return ipmr_cache_find_any_parent(mrt, vifi);
 }
+#endif
 
 /*
  *	Allocate a multicast cache entry
@@ -1904,8 +1940,15 @@ forward:
 				struct sk_buff *skb2 = skb_clone(skb, GFP_ATOMIC);
 
 				if (skb2)
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+				{
+					blog_clone(skb, blog_ptr(skb2));
+#endif
 					ipmr_queue_xmit(net, mrt, skb2, cache,
 							psend);
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+				}
+#endif
 			}
 			psend = ct;
 		}
@@ -1997,6 +2040,27 @@ int ip_mr_input(struct sk_buff *skb)
 		    }
 	}
 
+#if defined(CONFIG_BCM_KF_MROUTE)
+	/* mroute should not apply to IGMP traffic
+	   in addition it does not make sense for TCP protocol to be used
+	   for multicast so just check for UDP */
+	cache = NULL;
+	if( ip_hdr(skb)->protocol == IPPROTO_UDP )
+	{
+		/* Don't forward the multicast stream with the dest port == 0 */
+		struct udphdr *uh = udp_hdr(skb);
+		if(ntohs(uh->dest) == 0)
+		{	
+			goto dont_forward;
+		}
+        
+		vifi_t vifi = ipmr_find_vif(mrt, skb->dev);
+		if ( vifi >= 0 )
+		{
+			cache = ipmr_cache_find_parent(mrt, ip_hdr(skb)->saddr, ip_hdr(skb)->daddr, vifi);
+		}
+	}
+#else
 	/* already under rcu_read_lock() */
 	cache = ipmr_cache_find(mrt, ip_hdr(skb)->saddr, ip_hdr(skb)->daddr);
 	if (!cache) {
@@ -2006,7 +2070,7 @@ int ip_mr_input(struct sk_buff *skb)
 			cache = ipmr_cache_find_any(mrt, ip_hdr(skb)->daddr,
 						    vif);
 	}
-
+#endif
 	/*
 	 *	No usable cache entry
 	 */
@@ -2039,13 +2103,29 @@ int ip_mr_input(struct sk_buff *skb)
 	read_unlock(&mrt_lock);
 
 	if (local)
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+	{
+		/* free blog if present */
+		blog_free(skb, blog_free_reason_ipmr_local);
+#endif
 		return ip_local_deliver(skb);
 
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+	}
+#endif
 	return 0;
 
 dont_forward:
 	if (local)
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+	{
+		/* free blog if present */
+		blog_free(skb, blog_free_reason_ipmr_local);
+#endif
 		return ip_local_deliver(skb);
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+	}
+#endif
 	kfree_skb(skb);
 	return 0;
 }
@@ -2196,9 +2276,15 @@ static int __ipmr_fill_mroute(struct mr_table *mrt, struct sk_buff *skb,
 	return 1;
 }
 
+#if defined(CONFIG_BCM_KF_MROUTE)
+int ipmr_get_route(struct net *net, struct sk_buff *skb,
+		   __be32 saddr, __be32 daddr,
+		   struct rtmsg *rtm, int nowait, int ifIndex)
+#else
 int ipmr_get_route(struct net *net, struct sk_buff *skb,
 		   __be32 saddr, __be32 daddr,
 		   struct rtmsg *rtm, int nowait)
+#endif
 {
 	struct mfc_cache *cache;
 	struct mr_table *mrt;
@@ -2209,6 +2295,33 @@ int ipmr_get_route(struct net *net, struct sk_buff *skb,
 		return -ENOENT;
 
 	rcu_read_lock();
+#if defined(CONFIG_BCM_KF_MROUTE)
+	/* mroute should not apply to IGMP traffic
+	   in addition it does not make sense for TCP protocol to be used
+	   for multicast so just check for UDP */
+	cache = NULL;
+	if ((NULL == skb->dev) || (ip_hdr(skb) == NULL) ||
+	    (ip_hdr(skb)->protocol == IPPROTO_UDP))
+	{
+		/* Don't forward the multicast stream with the dest port == 0 */
+		struct udphdr *uh = udp_hdr(skb);
+		if(ntohs(uh->dest) == 0)
+		{	
+			return -EFAULT;
+		}
+		
+		struct net_device *dev = dev_get_by_index(net, ifIndex);
+		if (dev) 
+		{
+			vifi_t vifi = ipmr_find_vif(mrt, dev);
+			if ( vifi >= 0 )
+			{
+				cache = ipmr_cache_find_parent(mrt, saddr, daddr, vifi);
+			}
+			dev_put(dev);
+		}
+	}
+#else
 	cache = ipmr_cache_find(mrt, saddr, daddr);
 	if (!cache && skb->dev) {
 		int vif = ipmr_find_vif(mrt, skb->dev);
@@ -2216,6 +2329,7 @@ int ipmr_get_route(struct net *net, struct sk_buff *skb,
 		if (vif >= 0)
 			cache = ipmr_cache_find_any(mrt, daddr, vif);
 	}
+#endif
 	if (!cache) {
 		struct sk_buff *skb2;
 		struct iphdr *iph;

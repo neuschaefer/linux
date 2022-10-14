@@ -87,13 +87,34 @@ static inline u64 arch_counter_get_cntpct(void)
 	return cval;
 }
 
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX) && defined(LVCNT)
+static u64 lvcnt=0;
+#endif
+
 static inline u64 arch_counter_get_cntvct(void)
 {
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX) && defined(LVCNT)
+	u64 cval, snap_lvcnt;
+	snap_lvcnt = lvcnt;
+	isb();
+	asm volatile("mrrc p15, 1, %Q0, %R0, c14" : "=r" (lvcnt));
+	cval = lvcnt; 
+	if(snap_lvcnt > cval)
+	{
+	    if((snap_lvcnt - cval) < (u64)(1ULL << 63))
+	    {
+		lvcnt = snap_lvcnt;
+		cval = snap_lvcnt;
+	    }
+	}
+	return cval;
+#else
 	u64 cval;
 
 	isb();
 	asm volatile("mrrc p15, 1, %Q0, %R0, c14" : "=r" (cval));
 	return cval;
+#endif
 }
 
 static inline u32 arch_timer_get_cntkctl(void)

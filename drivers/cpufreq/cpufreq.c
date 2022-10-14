@@ -526,8 +526,13 @@ static ssize_t show_scaling_cur_freq(struct cpufreq_policy *policy, char *buf)
 	return ret;
 }
 
+#if defined(CONFIG_BCM_KF_BCM63XX_CPUFREQ)
+int cpufreq_set_policy(struct cpufreq_policy *policy,
+				struct cpufreq_policy *new_policy);
+#else
 static int cpufreq_set_policy(struct cpufreq_policy *policy,
 				struct cpufreq_policy *new_policy);
+#endif
 
 /**
  * cpufreq_per_cpu_attr_write() / store_##file_name() - sysfs write access
@@ -1267,6 +1272,7 @@ static int __cpufreq_add_dev(struct device *dev, struct subsys_interface *sif)
 		policy->user_policy.policy = policy->policy;
 		policy->user_policy.governor = policy->governor;
 	}
+
 	up_write(&policy->rwsem);
 
 	kobject_uevent(&policy->kobj, KOBJ_ADD);
@@ -2149,8 +2155,13 @@ EXPORT_SYMBOL(cpufreq_get_policy);
  * policy : current policy.
  * new_policy: policy to be set.
  */
+#if defined(CONFIG_BCM_KF_BCM63XX_CPUFREQ)
+int cpufreq_set_policy(struct cpufreq_policy *policy,
+				struct cpufreq_policy *new_policy)
+#else
 static int cpufreq_set_policy(struct cpufreq_policy *policy,
 				struct cpufreq_policy *new_policy)
+#endif
 {
 	struct cpufreq_governor *old_gov;
 	int ret;
@@ -2240,6 +2251,87 @@ static int cpufreq_set_policy(struct cpufreq_policy *policy,
 	pr_debug("governor: change or update limits\n");
 	return __cpufreq_governor(policy, CPUFREQ_GOV_LIMITS);
 }
+
+#if defined(CONFIG_BCM_KF_BCM63XX_CPUFREQ)
+EXPORT_SYMBOL(cpufreq_set_policy);
+
+// set governor, and if supported, set speed to specified fraction of max
+int cpufreq_set_speed(const char *govstr, int fraction)
+{
+	struct cpufreq_policy *data, policy;
+	struct cpufreq_governor *governor;
+	unsigned cpu;
+	int rc;
+
+	governor = find_governor(govstr);
+	if (governor == 0) {
+		pr_warn("governor %s unavailable\n", govstr);
+		return -ENOENT;
+	}
+
+	cpu = get_cpu();
+	data = cpufreq_cpu_get(cpu);
+	put_cpu();
+	if (data == 0) {
+		pr_warn("policy unavailable\n");
+		return -ENOENT;
+	}
+	policy = *data;
+	policy.governor = governor;
+
+	down_write(&data->rwsem);
+	rc = cpufreq_set_policy(data, &policy);
+	up_write(&data->rwsem);
+	if (rc == 0) {
+		data->user_policy.policy = data->policy;
+		data->user_policy.governor = data->governor;
+		if (fraction && data->governor->store_setspeed) {
+			data->governor->store_setspeed(data, data->max / fraction);
+		}
+	}
+	cpufreq_cpu_put(data);
+	return rc;
+}
+EXPORT_SYMBOL(cpufreq_set_speed);
+
+// return current frequency (0 if dynamic) and max frequency
+unsigned cpufreq_get_freq_max(unsigned *max)
+{
+	struct cpufreq_policy *data;
+	unsigned cpu, freq = 0;
+
+	cpu = get_cpu();
+	data = cpufreq_cpu_get(cpu);
+	put_cpu();
+	if (max) *max = data->max;
+	if (data->governor && data->governor->store_setspeed) {
+		freq = data->cur;
+	}
+	cpufreq_cpu_put(data);
+
+	return freq;
+}
+EXPORT_SYMBOL(cpufreq_get_freq_max);
+
+// set maximum frequency for governor
+// [ XXX also set current frequency for userspace governor? ]
+void cpufreq_set_freq_max(unsigned maxdiv)
+{
+	struct cpufreq_policy *data;
+	unsigned cpu;
+
+	cpu = get_cpu();
+	data = cpufreq_cpu_get(cpu);
+	put_cpu();
+
+	if (data) {
+		data->user_policy.max = data->cpuinfo.max_freq / (maxdiv ?: 1);
+		cpufreq_update_policy(data->cpu);
+		cpufreq_cpu_put(data);
+	}
+}
+EXPORT_SYMBOL(cpufreq_set_freq_max);
+#endif
 
 /**
  *	cpufreq_update_policy - re-evaluate an existing cpufreq policy

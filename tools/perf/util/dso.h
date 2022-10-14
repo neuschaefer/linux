@@ -220,6 +220,14 @@ bool is_kernel_module(const char *pathname);
 bool decompress_to_file(const char *ext, const char *filename, int output_fd);
 bool dso__needs_decompress(struct dso *dso);
 
+#define IGNORE_BCM_KF_EXCEPTION
+#if 1 // defined(CONFIG_BCM_KF_MISC_BACKPORTS)
+int dso__decompress_kmodule_path(struct dso *dso, const char *name,
+				 char *pathname, size_t len);
+#define KMOD_DECOMP_NAME  "/tmp/perf-kmod-XXXXXX"
+#define KMOD_DECOMP_LEN   sizeof(KMOD_DECOMP_NAME)
+#endif
+
 struct kmod_path {
 	char *name;
 	char *ext;

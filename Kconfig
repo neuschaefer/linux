@@ -9,3 +9,16 @@ config SRCARCH
 	option env="SRCARCH"
 
 source "arch/$SRCARCH/Kconfig"
+
+#IGNORE_BCM_KF_EXCEPTION
+
+menu "Broadcom Specific Configurations"
+
+source "Kconfig.bcm_kf"
+source "Kconfig.bcm"
+
+endmenu
+
+config BCM_IN_KERNEL
+	bool
+	default y

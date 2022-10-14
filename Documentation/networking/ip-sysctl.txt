@@ -223,6 +223,17 @@ tcp_base_mss - INTEGER
 	Path MTU discovery (MTU probing).  If MTU probing is enabled,
 	this is the initial MSS used by the connection.
 
+#if defined(CONFIG_BCM_KF_MISC_BACKPORTS)
+/* CVE-2019-11479 */
+tcp_min_snd_mss - INTEGER
+	TCP SYN and SYNACK messages usually advertise an ADVMSS option,
+	as described in RFC 1122 and RFC 6691.
+	If this ADVMSS option is smaller than tcp_min_snd_mss,
+	it is silently capped to tcp_min_snd_mss.
+
+	Default : 48 (at least 8 bytes of payload per segment)
+#endif
+
 tcp_congestion_control - STRING
 	Set the congestion control algorithm to be used for new
 	connections. The algorithm "reno" is always available, but
@@ -675,6 +686,20 @@ tcp_challenge_ack_limit - INTEGER
 	in RFC 5961 (Improving TCP's Robustness to Blind In-Window Attacks)
 	Default: 100
 
+#if defined(CONFIG_BCM_MPTCP) && defined(CONFIG_BCM_KF_MPTCP)
+MPTCP variables:
+
+mptcp_enabled - INTEGER
+	Enable or disable Multipath TCP for new connections.
+	Possible values are:
+
+	0: Multipath TCP is disabled on all TCP-sockets that are newly created.
+	1: Multipath TCP is enabled by default on all new TCP-sockets. Note that
+	   existing sockets in LISTEN-state will still use regular TCP.
+	2: Enables Multipath TCP only upon the request of the application
+	   throught the socket-option MPTCP_ENABLED.
+
+#endif
 UDP variables:
 
 udp_mem - vector of 3 INTEGERs: min, pressure, max

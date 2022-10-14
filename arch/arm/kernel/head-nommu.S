@@ -46,7 +46,11 @@ ENTRY(stext)
 	.arm
 ENTRY(stext)
 
+#if defined(CONFIG_BCM_KF_SPECTRE_PATCH) && defined(CONFIG_BCM_SPECTRE_PATCH_ENABLE)
+ THUMB(	badr	r9, 1f		)	@ Kernel is always entered in ARM.
+#else
  THUMB(	adr	r9, BSYM(1f)	)	@ Kernel is always entered in ARM.
+#endif
  THUMB(	bx	r9		)	@ If this is a Thumb-2 kernel,
  THUMB(	.thumb			)	@ switch to Thumb now.
  THUMB(1:			)
@@ -79,7 +83,11 @@ ENTRY(stext)
 #endif
 	ldr	r13, =__mmap_switched		@ address to jump to after
 						@ initialising sctlr
+#if defined(CONFIG_BCM_KF_SPECTRE_PATCH) && defined(CONFIG_BCM_SPECTRE_PATCH_ENABLE)
+	badr	lr, 1f				@ return (PIC) address
+#else
 	adr	lr, BSYM(1f)			@ return (PIC) address
+#endif
 	ldr	r12, [r10, #PROCINFO_INITFUNC]
 	add	r12, r12, r10
 	ret	r12
@@ -115,7 +123,11 @@ ENTRY(secondary_startup)
 	bl      __setup_mpu			@ Initialize the MPU
 #endif
 
+#if defined(CONFIG_BCM_KF_SPECTRE_PATCH) && defined(CONFIG_BCM_SPECTRE_PATCH_ENABLE)
+	badr	lr, __after_proc_init		@ return address
+#else
 	adr	lr, BSYM(__after_proc_init)	@ return address
+#endif
 	mov	r13, r12			@ __secondary_switched address
 	ldr	r12, [r10, #PROCINFO_INITFUNC]
 	add	r12, r12, r10

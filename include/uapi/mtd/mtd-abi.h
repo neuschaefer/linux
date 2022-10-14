@@ -103,6 +103,9 @@ struct mtd_write_req {
 #define MTD_BIT_WRITEABLE	0x800	/* Single bits can be flipped */
 #define MTD_NO_ERASE		0x1000	/* No erase necessary */
 #define MTD_POWERUP_LOCK	0x2000	/* Always locked after reset */
+#if defined(CONFIG_BCM_KF_MTD_BCMNAND)
+#define MTD_NAND_NOP1		0x10000000	/* SLC NAND that only supports single page write (NOP=1) */
+#endif
 
 /* Some common devices / combinations of capabilities */
 #define MTD_CAP_ROM		0

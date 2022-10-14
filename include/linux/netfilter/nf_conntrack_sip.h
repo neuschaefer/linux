@@ -9,6 +9,7 @@
 #define SIP_PORT	5060
 #define SIP_TIMEOUT	3600
 
+
 struct nf_ct_sip_master {
 	unsigned int	register_cseq;
 	unsigned int	invite_cseq;
@@ -194,6 +195,5 @@ int ct_sip_get_sdp_header(const struct nf_conn *ct, const char *dptr,
 			  enum sdp_header_types type,
 			  enum sdp_header_types term,
 			  unsigned int *matchoff, unsigned int *matchlen);
-
 #endif /* __KERNEL__ */
 #endif /* __NF_CONNTRACK_SIP_H__ */

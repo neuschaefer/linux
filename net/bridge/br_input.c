@@ -21,6 +21,20 @@
 #include <linux/export.h>
 #include <linux/rculist.h>
 #include "br_private.h"
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+#include <linux/blog.h>
+#endif
+#if defined(CONFIG_BCM_KF_WL)
+#if defined(PKTC)
+#include <osl.h>
+#include <wl_pktc.h>
+unsigned long (*wl_pktc_req_hook)(int req_id, unsigned long param0, unsigned long param1, unsigned long param2) = NULL;
+EXPORT_SYMBOL(wl_pktc_req_hook);
+unsigned long (*dhd_pktc_req_hook)(int req_id, unsigned long param0, unsigned long param1, unsigned long param2) = NULL;
+EXPORT_SYMBOL(dhd_pktc_req_hook);
+#endif /* PKTC */
+#include <linux/bcm_skb_defines.h>
+#endif
 
 /* Hook for brouter */
 br_should_route_hook_t __rcu *br_should_route_hook __read_mostly;
@@ -32,6 +46,12 @@ static int br_pass_frame_up(struct sk_buff *skb)
 	struct net_bridge *br = netdev_priv(brdev);
 	struct pcpu_sw_netstats *brstats = this_cpu_ptr(br->stats);
 	struct net_port_vlans *pv;
+
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+	blog_lock();
+	blog_link(IF_DEVICE, blog_ptr(skb), (void*)br->dev, DIR_RX, skb->len);
+	blog_unlock();
+#endif
 
 	u64_stats_update_begin(&brstats->syncp);
 	brstats->rx_packets++;
@@ -137,6 +157,22 @@ int br_handle_frame_finish(struct sock *sk, struct sk_buff *skb)
 	if (!br_allowed_ingress(p->br, nbp_get_vlan_info(p), skb, &vid))
 		goto out;
 
+#if defined(CONFIG_BCM_KF_VLAN_AGGREGATION) && defined(CONFIG_BCM_VLAN_AGGREGATION)
+#if defined(CONFIG_BCM_KF_VLAN) && (defined(CONFIG_BCM_VLAN) || defined(CONFIG_BCM_VLAN_MODULE))
+	if (skb->vlan_count)
+ 		vid = (skb->vlan_header[0] >> 16) & VLAN_VID_MASK;
+	else
+#endif /* CONFIG_BCM_VLAN) */
+	/* 
+	*  dev.c/__netif_receive_skb(): if proto == ETH_P_8021Q
+	*  call vlan_untag() to remove tag and save vid in skb->vlan_tci
+	*/
+	if (skb_vlan_tag_present(skb))
+		vid = skb->vlan_tci & VLAN_VID_MASK;
+	else if ( vlan_eth_hdr(skb)->h_vlan_proto == htons(ETH_P_8021Q) )
+		vid = ntohs(vlan_eth_hdr(skb)->h_vlan_TCI) & VLAN_VID_MASK;
+#endif
+
 	/* insert into forwarding database after filtering to avoid spoofing */
 	br = p->br;
 	if (p->flags & BR_LEARNING)
@@ -146,7 +182,14 @@ int br_handle_frame_finish(struct sock *sk, struct sk_buff *skb)
 	    br_multicast_rcv(br, p, skb, vid))
 		goto drop;
 
+#if defined(CONFIG_BCM_KF_WL)
+	if ((p->state == BR_STATE_LEARNING) &&
+	    (skb->protocol != htons(0x886c) /*ETHER_TYPE_BRCM*/) &&
+	    (skb->protocol != htons(0x888e) /*ETHER_TYPE_802_1X*/) &&
+	    (skb->protocol != htons(0x88c7) /*ETHER_TYPE_802_1X_PREAUTH*/))
+#else
 	if (p->state == BR_STATE_LEARNING)
+#endif
 		goto drop;
 
 	BR_INPUT_SKB_CB(skb)->brdev = br->dev;
@@ -161,6 +204,24 @@ int br_handle_frame_finish(struct sock *sk, struct sk_buff *skb)
 
 	if (IS_ENABLED(CONFIG_INET) && skb->protocol == htons(ETH_P_ARP))
 		br_do_proxy_arp(skb, br, vid, p);
+
+#if (defined(CONFIG_BCM_MCAST) || defined(CONFIG_BCM_MCAST_MODULE)) && defined(CONFIG_BCM_KF_MCAST)
+	if ( br_bcm_mcast_receive != NULL )
+	{
+		int rv = br_bcm_mcast_receive(br->dev->ifindex, skb, 0);
+		if ( rv < 0 )
+		{
+			/* there was an error with the packet */
+			goto drop;
+		}
+		else if ( rv > 0 )
+		{
+			/* the packet was consumed */
+			goto out;
+		}
+		/* continue */
+	}
+#endif
 
 	if (is_broadcast_ether_addr(dest)) {
 		skb2 = skb;
@@ -181,13 +242,161 @@ int br_handle_frame_finish(struct sock *sk, struct sk_buff *skb)
 
 		unicast = false;
 		br->dev->stats.multicast++;
+#if !(defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG))
 	} else if ((dst = __br_fdb_get(br, dest, vid)) &&
 			dst->is_local) {
 		skb2 = skb;
 		/* Do not forward the packet since it's local. */
 		skb = NULL;
 	}
+#else
+	} else {
+		struct net_bridge_fdb_entry *src;
 
+		dst = __br_fdb_get(br, dest, vid);
+		src = __br_fdb_get(br, eth_hdr(skb)->h_source, vid);
+		blog_lock();
+		if (src)
+			blog_link(BRIDGEFDB, blog_ptr(skb), (void*)src, BLOG_PARAM1_SRCFDB, 0);
+
+		if (dst)
+			blog_link(BRIDGEFDB, blog_ptr(skb), (void*)dst, BLOG_PARAM1_DSTFDB, 0);
+
+		blog_unlock();
+
+#if defined(PKTC)
+		/* wlan pktc */
+		if ((dst != NULL) && (dst->dst != NULL) && (!dst->is_local)) {
+#if defined(CONFIG_BCM_KF_WL)
+			u8 from_wl_to_switch=0, from_switch_to_wl=0, from_wlan_to_wlan=0;
+			BlogPhy_t srcPhyType, dstPhyType;
+			uint32_t chainIdx;
+			uint16_t dst_dev_has_vlan = 0;
+			uint32_t pktc_tx_enabled = wl_pktc_req_hook ? 
+						wl_pktc_req_hook(PKTC_TBL_GET_TX_MODE, 0, 0, 0) : 0;
+
+			src = __br_fdb_get(br, eth_hdr(skb)->h_source, vid);
+			if (unlikely(src == NULL) || unlikely(src->dst == NULL))
+				goto next;
+
+			srcPhyType = BLOG_GET_PHYTYPE(src->dst->dev->path.hw_port_type);
+			dstPhyType = BLOG_GET_PHYTYPE(dst->dst->dev->path.hw_port_type);
+
+			if ((srcPhyType == BLOG_WLANPHY) &&
+			    (dstPhyType == BLOG_ENETPHY)) {
+				from_wl_to_switch = 1;
+			} else if ((srcPhyType == BLOG_ENETPHY || srcPhyType == BLOG_XTMPHY || srcPhyType == BLOG_EPONPHY || srcPhyType == BLOG_GPONPHY ||
+				((src->dst->dev->rtnl_link_ops != NULL) && (strstr(src->dst->dev->rtnl_link_ops->kind, "gre") != NULL))) &&
+ 				(dstPhyType == BLOG_WLANPHY) && pktc_tx_enabled)
+  			{ 
+				from_switch_to_wl = 1;
+   			}
+
+#if defined (CONFIG_BCM_DHD_RUNNER) && defined (CONFIG_BCM_WIFI_FORWARDING_DRV_MODULE) || defined(CONFIG_BCM947189) || defined(CONFIG_BCM_ARCHER_WLAN)
+			else if((srcPhyType == BLOG_WLANPHY) && (dstPhyType == BLOG_WLANPHY))
+				from_wlan_to_wlan = 1;
+#endif
+#if defined(CONFIG_BCM_KF_WANDEV)
+
+			if ((dst->dst->dev->priv_flags & IFF_BCM_VLAN))
+			{
+			    int len = strlen(dst->dst->dev->name);
+			    dst_dev_has_vlan = 1;
+
+			    /* WLAN Rx: Check dev is default LAN side VLAN (for ex:eth1.0 or eth2.0) 
+                               that doesn't add/remove VLAN tag. So still create PKTC for it. 
+			       WLAN Tx: Allow to create PKTC as VLAN tag modifications are performed by the accelerator(fcache/fap/runner).
+			    */
+
+			    if ((!(dst->dst->dev->priv_flags & IFF_WANDEV)) && (len > 3))
+			    {
+					if (( from_wl_to_switch && (dst->dst->dev->name[len-2] == '.') && (dst->dst->dev->name[len-1] == '0') )
+						|| from_switch_to_wl )
+					{
+						dst_dev_has_vlan = 0;
+					}
+			    }
+			}
+
+			if ((from_wl_to_switch || from_switch_to_wl || from_wlan_to_wlan) &&
+			    !(dst->dst->dev->priv_flags & IFF_WANDEV) &&
+			    !(dst_dev_has_vlan)) {
+
+			/* Also check for non-WAN cases.
+			 * For the Rx direction, VLAN cases are allowed as long 
+			 * as the packets are untagged.
+			 *
+			 * Tagged packets are not forwarded through the chaining 
+			 * path by WLAN driver. Tagged packets go through the
+			 * flowcache path.
+			 * see wlc_sendup_chain() function for reference.
+			 *
+			 * For the Tx direction, there are no VLAN interfaces 
+			 * created on wl device when LAN_VLAN flag is enabled 
+			 * in the build.
+			 *
+			 * Get the root dest device and make sure that we 
+			 * are always transmitting to a root device */
+
+				struct net_device *root_dst_dev_p = dst->dst->dev;
+				/* Get the root destination device */
+				while (!netdev_path_is_root(root_dst_dev_p)) {
+					root_dst_dev_p = netdev_path_next_dev(root_dst_dev_p);
+				}
+ 
+				/* Update chaining table for DHD on the wl to switch direction only */
+				if ( (    from_wl_to_switch
+#if defined(CONFIG_BCM947189)
+  			   	      || from_wlan_to_wlan
+#endif
+				    )
+				    && (dhd_pktc_req_hook != NULL)) 
+				{
+					dhd_pktc_req_hook(PKTC_TBL_UPDATE,
+								     (unsigned long)&(dst->addr.addr[0]),
+								     (unsigned long)root_dst_dev_p, 0);
+				}
+			 
+			 	/* Update chaining table for WL (NIC driver) */
+				chainIdx = wl_pktc_req_hook ? 
+								wl_pktc_req_hook(PKTC_TBL_UPDATE,
+								     (unsigned long)&(dst->addr.addr[0]),
+								     (unsigned long)root_dst_dev_p, 0) : PKTC_INVALID_CHAIN_IDX;
+				if (chainIdx != PKTC_INVALID_CHAIN_IDX) {
+					/* Update chainIdx in blog
+					 * chainEntry->tx_dev will always be NOT 
+					 * NULL as we just added that above */
+					if (skb->blog_p != NULL) 
+					{
+						if (from_switch_to_wl || from_wlan_to_wlan)
+						{
+							skb->blog_p->wfd.nic_ucast.is_tx_hw_acc_en = 1;
+
+							/* in case of flow from WLAN to WLAN the flow will
+							 *  be open in Runner only if is_rx_hw_acc_en in DHD
+							 */
+							if (from_wlan_to_wlan && (0 == skb->blog_p->rnr.is_rx_hw_acc_en))
+								skb->blog_p->wfd.nic_ucast.is_tx_hw_acc_en = 0; 
+
+							skb->blog_p->wfd.nic_ucast.is_chain = 1;
+							skb->blog_p->wfd.nic_ucast.wfd_idx = ((chainIdx & PKTC_WFD_IDX_BITMASK) >> PKTC_WFD_IDX_BITPOS);
+							skb->blog_p->wfd.nic_ucast.chain_idx = chainIdx;
+						}
+					}
+				}
+			}
+#endif /* CONFIG_BCM_KF_WANDEV */
+#endif
+		}
+next:
+#endif /* PKTC */
+		if ((dst != NULL) && dst->is_local) {
+			skb2 = skb;
+			/* Do not forward the packet since it's local. */
+			skb = NULL;
+		}
+	}
+#endif
 	if (skb) {
 		if (dst) {
 			dst->used = jiffies;
@@ -213,9 +422,17 @@ static int br_handle_local_finish(struct sock *sk, struct sk_buff *skb)
 	struct net_bridge_port *p = br_port_get_rcu(skb->dev);
 	u16 vid = 0;
 
+#if defined(CONFIG_BCM_KF_BYPASS_STP_FOR_LOCAL)
+	if (p->state != BR_STATE_DISABLED) {
+		/* check if vlan is allowed, to avoid spoofing */
+		if (p->flags & BR_LEARNING && br_should_learn(p, skb, &vid))
+			br_fdb_update(p->br, p, eth_hdr(skb)->h_source, vid, false);
+	}
+#else 
 	/* check if vlan is allowed, to avoid spoofing */
 	if (p->flags & BR_LEARNING && br_should_learn(p, skb, &vid))
 		br_fdb_update(p->br, p, eth_hdr(skb)->h_source, vid, false);
+#endif /* CONFIG_BCM_KF_BYPASS_STP_FOR_LOCAL */
 	return 0;	 /* process further */
 }
 
@@ -242,6 +459,13 @@ rx_handler_result_t br_handle_frame(struct sk_buff **pskb)
 
 	p = br_port_get_rcu(skb->dev);
 
+#if defined(CONFIG_BCM_KF_WANDEV)
+        if (!p)
+        {
+            kfree_skb(skb);
+            return RX_HANDLER_CONSUMED;
+        }
+#endif
 	if (unlikely(is_link_local_ether_addr(dest))) {
 		u16 fwd_mask = p->br->group_fwd_mask_required;
 
@@ -288,8 +512,56 @@ rx_handler_result_t br_handle_frame(struct sk_buff **pskb)
 	}
 
 forward:
+#if defined(CONFIG_BCM_KF_IEEE1905) && defined(CONFIG_BCM_IEEE1905)
+	/* allow broute to forward packets to the stack in any STP state */
+	rhook = rcu_dereference(br_should_route_hook);
+	if (rhook) {
+		if ((*rhook)(skb)) {
+			*pskb = skb;
+			if ((skb->protocol == htons(0x893a)) ||
+			    (skb->protocol == htons(0x8912)) ||
+			    (skb->protocol == htons(0x88e1)))
+				br_handle_local_finish(NULL, skb);
+
+			return RX_HANDLER_PASS;
+		} else if (skb->protocol == htons(0x893a) &&
+			   (skb->pkt_type == PACKET_MULTICAST))
+			/* do not bridge multicast 1905 packets when 1905 is compiled */
+			goto drop;
+
+		dest = eth_hdr(skb)->h_dest;
+	}
+#endif
+
+#if defined(CONFIG_BCM_KF_WL)
+	if (( (skb->protocol == htons(0x886c) /*ETHER_TYPE_BRCM*/) ||
+	       (skb->protocol == htons(0x888e) /*ETHER_TYPE_802_1X*/) ||
+	       (skb->protocol == htons(0x88c7) /*ETHER_TYPE_802_1X_PREAUTH*/) ) &&
+	    (p->state != BR_STATE_FORWARDING) && (p->state != BR_STATE_DISABLED)) {
+		/* force to forward brcm_type event packet */
+		NF_HOOK(NFPROTO_BRIDGE, NF_BR_PRE_ROUTING, NULL, skb, skb->dev, NULL,
+			br_handle_frame_finish);
+		return RX_HANDLER_CONSUMED;
+	}
+#endif
+
 	switch (p->state) {
+#if defined(CONFIG_BCM_KF_BYPASS_STP_FOR_LOCAL)
+	case BR_STATE_DISABLED:
+		if (ether_addr_equal(p->br->dev->dev_addr, dest))
+			skb->pkt_type = PACKET_HOST;
+
+		if (NF_HOOK(NFPROTO_BRIDGE, NF_BR_PRE_ROUTING, NULL, skb, skb->dev, NULL,
+			br_handle_local_finish))
+			break;
+
+		BR_INPUT_SKB_CB(skb)->brdev = p->br->dev;
+		br_pass_frame_up(skb);
+		break;
+
+#endif /* CONFIG_BCM_KF_BYPASS_STP_FOR_LOCAL */
 	case BR_STATE_FORWARDING:
+#if !defined(CONFIG_BCM_KF_IEEE1905) || !defined(CONFIG_BCM_IEEE1905)
 		rhook = rcu_dereference(br_should_route_hook);
 		if (rhook) {
 			if ((*rhook)(skb)) {
@@ -298,6 +570,7 @@ forward:
 			}
 			dest = eth_hdr(skb)->h_dest;
 		}
+#endif
 		/* fall through */
 	case BR_STATE_LEARNING:
 		if (ether_addr_equal(p->br->dev->dev_addr, dest))

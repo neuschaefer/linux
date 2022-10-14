@@ -217,6 +217,9 @@ static void cpu_idle_loop(void)
 		 */
 
 		__current_set_polling();
+#if defined CONFIG_BCM_KF_INTERACTIVE && defined CONFIG_CPU_FREQ_GOV_INTERACTIVE
+		idle_notifier_call_chain(IDLE_START);
+#endif
 		tick_nohz_idle_enter();
 
 		while (!need_resched()) {
@@ -261,6 +264,9 @@ static void cpu_idle_loop(void)
 		 */
 		preempt_set_need_resched();
 		tick_nohz_idle_exit();
+#if defined CONFIG_BCM_KF_INTERACTIVE && defined CONFIG_CPU_FREQ_GOV_INTERACTIVE
+		idle_notifier_call_chain(IDLE_END);
+#endif
 		__current_clr_polling();
 
 		/*

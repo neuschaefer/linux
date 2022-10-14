@@ -80,6 +80,9 @@ struct ip_mc_list {
 	unsigned int		sfmode;
 	struct ip_sf_list	*sources;
 	struct ip_sf_list	*tomb;
+#if defined(CONFIG_BCM_KF_MCAST_GR_SUPPRESSION)
+	unsigned int		osfmode;
+#endif
 	unsigned long		sfcount[2];
 	union {
 		struct ip_mc_list *next;

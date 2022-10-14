@@ -50,7 +50,20 @@ struct nand_flash_dev nand_flash_ids[] = {
 		{ .id = {0xad, 0xde, 0x94, 0xda, 0x74, 0xc4} },
 		  SZ_8K, SZ_8K, SZ_2M, 0, 6, 640, NAND_ECC_INFO(40, SZ_1K),
 		  4 },
+#if defined(CONFIG_BCM_KF_MTD_BCMNAND)
+	/* list all the NOP=1 SLC device here */
+	{"K9F1G08U0E 128MiB 3.3V 8-bit",
+		{ .id = {0xec, 0xf1, 0x00, 0x95, 0x41} },
+		  SZ_2K, SZ_128, SZ_128K, NAND_PAGE_NOP1, 5, 64, NAND_ECC_INFO(1, SZ_512) },
 
+	/* list all the device here with non default timing parameter */
+	{"HY27UF082G2A 256MiB 3.3V 8-bit",
+		{ .id = {0xad, 0xda, 0x80, 0x1d, 0x00} },
+		  SZ_2K, SZ_256, SZ_128K, 0, 5, 64, NAND_ECC_INFO(1, SZ_512), 0, 0x00420000, 0x00000005 },
+	{"HY27U4G8F2D ??512MiB?? 3.3V 8-bit", /* No datasheet available.. best guess */
+		{ .id = {0xad, 0xdc} },
+		  SZ_2K, SZ_512, SZ_128K, 0, 2, 64, NAND_ECC_INFO(1, SZ_512), 0, 0x00420000, 0x00000005 },
+#endif
 	LEGACY_ID_NAND("NAND 4MiB 5V 8-bit",   0x6B, 4, SZ_8K, SP_OPTIONS),
 	LEGACY_ID_NAND("NAND 4MiB 3,3V 8-bit", 0xE3, 4, SZ_8K, SP_OPTIONS),
 	LEGACY_ID_NAND("NAND 4MiB 3,3V 8-bit", 0xE5, 4, SZ_8K, SP_OPTIONS),
@@ -159,7 +172,9 @@ struct nand_flash_dev nand_flash_ids[] = {
 	EXTENDED_ID_NAND("NAND 64GiB 3,3V 8-bit",  0x3E, 65536, LP_OPTIONS),
 	EXTENDED_ID_NAND("NAND 64GiB 1,8V 16-bit", 0x2E, 65536, LP_OPTIONS16),
 	EXTENDED_ID_NAND("NAND 64GiB 3,3V 16-bit", 0x4E, 65536, LP_OPTIONS16),
-
+#if defined(CONFIG_BCM_KF_MTD_BCMNAND)
+	EXTENDED_ID_NAND("; set by driver",        0x00,     0, LP_OPTIONS), // generic SPI NAND device detection just to make Linux NAND driver happy
+#endif
 	{NULL}
 };
 

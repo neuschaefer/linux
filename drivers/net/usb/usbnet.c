@@ -46,6 +46,16 @@
 #include <linux/kernel.h>
 #include <linux/pm_runtime.h>
 
+#if (defined(CONFIG_BCM_KF_USBNET) && defined(CONFIG_BCM_USBNET_ACCELERATION) && defined(CONFIG_BLOG))
+#include <linux/nbuff.h> 
+#include <linux/blog.h>
+#endif
+
+#if (defined(CONFIG_BCM_KF_USBNET) && defined(CONFIG_BCM_USBNET_THREAD))
+#include <linux/kthread.h>
+#include <linux/bcm_realtime.h>
+#endif
+
 #define DRIVER_VERSION		"22-Aug-2005"
 
 
@@ -76,6 +86,13 @@
 
 // between wakeups
 #define UNLINK_TIMEOUT_MS	3
+
+#if (defined(CONFIG_BCM_KF_USBNET) && defined(CONFIG_BCM_USBNET_THREAD))
+
+#define USBNET_RX_BUDGET 64
+#define USBNET_PENDING_RX_SKB_THRESH_DEFAULT 64
+
+#endif
 
 /*-------------------------------------------------------------------------*/
 
@@ -323,6 +340,30 @@ void usbnet_skb_return (struct usbnet *dev, struct sk_buff *skb)
 		return;
 	}
 
+#if (defined(CONFIG_BCM_KF_USBNET) && defined(CONFIG_BCM_USBNET_ACCELERATION) && defined(CONFIG_BLOG))
+	if(skb->clone_fc_head == NULL)
+	{
+		/* Make sure fcache does not expand the skb->data if clone_fc_head
+		 * is not set by the dongle driver's(ex:rndis_host.c, asix.c etc..)
+		 * we expect dongle/class drivers using fcache to set minumun headroom
+		 * available for all packets in an aggregated skb by calling 
+		 * skb_clone_headers_set() before calling usbnet_skb_return.
+		 *
+		 * Ex:rndis based drivers have 8 bytes spacig between 2 packets in an
+		 * aggreated skb. we can call skb_clone_ headers_set(skb, 8) in
+		 * rndis_rx_fixup();
+		 * By setting this we are telling fcache or enet driver can expand
+		 * skb->data for upto 8 bytes. This is helpful to avoid packet
+		 * copy incase of LAN VLAN's, External Switch tag's  etc..
+		 *   
+		 */
+		skb_clone_headers_set(skb, 0);
+	}
+	if (PKT_DONE == blog_sinit(skb, skb->dev, TYPE_ETH, 0, BLOG_USBPHY)) {
+		return;
+	}
+#endif
+
 	skb->protocol = eth_type_trans (skb, dev->net);
 	dev->net->stats.rx_packets++;
 	dev->net->stats.rx_bytes += skb->len;
@@ -334,7 +375,19 @@ void usbnet_skb_return (struct usbnet *dev, struct sk_buff *skb)
 	if (skb_defer_rx_timestamp(skb))
 		return;
 
+#if (defined(CONFIG_BCM_KF_USBNET) && defined(CONFIG_BCM_USBNET_ACCELERATION) && defined(CONFIG_BLOG))
+
+#if defined(CONFIG_BCM_USBNET_THREAD)
+	local_bh_disable();
+	status = netif_receive_skb(skb);
+	local_bh_enable();
+#else
+	status = netif_receive_skb(skb);
+#endif
+
+#else
 	status = netif_rx (skb);
+#endif
 	if (status != NET_RX_SUCCESS)
 		netif_dbg(dev, rx_err, dev->net,
 			  "netif_rx status %d\n", status);
@@ -363,6 +416,13 @@ void usbnet_update_max_qlen(struct usbnet *dev)
 	default:
 		dev->rx_qlen = dev->tx_qlen = 4;
 	}
+
+#if (defined(CONFIG_BCM_KF_USBNET) && defined(CONFIG_BCM_USBNET_THREAD))
+	if(dev->rx_qlen < USBNET_RX_BUDGET)
+		dev->rx_qlen = USBNET_RX_BUDGET;
+
+	dev->pending_rx_skb_thresh = 2 * dev->rx_qlen;
+#endif
 }
 EXPORT_SYMBOL_GPL(usbnet_update_max_qlen);
 
@@ -411,6 +471,107 @@ static void __usbnet_queue_skb(struct sk_buff_head *list,
 	entry->state = state;
 }
 
+#if (defined(CONFIG_BCM_KF_USBNET) && defined(CONFIG_BCM_USBNET_THREAD))
+
+
+static inline int bcm_skb_queue_len(struct sk_buff_head *list)
+{
+	unsigned long flags;
+	__u32 qlen;
+
+	spin_lock_irqsave(&list->lock, flags);
+	qlen = list->qlen;
+	spin_unlock_irqrestore(&list->lock, flags);
+	return qlen;
+}
+
+static inline struct sk_buff *bcm_skb_done_dequeue(struct usbnet *dev)
+{
+	unsigned long flags;
+	struct sk_buff *result;
+
+	spin_lock_irqsave(&dev->done.lock, flags);
+	result = __skb_dequeue(&dev->done);
+	
+	if(result && (((struct skb_data *) result->cb)->state != tx_done))
+		dev->pending_rx_skb_count--;
+	
+	spin_unlock_irqrestore(&dev->done.lock, flags);
+	return result;
+}
+
+static void usbnet_bh (unsigned long param);
+
+
+static int usbnet_thread_func(void *thread_data)
+{
+	struct usbnet *dev =(struct usbnet *)thread_data;
+
+	while (1) {
+
+		wait_event_interruptible(dev->thread_wq, 
+				(bcm_skb_queue_len(&dev->done) | dev->usbnet_thread_resched 
+				 | kthread_should_stop()));
+
+		if(unlikely(kthread_should_stop()))
+		{
+			return 0;
+		}
+
+		/*clear all conditions */
+		dev->usbnet_thread_resched=0;
+
+		usbnet_bh((unsigned long)dev);
+
+		if (dev->usbnet_thread_resched || (bcm_skb_queue_len(&dev->done) >= 1)) {
+			//cond_resched();
+			yield();
+		} 
+	}
+	return 0;
+}
+
+static inline void usbnet_thread_wakeup(struct usbnet *dev)
+{
+	wake_up_interruptible(&dev->thread_wq);
+}
+
+static inline void usbnet_thread_schedule(struct usbnet *dev)
+{
+	dev->usbnet_thread_resched = 1;
+	usbnet_thread_wakeup(dev);
+}
+
+static void usbnet_bh_timer(unsigned long param)
+{
+	usbnet_thread_schedule((struct usbnet *)param);
+}
+
+struct task_struct *create_usbnet_thread(void *thread_data)
+{
+	struct task_struct *tsk;
+	struct sched_param param;
+
+	/*TODO fix thread name when multiple devices are present 
+      * this is just a cosmetic issue
+      */
+
+	tsk = kthread_create(usbnet_thread_func, thread_data, "usbnet_thread");
+
+	if (IS_ERR(tsk)) {
+		printk("usbnet_thread_free_task creation failed\n");
+		return NULL;
+	}
+
+	param.sched_priority = BCM_RTPRIO_DATA;
+	sched_setscheduler(tsk, SCHED_RR, &param);
+	wake_up_process(tsk);
+
+	printk("usbnet_thread created successfully \n");
+	return tsk;
+}
+#endif
+
 /*-------------------------------------------------------------------------*/
 
 /* some LK 2.4 HCDs oopsed if we freed or resubmitted urbs from
@@ -431,8 +592,21 @@ static enum skb_state defer_bh(struct usbnet *dev, struct sk_buff *skb,
 	spin_unlock(&list->lock);
 	spin_lock(&dev->done.lock);
 	__skb_queue_tail(&dev->done, skb);
+#if (defined(CONFIG_BCM_KF_USBNET) && defined(CONFIG_BCM_USBNET_THREAD))
+	/* restrict number of pending urbs/skb's to avoid irq flooding */
+	if((state != tx_done))
+	{
+		++dev->pending_rx_skb_count;
+		old_state = unlink_start;
+	}
+
+	if (dev->done.qlen == 1)
+		usbnet_thread_wakeup(dev);
+
+#else
 	if (dev->done.qlen == 1)
 		tasklet_schedule(&dev->bh);
+#endif
 	spin_unlock_irqrestore(&dev->done.lock, flags);
 	return old_state;
 }
@@ -447,12 +621,20 @@ void usbnet_defer_kevent (struct usbnet *dev, int work)
 	set_bit (work, &dev->flags);
 	if (!schedule_work (&dev->kevent)) {
 		if (net_ratelimit())
+#if defined(CONFIG_BCM_KF_MISC_BACKPORTS)
+			netdev_dbg(dev->net, "kevent %d may have been dropped\n", work);
+#else
 			netdev_err(dev->net, "kevent %d may have been dropped\n", work);
+#endif
 	} else {
 		netdev_dbg(dev->net, "kevent %d scheduled\n", work);
 	}
 }
 EXPORT_SYMBOL_GPL(usbnet_defer_kevent);
+
+#if (defined(CONFIG_BCM_KF_USBNET) && defined(CONFIG_BCM96838))
+int bcm_usb_hw_align_size = 1024;
+#endif
 
 /*-------------------------------------------------------------------------*/
 
@@ -472,13 +654,26 @@ static int rx_submit (struct usbnet *dev, struct urb *urb, gfp_t flags)
 		return -ENOLINK;
 	}
 
+#if (defined(CONFIG_BCM_KF_USBNET) && defined(CONFIG_BCM96838))
+	skb = __netdev_alloc_skb_ip_align(dev->net, size + bcm_usb_hw_align_size, flags);
+#else
 	skb = __netdev_alloc_skb_ip_align(dev->net, size, flags);
+#endif
+
 	if (!skb) {
 		netif_dbg(dev, rx_err, dev->net, "no rx skb\n");
 		usbnet_defer_kevent (dev, EVENT_RX_MEMORY);
 		usb_free_urb (urb);
 		return -ENOMEM;
 	}
+
+#if (defined(CONFIG_BCM_KF_USBNET) && defined(CONFIG_BCM96838))
+    {
+        unsigned int aligned_len = (unsigned int)skb->data;
+        aligned_len = bcm_usb_hw_align_size - (aligned_len & (bcm_usb_hw_align_size - 1));
+		skb_reserve(skb, aligned_len);
+    }
+#endif
 
 	entry = (struct skb_data *) skb->cb;
 	entry->urb = urb;
@@ -511,7 +706,11 @@ static int rx_submit (struct usbnet *dev, struct urb *urb, gfp_t flags)
 		default:
 			netif_dbg(dev, rx_err, dev->net,
 				  "rx submit, %d\n", retval);
-			tasklet_schedule (&dev->bh);
+#if (defined(CONFIG_BCM_KF_USBNET) && defined(CONFIG_BCM_USBNET_THREAD))
+			usbnet_thread_schedule(dev);
+#else
+			tasklet_schedule(&dev->bh);
+#endif
 			break;
 		case 0:
 			__usbnet_queue_skb(&dev->rxq, skb, rx_start);
@@ -527,7 +726,6 @@ static int rx_submit (struct usbnet *dev, struct urb *urb, gfp_t flags)
 	}
 	return retval;
 }
-
 
 /*-------------------------------------------------------------------------*/
 
@@ -556,7 +754,26 @@ static inline void rx_process (struct usbnet *dev, struct sk_buff *skb)
 	}
 
 done:
+#if (defined(CONFIG_BCM_KF_USBNET) && defined(CONFIG_BCM_USBNET_THREAD))
+#if 1
+	/* there is no need to queue the skb back to done queue just for freeing,
+	 * we can just call free here as we are in thread context 
+	 */
+
+	usb_free_urb (((struct skb_data *)skb->cb)->urb);
+	dev_kfree_skb (skb);
+#else
+	{
+		unsigned long flags;
+		spin_lock_irqsave(&dev->done.lock, flags);
+		__skb_queue_tail(&dev->done, skb);
+		dev->pending_rx_skb_count++ ;
+		spin_unlock_irqrestore(&dev->done.lock, flags);
+	}
+#endif
+#else
 	skb_queue_tail(&dev->done, skb);
+#endif
 }
 
 /*-------------------------------------------------------------------------*/
@@ -673,7 +890,11 @@ void usbnet_resume_rx(struct usbnet *dev)
 		num++;
 	}
 
+#if (defined(CONFIG_BCM_KF_USBNET) && defined(CONFIG_BCM_USBNET_THREAD))
+	usbnet_thread_schedule(dev);
+#else
 	tasklet_schedule(&dev->bh);
+#endif
 
 	netif_dbg(dev, rx_status, dev->net,
 		  "paused rx queue disabled, %d skbs requeued\n", num);
@@ -742,7 +963,11 @@ void usbnet_unlink_rx_urbs(struct usbnet *dev)
 {
 	if (netif_running(dev->net)) {
 		(void) unlink_urbs (dev, &dev->rxq);
+#if (defined(CONFIG_BCM_KF_USBNET) && defined(CONFIG_BCM_USBNET_THREAD))
+		usbnet_thread_schedule(dev);
+#else
 		tasklet_schedule(&dev->bh);
+#endif
 	}
 }
 EXPORT_SYMBOL_GPL(usbnet_unlink_rx_urbs);
@@ -817,7 +1042,11 @@ int usbnet_stop (struct net_device *net)
 	 */
 	dev->flags = 0;
 	del_timer_sync (&dev->delay);
+#if (defined(CONFIG_BCM_KF_USBNET) && defined(CONFIG_BCM_USBNET_THREAD))
+	/* no need to do anything here for now*/
+#else
 	tasklet_kill (&dev->bh);
+#endif
 	if (!pm)
 		usb_autopm_put_interface(dev->intf);
 
@@ -901,7 +1130,11 @@ int usbnet_open (struct net_device *net)
 	clear_bit(EVENT_RX_KILL, &dev->flags);
 
 	// delay posting reads until we're fully open
-	tasklet_schedule (&dev->bh);
+#if (defined(CONFIG_BCM_KF_USBNET) && defined(CONFIG_BCM_USBNET_THREAD))
+	usbnet_thread_schedule(dev);
+#else
+	tasklet_schedule(&dev->bh);
+#endif
 	if (info->manage_power) {
 		retval = info->manage_power(dev, 1);
 		if (retval < 0) {
@@ -1043,7 +1276,11 @@ static void __handle_link_change(struct usbnet *dev)
 		 */
 	} else {
 		/* submitting URBs for reading packets */
+#if (defined(CONFIG_BCM_KF_USBNET) && defined(CONFIG_BCM_USBNET_THREAD))
+		usbnet_thread_schedule(dev);
+#else
 		tasklet_schedule(&dev->bh);
+#endif
 	}
 
 	/* hard_mtu or rx_urb_size may change during link change */
@@ -1116,7 +1353,11 @@ fail_halt:
 					   status);
 		} else {
 			clear_bit (EVENT_RX_HALT, &dev->flags);
-			tasklet_schedule (&dev->bh);
+#if (defined(CONFIG_BCM_KF_USBNET) && defined(CONFIG_BCM_USBNET_THREAD))
+			usbnet_thread_schedule(dev);
+#else
+			tasklet_schedule(&dev->bh);
+#endif
 		}
 	}
 
@@ -1141,7 +1382,11 @@ fail_halt:
 			usb_autopm_put_interface(dev->intf);
 fail_lowmem:
 			if (resched)
-				tasklet_schedule (&dev->bh);
+#if (defined(CONFIG_BCM_KF_USBNET) && defined(CONFIG_BCM_USBNET_THREAD))
+				usbnet_thread_schedule(dev);
+#else
+				tasklet_schedule(&dev->bh);
+#endif
 		}
 	}
 
@@ -1237,7 +1482,11 @@ void usbnet_tx_timeout (struct net_device *net)
 	struct usbnet		*dev = netdev_priv(net);
 
 	unlink_urbs (dev, &dev->txq);
-	tasklet_schedule (&dev->bh);
+#if (defined(CONFIG_BCM_KF_USBNET) && defined(CONFIG_BCM_USBNET_THREAD))
+	usbnet_thread_schedule(dev);
+#else
+	tasklet_schedule(&dev->bh);
+#endif
 	/* this needs to be handled individually because the generic layer
 	 * doesn't know what is sufficient and could not restore private
 	 * information if a remedy of an unconditional reset were used.
@@ -1293,6 +1542,26 @@ netdev_tx_t usbnet_start_xmit (struct sk_buff *skb,
 	unsigned long		flags;
 	int retval;
 
+#if (defined(CONFIG_BCM_KF_USBNET) && defined(CONFIG_BCM_USBNET_ACCELERATION) && defined(CONFIG_BLOG))
+	if(skb)
+	{
+		struct sk_buff *orig_skb = skb;
+		
+		if(unlikely(netif_queue_stopped(net)))
+			skb = NULL;
+		else
+			skb = nbuff_xlate((pNBuff_t )skb);
+
+		if (skb == NULL)
+		{
+			dev->net->stats.tx_dropped++;
+			nbuff_free((pNBuff_t) orig_skb);
+			return NETDEV_TX_OK;
+		}
+		blog_emit( skb, net, TYPE_ETH, 0, BLOG_USBPHY );
+	}
+#endif
+
 	if (skb)
 		skb_tx_timestamp(skb);
 
@@ -1308,6 +1577,33 @@ netdev_tx_t usbnet_start_xmit (struct sk_buff *skb,
 			goto drop;
 		}
 	}
+
+#if (defined(CONFIG_BCM_KF_USBNET) && defined(CONFIG_BCM963268))
+	/* on 63268 if TX buffer is not 4 byte aligned then some times 
+	 * USB descriptors are corrupted beacuse of a BUG in hW
+	 * for unaligned buffers copy data to a new aligned buffer
+	 */
+	if (((unsigned int)skb->data & 0x3) ) {
+		struct sk_buff	*oskb = skb;
+		int newheadroom = skb_headroom(oskb);
+		/* create a new skb from an existing skb 
+		 * and adjust the data pointer to be word aligned
+		 */
+		newheadroom += newheadroom%4;  
+		skb = skb_copy_expand(oskb, newheadroom, 1, GFP_ATOMIC);
+		dev_kfree_skb_any(oskb);
+
+		if ( unlikely(!skb) )
+			goto drop;
+
+		if (unlikely((unsigned int)skb->data & 0x3))
+		{
+			printk(KERN_WARNING"%s: unaligned skb->data=%p \n", __func__,
+				 skb->data);
+			goto drop;
+		}
+	}
+#endif
 
 	if (!(urb = usb_alloc_urb (0, GFP_ATOMIC))) {
 		netif_dbg(dev, tx_err, dev->net, "no urb\n");
@@ -1453,9 +1749,21 @@ static void usbnet_bh (unsigned long param)
 	struct usbnet		*dev = (struct usbnet *) param;
 	struct sk_buff		*skb;
 	struct skb_data		*entry;
+	
+#if (defined(CONFIG_BCM_KF_USBNET) && defined(CONFIG_BCM_USBNET_THREAD))
+	int rx_budget = USBNET_RX_BUDGET;
 
+	while ((skb = bcm_skb_done_dequeue (dev))) {
+		entry = (struct skb_data *) skb->cb;
+
+		/*TODO: try to add seperate tx_done queue*/
+		if(entry->state != tx_done)
+			rx_budget--;
+#else
 	while ((skb = skb_dequeue (&dev->done))) {
 		entry = (struct skb_data *) skb->cb;
+
+#endif
 		switch (entry->state) {
 		case rx_done:
 			entry->state = rx_cleanup;
@@ -1470,6 +1778,11 @@ static void usbnet_bh (unsigned long param)
 		default:
 			netdev_dbg(dev->net, "bogus skb state %d\n", entry->state);
 		}
+
+#if (defined(CONFIG_BCM_KF_USBNET) && defined(CONFIG_BCM_USBNET_THREAD))
+		if(rx_budget == 0) 
+			break;
+#endif
 	}
 
 	/* restart RX again after disabling due to high error rate */
@@ -1490,15 +1803,25 @@ static void usbnet_bh (unsigned long param)
 		   !test_bit (EVENT_RX_HALT, &dev->flags)) {
 		int	temp = dev->rxq.qlen;
 
+#if (defined(CONFIG_BCM_KF_USBNET) && defined(CONFIG_BCM_USBNET_THREAD))
+		if ( (dev->pending_rx_skb_count < dev->pending_rx_skb_thresh)  &&
+				(temp < RX_QLEN(dev)) ) {
+			if (rx_alloc_submit(dev, GFP_KERNEL) == -ENOLINK)
+#else
 		if (temp < RX_QLEN(dev)) {
 			if (rx_alloc_submit(dev, GFP_ATOMIC) == -ENOLINK)
+#endif
 				return;
 			if (temp != dev->rxq.qlen)
 				netif_dbg(dev, link, dev->net,
 					  "rxqlen %d --> %d\n",
 					  temp, dev->rxq.qlen);
 			if (dev->rxq.qlen < RX_QLEN(dev))
-				tasklet_schedule (&dev->bh);
+#if (defined(CONFIG_BCM_KF_USBNET) && defined(CONFIG_BCM_USBNET_THREAD))
+				usbnet_thread_schedule(dev);
+#else
+				tasklet_schedule(&dev->bh);
+#endif
 		}
 		if (dev->txq.qlen < TX_QLEN (dev))
 			netif_wake_queue (dev->net);
@@ -1546,6 +1869,9 @@ void usbnet_disconnect (struct usb_interface *intf)
 	usb_free_urb(dev->interrupt);
 	kfree(dev->padding_pkt);
 
+#if (defined(CONFIG_BCM_KF_USBNET) && defined(CONFIG_BCM_USBNET_THREAD))
+	kthread_stop(dev->usbnet_thread );
+#endif
 	free_netdev(net);
 }
 EXPORT_SYMBOL_GPL(usbnet_disconnect);
@@ -1625,11 +1951,26 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 	skb_queue_head_init (&dev->txq);
 	skb_queue_head_init (&dev->done);
 	skb_queue_head_init(&dev->rxq_pause);
+#if (defined(CONFIG_BCM_KF_USBNET) && defined(CONFIG_BCM_USBNET_THREAD))
+	init_waitqueue_head(&dev->thread_wq);
+	dev->usbnet_thread = create_usbnet_thread(dev);
+	if(dev->usbnet_thread == NULL)
+		goto out1;
+	dev->usbnet_thread_resched=0;
+	dev->pending_rx_skb_thresh=USBNET_PENDING_RX_SKB_THRESH_DEFAULT;
+	dev->pending_rx_skb_count=0;
+#else
 	dev->bh.func = usbnet_bh;
 	dev->bh.data = (unsigned long) dev;
+#endif
+
 	INIT_WORK (&dev->kevent, usbnet_deferred_kevent);
 	init_usb_anchor(&dev->deferred);
+#if (defined(CONFIG_BCM_KF_USBNET) && defined(CONFIG_BCM_USBNET_THREAD))
+	dev->delay.function = usbnet_bh_timer;
+#else
 	dev->delay.function = usbnet_bh;
+#endif
 	dev->delay.data = (unsigned long) dev;
 	init_timer (&dev->delay);
 	mutex_init (&dev->phy_mutex);
@@ -1655,6 +1996,9 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 	net->watchdog_timeo = TX_TIMEOUT_JIFFIES;
 	net->ethtool_ops = &usbnet_ethtool_ops;
 
+#if (defined(CONFIG_BCM_KF_USBNET) && defined(CONFIG_BCM96838))
+    printk("+++++ &bcm_usb_hw_align_size =%p \n", &bcm_usb_hw_align_size);
+#endif
 	// allow device-specific bind/init procedures
 	// NOTE net->name still not usable ...
 	if (info->bind) {
@@ -1761,6 +2105,11 @@ out1:
 	 */
 	cancel_work_sync(&dev->kevent);
 	del_timer_sync(&dev->delay);
+
+#if (defined(CONFIG_BCM_KF_USBNET) && defined(CONFIG_BCM_USBNET_THREAD))
+	if(dev->usbnet_thread)
+		kthread_stop(dev->usbnet_thread );
+#endif
 	free_netdev(net);
 out:
 	return status;
@@ -1849,7 +2198,11 @@ int usbnet_resume (struct usb_interface *intf)
 
 			if (!(dev->txq.qlen >= TX_QLEN(dev)))
 				netif_tx_wake_all_queues(dev->net);
-			tasklet_schedule (&dev->bh);
+#if (defined(CONFIG_BCM_KF_USBNET) && defined(CONFIG_BCM_USBNET_THREAD))
+			usbnet_thread_schedule(dev);
+#else
+			tasklet_schedule(&dev->bh);
+#endif
 		}
 	}
 
@@ -2044,8 +2397,13 @@ int usbnet_write_cmd_async(struct usbnet *dev, u8 cmd, u8 reqtype,
 
 	urb = usb_alloc_urb(0, GFP_ATOMIC);
 	if (!urb) {
+#if defined(CONFIG_BCM_KF_MISC_BACKPORTS)
+		netdev_dbg(dev->net, "Error allocating URB in"
+			   " %s!\n", __func__);
+#else
 		netdev_err(dev->net, "Error allocating URB in"
 			   " %s!\n", __func__);
+#endif
 		goto fail;
 	}
 

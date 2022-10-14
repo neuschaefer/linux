@@ -29,11 +29,22 @@ obj-$(CONFIG_NF_REJECT_IPV4) += nf_reject_ipv4.o
 # NAT helpers (nf_conntrack)
 obj-$(CONFIG_NF_NAT_H323) += nf_nat_h323.o
 obj-$(CONFIG_NF_NAT_PPTP) += nf_nat_pptp.o
+ifdef BCM_KF # defined(CONFIG_BCM_KF_NETFILTER)
+obj-$(CONFIG_NF_NAT_IPSEC) += nf_nat_ipsec.o
+endif #BCM_KF # defined(CONFIG_BCM_KF_NETFILTER)
 obj-$(CONFIG_NF_NAT_SNMP_BASIC) += nf_nat_snmp_basic.o
 obj-$(CONFIG_NF_NAT_MASQUERADE_IPV4) += nf_nat_masquerade_ipv4.o
 
+ifdef BCM_KF # defined(CONFIG_BCM_KF_NETFILTER)
+obj-$(CONFIG_NF_NAT_PT) += nf_nat_pt.o
+obj-$(CONFIG_NF_NAT_RTSP) += nf_nat_rtsp.o
+endif #BCM_KF # defined(CONFIG_BCM_KF_NETFILTER)
+
 # NAT protocols (nf_nat)
 obj-$(CONFIG_NF_NAT_PROTO_GRE) += nf_nat_proto_gre.o
+ifdef BCM_KF # defined(CONFIG_BCM_KF_NETFILTER)
+obj-$(CONFIG_NF_NAT_PROTO_ESP) += nf_nat_proto_esp.o
+endif #BCM_KF # defined(CONFIG_BCM_KF_NETFILTER
 
 obj-$(CONFIG_NF_TABLES_IPV4) += nf_tables_ipv4.o
 obj-$(CONFIG_NFT_CHAIN_ROUTE_IPV4) += nft_chain_route_ipv4.o

@@ -386,8 +386,11 @@ static int mtdchar_writeoob(struct file *file, struct mtd_info *mtd,
 	ops.ooboffs = start & (mtd->writesize - 1);
 	ops.datbuf = NULL;
 	ops.mode = (mfi->mode == MTD_FILE_MODE_RAW) ? MTD_OPS_RAW :
+#if defined(CONFIG_BCM_KF_MTD_OOB_AUTO)
+		MTD_OPS_AUTO_OOB;
+#else
 		MTD_OPS_PLACE_OOB;
-
+#endif
 	if (ops.ooboffs && ops.ooblen > (mtd->oobsize - ops.ooboffs))
 		return -EINVAL;
 
@@ -426,8 +429,11 @@ static int mtdchar_readoob(struct file *file, struct mtd_info *mtd,
 	ops.ooboffs = start & (mtd->writesize - 1);
 	ops.datbuf = NULL;
 	ops.mode = (mfi->mode == MTD_FILE_MODE_RAW) ? MTD_OPS_RAW :
+#if defined(CONFIG_BCM_KF_MTD_OOB_AUTO)
+		MTD_OPS_AUTO_OOB;
+#else
 		MTD_OPS_PLACE_OOB;
-
+#endif
 	if (ops.ooboffs && ops.ooblen > (mtd->oobsize - ops.ooboffs))
 		return -EINVAL;
 

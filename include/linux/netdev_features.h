@@ -68,6 +68,10 @@ enum {
 	NETIF_F_BUSY_POLL_BIT,		/* Busy poll */
 	NETIF_F_HW_SWITCH_OFFLOAD_BIT,  /* HW switch offload */
 
+#if defined(CONFIG_BCM_KF_EXTSTATS)
+	NETIF_F_EXTSTATS_BIT,		/* Support extended statistics */
+#endif
+
 	/*
 	 * Add your fresh new feature above and remember to update
 	 * netdev_features_strings[] in net/core/ethtool.c and maybe
@@ -126,6 +130,10 @@ enum {
 #define NETIF_F_HW_L2FW_DOFFLOAD	__NETIF_F(HW_L2FW_DOFFLOAD)
 #define NETIF_F_BUSY_POLL	__NETIF_F(BUSY_POLL)
 #define NETIF_F_HW_SWITCH_OFFLOAD	__NETIF_F(HW_SWITCH_OFFLOAD)
+
+#if defined(CONFIG_BCM_KF_EXTSTATS)
+#define NETIF_F_EXTSTATS	__NETIF_F(EXTSTATS)
+#endif
 
 /* Features valid for ethtool to change */
 /* = all defined minus driver/device-class-related */

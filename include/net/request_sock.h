@@ -191,7 +191,11 @@ struct request_sock_queue {
 };
 
 int reqsk_queue_alloc(struct request_sock_queue *queue,
+#if !defined(CONFIG_BCM_MPTCP) || !defined(CONFIG_BCM_KF_MPTCP)
 		      unsigned int nr_table_entries);
+#else
+		      unsigned int nr_table_entries, gfp_t flags);
+#endif
 
 void __reqsk_queue_destroy(struct request_sock_queue *queue);
 void reqsk_queue_destroy(struct request_sock_queue *queue);

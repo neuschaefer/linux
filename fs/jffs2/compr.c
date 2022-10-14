@@ -156,6 +156,14 @@ uint16_t jffs2_compress(struct jffs2_sb_info *c, struct jffs2_inode_info *f,
 	uint32_t orig_slen, orig_dlen;
 	uint32_t best_slen=0, best_dlen=0;
 
+#if defined(CONFIG_BCM_KF_JFFS)
+	if( (f->inocache->flags & INO_FLAGS_COMPR_NONE) == INO_FLAGS_COMPR_NONE )
+	{
+		ret = JFFS2_COMPR_NONE;
+		goto out;
+	}
+#endif
+
 	if (c->mount_opts.override_compr)
 		mode = c->mount_opts.compr;
 	else
@@ -240,6 +248,10 @@ uint16_t jffs2_compress(struct jffs2_sb_info *c, struct jffs2_inode_info *f,
 	default:
 		pr_err("unknown compression mode\n");
 	}
+
+#if defined(CONFIG_BCM_KF_JFFS)
+out:
+#endif
 
 	if (ret == JFFS2_COMPR_NONE) {
 		*cpage_out = data_in;

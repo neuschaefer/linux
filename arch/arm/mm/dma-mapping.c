@@ -371,7 +371,11 @@ static int __init atomic_pool_init(void)
 			goto destroy_genpool;
 
 		gen_pool_set_algo(atomic_pool,
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX)
+				gen_pool_best_fit,
+#else
 				gen_pool_first_fit_order_align,
+#endif
 				(void *)PAGE_SHIFT);
 		pr_info("DMA: preallocated %zd KiB pool for atomic coherent allocations\n",
 		       atomic_pool_size / 1024);
@@ -594,6 +598,14 @@ static inline pgprot_t __get_dma_pgprot(struct dma_attrs *attrs, pgprot_t prot)
 
 #endif	/* CONFIG_MMU */
 
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX)
+static void dmac_flush_area(const void * addr, size_t len, int dir)
+{
+	dmac_flush_range(addr, addr + len);
+}
+
+#endif
+
 static void *__alloc_simple_buffer(struct device *dev, size_t size, gfp_t gfp,
 				   struct page **ret_page)
 {
@@ -629,7 +641,11 @@ static void *__dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
 	if (!mask)
 		return NULL;
 
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX) && defined(CONFIG_BCM_ZONE_ACP)
+	if ((mask < 0xffffffffULL) && !(gfp & GFP_ACP))
+#else
 	if (mask < 0xffffffffULL)
+#endif
 		gfp |= GFP_DMA;
 
 	/*
@@ -899,6 +915,29 @@ static void __dma_page_dev_to_cpu(struct page *page, unsigned long off,
 		}
 	}
 }
+
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX)
+void ___dma_page_cpu_to_dev_flush(struct page *page, unsigned long off,
+	size_t size, enum dma_data_direction dir)
+{
+#ifdef CONFIG_OUTER_CACHE
+	unsigned long paddr;
+
+	dma_cache_maint_page(page, off, size, dir, dmac_map_area);
+
+	paddr = page_to_phys(page) + off;
+	if (dir == DMA_FROM_DEVICE) {
+		outer_inv_range(paddr, paddr + size);
+	} else {
+		outer_flush_range(paddr, paddr + size);
+	}
+#endif
+
+	dma_cache_maint_page(page, off, size, dir, &dmac_flush_area);
+}
+EXPORT_SYMBOL(___dma_page_cpu_to_dev_flush);
+
+#endif
 
 /**
  * arm_dma_map_sg - map a set of SG buffers for streaming mode DMA
@@ -2146,6 +2185,9 @@ void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
 
 	set_dma_ops(dev, dma_ops);
 }
+#if defined(CONFIG_BCM_KF_GLB_COHERENCY) && defined(CONFIG_BCM_GLB_COHERENCY)
+EXPORT_SYMBOL(arch_setup_dma_ops);
+#endif
 
 void arch_teardown_dma_ops(struct device *dev)
 {

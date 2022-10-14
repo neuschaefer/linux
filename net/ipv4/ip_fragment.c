@@ -832,8 +832,13 @@ static int __net_init ipv4_frags_init_net(struct net *net)
 	 * we will prune down to 3MB, making room for approx 8 big 64K
 	 * fragments 8x128k.
 	 */
+#if defined(CONFIG_BCM_KF_MISC_BACKPORTS) 
+	net->ipv4.frags.high_thresh = 256 * 1024;
+	net->ipv4.frags.low_thresh = 192 * 1024;
+#else
 	net->ipv4.frags.high_thresh = 4 * 1024 * 1024;
 	net->ipv4.frags.low_thresh  = 3 * 1024 * 1024;
+#endif
 	/*
 	 * Important NOTE! Fragment queue must be destroyed before MSL expires.
 	 * RFC791 is wrong proposing to prolongate timer each fragment arrival

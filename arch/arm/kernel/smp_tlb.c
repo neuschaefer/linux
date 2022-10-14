@@ -92,6 +92,19 @@ void erratum_a15_798181_init(void)
 	unsigned int midr = read_cpuid_id();
 	unsigned int revidr = read_cpuid(CPUID_REVIDR);
 
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX)
+	/* specifically for the B15 used in BCM63148 */
+	if (midr == 0x420f00f3) {
+		if ((revidr & 0x210) == 0x210)
+			return;
+		if (revidr & 0x10)
+			erratum_a15_798181_handler = erratum_a15_798181_partial;
+		else
+			erratum_a15_798181_handler = erratum_a15_798181_broadcast;
+		return;
+	}
+#endif
+	
 	/* Brahma-B15 r0p0..r0p2 affected
 	 * Cortex-A15 r0p0..r3p2 w/o ECO fix affected */
 	if ((midr & 0xff0ffff0) == 0x420f00f0 && midr <= 0x420f00f2)

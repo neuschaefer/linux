@@ -185,8 +185,15 @@ void register_pci_controller(struct pci_controller *hose)
 		parent = &ioport_resource;
 
 	if (request_resource(parent, hose->io_resource) < 0) {
-		release_resource(hose->mem_resource);
-		goto out;
+#if defined(CONFIG_BCM_KF_PCI_FIXUP)
+		if(!((hose->io_resource->start == 0) && (hose->io_resource->end == 0)))
+		{
+#endif	
+			release_resource(hose->mem_resource);
+			goto out;
+#if defined(CONFIG_BCM_KF_PCI_FIXUP)
+		}
+#endif
 	}
 
 	*hose_tail = hose;

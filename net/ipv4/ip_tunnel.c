@@ -63,6 +63,11 @@
 #include <net/ip6_route.h>
 #endif
 
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+#include <linux/nbuff.h>
+#include <linux/blog.h>
+#endif
+
 static unsigned int ip_tunnel_hash(__be32 key, __be32 remote)
 {
 	return hash_32((__force u32)key ^ (__force u32)remote,
@@ -440,7 +445,18 @@ int ip_tunnel_rcv(struct ip_tunnel *tunnel, struct sk_buff *skb,
 		goto drop;
 	}
 
+#if (defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG))
+	/* as bcm_gre_rcv_check increments seqno (for all tunnel packets) when  
+	 * GRE acceleration is enabled, we try to avoid double increment here 
+	 */
+
+	/*TODO: fix this check to make sure this logic applies only for GRE
+	 * tunnel. right now the code may break other type of tunnels
+	 */
+	if (!blog_gre_tunnel_accelerated() && (tunnel->parms.i_flags&TUNNEL_SEQ)){
+#else
 	if (tunnel->parms.i_flags&TUNNEL_SEQ) {
+#endif
 		if (!(tpi->flags&TUNNEL_SEQ) ||
 		    (tunnel->i_seqno && (s32)(ntohl(tpi->seq) - tunnel->i_seqno) < 0)) {
 			tunnel->dev->stats.rx_fifo_errors++;
@@ -478,6 +494,16 @@ int ip_tunnel_rcv(struct ip_tunnel *tunnel, struct sk_buff *skb,
 	} else {
 		skb->dev = tunnel->dev;
 	}
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+		if ((skb->protocol != htons(ETH_P_IP))
+#if IS_ENABLED(CONFIG_IPV6)
+			&& (skb->protocol != htons(ETH_P_IPV6)) &&
+            (tpi->proto != htons(ETH_P_TEB) || skb->protocol != htons(ETH_P_8021Q))
+#endif
+		) {
+			blog_skip(skb, blog_skip_reason_unknown_proto);      /* No blogging */
+		}
+#endif
 
 	gro_cells_receive(&tunnel->gro_cells, skb);
 	return 0;

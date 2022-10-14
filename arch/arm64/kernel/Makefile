@@ -5,6 +5,11 @@
 CPPFLAGS_vmlinux.lds	:= -DTEXT_OFFSET=$(TEXT_OFFSET)
 AFLAGS_head.o		:= -DTEXT_OFFSET=$(TEXT_OFFSET)
 CFLAGS_efi-stub.o 	:= -DTEXT_OFFSET=$(TEXT_OFFSET)
+CFLAGS_smp_spin_table.o := -I${INC_BRCMSHARED_PUB_PATH}/bcm963xx\
+       			   -I${INC_BRCMDRIVER_PUB_PATH}/bcm963xx\
+       			   -I${INC_BRCMSHARED_PUB_PATH}/pmc
+CFLAGS_irq.o            := -I${INC_BRCMSHARED_PUB_PATH}/bcm963xx\
+			   -I${INC_BRCMDRIVER_PUB_PATH}/bcm963xx
 CFLAGS_armv8_deprecated.o := -I$(src)
 
 CFLAGS_REMOVE_ftrace.o = -pg
@@ -18,6 +23,10 @@ arm64-obj-y		:= debug-monitors.o entry.o irq.o fpsimd.o		\
 			   hyp-stub.o psci.o psci-call.o cpu_ops.o insn.o	\
 			   return_address.o cpuinfo.o cpu_errata.o		\
 			   cpufeature.o alternative.o cacheinfo.o
+
+ifdef BCM_KF # defined(CONFIG_BCM_KF_OPTEE_414_BACKPORTS)
+arm64-obj-$(CONFIG_HAVE_ARM_SMCCC)	+= smccc-call.o
+endif
 
 arm64-obj-$(CONFIG_COMPAT)		+= sys32.o kuser32.o signal32.o 	\
 					   sys_compat.o entry32.o		\

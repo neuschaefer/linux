@@ -75,7 +75,16 @@ static char __initdata builtin_cmdline[COMMAND_LINE_SIZE] = CONFIG_CMDLINE;
  * mips_io_port_base is the begin of the address space to which x86 style
  * I/O ports are mapped.
  */
+#if !defined(CONFIG_BCM_KF_MIPS_BCM9685XX) && defined(CONFIG_BCM_KF_MIPS_IOPORT_BASE)
+/* mips_io_port_base is normally set using set_io_port_base.  The
+   only reason we would need it here is to get around a race condition.
+   I don't know what the race condition is, but some ivestigation can be done
+   later to determine if we can remove it.  For now, leave it in so it
+   doesn't hinder the development. */
+const unsigned long mips_io_port_base = KSEG1;
+#else
 const unsigned long mips_io_port_base = -1;
+#endif
 EXPORT_SYMBOL(mips_io_port_base);
 
 static struct resource code_resource = { .name = "Kernel code", };
@@ -94,6 +103,11 @@ void __init add_memory_region(phys_addr_t start, phys_addr_t size, long type)
 		return;
 	}
 
+#if defined(CONFIG_BCM_KF_MIPS_BCM963XX) && defined(CONFIG_MIPS_BCM963XX)
+	/* workaround for 6838 which require the two reserved region not merged in order for
+	 runner driver to run*/
+	(void)i;
+#else
 	/*
 	 * Try to merge with existing entry, if any.
 	 */
@@ -116,7 +130,7 @@ void __init add_memory_region(phys_addr_t start, phys_addr_t size, long type)
 
 		return;
 	}
-
+#endif
 	if (boot_mem_map.nr_map == BOOT_MEM_MAP_MAX) {
 		pr_err("Ooops! Too many entries in the memory map!\n");
 		return;

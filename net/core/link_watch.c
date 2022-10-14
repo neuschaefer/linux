@@ -23,6 +23,30 @@
 #include <linux/bitops.h>
 #include <linux/types.h>
 
+#if defined(CONFIG_BCM_KF_LINKWATCH_WQ)
+#include <linux/init.h>
+/*
+ * Problem scenario: wlmngr does an ioctl, and the upper layers
+ * of ioctl code grabs the rtnl lock before calling the wlan ioctl code.
+ * Wlan ioctl code calls flush_workqueue, but there is a linkwatch_event
+ * function on the work queue.  Linkwatch_event function tries to grab the
+ * rtnl lock, but cannot, so now the event thread is deadlocked.
+ * Partial solution: put linkwatch_event on its own workqueue so that
+ * the wlan events can get flushed without having to run the linkwatch_event.
+ * Eventually, the wlan events should also get moved off of the common
+ * event workqueue.
+ */
+static struct workqueue_struct *lw_wq=NULL;
+
+int __init init_linkwatch(void)
+{
+	lw_wq = create_singlethread_workqueue("linkwatch");
+
+	return 0;
+}
+
+__initcall(init_linkwatch);
+#endif
 
 enum lw_bits {
 	LW_URGENT = 0,
@@ -135,9 +159,17 @@ static void linkwatch_schedule_work(int urgent)
 	 * override the existing timer.
 	 */
 	if (test_bit(LW_URGENT, &linkwatch_flags))
+#if defined(CONFIG_BCM_KF_LINKWATCH_WQ)
+		mod_delayed_work(lw_wq, &linkwatch_work, 0);
+#else
 		mod_delayed_work(system_wq, &linkwatch_work, 0);
+#endif
 	else
+#if defined(CONFIG_BCM_KF_LINKWATCH_WQ)
+		queue_delayed_work(lw_wq, &linkwatch_work, delay);
+#else
 		schedule_delayed_work(&linkwatch_work, delay);
+#endif
 }
 
 

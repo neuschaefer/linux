@@ -111,6 +111,17 @@ static netdev_tx_t veth_xmit(struct sk_buff *skb, struct net_device *dev)
 	struct net_device *rcv;
 	int length = skb->len;
 
+#if defined(CONFIG_BCM_KF_VETH_IPV6_DISABLE)
+	const struct ipv6hdr *hdr;
+	hdr = ipv6_hdr(skb);
+
+	if (hdr->version == 6)
+	{
+		kfree_skb(skb);
+		return NETDEV_TX_OK;
+	}
+#endif
+
 	rcu_read_lock();
 	rcv = rcu_dereference(priv->peer);
 	if (unlikely(!rcv)) {

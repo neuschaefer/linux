@@ -404,6 +404,10 @@ static __always_inline void __write_once_size(volatile void *p, void *res, int s
 # define __compiletime_error_fallback(condition) do { } while (0)
 #endif
 
+#if defined(CONFIG_BCM_KF_BUZZZ) && defined(CONFIG_BUZZZ_FUNC) && defined(BUZZZ_O0)
+#define __compiletime_assert(condition, msg, prefix, suffix)		\
+	do { /* no-op */ } while (0)
+#else
 #define __compiletime_assert(condition, msg, prefix, suffix)		\
 	do {								\
 		bool __cond = !(condition);				\
@@ -412,6 +416,7 @@ static __always_inline void __write_once_size(volatile void *p, void *res, int s
 			prefix ## suffix();				\
 		__compiletime_error_fallback(__cond);			\
 	} while (0)
+#endif
 
 #define _compiletime_assert(condition, msg, prefix, suffix) \
 	__compiletime_assert(condition, msg, prefix, suffix)

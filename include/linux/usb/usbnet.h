@@ -62,7 +62,15 @@ struct usbnet {
 	unsigned		interrupt_count;
 	struct mutex		interrupt_mutex;
 	struct usb_anchor	deferred;
+#if (defined(CONFIG_BCM_KF_USBNET) && defined(CONFIG_BCM_USBNET_THREAD))
+	struct task_struct *usbnet_thread;
+	int usbnet_thread_resched;
+	wait_queue_head_t	thread_wq;
+	int pending_rx_skb_thresh;
+	int pending_rx_skb_count;
+#else
 	struct tasklet_struct	bh;
+#endif
 
 	struct work_struct	kevent;
 	unsigned long		flags;

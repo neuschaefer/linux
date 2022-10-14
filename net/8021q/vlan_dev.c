@@ -37,6 +37,7 @@
 #include <linux/if_vlan.h>
 #include <linux/netpoll.h>
 
+
 /*
  *	Create the VLAN header for an arbitrary protocol layer
  *
@@ -124,6 +125,14 @@ static netdev_tx_t vlan_dev_hard_start_xmit(struct sk_buff *skb,
 
 	skb->dev = vlan->real_dev;
 	len = skb->len;
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+    if (blog_ptr(skb)) 
+    {
+        blog_lock();
+        blog_link( IF_DEVICE, blog_ptr(skb), (void*)dev, DIR_TX, skb->len );
+        blog_unlock();
+    }
+#endif
 	if (unlikely(netpoll_tx_running(dev)))
 		return vlan_netpoll_send_skb(vlan, skb);
 
@@ -351,6 +360,36 @@ out:
 	ether_addr_copy(dev->dev_addr, addr->sa_data);
 	return 0;
 }
+
+#if defined(CONFIG_BCM_KF_VLAN) && (defined(CONFIG_BCM_VLAN) || defined(CONFIG_BCM_VLAN_MODULE))
+int vlan_dev_set_nfmark_to_priority(char *dev_name, int nfmark_to_priority)
+{
+	struct net_device *dev = dev_get_by_name(&init_net, dev_name);
+
+	if (dev) {
+        if (dev->priv_flags & IFF_802_1Q_VLAN) {
+            if (nfmark_to_priority>=-1 && nfmark_to_priority <=29) {
+                vlan_dev_priv(dev)->nfmark_to_priority = nfmark_to_priority;
+                dev_put(dev);
+                return 0;
+            }
+            else {
+    		    printk("invalid nfmark_to_priority\n");
+            }
+        }
+        else {
+            printk(KERN_ERR 
+             "%s: %s is not a vlan device, priv_flags: %hX.\n",
+            __FUNCTION__, dev->name, dev->priv_flags);
+        }    
+    }
+    else {
+		printk(KERN_ERR  "%s: Could not find device: %s\n", __FUNCTION__, dev_name);
+    }
+    dev_put(dev);
+    return -EINVAL;
+}
+#endif
 
 static int vlan_dev_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
@@ -817,5 +856,9 @@ void vlan_setup(struct net_device *dev)
 	dev->destructor		= vlan_dev_free;
 	dev->ethtool_ops	= &vlan_ethtool_ops;
 
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+        dev->blog_stats_flags |= BLOG_DEV_STAT_FLAG_INCLUDE_ALL;
+#endif
 	eth_zero_addr(dev->broadcast);
+
 }

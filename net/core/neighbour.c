@@ -1180,6 +1180,15 @@ int neigh_update(struct neighbour *neigh, const u8 *lladdr, u8 new,
 	}
 
 	if (lladdr != neigh->ha) {
+#if defined(CONFIG_BCM_KF_BLOG)
+		/* Do not raise an ARP BINDING Change event when the ARP is
+			resolved first time. Raise this event only when there is
+			a real MAC address change.*/
+		if (neigh->ha[0] != 0 || neigh->ha[1] != 0 || neigh->ha[2] != 0 || 
+			neigh->ha[3] != 0 || neigh->ha[4] != 0 || neigh->ha[5] != 0) {
+			call_netevent_notifiers(NETEVENT_ARP_BINDING_CHANGE, neigh);
+		}
+#endif
 		write_seqlock(&neigh->ha_lock);
 		memcpy(&neigh->ha, lladdr, dev->addr_len);
 		write_sequnlock(&neigh->ha_lock);

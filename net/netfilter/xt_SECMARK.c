@@ -35,6 +35,12 @@ secmark_tg(struct sk_buff *skb, const struct xt_action_param *par)
 	u32 secmark = 0;
 	const struct xt_secmark_target_info *info = par->targinfo;
 
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG_FEATURE)
+	skb->ipt_check |= IPT_TARGET_SECMARK;
+	if ( skb->ipt_check & IPT_TARGET_CHECK )
+		return XT_CONTINUE;
+#endif
+
 	BUG_ON(info->mode != mode);
 
 	switch (mode) {

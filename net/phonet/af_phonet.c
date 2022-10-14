@@ -34,6 +34,52 @@
 #include <net/phonet/phonet.h>
 #include <net/phonet/pn_dev.h>
 
+#ifdef CONFIG_BCM_KF_PHONET
+#ifdef ACTIVATE_PHONET_DEBUG
+
+phonet_debug_state phonet_dbg_state = OFF;
+
+static ssize_t phonet_show(struct kobject *kobj, struct kobj_attribute *attr,
+			   char *buf)
+{
+
+	switch (phonet_dbg_state) {
+	case ON:
+		return sprintf(buf, "on\n");
+	case OFF:
+		return sprintf(buf, "off\n");
+	case DATA:
+		return sprintf(buf, "data\n");
+	default:
+		return -ENODEV;
+	}
+
+	return -ENODEV;
+}
+
+static ssize_t phonet_store(struct kobject *kobj, struct kobj_attribute *attr,
+			    const char *buf, size_t n)
+{
+
+	if (sysfs_streq(buf, "on")) {
+		phonet_dbg_state = ON;
+		pr_alert(
+		       "Phonet traces activated\nBe Careful do not trace Dmesg in MTD\n");
+	} else if (sysfs_streq(buf, "off")) {
+		phonet_dbg_state = OFF;
+	} else if (sysfs_streq(buf, "data")) {
+		phonet_dbg_state = DATA;
+	} else {
+		pr_alert("please use  on/off/data\n");
+	}
+	return -EINVAL;
+}
+
+static struct kobj_attribute phonet_attr =
+__ATTR(phonet_dbg, 0644, phonet_show, phonet_store);
+#endif
+#endif /* CONFIG_BCM_KF_PHONET */
+
 /* Transport protocol registration */
 static struct phonet_protocol *proto_tab[PHONET_NPROTO] __read_mostly;
 
@@ -68,8 +114,13 @@ static int pn_socket_create(struct net *net, struct socket *sock, int protocol,
 	struct phonet_protocol *pnp;
 	int err;
 
+#ifdef CONFIG_BCM_KF_PHONET
+	/* skip the capable check in order to allow user
+	 * applications creating phonet socket */
+#else
 	if (!capable(CAP_SYS_ADMIN))
 		return -EPERM;
+#endif
 
 	if (protocol == 0) {
 		/* Default protocol selection */
@@ -112,6 +163,10 @@ static int pn_socket_create(struct net *net, struct socket *sock, int protocol,
 	pn->sobject = 0;
 	pn->dobject = 0;
 	pn->resource = 0;
+#ifdef CONFIG_BCM_KF_PHONET
+	pn->resource_type = 0;
+	pn->resource_subtype = 0;
+#endif
 	sk->sk_prot->init(sk);
 	err = 0;
 
@@ -163,6 +218,9 @@ static int pn_send(struct sk_buff *skb, struct net_device *dev,
 {
 	struct phonethdr *ph;
 	int err;
+#ifdef CONFIG_BCM_KF_PHONET
+	int i;
+#endif
 
 	if (skb->len + 2 > 0xffff /* Phonet length field limit */ ||
 	    skb->len + sizeof(struct phonethdr) > dev->mtu) {
@@ -191,6 +249,18 @@ static int pn_send(struct sk_buff *skb, struct net_device *dev,
 	skb->protocol = htons(ETH_P_PHONET);
 	skb->priority = 0;
 	skb->dev = dev;
+
+#ifdef CONFIG_BCM_KF_PHONET
+	PN_PRINTK("pn_send  rdev %x sdev %x res %x robj %x sobj %x netdev=%s\n",
+		  ph->pn_rdev, ph->pn_sdev, ph->pn_res, ph->pn_robj,
+		  ph->pn_sobj, dev->name);
+	PN_DATA_PRINTK("PHONET : skb  data = %d\nPHONET :", skb->len);
+	for (i = 1; i <= skb->len; i++) {
+		PN_DATA_PRINTK(" %02x", skb->data[i - 1]);
+		if ((i % 8) == 0)
+			PN_DATA_PRINTK("\n");
+	}
+#endif
 
 	if (skb->pkt_type == PACKET_LOOPBACK) {
 		skb_reset_mac_header(skb);
@@ -280,7 +350,11 @@ int pn_skb_send(struct sock *sk, struct sk_buff *skb,
 		goto drop;
 
 	if (!pn_addr(src))
+#ifdef CONFIG_BCM_KF_PHONET
+		src = pn_object(saddr, pn_port(src));
+#else
 		src = pn_object(saddr, pn_obj(src));
+#endif
 
 	err = pn_send(skb, dev, dst, src, res, 0);
 	dev_put(dev);
@@ -376,6 +450,9 @@ static int phonet_rcv(struct sk_buff *skb, struct net_device *dev,
 	struct phonethdr *ph;
 	struct sockaddr_pn sa;
 	u16 len;
+#ifdef CONFIG_BCM_KF_PHONET
+	int i;
+#endif
 
 	skb = skb_share_check(skb, GFP_ATOMIC);
 	if (!skb)
@@ -397,6 +474,26 @@ static int phonet_rcv(struct sk_buff *skb, struct net_device *dev,
 
 	pn_skb_get_dst_sockaddr(skb, &sa);
 
+#ifdef CONFIG_BCM_KF_PHONET
+	PN_PRINTK(
+	    "phonet rcv : phonet hdr rdev %x sdev %x res %x robj %x sobj %x netdev=%s orig_netdev=%s\n",
+	     ph->pn_rdev, ph->pn_sdev, ph->pn_res, ph->pn_robj, ph->pn_sobj,
+	     dev->name, orig_dev->name);
+
+	PN_DATA_PRINTK("PHONET : skb  data = %d\nPHONET :", skb->len);
+	for (i = 1; i <= skb->len; i++) {
+		PN_DATA_PRINTK(" %02x", skb->data[i - 1]);
+		if ((i % 8) == 0)
+			PN_DATA_PRINTK("\n");
+	}
+
+	/* check if this is multicasted */
+	if (pn_sockaddr_get_object(&sa) == PNOBJECT_MULTICAST) {
+		pn_deliver_sock_broadcast(net, skb);
+		goto out;
+	}
+#endif
+
 	/* check if this is broadcasted */
 	if (pn_sockaddr_get_addr(&sa) == PNADDR_BROADCAST) {
 		pn_deliver_sock_broadcast(net, skb);
@@ -413,7 +510,11 @@ static int phonet_rcv(struct sk_buff *skb, struct net_device *dev,
 	/* check if we are the destination */
 	if (phonet_address_lookup(net, pn_sockaddr_get_addr(&sa)) == 0) {
 		/* Phonet packet input */
+#ifdef CONFIG_BCM_KF_PHONET
+		struct sock *sk = pn_find_sock_by_sa_and_skb(net, &sa, skb);
+#else
 		struct sock *sk = pn_find_sock_by_sa(net, &sa);
+#endif
 
 		if (sk)
 			return sk_receive_skb(sk, skb, 0);
@@ -438,9 +539,16 @@ static int phonet_rcv(struct sk_buff *skb, struct net_device *dev,
 		__skb_push(skb, sizeof(struct phonethdr));
 		skb->dev = out_dev;
 		if (out_dev == dev) {
+#ifdef CONFIG_BCM_KF_PHONET
+			net_dbg_ratelimited(KERN_ERR
+				       "Phonet loop to %02X on %s ori=%s\n",
+				       pn_sockaddr_get_addr(&sa), dev->name,
+				       orig_dev->name);
+#else
 			net_dbg_ratelimited("Phonet loop to %02X on %s\n",
 					    pn_sockaddr_get_addr(&sa),
 					    dev->name);
+#endif
 			goto out_dev;
 		}
 		/* Some drivers (e.g. TUN) do not allocate HW header space */
@@ -507,6 +615,13 @@ EXPORT_SYMBOL(phonet_proto_unregister);
 static int __init phonet_init(void)
 {
 	int err;
+#ifdef CONFIG_BCM_KF_PHONET
+#ifdef ACTIVATE_PHONET_DEBUG
+	err = sysfs_create_file(kernel_kobj, &phonet_attr.attr);
+	if (err)
+		pr_alert("phonet sysfs_create_file failed: %d\n", err);
+#endif
+#endif
 
 	err = phonet_device_init();
 	if (err)

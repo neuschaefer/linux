@@ -45,7 +45,10 @@
 #define THUMB(x...)	x
 #ifdef __ASSEMBLY__
 #define W(instr)	instr.w
+#if defined(CONFIG_BCM_KF_SPECTRE_PATCH) && defined(CONFIG_BCM_SPECTRE_PATCH_ENABLE)
+#else
 #define BSYM(sym)	sym + 1
+#endif
 #else
 #define WASM(instr)	#instr ".w"
 #endif
@@ -59,7 +62,10 @@
 #define THUMB(x...)
 #ifdef __ASSEMBLY__
 #define W(instr)	instr
+#if defined(CONFIG_BCM_KF_SPECTRE_PATCH) && defined(CONFIG_BCM_SPECTRE_PATCH_ENABLE)
+#else
 #define BSYM(sym)	sym
+#endif
 #else
 #define WASM(instr)	#instr
 #endif

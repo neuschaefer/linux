@@ -94,10 +94,14 @@
 #endif
 
 #ifndef FIXADDR_TOP
+#if defined(CONFIG_BCM_KF_FIXADDR_TOP)
+#define FIXADDR_TOP     ((unsigned long)(long)(int)0xff000000)
+#else
 #ifdef CONFIG_KVM_GUEST
 #define FIXADDR_TOP		((unsigned long)(long)(int)0x7ffe0000)
 #else
 #define FIXADDR_TOP		((unsigned long)(long)(int)0xfffe0000)
+#endif
 #endif
 #endif
 

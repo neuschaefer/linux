@@ -84,6 +84,14 @@
 
 #include "bonding_priv.h"
 
+#if defined(CONFIG_BCM_KF_KBONDING) && defined(CONFIG_BCM_KERNEL_BONDING)
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+#include <linux/blog.h>
+#endif
+#include <linux/bcm_log.h>
+#include <linux/bcm_log_mod.h>
+#endif
+
 /*---------------------------- Module parameters ----------------------------*/
 
 /* monitor all links that often (in milliseconds). <=0 disables monitoring */
@@ -1152,6 +1160,23 @@ static rx_handler_result_t bond_handle_frame(struct sk_buff **pskb)
 	if (unlikely(!skb))
 		return RX_HANDLER_CONSUMED;
 
+#if defined(CONFIG_BCM_KF_KBONDING) && defined(CONFIG_BCM_KERNEL_BONDING)
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+	if (blog_ptr(skb)) 
+	{
+
+		/* Clarify : bond device shouldn't modify the packet;
+			also it does not hold its own stats rather gets the cummulative stats from its slave devices [ see:bond_get_stats() ];
+			blog->put_stats,clr_stats are also not needed for the same reason; 
+			Do we need to link bond devices ; One usage could be that when bond device goes down ; FC will be able to remove the flows */
+
+		blog_lock();
+		blog_link( IF_DEVICE, blog_ptr(skb), (void*)skb->dev, DIR_RX, skb->len );
+		blog_unlock();
+	}
+#endif /* defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG) */
+#endif /* defined(CONFIG_BCM_KF_KBONDING) && defined(CONFIG_BCM_KERNEL_BONDING) */
+
 	*pskb = skb;
 
 	slave = bond_slave_get_rcu(skb->dev);
@@ -1631,7 +1656,7 @@ int bond_enslave(struct net_device *bond_dev, struct net_device *slave_dev)
 		goto err_upper_unlink;
 	}
 
-	/* If the mode uses primary, then the following is handled by
+		/* If the mode uses primary, then the following is handled by
 	 * bond_change_active_slave().
 	 */
 	if (!bond_uses_primary(bond)) {
@@ -1685,6 +1710,7 @@ int bond_enslave(struct net_device *bond_dev, struct net_device *slave_dev)
 
 	/* enslave is successful */
 	bond_queue_slave_event(new_slave);
+
 	return 0;
 
 /* Undo stages on error */
@@ -3080,6 +3106,44 @@ static struct notifier_block bond_netdev_notifier = {
 	.notifier_call = bond_netdev_event,
 };
 
+#if defined(CONFIG_BCM_KF_KBONDING) && defined(CONFIG_BCM_KERNEL_BONDING)
+
+/* bond_br_stp_event: handle bridge stp notifier chain events.
+ *
+ */
+#include <linux/if_bridge.h>
+static int bond_br_stp_event(struct notifier_block *unused,
+							 unsigned long event, void *ptr)
+{
+	struct stpPortInfo *pInfo = (struct stpPortInfo *)ptr;
+	struct net_device *bond_dev;
+
+	bond_dev = dev_get_by_name(&init_net, pInfo->portName);
+	if (!bond_dev)
+		return NOTIFY_DONE;
+
+	if ((bond_dev->priv_flags & IFF_BONDING) &&
+		(bond_dev->flags & IFF_MASTER)) {
+		struct bonding *bond = netdev_priv(bond_dev);
+		struct slave *slave;
+		struct list_head *iter;
+
+		bond_for_each_slave(bond, slave, iter) {
+			/* Propogate the STP event to slaves */
+			call_br_stp_notifiers(event, slave->dev, pInfo);
+		}
+
+	}
+
+	dev_put(bond_dev);
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block bond_br_stp_notifier = {
+	.notifier_call = bond_br_stp_event,
+};
+
+#endif
 /*---------------------------- Hashing Policies -----------------------------*/
 
 /* L2 hash helper */
@@ -3983,6 +4047,32 @@ static netdev_tx_t __bond_start_xmit(struct sk_buff *skb, struct net_device *dev
 	    !bond_slave_override(bond, skb))
 		return NETDEV_TX_OK;
 
+#if defined(CONFIG_BCM_KF_KBONDING) && defined(CONFIG_BCM_KERNEL_BONDING)
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+
+/* Only XOR or 802.3AD mode can be accelerated by flow-cache -- these are flow-based moded */
+#define BOND_SUPPORTED_ACCL_MODE(mode) (((mode) == BOND_MODE_XOR) || ((mode) == BOND_MODE_8023AD))
+
+/* IS_SKB check not needed unless we support flow-cache acceleration to bond device in other modes;
+   No need to check for non-NULL blog as well -- blog_skip will take care */
+
+    if (!BOND_SUPPORTED_ACCL_MODE(bond->params.mode))
+		blog_skip(skb, blog_skip_reason_bond);
+    else if (blog_ptr(skb)) 
+    {
+        /* Clarify : bond device shouldn't modify the packet;
+           also it does not hold its own stats rather gets the cummulative stats from its slave devices [ see:bond_get_stats() ];
+           blog->put_stats,clr_stats are also not needed for the same reason;
+           Do we need to link bond devices ??                                                          ;
+           One usage could be that when bond device goes down -- FC will be able to remove the flows */
+        blog_lock();
+        blog_link( IF_DEVICE, blog_ptr(skb), (void*)dev, DIR_TX, skb->len );
+        blog_unlock();
+    }
+
+#endif /* defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG) */
+#endif /* defined(CONFIG_BCM_KF_KBONDING) && defined(CONFIG_BCM_KERNEL_BONDING) */
+
 	switch (BOND_MODE(bond)) {
 	case BOND_MODE_ROUNDROBIN:
 		return bond_xmit_roundrobin(skb, dev);
@@ -4676,6 +4766,35 @@ static struct pernet_operations bond_net_ops = {
 	.size = sizeof(struct bond_net),
 };
 
+#if defined(CONFIG_BCM_KF_KBONDING) && defined(CONFIG_BCM_KERNEL_BONDING) && defined(CONFIG_BCM_KF_LOG)
+/* Callback function through bcm_log function pointer;
+	Given a slave device ; update bond group stat, and clear saved slave stat */
+int bcm_bond_clr_slave_stat(void *ctxt)
+{
+    struct net_device *slave_dev = ctxt;
+
+    if (netif_is_bond_slave(slave_dev)) {
+        struct slave *slave = bond_slave_get_rcu(slave_dev);
+        if (slave) {
+            rcu_read_lock();
+            /* clear slave stats for the next run */
+            memset(&slave->slave_stats, 0, sizeof(slave->slave_stats));
+            rcu_read_unlock();
+            return 0;
+        }
+    }
+    return -1;
+}
+
+/* Callback function through bcm_log function pointer;
+	Given a RX Handler function pointer for a device ; confirms if it is same as bond RX handler */
+int bcm_bond_is_rx_handler(void *ctxt)
+{
+    return (ctxt == (void*)bond_handle_frame);
+}
+
+#endif /* defined(CONFIG_BCM_KF_KBONDING) && defined(CONFIG_BCM_KERNEL_BONDING) */
+
 static int __init bonding_init(void)
 {
 	int i;
@@ -4704,6 +4823,13 @@ static int __init bonding_init(void)
 	}
 
 	register_netdevice_notifier(&bond_netdev_notifier);
+
+#if defined(CONFIG_BCM_KF_KBONDING) && defined(CONFIG_BCM_KERNEL_BONDING) 
+	register_bridge_stp_notifier(&bond_br_stp_notifier);
+	bcmFun_reg(BCM_FUN_ID_BOND_CLR_SLAVE_STAT, bcm_bond_clr_slave_stat);
+	bcmFun_reg(BCM_FUN_ID_BOND_RX_HANDLER, bcm_bond_is_rx_handler);
+#endif /* defined(CONFIG_BCM_KF_KBONDING) && defined(CONFIG_BCM_KERNEL_BONDING) */
+
 out:
 	return res;
 err:
@@ -4718,6 +4844,12 @@ err_link:
 static void __exit bonding_exit(void)
 {
 	unregister_netdevice_notifier(&bond_netdev_notifier);
+
+#if defined(CONFIG_BCM_KF_KBONDING) && defined(CONFIG_BCM_KERNEL_BONDING)
+	unregister_bridge_stp_notifier(&bond_br_stp_notifier);
+	bcmFun_dereg(BCM_FUN_ID_BOND_CLR_SLAVE_STAT);
+	bcmFun_dereg(BCM_FUN_ID_BOND_RX_HANDLER);
+#endif /* defined(CONFIG_BCM_KF_KBONDING) && defined(CONFIG_BCM_KERNEL_BONDING) */
 
 	bond_destroy_debugfs();
 

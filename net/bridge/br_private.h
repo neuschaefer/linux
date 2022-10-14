@@ -20,8 +20,22 @@
 #include <net/route.h>
 #include <linux/if_vlan.h>
 
+#if defined(CONFIG_BCM_KF_RUNNER)
+#if defined(CONFIG_BCM_RDPA) || defined(CONFIG_BCM_RDPA_MODULE)
+#if defined(CONFIG_BCM_RDPA_BRIDGE) || defined(CONFIG_BCM_RDPA_BRIDGE_MODULE)
+#include "br_fp.h"
+#endif /* CONFIG_BCM_RDPA_BRIDGE || CONFIG_BCM_RDPA_BRIDGE_MODULE */
+#endif /* CONFIG_BCM_RUNNER */
+#endif /* CONFIG_BCM_KF_RUNNER */
+
+
 #define BR_HASH_BITS 8
 #define BR_HASH_SIZE (1 << BR_HASH_BITS)
+
+#if (defined(CONFIG_BCM_MCAST) || defined(CONFIG_BCM_MCAST_MODULE)) && defined(CONFIG_BCM_KF_MCAST)
+extern br_bcm_mcast_receive_hook br_bcm_mcast_receive;
+extern br_bcm_mcast_should_deliver_hook br_bcm_mcast_should_deliver;
+#endif
 
 #define BR_HOLD_TIME (1*HZ)
 
@@ -30,6 +44,10 @@
 #define BR_VLAN_BITMAP_LEN	BITS_TO_LONGS(VLAN_N_VID)
 
 #define BR_VERSION	"2.3"
+
+#if defined(CONFIG_BCM_KF_BRIDGE_MAC_FDB_LIMIT)
+#define BR_MAX_FDB_ENTRIES 4096
+#endif
 
 /* Control of forwarding link local multicast */
 #define BR_GROUPFWD_DEFAULT	0
@@ -102,9 +120,11 @@ struct net_bridge_fdb_entry
 					is_static:1,
 					added_by_user:1,
 					added_by_external_learn:1;
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+	unsigned int			fdb_key;
+#endif
 	__u16				vlan_id;
 };
-
 struct net_bridge_port_group {
 	struct net_bridge_port		*port;
 	struct net_bridge_port_group __rcu *next;
@@ -156,7 +176,6 @@ struct net_bridge_port
 	u32				path_cost;
 	u32				designated_cost;
 	unsigned long			designated_age;
-
 	struct timer_list		forward_delay_timer;
 	struct timer_list		hold_timer;
 	struct timer_list		message_age_timer;
@@ -186,6 +205,12 @@ struct net_bridge_port
 #ifdef CONFIG_BRIDGE_VLAN_FILTERING
 	struct net_port_vlans __rcu	*vlan_info;
 #endif
+
+#if defined(CONFIG_BCM_KF_BRIDGE_MAC_FDB_LIMIT) && defined(CONFIG_BCM_BRIDGE_MAC_FDB_LIMIT)
+	int                     num_port_fdb_entries;
+	int                     max_port_fdb_entries;
+	int                     min_port_fdb_entries;
+#endif
 };
 
 #define br_auto_port(p) ((p)->flags & BR_AUTO_MASK)
@@ -211,6 +236,9 @@ struct net_bridge
 	struct net_device		*dev;
 
 	struct pcpu_sw_netstats		__percpu *stats;
+#if defined(CONFIG_BCM_KF_BRIDGE_COUNTERS)
+	u32 mac_entry_discard_counter;
+#endif
 	spinlock_t			hash_lock;
 	struct hlist_head		hash[BR_HASH_SIZE];
 #if IS_ENABLED(CONFIG_BRIDGE_NETFILTER)
@@ -219,6 +247,16 @@ struct net_bridge
 	bool				nf_call_ip6tables;
 	bool				nf_call_arptables;
 #endif
+
+#if defined(CONFIG_BCM_KF_BRIDGE_MAC_FDB_LIMIT) 
+	int                     num_fdb_entries;
+#endif
+
+#if defined(CONFIG_BCM_KF_BRIDGE_MAC_FDB_LIMIT) && defined(CONFIG_BCM_BRIDGE_MAC_FDB_LIMIT)
+	int                     max_br_fdb_entries;
+	int                     used_br_fdb_entries;
+#endif
+
 	u16				group_fwd_mask;
 	u16				group_fwd_mask_required;
 
@@ -293,6 +331,21 @@ struct net_bridge
 	__be16				vlan_proto;
 	u16				default_pvid;
 	struct net_port_vlans __rcu	*vlan_info;
+#endif
+
+#if defined(CONFIG_BCM_KF_RUNNER)
+#if defined(CONFIG_BCM_RDPA) || defined(CONFIG_BCM_RDPA_MODULE)
+#if defined(CONFIG_BCM_RDPA_BRIDGE) || defined(CONFIG_BCM_RDPA_BRIDGE_MODULE)
+	struct br_fp_data		fp_hooks;
+#endif /* CONFIG_BCM_RDPA_BRIDGE || CONFIG_BCM_RDPA_BRIDGE_MODULE */
+#endif /* CONFIG_BCM_RUNNER */
+#endif /* CONFIG_BCM_KF_RUNNER */
+#if defined(CONFIG_BCM_KF_INTF_BRG) && defined(CONFIG_BCM_INTF_BRG_ENABLED)
+	u16				lan_port_num;
+	u16				wan_port_num;
+#endif /* CONFIG_BCM_KF_INTF_BRG && CONFIG_BCM_INTF_BRG_ENABLED */
+#if defined(CONFIG_BCM_KF_LOCAL_SWITCHING_DISABLE)
+	int local_switching_disable;
 #endif
 };
 
@@ -408,6 +461,14 @@ int br_fdb_external_learn_add(struct net_bridge *br, struct net_bridge_port *p,
 int br_fdb_external_learn_del(struct net_bridge *br, struct net_bridge_port *p,
 			      const unsigned char *addr, u16 vid);
 
+#if defined(CONFIG_BCM_KF_BRIDGE_MAC_FDB_LIMIT) && defined(CONFIG_BCM_BRIDGE_MAC_FDB_LIMIT)
+int br_set_fdb_limit(struct net_bridge *br, 
+						struct net_bridge_port *p,
+						int lmt_type,
+						int is_min,
+						int fdb_limit);
+#endif
+		
 /* br_forward.c */
 void br_deliver(const struct net_bridge_port *to, struct sk_buff *skb);
 int br_dev_queue_push_xmit(struct sock *sk, struct sk_buff *skb);
@@ -419,6 +480,55 @@ void br_flood_forward(struct net_bridge *br, struct sk_buff *skb,
 		      struct sk_buff *skb2, bool unicast);
 
 /* br_if.c */
+#if defined(CONFIG_BCM_KF_INTF_BRG) && defined(CONFIG_BCM_INTF_BRG_ENABLED)
+static inline void br_port_num_inc(struct net_bridge *br, struct net_bridge_port *p)
+{
+#if defined(CONFIG_BCM_KF_WANDEV)
+    if (p->dev->priv_flags & IFF_WANDEV)
+    {
+        br->wan_port_num++;
+    }
+    else
+#endif
+    {
+        br->lan_port_num++;
+    }
+}
+
+static inline void br_port_num_dec(struct net_bridge *br, struct net_bridge_port *p)
+{
+#if defined(CONFIG_BCM_KF_WANDEV)
+    if (p->dev->priv_flags & IFF_WANDEV)
+    {
+        br->wan_port_num--;
+    }
+    else
+#endif
+    {
+        br->lan_port_num--;
+    }
+}
+
+static inline bool is_interface_br(struct net_bridge *br, struct sk_buff *skb)
+{
+    struct net_bridge_port *pin;
+
+    if (!skb->dev)
+    {
+        return 0;
+    }
+ 
+    pin = br_port_get_rcu(skb->dev);
+    if ((!pin) || (!pin->dev))
+    {
+        return 0;
+    }
+
+    return ((br->lan_port_num == 1) && (br->wan_port_num == 1));
+}
+
+#endif /* CONFIG_BCM_KF_INTF_BRG && CONFIG_BCM_INTF_BRG_ENABLED */
+
 void br_port_carrier_check(struct net_bridge_port *p);
 int br_add_bridge(struct net *net, const char *name);
 int br_del_bridge(struct net *net, const char *name);
@@ -847,5 +957,19 @@ static inline int br_sysfs_renameif(struct net_bridge_port *p) { return 0; }
 static inline int br_sysfs_addbr(struct net_device *dev) { return 0; }
 static inline void br_sysfs_delbr(struct net_device *dev) { return; }
 #endif /* CONFIG_SYSFS */
+
+#if defined(CONFIG_BCM_KF_BRIDGE_STP)
+/* br_notifier.c */
+extern void br_stp_notify_state_port(const struct net_bridge_port *p);
+extern void br_stp_notify_state_bridge(const struct net_bridge *br);
+#endif
+#if defined(CONFIG_BCM_KF_BRIDGE_PORT_ISOLATION)
+struct bridge_notifier_info {
+    struct net_device *br_dev;
+	struct net_device *dev;
+    int isadd;
+};
+extern void br_dev_notify_if_change(struct net_device *br_dev, struct net_device *dev, int isadd);
+#endif
 
 #endif

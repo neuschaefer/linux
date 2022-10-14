@@ -1995,11 +1995,12 @@ pl011_console_write(struct console *co, const char *s, unsigned int count)
 {
 	struct uart_amba_port *uap = amba_ports[co->index];
 	unsigned int status, old_cr, new_cr;
+#if !defined(CONFIG_BCM_KF_PRINTK_INT_ENABLED) || !defined(CONFIG_BCM_PRINTK_INT_ENABLED)
 	unsigned long flags;
 	int locked = 1;
-
+#endif
 	clk_enable(uap->clk);
-
+#if !defined(CONFIG_BCM_KF_PRINTK_INT_ENABLED) || !defined(CONFIG_BCM_PRINTK_INT_ENABLED)
 	local_irq_save(flags);
 	if (uap->port.sysrq)
 		locked = 0;
@@ -2007,7 +2008,7 @@ pl011_console_write(struct console *co, const char *s, unsigned int count)
 		locked = spin_trylock(&uap->port.lock);
 	else
 		spin_lock(&uap->port.lock);
-
+#endif
 	/*
 	 *	First save the CR then disable the interrupts
 	 */
@@ -2026,11 +2027,11 @@ pl011_console_write(struct console *co, const char *s, unsigned int count)
 		status = readw(uap->port.membase + UART01x_FR);
 	} while (status & UART01x_FR_BUSY);
 	writew(old_cr, uap->port.membase + UART011_CR);
-
+#if !defined(CONFIG_BCM_KF_PRINTK_INT_ENABLED) || !defined(CONFIG_BCM_PRINTK_INT_ENABLED)
 	if (locked)
 		spin_unlock(&uap->port.lock);
 	local_irq_restore(flags);
-
+#endif
 	clk_disable(uap->clk);
 }
 

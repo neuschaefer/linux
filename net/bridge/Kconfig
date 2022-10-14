@@ -60,3 +60,9 @@ config BRIDGE_VLAN_FILTERING
 	  Say N to exclude this support and reduce the binary size.
 
 	  If unsure, say Y.
+
+config BCM_VLAN_AGGREGATION
+	bool "vlan aggregation"
+	depends on BCM_KF_VLAN_AGGREGATION
+	---help---
+	If you say Y here, it will enable vlan aggregation

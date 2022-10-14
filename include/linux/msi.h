@@ -114,6 +114,10 @@ struct msi_controller {
 
 	int (*setup_irq)(struct msi_controller *chip, struct pci_dev *dev,
 			 struct msi_desc *desc);
+#if defined(CONFIG_BCM_KF_MISC_BACKPORTS)
+	int (*setup_irqs)(struct msi_controller *chip, struct pci_dev *dev,
+			  int nvec, int type);
+#endif
 	void (*teardown_irq)(struct msi_controller *chip, unsigned int irq);
 };
 

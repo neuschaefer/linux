@@ -56,6 +56,10 @@
 #include <linux/netfilter/nfnetlink.h>
 #include <linux/netfilter/nfnetlink_conntrack.h>
 
+#if defined(CONFIG_BCM_KF_DPI) && defined(CONFIG_BCM_DPI_MODULE)
+#include <linux/dpi.h>
+#endif
+
 MODULE_LICENSE("GPL");
 
 static char __initdata version[] = "0.93";
@@ -214,6 +218,9 @@ nla_put_failure:
 
 static int
 dump_counters(struct sk_buff *skb, struct nf_conn_acct *acct,
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+	      const struct nf_conn *ct,
+#endif
 	      enum ip_conntrack_dir dir, int type)
 {
 	enum ctattr_type attr = dir ? CTA_COUNTERS_REPLY: CTA_COUNTERS_ORIG;
@@ -228,6 +235,20 @@ dump_counters(struct sk_buff *skb, struct nf_conn_acct *acct,
 		pkts = atomic64_read(&counter[dir].packets);
 		bytes = atomic64_read(&counter[dir].bytes);
 	}
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+	{
+		BlogFcStats_t fast_stats;
+
+		fast_stats.rx_packets = 0;
+		fast_stats.rx_bytes = 0;
+
+		if(blog_ct_get_stats(ct, ct->blog_key[dir], dir, &fast_stats) == 0)
+			counter[dir].ts = fast_stats.pollTS_ms;
+
+		pkts += counter[dir].cum_fast_pkts + fast_stats.rx_packets;
+		bytes += counter[dir].cum_fast_bytes + fast_stats.rx_bytes;
+	}
+#endif
 
 	nest_count = nla_nest_start(skb, attr | NLA_F_NESTED);
 	if (!nest_count)
@@ -253,10 +274,17 @@ ctnetlink_dump_acct(struct sk_buff *skb, const struct nf_conn *ct, int type)
 	if (!acct)
 		return 0;
 
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+	if (dump_counters(skb, acct, ct, IP_CT_DIR_ORIGINAL, type) < 0)
+		return -1;
+	if (dump_counters(skb, acct, ct, IP_CT_DIR_REPLY, type) < 0)
+		return -1;
+#else
 	if (dump_counters(skb, acct, IP_CT_DIR_ORIGINAL, type) < 0)
 		return -1;
 	if (dump_counters(skb, acct, IP_CT_DIR_REPLY, type) < 0)
 		return -1;
+#endif
 
 	return 0;
 }
@@ -456,6 +484,89 @@ nla_put_failure:
 	return -1;
 }
 
+#if defined(CONFIG_BCM_KF_DPI) && defined(CONFIG_BCM_DPI_MODULE)
+static int ctnetlink_dpi_size(const struct nf_conn *ct)
+{
+	int len = dpi_url_len(ct->dpi.url);
+
+	return nla_total_size(sizeof(u_int32_t)) /* CTA_DPI_APP_ID */
+	       + 6 * nla_total_size(sizeof(u_int8_t)) /* CTA_DPI_MAC */
+	       + nla_total_size(sizeof(u_int32_t)) /* CTA_DPI_STATUS */
+	       + nla_total_size(sizeof(char) * len); /* CTA_DPI_URL */
+	       ;
+}
+
+static inline int
+ctnetlink_dump_dpi(struct sk_buff *skb, const struct nf_conn *ct)
+{
+	struct nlattr *nest_parms;
+	uint32_t app_id;
+	uint8_t *mac;
+	uint8_t empty_mac[6] = {0};
+	char *url;
+
+	app_id = dpi_app_id(ct->dpi.app);
+	mac = dpi_mac(ct->dpi.dev);
+	if (!mac)
+		mac = empty_mac;
+	url = dpi_url(ct->dpi.url);
+
+	nest_parms = nla_nest_start(skb, CTA_DPI | NLA_F_NESTED);
+	if (!nest_parms)
+		goto nla_put_failure;
+
+	if (nla_put_be32(skb, CTA_DPI_APP_ID, htonl(app_id)))
+		goto nla_put_failure;
+	if (nla_put(skb, CTA_DPI_MAC, sizeof(empty_mac), mac))
+		goto nla_put_failure;
+	if (nla_put_be32(skb, CTA_DPI_STATUS, htonl(ct->dpi.flags)))
+		goto nla_put_failure;
+	if (url && nla_put_string(skb, CTA_DPI_URL, url))
+		goto nla_put_failure;
+
+	nla_nest_end(skb, nest_parms);
+
+	return 0;
+
+nla_put_failure:
+	return -1;
+}
+
+static const struct nla_policy dpi_policy[CTA_DPI_MAX+1] = {
+	[CTA_DPI_APP_ID]	= { .type = NLA_U32 },
+	[CTA_DPI_MAC]		= { .type = NLA_BINARY,
+				    .len = 6 * sizeof(uint8_t) },
+	[CTA_DPI_STATUS]	= { .type = NLA_U32 },
+};
+
+static int
+ctnetlink_change_dpi(struct nf_conn *ct, const struct nlattr * const cda[])
+{
+	const struct nlattr *attr = cda[CTA_DPI];
+	struct nlattr *tb[CTA_DPI_MAX+1];
+	int err = 0;
+
+	err = nla_parse_nested(tb, CTA_DPI_MAX, attr, dpi_policy);
+	if (err < 0)
+		return err;
+
+	if (tb[CTA_DPI_STATUS]) {
+		unsigned long new = ntohl(nla_get_be32(tb[CTA_DPI_STATUS]));
+		unsigned long old = ct->dpi.flags;
+		unsigned long changed;
+
+		ct->dpi.flags = (new & DPI_NL_CHANGE_MASK) |
+				(old & ~DPI_NL_CHANGE_MASK);
+		changed = old ^ ct->dpi.flags;
+
+		if (test_bit(DPI_CT_BLOCK_BIT, &changed))
+			dpi_block(ct);
+	}
+
+	return 0;
+}
+#endif
+
 static int
 ctnetlink_fill_info(struct sk_buff *skb, u32 portid, u32 seq, u32 type,
 		    struct nf_conn *ct)
@@ -507,6 +618,11 @@ ctnetlink_fill_info(struct sk_buff *skb, u32 portid, u32 seq, u32 type,
 	    ctnetlink_dump_master(skb, ct) < 0 ||
 	    ctnetlink_dump_ct_seq_adj(skb, ct) < 0)
 		goto nla_put_failure;
+
+#if defined(CONFIG_BCM_KF_DPI) && defined(CONFIG_BCM_DPI_MODULE)
+	if (ctnetlink_dump_dpi(skb, ct) < 0)
+		goto nla_put_failure;
+#endif
 
 	nlmsg_end(skb, nlh);
 	return skb->len;
@@ -604,6 +720,9 @@ ctnetlink_nlmsg_size(const struct nf_conn *ct)
 #endif
 	       + ctnetlink_proto_size(ct)
 	       + ctnetlink_label_size(ct)
+#if defined(CONFIG_BCM_KF_DPI) && defined(CONFIG_BCM_DPI_MODULE)
+	       + ctnetlink_dpi_size(ct) /* CTA_DPI */
+#endif
 	       ;
 }
 
@@ -718,6 +837,11 @@ ctnetlink_conntrack_event(unsigned int events, struct nf_ct_event *item)
 #ifdef CONFIG_NF_CONNTRACK_MARK
 	if ((events & (1 << IPCT_MARK) || ct->mark)
 	    && ctnetlink_dump_mark(skb, ct) < 0)
+		goto nla_put_failure;
+#endif
+
+#if defined(CONFIG_BCM_KF_DPI) && defined(CONFIG_BCM_DPI_MODULE)
+	if (ctnetlink_dump_dpi(skb, ct) < 0)
 		goto nla_put_failure;
 #endif
 	rcu_read_unlock();
@@ -1648,6 +1772,14 @@ ctnetlink_change_conntrack(struct nf_conn *ct,
 			return err;
 	}
 
+#if defined(CONFIG_BCM_KF_DPI) && defined(CONFIG_BCM_DPI_MODULE)
+	if (cda[CTA_DPI]) {
+		err = ctnetlink_change_dpi(ct, cda);
+		if (err < 0)
+			return err;
+	}
+#endif
+
 	return 0;
 }
 
@@ -1663,7 +1795,11 @@ ctnetlink_create_conntrack(struct net *net, u16 zone,
 	struct nf_conntrack_helper *helper;
 	struct nf_conn_tstamp *tstamp;
 
+#if defined(CONFIG_BCM_KF_NETFILTER)
+	ct = nf_conntrack_alloc(net, zone, NULL, otuple, rtuple, GFP_ATOMIC);
+#else
 	ct = nf_conntrack_alloc(net, zone, otuple, rtuple, GFP_ATOMIC);
+#endif	
 	if (IS_ERR(ct))
 		return ERR_PTR(-ENOMEM);
 
@@ -2094,6 +2230,9 @@ ctnetlink_nfqueue_build_size(const struct nf_conn *ct)
 	       + nla_total_size(sizeof(u_int16_t)) /* CTA_ZONE */
 #endif
 	       + ctnetlink_proto_size(ct)
+#if defined(CONFIG_BCM_KF_DPI) && defined(CONFIG_BCM_DPI_MODULE)
+	       + ctnetlink_dpi_size(ct) /* CTA_DPI */
+#endif
 	       ;
 }
 
@@ -2154,6 +2293,10 @@ ctnetlink_nfqueue_build(struct sk_buff *skb, struct nf_conn *ct)
 #endif
 	if (ctnetlink_dump_labels(skb, ct) < 0)
 		goto nla_put_failure;
+#if defined(CONFIG_BCM_KF_DPI) && defined(CONFIG_BCM_DPI_MODULE)
+	if (ctnetlink_dump_dpi(skb, ct) < 0)
+		goto nla_put_failure;
+#endif
 	rcu_read_unlock();
 	return 0;
 

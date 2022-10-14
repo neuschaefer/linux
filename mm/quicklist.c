@@ -37,6 +37,9 @@ static unsigned long max_pages(unsigned long min_pages)
 #ifdef CONFIG_ZONE_DMA32
 		zone_page_state(&zones[ZONE_DMA32], NR_FREE_PAGES) +
 #endif
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX) && defined(CONFIG_BCM_ZONE_ACP)
+		zone_page_state(&zones[ZONE_ACP], NR_FREE_PAGES) +
+#endif
 		zone_page_state(&zones[ZONE_NORMAL], NR_FREE_PAGES);
 
 	max = node_free_pages / FRACTION_OF_NODE_MEM;

@@ -1168,6 +1168,23 @@ static int pppol2tp_tunnel_ioctl(struct l2tp_tunnel *tunnel,
 			err = -EFAULT;
 			break;
 		}
+#if defined(CONFIG_BCM_KF_MISC_BACKPORTS)
+		if (stats.session_id != 0) {
+			/* resend to session ioctl handler */
+			struct l2tp_session *session =
+				l2tp_session_get(sock_net(sk), tunnel, stats.session_id, true);
+
+			if (session) {
+				err = pppol2tp_session_ioctl(session, cmd, arg);
+				if (session->deref)
+					session->deref(session);
+				l2tp_session_dec_refcount(session);
+			} else {
+ 				err = -EBADR;
+			}
+			break;
+		}
+#else
 		if (stats.session_id != 0) {
 			/* resend to session ioctl handler */
 			struct l2tp_session *session =
@@ -1178,6 +1195,7 @@ static int pppol2tp_tunnel_ioctl(struct l2tp_tunnel *tunnel,
 				err = -EBADR;
 			break;
 		}
+#endif
 #ifdef CONFIG_XFRM
 		stats.using_ipsec = (sk->sk_policy[0] || sk->sk_policy[1]) ? 1 : 0;
 #endif

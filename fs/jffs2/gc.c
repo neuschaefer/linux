@@ -903,6 +903,11 @@ static int jffs2_garbage_collect_deletion_dirent(struct jffs2_sb_info *c, struct
 
 		for (raw = f->inocache->nodes; raw != (void *)f->inocache; raw = raw->next_in_ino) {
 
+#if defined(CONFIG_BCM_KF_JFFS)
+			if (!raw)
+				break;
+#endif
+
 			cond_resched();
 
 			/* We only care about obsolete ones */
@@ -923,7 +928,20 @@ static int jffs2_garbage_collect_deletion_dirent(struct jffs2_sb_info *c, struct
 
 			/* This is an obsolete node belonging to the same directory, and it's of the right
 			   length. We need to take a closer look...*/
+ #if defined(CONFIG_BCM_KF_JFFS)
+			/* The lock, erase_free_sem, needs to be unlocked here in order to prevent a possible
+			* deadlock. Without doing this, the following condition can occur.
+			* thread 1: brcmnand_erase => brcmnand_get_device (gets and holds chip_lock) =>
+			*           jffs2_erase_pending_blocks (blocks trying to get erase_free_sem)
+			* thread 2: jffs2_garbage_collect_deletion_dirent (gets and holds erase_free_sem) =>
+			*           brcmnand_get_device (blocks trying to get chip_lock)
+			*/
+			mutex_unlock(&c->erase_free_sem);
 			ret = jffs2_flash_read(c, ref_offset(raw), rawlen, &retlen, (char *)rd);
+			mutex_lock(&c->erase_free_sem);
+#else
+			ret = jffs2_flash_read(c, ref_offset(raw), rawlen, &retlen, (char *)rd);
+#endif
 			if (ret) {
 				pr_warn("%s(): Read error (%d) reading obsolete node at %08x\n",
 					__func__, ret, ref_offset(raw));

@@ -1068,6 +1068,9 @@ int spi_nor_scan(struct spi_nor *nor, const char *name, enum read_mode mode)
 	mtd->_erase = spi_nor_erase;
 	mtd->_read = spi_nor_read;
 
+#ifdef CONFIG_BCM_KF_MTD_OOPS
+	mtd->_panic_write = spi_nor_write;
+#endif
 	/* nor protection support for STmicro chips */
 	if (JEDEC_MFR(info) == CFI_MFR_ST) {
 		nor->flash_lock = stm_lock;

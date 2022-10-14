@@ -99,6 +99,10 @@
 
 #define ETH_P_802_3_MIN	0x0600		/* If the value in the ethernet type is less than this value
 					 * then the frame is Ethernet II. Else it is 802.3 */
+#if defined(CONFIG_BCM_KF_VLAN)
+#define ETH_P_8021AG	0x8902		/* 802.1ag Connectivity Fault Mgmt */
+#define	ETH_P_8023AH	0x8809      /* 802.3ah Ethernet OAM */
+#endif
 
 /*
  *	Non DIX types. Won't clash for 1500 types.
@@ -129,6 +133,11 @@
 #define ETH_P_IEEE802154 0x00F6		/* IEEE802.15.4 frame		*/
 #define ETH_P_CAIF	0x00F7		/* ST-Ericsson CAIF protocol	*/
 #define ETH_P_XDSA	0x00F8		/* Multiplexed DSA protocol	*/
+#ifdef CONFIG_BCM_KF_MHI
+#define ETH_P_MHI	0x00F9		/* Renesas MHI protocol		*/
+#define ETH_P_RAW	0x00FA		/* RAW access to frames		*/
+#define ETH_P_MHDP	0x00FB		/* MHDP data frames		*/
+#endif
 
 /*
  *	This is an Ethernet frame header.

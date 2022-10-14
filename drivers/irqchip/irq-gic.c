@@ -953,7 +953,14 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
 		gic_irqs = 1020;
 	gic->gic_irqs = gic_irqs;
 
+#if defined(CONFIG_BCM_KF_ARM_BCM963XX) && (defined(CONFIG_BCM963138) || defined(CONFIG_BCM963148))
+	/* To support GIC in device tree for 63138/63148 legacy device, always use legacy way to add
+	   irq domain and allocate irqs first. A lot of devices has not using device tree yet so need to
+	   pre-allocate irq heres otherwise request_irq function return error */
+	if (false) {
+#else
 	if (node) {		/* DT case */
+#endif
 		gic->domain = irq_domain_add_linear(node, gic_irqs,
 						    &gic_irq_domain_hierarchy_ops,
 						    gic);

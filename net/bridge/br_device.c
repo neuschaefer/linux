@@ -22,6 +22,18 @@
 #include <asm/uaccess.h>
 #include "br_private.h"
 
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+#include <linux/blog.h>
+#endif
+#if defined(CONFIG_BCM_KF_WL)
+#if defined(PKTC)
+#include <osl.h>
+#include <wl_pktc.h>
+extern unsigned long (*wl_pktc_req_hook)(int req_id, unsigned long param0, unsigned long param1, unsigned long param2);
+#endif /* PKTC */
+#include <linux/bcm_skb_defines.h>
+#endif
+
 #define COMMON_FEATURES (NETIF_F_SG | NETIF_F_FRAGLIST | NETIF_F_HIGHDMA | \
 			 NETIF_F_GSO_MASK | NETIF_F_HW_CSUM)
 
@@ -47,6 +59,12 @@ netdev_tx_t br_dev_xmit(struct sk_buff *skb, struct net_device *dev)
 		rcu_read_unlock();
 		return NETDEV_TX_OK;
 	}
+
+#if defined(CONFIG_BCM_KF_BLOG)
+	blog_lock();
+	blog_link(IF_DEVICE, blog_ptr(skb), (void*)dev, DIR_TX, skb->len);
+	blog_unlock();
+#endif
 
 	u64_stats_update_begin(&brstats->syncp);
 	brstats->tx_packets++;
@@ -80,7 +98,50 @@ netdev_tx_t br_dev_xmit(struct sk_buff *skb, struct net_device *dev)
 		else
 			br_flood_deliver(br, skb, false);
 	} else if ((dst = __br_fdb_get(br, dest, vid)) != NULL)
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+	{
+		blog_lock();
+		blog_link(BRIDGEFDB, blog_ptr(skb), (void*)dst, BLOG_PARAM1_DSTFDB, 0);
+		blog_unlock();
+#if defined(CONFIG_BCM_KF_WL)
+#if defined(PKTC)
+		if (wl_pktc_req_hook && (dst->dst != NULL) &&
+			(BLOG_GET_PHYTYPE(dst->dst->dev->path.hw_port_type) == BLOG_WLANPHY) && 
+			wl_pktc_req_hook(PKTC_TBL_GET_TX_MODE, 0, 0, 0))
+		{
+			struct net_device *root_dst_dev_p = dst->dst->dev;
+			unsigned long chainIdx;
+
+			/* Get the root destination device */
+			while (!netdev_path_is_root(root_dst_dev_p)) {
+				  root_dst_dev_p = netdev_path_next_dev(root_dst_dev_p);
+			}
+			chainIdx = wl_pktc_req_hook(PKTC_TBL_UPDATE, (unsigned long)&(dst->addr.addr[0]), (unsigned long)root_dst_dev_p, 0);
+			if (chainIdx != PKTC_INVALID_CHAIN_IDX)
+			{
+				// Update chainIdx in blog
+				if (skb->blog_p != NULL)
+				{
+					skb->blog_p->wfd.nic_ucast.is_tx_hw_acc_en = 1;
+					skb->blog_p->wfd.nic_ucast.is_wfd = 1;
+					skb->blog_p->wfd.nic_ucast.is_chain = 1;
+					skb->blog_p->wfd.nic_ucast.wfd_idx = ((chainIdx & PKTC_WFD_IDX_BITMASK) >> PKTC_WFD_IDX_BITPOS);
+					skb->blog_p->wfd.nic_ucast.chain_idx = chainIdx;
+					//printk("%s: Added ChainEntryIdx 0x%x Dev %s blogSrcAddr 0x%x blogDstAddr 0x%x DstMac %x:%x:%x:%x:%x:%x "
+					//       "wfd_q %d wl_metadata %d wl 0x%x\n", __FUNCTION__,
+					//        chainIdx, dst->dst->dev->name, skb->blog_p->rx.tuple.saddr, skb->blog_p->rx.tuple.daddr,
+					//        dst->addr.addr[0], dst->addr.addr[1], dst->addr.addr[2], dst->addr.addr[3], dst->addr.addr[4],
+					//        dst->addr.addr[5], skb->blog_p->wfd_queue, skb->blog_p->wl_metadata, skb->blog_p->wl);
+				}
+			}
+		}
+#endif
+#endif
 		br_deliver(dst->dst, skb);
+	}        
+#else
+		br_deliver(dst->dst, skb);
+#endif
 	else
 		br_flood_deliver(br, skb, true);
 
@@ -170,7 +231,6 @@ static struct rtnl_link_stats64 *br_get_stats64(struct net_device *dev,
 	stats->tx_packets = sum.tx_packets;
 	stats->rx_bytes   = sum.rx_bytes;
 	stats->rx_packets = sum.rx_packets;
-
 	return stats;
 }
 
@@ -368,6 +428,10 @@ void br_dev_setup(struct net_device *dev)
 	eth_hw_addr_random(dev);
 	ether_setup(dev);
 
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+	dev->blog_stats_flags |= BLOG_DEV_STAT_FLAG_INCLUDE_ALL;
+#endif
+
 	dev->netdev_ops = &br_netdev_ops;
 	dev->destructor = br_dev_free;
 	dev->ethtool_ops = &br_ethtool_ops;
@@ -400,8 +464,20 @@ void br_dev_setup(struct net_device *dev)
 	br->bridge_hello_time = br->hello_time = 2 * HZ;
 	br->bridge_forward_delay = br->forward_delay = 15 * HZ;
 	br->ageing_time = 300 * HZ;
+#if defined(CONFIG_BCM_KF_BRIDGE_COUNTERS)
+	br->mac_entry_discard_counter = 0;
+#endif
 
 	br_netfilter_rtable_init(br);
 	br_stp_timer_init(br);
 	br_multicast_init(br);
+
+#if defined(CONFIG_BCM_KF_BRIDGE_MAC_FDB_LIMIT)
+	br->num_fdb_entries = 0;
+#endif
+
+#if defined(CONFIG_BCM_KF_BRIDGE_MAC_FDB_LIMIT) && defined(CONFIG_BCM_BRIDGE_MAC_FDB_LIMIT)
+	br->max_br_fdb_entries = BR_MAX_FDB_ENTRIES;
+	br->used_br_fdb_entries = 0;
+#endif
 }

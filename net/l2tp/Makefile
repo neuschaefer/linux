@@ -2,6 +2,11 @@
 # Makefile for the L2TP.
 #
 
+ifdef BCM_KF # defined(CONFIG_BCM_KF_BLOG)
+EXTRA_CFLAGS	+= -I$(INC_BRCMDRIVER_PUB_PATH)/$(BRCM_BOARD)
+EXTRA_CFLAGS	+= -I$(INC_BRCMSHARED_PUB_PATH)/bcm963xx
+endif # BCM_KF
+
 obj-$(CONFIG_L2TP) += l2tp_core.o
 
 # Build l2tp as modules if L2TP is M

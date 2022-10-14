@@ -36,6 +36,9 @@ struct ovl_dir_cache {
 
 struct ovl_readdir_data {
 	struct dir_context ctx;
+#if defined(CONFIG_BCM_KF_OVERLAYFS_BACKPORTS)
+	struct dentry *dentry;
+#endif
 	bool is_merge;
 	struct rb_root root;
 	struct list_head *list;
@@ -205,6 +208,9 @@ static int ovl_check_whiteouts(struct dentry *dir, struct ovl_readdir_data *rdd)
 	struct ovl_cache_entry *p;
 	struct dentry *dentry;
 	const struct cred *old_cred;
+#if defined(CONFIG_BCM_KF_OVERLAYFS_BACKPORTS)
+	old_cred = ovl_override_creds(rdd->dentry->d_sb);
+#else
 	struct cred *override_cred;
 
 	override_cred = prepare_creds();
@@ -216,6 +222,7 @@ static int ovl_check_whiteouts(struct dentry *dir, struct ovl_readdir_data *rdd)
 	 */
 	cap_raise(override_cred->cap_effective, CAP_DAC_OVERRIDE);
 	old_cred = override_creds(override_cred);
+#endif
 
 	err = mutex_lock_killable(&dir->d_inode->i_mutex);
 	if (!err) {
@@ -231,7 +238,9 @@ static int ovl_check_whiteouts(struct dentry *dir, struct ovl_readdir_data *rdd)
 		mutex_unlock(&dir->d_inode->i_mutex);
 	}
 	revert_creds(old_cred);
+#if !defined(CONFIG_BCM_KF_OVERLAYFS_BACKPORTS)
 	put_cred(override_cred);
+#endif
 
 	return err;
 }
@@ -287,6 +296,9 @@ static int ovl_dir_read_merged(struct dentry *dentry, struct list_head *list)
 	struct path realpath;
 	struct ovl_readdir_data rdd = {
 		.ctx.actor = ovl_fill_merge,
+#if defined(CONFIG_BCM_KF_OVERLAYFS_BACKPORTS)
+		.dentry = dentry,
+#endif
 		.list = list,
 		.root = RB_ROOT,
 		.is_merge = false,

@@ -1725,7 +1725,11 @@ static int scratchpad_alloc(struct xhci_hcd *xhci, gfp_t flags)
 		if (!buf)
 			goto fail_sp5;
 
+#if defined(CONFIG_BCM_KF_MIPS_BCM963XX) || defined(CONFIG_BCM_KF_ARM_BCM963XX) 
+		xhci->scratchpad->sp_array[i] = cpu_to_le64(dma);
+#else
 		xhci->scratchpad->sp_array[i] = dma;
+#endif
 		xhci->scratchpad->sp_buffers[i] = buf;
 		xhci->scratchpad->sp_dma_buffers[i] = dma;
 	}

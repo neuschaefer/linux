@@ -2692,6 +2692,7 @@ static int packet_do_bind(struct sock *sk, const char *name, int ifindex,
 {
 	struct packet_sock *po = pkt_sk(sk);
 	struct net_device *dev_curr;
+
 	__be16 proto_curr;
 	bool need_rehook;
 	struct net_device *dev = NULL;
@@ -2747,6 +2748,8 @@ static int packet_do_bind(struct sock *sk, const char *name, int ifindex,
 		BUG_ON(po->running);
 		po->num = proto;
 		po->prot_hook.type = proto;
+#if !defined(CONFIG_BCM_KF_MISC_BACKPORTS)
+#endif
 
 		if (unlikely(unlisted)) {
 			dev_put(dev);

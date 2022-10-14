@@ -182,4 +182,8 @@ source "drivers/thunderbolt/Kconfig"
 
 source "drivers/android/Kconfig"
 
+if BCM_KF_OPTEE
+source "drivers/tee/Kconfig"
+endif
+
 endmenu

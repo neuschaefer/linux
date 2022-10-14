@@ -21,6 +21,15 @@ bool vlan_do_receive(struct sk_buff **skbp)
 	if (unlikely(!skb))
 		return false;
 
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+    if (blog_ptr(skb)) 
+    {
+        blog_lock();
+        blog_link( IF_DEVICE, blog_ptr(skb), (void*)vlan_dev, DIR_RX, skb->len );
+        blog_unlock();
+    }
+#endif
+
 	skb->dev = vlan_dev;
 	if (unlikely(skb->pkt_type == PACKET_OTHERHOST)) {
 		/* Our lower layer thinks this is not local, let's make sure.

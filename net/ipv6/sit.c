@@ -56,6 +56,10 @@
 #include <net/net_namespace.h>
 #include <net/netns/generic.h>
 
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+#include <linux/blog.h>
+#endif
+
 /*
    This version of net/ipv6/sit.c is cloned of net/ipv4/ip_gre.c
 
@@ -710,6 +714,13 @@ static int ipip6_rcv(struct sk_buff *skb)
 		tstats->rx_bytes += skb->len;
 		u64_stats_update_end(&tstats->syncp);
 
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+		blog_lock();
+		blog_link(TOS_MODE, blog_ptr(skb), tunnel, DIR_RX, BLOG_TOS_FIXED);
+		blog_link(IF_DEVICE, blog_ptr(skb), (void*)tunnel->dev, DIR_RX, skb->len);
+		blog_unlock();
+#endif
+
 		netif_rx(skb);
 
 		return 0;
@@ -985,9 +996,36 @@ static netdev_tx_t ipip6_tunnel_xmit(struct sk_buff *skb,
 
 	skb_set_inner_ipproto(skb, IPPROTO_IPV6);
 
-	err = iptunnel_xmit(NULL, rt, skb, fl4.saddr, fl4.daddr,
-			    protocol, tos, ttl, df,
-			    !net_eq(tunnel->net, dev_net(dev)));
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+	blog_lock();
+	blog_link(TOS_MODE, blog_ptr(skb), tunnel, DIR_TX, tunnel->parms.iph.tos);
+	blog_link(IF_DEVICE, blog_ptr(skb), (void*)dev, DIR_TX, skb->len);
+	blog_unlock();
+#endif
+
+#if defined(CONFIG_BCM_KF_IP)
+	/*
+	 *	cd-router #1329: DF flag should not be set
+	 *	RFC 3056 sec 4: DF flag should not be set
+	 *	RFC 4213 sec 3.2.1: DF flag MUST NOT be set for static MTU cases.
+	 *	RFC 4213 sec 3.2.2: For dynamic MTU cases, the algorithm should be:
+	 *	if ( (v4MTU-20) < 1280 ) {
+	 *	    if ( v6Pkt > 1280 ) send ICMPv6 "TooBig" with MTU=1280;
+	 *	    else encapsulate to v4 packet and DF flag MUST NOT be set
+	 *	}
+	 *	else {
+	 *	    if ( v6Pkt > (v4MTU-20) ) send ICMPv6 "TooBig" with MTU=(v4MTU-20);
+	 *	    else encapsulate to v4 packet and DF flag MUST be set
+	 *	}
+	 */
+	err = iptunnel_xmit(NULL, rt, skb, fl4.saddr, fl4.daddr, IPPROTO_IPV6, tos,
+			    ttl, 0, !net_eq(tunnel->net, dev_net(dev)));
+#else
+        err = iptunnel_xmit(NULL, rt, skb, fl4.saddr, fl4.daddr,
+                            protocol, tos, ttl, df,
+                            !net_eq(tunnel->net, dev_net(dev)));
+#endif
+
 	iptunnel_xmit_stats(err, &dev->stats, dev->tstats);
 	return NETDEV_TX_OK;
 
@@ -1373,6 +1411,9 @@ static void ipip6_tunnel_setup(struct net_device *dev)
 	dev->features		|= NETIF_F_LLTX;
 	dev->features		|= SIT_FEATURES;
 	dev->hw_features	|= SIT_FEATURES;
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+	dev->blog_stats_flags |= BLOG_DEV_STAT_FLAG_INCLUDE_ALL;
+#endif
 }
 
 static int ipip6_tunnel_init(struct net_device *dev)

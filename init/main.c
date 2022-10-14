@@ -465,7 +465,7 @@ void __init __weak smp_setup_processor_id(void)
 {
 }
 
-# if THREAD_SIZE >= PAGE_SIZE
+#if THREAD_SIZE >= PAGE_SIZE
 void __init __weak thread_info_cache_init(void)
 {
 }
@@ -673,7 +673,6 @@ asmlinkage __visible void __init start_kernel(void)
 	}
 
 	ftrace_init();
-
 	/* Do the rest non-__init'ed, we're now alive */
 	rest_init();
 }

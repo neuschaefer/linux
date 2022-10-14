@@ -48,6 +48,11 @@ ifneq ($(SUBARCH),$(ARCH))
   endif
 endif
 
+ifdef BCM_KF # defined(CONFIG_BCM_KF_MISC_MAKEFILE)
+# removing -ffunction-sections from clfags-y
+cflags-y :=
+endif # BCM_KF # CONFIG_BCM_KF_MISC_MAKEFILE
+
 ifdef CONFIG_FUNCTION_GRAPH_TRACER
   ifndef KBUILD_MCOUNT_RA_ADDRESS
     ifeq ($(call cc-option-yn,-mmcount-ra-address), y)
@@ -119,11 +124,20 @@ undef-all += -UMIPSEB -U_MIPSEB -U__MIPSEB -U__MIPSEB__
 undef-all += -UMIPSEL -U_MIPSEL -U__MIPSEL -U__MIPSEL__
 predef-be += -DMIPSEB -D_MIPSEB -D__MIPSEB -D__MIPSEB__
 predef-le += -DMIPSEL -D_MIPSEL -D__MIPSEL -D__MIPSEL__
+ifdef BCM_KF # defined(CONFIG_BCM_KF_MISC_MAKEFILE)
+cflags-$(CONFIG_CPU_BIG_ENDIAN)		+= $(shell $(CC) -dumpmachine |grep -q 'mips.*el-.*' || echo -EB $(undef-all) $(predef-be))
+cflags-$(CONFIG_CPU_LITTLE_ENDIAN)	+= $(shell $(CC) -dumpmachine |grep -q 'mips.*el-.*' && echo -EL $(undef-all) $(predef-le))
+else # BCM_KF # defined(CONFIG_BCM_KF_MISC_MAKEFILE)
 cflags-$(CONFIG_CPU_BIG_ENDIAN)		+= $(shell $(CC) -dumpmachine |grep -q 'mips.*el-.*' && echo -EB $(undef-all) $(predef-be))
 cflags-$(CONFIG_CPU_LITTLE_ENDIAN)	+= $(shell $(CC) -dumpmachine |grep -q 'mips.*el-.*' || echo -EL $(undef-all) $(predef-le))
+endif # BCM_KF # defined(CONFIG_BCM_KF_MISC_MAKEFILE)
 
 cflags-$(CONFIG_SB1XXX_CORELIS)	+= $(call cc-option,-mno-sched-prolog) \
 				   -fno-omit-frame-pointer
+
+ifdef BCM_KF # defined(CONFIG_BCM_KF_MISC_MAKEFILE)
+cflags-$(CONFIG_REMOTE_DEBUG)	+= -ggdb
+endif # BCM_KF # CONFIG_BCM_KF_MISC_MAKEFILE
 #
 # CPU-dependent compiler/assembler options for optimization.
 #
@@ -366,16 +380,33 @@ CLEAN_FILES += vmlinux.32 vmlinux.64
 # device-trees
 core-$(CONFIG_BUILTIN_DTB) += arch/mips/boot/dts/
 
+ifdef BCM_KF # defined(CONFIG_BCM_KF_MISC_MAKEFILE)
+boot := arch/mips/boot
+endif # BCM_KF # defined(CONFIG_BCM_KF_MISC_MAKEFILE)
+
 %.dtb %.dtb.S %.dtb.o: | scripts
+ifdef BCM_KF # defined(CONFIG_BCM_KF_MISC_MAKEFILE)
+	$(Q)$(MAKE) $(build)=$(boot)/dts $(boot)/dts/$@
+else  # BCM_KF # defined(CONFIG_BCM_KF_MISC_MAKEFILE)
 	$(Q)$(MAKE) $(build)=arch/mips/boot/dts arch/mips/boot/dts/$@
+endif # BCM_KF # defined(CONFIG_BCM_KF_MISC_MAKEFILE)
 
 PHONY += dtbs
+ifdef BCM_KF #defined (CONFIG_BCM_KF_MISC_MAKEFILE)
+dtbs: prepare scripts
+	$(Q)$(MAKE) $(build)=$(boot)/dts
+else # BCM_KF # defined(CONFIG_BCM_KF_MISC_MAKEFILE)
 dtbs: scripts
 	$(Q)$(MAKE) $(build)=arch/mips/boot/dts
+endif # BCM_KF # defined(CONFIG_BCM_KF_MISC_MAKEFILE)
 
 PHONY += dtbs_install
 dtbs_install:
+ifdef BCM_KF #defined (CONFIG_BCM_KF_MISC_MAKEFILE)
+	$(Q)$(MAKE) $(dtbinst)=$(boot)/dts
+else # BCM_KF #defined (CONFIG_BCM_KF_MISC_MAKEFILE)
 	$(Q)$(MAKE) $(dtbinst)=arch/mips/boot/dts
+endif # BCM_KF #defined (CONFIG_BCM_KF_MISC_MAKEFILE)
 
 archprepare:
 ifdef CONFIG_MIPS32_N32

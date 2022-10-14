@@ -26,6 +26,9 @@
 
 struct mtd_info;
 struct nand_flash_dev;
+#if defined(CONFIG_BCM_KF_MTD_BCMNAND)
+struct device_node;
+#endif
 /* Scan and identify a NAND device */
 extern int nand_scan(struct mtd_info *mtd, int max_chips);
 /*
@@ -187,6 +190,14 @@ typedef enum {
  * kmap'ed, vmalloc'ed highmem buffers being passed from upper layers
  */
 #define NAND_USE_BOUNCE_BUFFER	0x00100000
+
+#if defined(CONFIG_BCM_KF_MTD_BCMNAND)
+/* For Hynix MLC flashes, the BI are written to last and (last-2) pages. */
+#define NAND_SCAN_BI_3RD_PAGE	0x10000000
+
+/* NOP=1 NAND SLC device */
+#define NAND_PAGE_NOP1		0x20000000
+#endif
 
 /* Options set by nand scan */
 /* Nand scan has allocated controller struct */
@@ -643,6 +654,9 @@ struct nand_buffers {
 struct nand_chip {
 	void __iomem *IO_ADDR_R;
 	void __iomem *IO_ADDR_W;
+#if defined(CONFIG_BCM_KF_MTD_BCMNAND)
+	struct device_node *dn;
+#endif
 
 	uint8_t (*read_byte)(struct mtd_info *mtd);
 	u16 (*read_word)(struct mtd_info *mtd);
@@ -690,6 +704,13 @@ struct nand_chip {
 	uint16_t ecc_strength_ds;
 	uint16_t ecc_step_ds;
 	int onfi_timing_mode_default;
+#if defined(CONFIG_BCM_KF_MTD_BCMNAND)
+	/* before ONFI auto timing adjustment in kernel, add Broadcom specific timing
+	 * parameters for better performnace.
+	 */
+	uint32_t timing_1;
+	uint32_t timing_2;
+#endif
 	int badblockpos;
 	int badblockbits;
 
@@ -737,6 +758,7 @@ struct nand_chip {
 #define NAND_MFR_SANDISK	0x45
 #define NAND_MFR_INTEL		0x89
 #define NAND_MFR_ATO		0x9b
+
 
 /* The maximum expected count of bytes in the NAND ID sequence */
 #define NAND_MAX_ID_LEN 8
@@ -818,6 +840,13 @@ struct nand_flash_dev {
 		uint16_t step_ds;
 	} ecc;
 	int onfi_timing_mode_default;
+#if defined(CONFIG_BCM_KF_MTD_BCMNAND)
+	/* before ONFI auto timing adjustment in kernel, add Broadcom specific timing
+	 * parameters for better performnace.
+	 */
+	uint32_t timing_1;
+	uint32_t timing_2;
+#endif
 };
 
 /**

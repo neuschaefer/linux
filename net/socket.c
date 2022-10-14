@@ -2904,6 +2904,10 @@ static int dev_ifsioc(struct net *net, struct socket *sock,
 		case SIOCGIFTXQLEN:
 		case SIOCGMIIPHY:
 		case SIOCGMIIREG:
+#if defined(CONFIG_BCM_KF_WANDEV)
+		case SIOCGIFTRANSSTART:
+		case SIOCDEVISWANDEV:
+#endif
 			if (copy_in_user(uifr32, uifr, sizeof(*uifr32)))
 				err = -EFAULT;
 			break;
@@ -3141,6 +3145,13 @@ static int compat_sock_ioctl_trans(struct file *file, struct socket *sock,
 	case SIOCGMIIPHY:
 	case SIOCGMIIREG:
 	case SIOCSMIIREG:
+#if defined(CONFIG_BCM_KF_MISC_IOCTLS)
+	case SIOCGIFTRANSSTART:
+	case SIOCCIFSTATS:
+#endif
+#if defined(CONFIG_BCM_KF_WANDEV)
+	case SIOCDEVISWANDEV:
+#endif
 		return dev_ifsioc(net, sock, cmd, argp);
 
 	case SIOCSARP:

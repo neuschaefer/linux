@@ -97,8 +97,12 @@ static __inline__ struct ipv6_pinfo *inet6_sk_generic(struct sock *sk)
 	return (struct ipv6_pinfo *)(((u8 *)sk) + offset);
 }
 
+#if !defined(CONFIG_BCM_MPTCP) || !defined(CONFIG_BCM_KF_MPTCP)
 static int inet6_create(struct net *net, struct socket *sock, int protocol,
 			int kern)
+#else
+int inet6_create(struct net *net, struct socket *sock, int protocol, int kern)
+#endif
 {
 	struct inet_sock *inet;
 	struct ipv6_pinfo *np;

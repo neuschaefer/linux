@@ -58,6 +58,10 @@
 #include <net/net_namespace.h>
 #include <net/netns/generic.h>
 
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+#include <linux/blog.h>
+#endif
+
 MODULE_AUTHOR("Ville Nuorvala");
 MODULE_DESCRIPTION("IPv6 tunneling device");
 MODULE_LICENSE("GPL");
@@ -854,6 +858,15 @@ static int ip6_tnl_rcv(struct sk_buff *skb, __u16 protocol,
 		u64_stats_update_begin(&tstats->syncp);
 		tstats->rx_packets++;
 		tstats->rx_bytes += skb->len;
+
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+		blog_lock();
+		blog_link(TOS_MODE, blog_ptr(skb), NULL, DIR_RX, 
+			(t->parms.flags & IP6_TNL_F_RCV_DSCP_COPY) ?
+				BLOG_TOS_INHERIT : BLOG_TOS_FIXED);
+		blog_link(IF_DEVICE, blog_ptr(skb), (void*)t->dev, DIR_RX, skb->len);
+		blog_unlock();
+#endif
 		u64_stats_update_end(&tstats->syncp);
 
 		netif_rx(skb);
@@ -989,6 +1002,9 @@ static int ip6_tnl_xmit2(struct sk_buff *skb,
 	unsigned int max_headroom = sizeof(struct ipv6hdr);
 	u8 proto;
 	int err = -1;
+#if defined(CONFIG_BCM_KF_IP)
+	u8 needFrag = 0;
+#endif
 
 	/* NBMA tunnel */
 	if (ipv6_addr_any(&t->parms.raddr)) {
@@ -1051,8 +1067,12 @@ static int ip6_tnl_xmit2(struct sk_buff *skb,
 		skb_dst(skb)->ops->update_pmtu(skb_dst(skb), NULL, skb, mtu);
 	if (skb->len > mtu) {
 		*pmtu = mtu;
+#if defined(CONFIG_BCM_KF_IP)
+		needFrag = 1;
+#else      
 		err = -EMSGSIZE;
 		goto tx_err_dst_release;
+#endif
 	}
 
 	skb_scrub_packet(skb, !net_eq(t->net, dev_net(dev)));
@@ -1103,7 +1123,17 @@ static int ip6_tnl_xmit2(struct sk_buff *skb,
 	ipv6h->nexthdr = proto;
 	ipv6h->saddr = fl6->saddr;
 	ipv6h->daddr = fl6->daddr;
+#if defined(CONFIG_BCM_KF_IP)
+	if (needFrag) {
+		skb->ignore_df = 1;
+		ip6_fragment(skb->sk, skb, ip6_local_out_sk);
+	}
+	else {
+		ip6tunnel_xmit(skb->sk, skb, dev);
+	}
+#else
 	ip6tunnel_xmit(NULL, skb, dev);
+#endif            
 	if (ndst)
 		ip6_tnl_dst_store(t, ndst);
 	return 0;
@@ -1146,6 +1176,15 @@ ip4ip6_tnl_xmit(struct sk_buff *skb, struct net_device *dev)
 					  & IPV6_TCLASS_MASK;
 	if (t->parms.flags & IP6_TNL_F_USE_ORIG_FWMARK)
 		fl6.flowi6_mark = skb->mark;
+
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+	blog_lock();
+	blog_link(TOS_MODE, blog_ptr(skb), NULL, DIR_TX,
+		(t->parms.flags & IP6_TNL_F_USE_ORIG_TCLASS) ?
+			BLOG_TOS_INHERIT : BLOG_TOS_FIXED);
+	blog_link(IF_DEVICE, blog_ptr(skb), (void*)dev, DIR_TX, skb->len);
+	blog_unlock();
+#endif
 
 	err = ip6_tnl_xmit2(skb, dev, dsfield, &fl6, encap_limit, &mtu);
 	if (err != 0) {
@@ -1566,6 +1605,9 @@ static void ip6_tnl_dev_setup(struct net_device *dev)
 	/* This perm addr will be used as interface identifier by IPv6 */
 	dev->addr_assign_type = NET_ADDR_RANDOM;
 	eth_random_addr(dev->perm_addr);
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+	dev->blog_stats_flags |= BLOG_DEV_STAT_FLAG_INCLUDE_ALL;
+#endif
 }
 
 

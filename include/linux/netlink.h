@@ -108,10 +108,14 @@ netlink_skb_clone(struct sk_buff *skb, gfp_t gfp_mask)
  *	use enormous buffer sizes on recvmsg() calls just to avoid
  *	MSG_TRUNC when PAGE_SIZE is very large.
  */
+#if defined(CONFIG_BCM_KF_512MB_DDR) && defined(CONFIG_BCM_512MB_DDR)
+#define NLMSG_GOODSIZE	SKB_WITH_OVERHEAD(4096UL)
+#else
 #if PAGE_SIZE < 8192UL
 #define NLMSG_GOODSIZE	SKB_WITH_OVERHEAD(PAGE_SIZE)
 #else
 #define NLMSG_GOODSIZE	SKB_WITH_OVERHEAD(8192UL)
+#endif
 #endif
 
 #define NLMSG_DEFAULT_SIZE (NLMSG_GOODSIZE - NLMSG_HDRLEN)

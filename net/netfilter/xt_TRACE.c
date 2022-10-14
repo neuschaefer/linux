@@ -13,6 +13,13 @@ MODULE_ALIAS("ip6t_TRACE");
 static unsigned int
 trace_tg(struct sk_buff *skb, const struct xt_action_param *par)
 {
+
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG_FEATURE)
+	skb->ipt_check |= IPT_TARGET_TRACE;
+	if ( skb->ipt_check & IPT_TARGET_CHECK )
+		return XT_CONTINUE;
+#endif
+
 	skb->nf_trace = 1;
 	return XT_CONTINUE;
 }

@@ -23,6 +23,12 @@
 #ifndef _UAPI_LINUX_IF_ARP_H
 #define _UAPI_LINUX_IF_ARP_H
 
+#if defined(CONFIG_BCM_KF_DOUBLE_INCLUSION) || !defined(CONFIG_BCM_IN_KERNEL)
+#ifndef _LINUX_IF_ARP_H
+#define _LINUX_IF_ARP_H
+#endif
+#endif
+
 #include <linux/netdevice.h>
 
 /* ARP protocol HARDWARE identifiers. */
@@ -40,6 +46,10 @@
 #define ARPHRD_METRICOM	23		/* Metricom STRIP (new IANA id)	*/
 #define	ARPHRD_IEEE1394	24		/* IEEE 1394 IPv4 - RFC 2734	*/
 #define ARPHRD_EUI64	27		/* EUI-64                       */
+#if defined(CONFIG_BCM_KF_IP) || !defined(CONFIG_BCM_IN_KERNEL)
+#define ARPHRD_CPCS     28              /* CPCS                         */
+#define ARPHRD_DSL      29              /* ADSL                         */
+#endif
 #define ARPHRD_INFINIBAND 32		/* InfiniBand			*/
 
 /* Dummy types for non ARP hardware */
@@ -95,6 +105,9 @@
 #define ARPHRD_IP6GRE	823		/* GRE over IPv6		*/
 #define ARPHRD_NETLINK	824		/* Netlink header		*/
 #define ARPHRD_6LOWPAN	825		/* IPv6 over LoWPAN             */
+#ifdef CONFIG_BCM_KF_MHI
+#define ARPHRD_MHI	1823		/* Modem-Host IF		*/
+#endif
 
 #define ARPHRD_VOID	  0xFFFF	/* Void type, nothing is known */
 #define ARPHRD_NONE	  0xFFFE	/* zero header length */

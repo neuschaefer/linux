@@ -310,11 +310,22 @@ bool ipv6_opt_accepted(const struct sock *sk, const struct sk_buff *skb,
 
 static inline bool ipv6_accept_ra(struct inet6_dev *idev)
 {
+#if defined(CONFIG_BCM_KF_IP)
+	/* WAN interface needs to act like a host. */
+	if (((idev->cnf.forwarding) && 
+		(!(idev->dev->priv_flags & IFF_WANDEV) || 
+		((idev->dev->priv_flags & IFF_WANDEV) && 
+		netdev_path_is_root(idev->dev))))
+		&& (idev->cnf.accept_ra < 2))
+	    return 0;
+	return idev->cnf.accept_ra;
+#else
 	/* If forwarding is enabled, RA are not accepted unless the special
 	 * hybrid mode (accept_ra=2) is enabled.
 	 */
 	return idev->cnf.forwarding ? idev->cnf.accept_ra == 2 :
 	    idev->cnf.accept_ra;
+#endif
 }
 
 #if IS_ENABLED(CONFIG_IPV6)

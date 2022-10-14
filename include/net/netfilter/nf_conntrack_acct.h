@@ -13,10 +13,19 @@
 #include <linux/netfilter/nf_conntrack_tuple_common.h>
 #include <net/netfilter/nf_conntrack.h>
 #include <net/netfilter/nf_conntrack_extend.h>
+#if defined(CONFIG_BCM_KF_DPI) && defined(CONFIG_BCM_DPI_MODULE)
+#include <linux/dpi.h>
+#endif
+
 
 struct nf_conn_counter {
 	atomic64_t packets;
 	atomic64_t bytes;
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+	unsigned long cum_fast_pkts;
+	unsigned long long cum_fast_bytes;
+	unsigned long ts;
+#endif    
 };
 
 struct nf_conn_acct {
@@ -48,6 +57,11 @@ struct nf_conn_acct *nf_ct_acct_ext_add(struct nf_conn *ct, gfp_t gfp)
 
 unsigned int seq_print_acct(struct seq_file *s, const struct nf_conn *ct,
 			    int dir);
+#if defined(CONFIG_BCM_KF_DPI) && defined(CONFIG_BCM_DPI_MODULE)
+void conntrack_dpi_evict_conn(struct nf_conn *ct, int dir);
+int conntrack_dpi_seq_print_stats(struct seq_file *s, struct nf_conn *ct,
+				  int dir);
+#endif
 
 /* Check if connection tracking accounting is enabled */
 static inline bool nf_ct_acct_enabled(struct net *net)

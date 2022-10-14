@@ -23,8 +23,14 @@
 #define EBT_IP_PROTO 0x08
 #define EBT_IP_SPORT 0x10
 #define EBT_IP_DPORT 0x20
+#if defined(CONFIG_BCM_KF_NETFILTER) || !defined(CONFIG_BCM_IN_KERNEL)
+#define EBT_IP_DSCP  0x40
+#define EBT_IP_MASK (EBT_IP_SOURCE | EBT_IP_DEST | EBT_IP_TOS | EBT_IP_PROTO |\
+ EBT_IP_SPORT | EBT_IP_DPORT | EBT_IP_DSCP )
+#else 
 #define EBT_IP_MASK (EBT_IP_SOURCE | EBT_IP_DEST | EBT_IP_TOS | EBT_IP_PROTO |\
  EBT_IP_SPORT | EBT_IP_DPORT )
+#endif
 #define EBT_IP_MATCH "ip"
 
 /* the same values are used for the invflags */
@@ -34,6 +40,9 @@ struct ebt_ip_info {
 	__be32 smsk;
 	__be32 dmsk;
 	__u8  tos;
+#if defined(CONFIG_BCM_KF_NETFILTER) || !defined(CONFIG_BCM_IN_KERNEL)
+	__u8  dscp;
+#endif
 	__u8  protocol;
 	__u8  bitmask;
 	__u8  invflags;

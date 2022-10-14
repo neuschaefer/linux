@@ -9,6 +9,8 @@ config MIPS
 	select HAVE_IRQ_EXIT_ON_IRQ_STACK
 	select HAVE_OPROFILE
 	select HAVE_PERF_EVENTS
+	select HAVE_PERF_REGS
+    select HAVE_PERF_USER_STACK_DUMP
 	select PERF_USE_VMALLOC
 	select HAVE_ARCH_KGDB
 	select HAVE_ARCH_SECCOMP_FILTER
@@ -207,6 +209,24 @@ config BCM63XX
 	select MIPS_L1_CACHE_SHIFT_4
 	help
 	 Support for BCM63XX based boards
+
+config MIPS_BCM963XX
+ 	depends on BCM_KF_MIPS_BCM963XX
+	bool "Broadcom 96xxx boards (kern)"
+	select CEVT_R4K
+	select CSRC_R4K
+	select IRQ_CPU
+	select DMA_NONCOHERENT
+	select SYS_SUPPORTS_32BIT_KERNEL
+	select SYS_HAS_CPU_MIPS32_R1
+	select SYS_SUPPORTS_BIG_ENDIAN
+	select SYS_SUPPORTS_LITTLE_ENDIAN
+	select HW_HAS_PCI
+	select MIPS_L1_CACHE_SHIFT_4
+	select USE_OF
+	help
+	 "Support for BCM963XX boards"
+
 
 config MIPS_COBALT
 	bool "Cobalt Server"
@@ -987,6 +1007,8 @@ config ARCH_MAY_HAVE_PC_FDC
 
 config BOOT_RAW
 	bool
+	prompt "boot from raw image" if BCM_KF_MIPS_BCM963XX
+        default n if BCM_KF_MIPS_BCM963XX
 
 config CEVT_BCM1480
 	bool
@@ -1734,6 +1756,7 @@ config CPU_BMIPS4350
 	bool
 	select SYS_SUPPORTS_SMP
 	select SYS_SUPPORTS_HOTPLUG_CPU
+        select MIPS_PERF_SHARED_TC_COUNTERS
 
 config CPU_BMIPS4380
 	bool
@@ -1747,6 +1770,7 @@ config CPU_BMIPS5000
 	select MIPS_L1_CACHE_SHIFT_7
 	select SYS_SUPPORTS_SMP
 	select SYS_SUPPORTS_HOTPLUG_CPU
+        select MIPS_PERF_SHARED_TC_COUNTERS
 
 config SYS_HAS_CPU_LOONGSON3
 	bool
@@ -2782,6 +2806,7 @@ config I8253
 
 config ZONE_DMA
 	bool
+	default y if BCM_KF_MIPS_BCM963XX
 
 config ZONE_DMA32
 	bool

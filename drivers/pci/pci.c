@@ -4544,6 +4544,15 @@ int pci_get_new_domain_nr(void)
 	return atomic_inc_return(&__domain_nr);
 }
 
+#ifdef CONFIG_BCM_KF_PCI_RESET_DOMAIN_NR
+void pci_reset_domain_nr(void)
+{
+	atomic_set(&__domain_nr, -1);
+	return;
+}
+EXPORT_SYMBOL(pci_reset_domain_nr);
+#endif /* CONFIG_BCM_KF_PCI_RESET_DOMAIN_NR */
+
 #ifdef CONFIG_PCI_DOMAINS_GENERIC
 void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
 {

@@ -56,6 +56,10 @@
 #include <net/ip6_route.h>
 #include <net/ip6_tunnel.h>
 
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+#include <linux/nbuff.h>
+#include <linux/blog.h>
+#endif
 
 static bool log_ecn_error = true;
 module_param(log_ecn_error, bool, 0644);
@@ -493,6 +497,13 @@ static int ip6gre_rcv(struct sk_buff *skb)
 					  &ipv6h->saddr, &ipv6h->daddr, key,
 					  gre_proto);
 	if (tunnel) {
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+		blog_link(IF_DEVICE, blog_ptr(skb), (void*)tunnel->dev, DIR_RX, 
+				skb->len);
+		blog_link(GRE_TUNL, blog_ptr(skb), (void*)tunnel, DIR_RX, 0);
+		blog_link(TOS_MODE, blog_ptr(skb), tunnel, DIR_RX, BLOG_TOS_FIXED);
+#endif   
+
 		struct pcpu_sw_netstats *tstats;
 
 		if (!xfrm6_policy_check(NULL, XFRM_POLICY_IN, skb))
@@ -623,6 +634,14 @@ static netdev_tx_t ip6gre_xmit2(struct sk_buff *skb,
 	struct sk_buff *new_skb;
 	__be16 protocol;
 
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+	blog_link(IF_DEVICE, blog_ptr(skb), (void*)dev, DIR_TX, skb->len);
+	blog_link(GRE_TUNL, blog_ptr(skb), (void*)tunnel, DIR_TX, 0);
+	blog_link(TOS_MODE, blog_ptr(skb), tunnel, DIR_TX,
+		(tunnel->parms.flags & IP6_TNL_F_USE_ORIG_TCLASS) ?
+			BLOG_TOS_INHERIT : BLOG_TOS_FIXED);
+#endif
+
 	if (dev->type == ARPHRD_ETHER)
 		IPCB(skb)->flags = 0;
 
@@ -746,7 +765,12 @@ static netdev_tx_t ip6gre_xmit2(struct sk_buff *skb,
 		__be32 *ptr = (__be32 *)(((u8 *)ipv6h) + tunnel->hlen - 4);
 
 		if (tunnel->parms.o_flags&GRE_SEQ) {
+#if (defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG))
+		if (!blog_gre_tunnel_accelerated())
 			++tunnel->o_seqno;
+#else
+			++tunnel->o_seqno;
+#endif
 			*ptr = htonl(tunnel->o_seqno);
 			ptr--;
 		}
@@ -763,6 +787,9 @@ static netdev_tx_t ip6gre_xmit2(struct sk_buff *skb,
 
 	skb_set_inner_protocol(skb, protocol);
 
+#if (defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG))
+	skb->tunl = tunnel;
+#endif
 	ip6tunnel_xmit(NULL, skb, dev);
 	if (ndst)
 		ip6_tnl_dst_store(tunnel, ndst);
@@ -1246,6 +1273,9 @@ static void ip6gre_tunnel_setup(struct net_device *dev)
 	dev->flags |= IFF_NOARP;
 	dev->addr_len = sizeof(struct in6_addr);
 	netif_keep_dst(dev);
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+	dev->blog_stats_flags |= BLOG_DEV_STAT_FLAG_INCLUDE_ALL;
+#endif
 }
 
 static int ip6gre_tunnel_init(struct net_device *dev)
@@ -1499,6 +1529,9 @@ static void ip6gre_tap_setup(struct net_device *dev)
 	dev->destructor = ip6gre_dev_free;
 
 	dev->features |= NETIF_F_NETNS_LOCAL;
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+	dev->blog_stats_flags |= BLOG_DEV_STAT_FLAG_INCLUDE_ALL;
+#endif
 }
 
 static int ip6gre_newlink(struct net *src_net, struct net_device *dev,
@@ -1671,6 +1704,133 @@ static struct rtnl_link_ops ip6gre_tap_ops __read_mostly = {
 	.get_link_net	= ip6_tnl_get_link_net,
 };
 
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+static inline int __bcm_gre6_rcv_check(struct ip6_tnl *tunnel, struct ipv6hdr *ipv6h, 
+	uint16_t len, uint32_t *pkt_seqno)
+{
+	int ret = BLOG_GRE_RCV_NO_SEQNO;
+	int grehlen = 4;
+	/* Not supporting extension headers. If this changes, need to calculate. */
+	__be16 *p = (__be16*)((uint8_t *)ipv6h+BLOG_IPV6_HDR_LEN);
+	__be16 flags;
+
+	flags = p[0];
+
+	if (tunnel->parms.i_flags & GRE_CSUM) {
+		uint16_t csum;
+
+		grehlen += 4;
+		csum = *(((__be16 *)p) + 2);
+
+		if (!csum)
+			goto no_csum;
+
+		csum = ip_compute_csum((void*)(ipv6h+1), len - BLOG_IPV6_HDR_LEN);
+
+		if (csum) {
+			tunnel->dev->stats.rx_crc_errors++;
+			tunnel->dev->stats.rx_errors++;
+			ret = BLOG_GRE_RCV_CHKSUM_ERR;
+			goto rcv_done;
+		}
+	}
+
+no_csum:
+	if ((tunnel->parms.i_flags & GRE_KEY) && (flags&GRE_KEY))
+		grehlen += 4;
+
+	if (tunnel->parms.i_flags & GRE_SEQ) {
+		uint32_t seqno = *(((__be32 *)p) + (grehlen / 4));
+		*pkt_seqno = seqno;
+		if (tunnel->i_seqno && (s32)(seqno - tunnel->i_seqno) == 0) {
+			tunnel->i_seqno = seqno + 1;
+			ret = BLOG_GRE_RCV_IN_SEQ;
+		} else if (tunnel->i_seqno && (s32)(seqno - tunnel->i_seqno) < 0) {
+			tunnel->dev->stats.rx_fifo_errors++;
+			tunnel->dev->stats.rx_errors++;
+			ret = BLOG_GRE_RCV_OOS_LT;
+		} else {
+			tunnel->i_seqno = seqno + 1;
+			ret = BLOG_GRE_RCV_OOS_GT;
+		}
+	}
+
+rcv_done:
+	return ret;
+}
+
+int bcm_gre6_rcv_check(struct net_device *dev, struct ipv6hdr *ipv6h,
+	uint16_t len, void **tunl, uint32_t *pkt_seqno)
+{
+	int ret = BLOG_GRE_RCV_NO_TUNNEL;
+	struct ip6_tnl *tunnel;
+
+	u8 *h = (uint8_t *)ipv6h+BLOG_IPV6_HDR_LEN;
+	__be16 flags = *(__be16 *)h;
+	__be16 protocol = *((__be16 *)h + 1);
+	__be32 *options =(__be32*)(__be32 *)(h + BLOG_GRE_HDR_LEN);
+	__be32 key = 0;
+
+	if (flags & GRE_CSUM) {
+		options++;
+	}
+
+	if (flags & GRE_KEY) {
+		key = *options;
+	}
+
+	tunnel = ip6gre_tunnel_lookup(dev, &ipv6h->daddr, &ipv6h->saddr,
+				key, protocol);
+
+	if (tunnel) {
+		rcu_read_lock();
+		ret =  __bcm_gre6_rcv_check(tunnel, ipv6h, len, pkt_seqno);
+		rcu_read_unlock();
+	}
+
+	*tunl = (void *) tunnel;
+	return ret;
+}
+
+/* Adds the TX seqno, Key and updates the GRE checksum */
+static inline
+void __bcm_gre6_xmit_update(struct ip6_tnl *tunnel, struct ipv6hdr *ipv6h,
+	uint16_t len)
+{
+	if (tunnel->parms.o_flags&(GRE_KEY|GRE_CSUM|GRE_SEQ)) {
+		/* ip6 tunnel hlen is precalculated GRE header length (includes encap). */
+		__be32 *ptr = (__be32*)(((u8*)ipv6h) + tunnel->hlen - 4);
+
+		if (tunnel->parms.o_flags&GRE_SEQ) {
+			++tunnel->o_seqno;
+			*ptr = htonl(tunnel->o_seqno);
+			ptr--;
+		}
+
+		if (tunnel->parms.o_flags&GRE_KEY) {
+			*ptr = tunnel->parms.o_key;
+			ptr--;
+		}
+
+		if (tunnel->parms.o_flags&GRE_CSUM) {
+			*ptr = 0;
+			*(__sum16*)ptr = ip_compute_csum((void*)(ipv6h+1), len - BLOG_IPV6_HDR_LEN);
+		}
+		cache_flush_len(ptr, tunnel->hlen);
+	}
+}
+
+/* Adds the oseqno and updates the GRE checksum */
+void bcm_gre6_xmit_update(struct ip6_tnl *tunnel, struct ipv6hdr *ipv6h,
+	uint16_t len)
+{
+	rcu_read_lock();
+	__bcm_gre6_xmit_update(tunnel, ipv6h, len);
+	rcu_read_unlock();
+}
+
+#endif
+
 /*
  *	And now the modules code and kernel interface.
  */
@@ -1698,6 +1858,11 @@ static int __init ip6gre_init(void)
 	err = rtnl_link_register(&ip6gre_tap_ops);
 	if (err < 0)
 		goto tap_ops_failed;
+
+#if defined(CONFIG_BCM_KF_BLOG) && defined(CONFIG_BLOG)
+	blog_gre6_rcv_check_fn = (blog_gre6_rcv_check_t) bcm_gre6_rcv_check;
+	blog_gre6_xmit_update_fn = (blog_gre6_xmit_upd_t) bcm_gre6_xmit_update;
+#endif
 
 out:
 	return err;

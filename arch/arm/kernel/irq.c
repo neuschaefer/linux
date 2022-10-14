@@ -39,10 +39,16 @@
 #include <linux/export.h>
 
 #include <asm/hardware/cache-l2x0.h>
+#if defined(CONFIG_BCM_KF_SPECTRE_PATCH) && defined(CONFIG_BCM_SPECTRE_PATCH_ENABLE)
+#include <asm/outercache.h>
+#endif
 #include <asm/exception.h>
 #include <asm/mach/arch.h>
 #include <asm/mach/irq.h>
 #include <asm/mach/time.h>
+#if defined CONFIG_BCM_KF_CPU_AFFINITY_HINT && defined CONFIG_HOTPLUG_CPU
+#include <bcm_intr.h>
+#endif
 
 unsigned long irq_err_count;
 
@@ -116,6 +122,9 @@ void __init init_IRQ(void)
 		if (ret)
 			pr_err("L2C: failed to init: %d\n", ret);
 	}
+#if defined CONFIG_BCM_KF_CPU_AFFINITY_HINT && defined CONFIG_HOTPLUG_CPU
+	hotcpu_notifier(bcm63xx_rehint_irqaffinity, 0);
+#endif
 }
 
 #ifdef CONFIG_MULTI_IRQ_HANDLER
@@ -152,6 +161,13 @@ static bool migrate_one_irq(struct irq_desc *desc)
 		return false;
 
 	if (cpumask_any_and(affinity, cpu_online_mask) >= nr_cpu_ids) {
+#if defined CONFIG_BCM_KF_CPU_AFFINITY_HINT
+		// affine cpu is offline; any hinted cpu online?
+		if (desc->affinity_hint &&
+		    cpumask_any_and(desc->affinity_hint, cpu_online_mask) < nr_cpu_ids)
+			affinity = desc->affinity_hint;
+		else
+#endif
 		affinity = cpu_online_mask;
 		ret = true;
 	}

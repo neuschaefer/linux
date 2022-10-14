@@ -23,6 +23,9 @@
 #include <net/route.h>
 #include <net/tcp_states.h>
 #include <net/xfrm.h>
+#if defined(CONFIG_BCM_MPTCP) && defined(CONFIG_BCM_KF_MPTCP)
+#include <net/mptcp.h>
+#endif
 #include <net/tcp.h>
 
 #ifdef INET_CSK_DEBUG
@@ -469,8 +472,13 @@ no_route:
 }
 EXPORT_SYMBOL_GPL(inet_csk_route_child_sock);
 
+#if !defined(CONFIG_BCM_MPTCP) || !defined(CONFIG_BCM_KF_MPTCP)
 static inline u32 inet_synq_hash(const __be32 raddr, const __be16 rport,
 				 const u32 rnd, const u32 synq_hsize)
+#else
+u32 inet_synq_hash(const __be32 raddr, const __be16 rport, const u32 rnd,
+		   const u32 synq_hsize)
+#endif
 {
 	return jhash_2words((__force u32)raddr, (__force u32)rport, rnd) & (synq_hsize - 1);
 }
@@ -610,7 +618,12 @@ static void reqsk_timer_handler(unsigned long data)
 	int max_retries, thresh;
 	u8 defer_accept;
 
+#if !defined(CONFIG_BCM_MPTCP) || !defined(CONFIG_BCM_KF_MPTCP)
 	if (sk_listener->sk_state != TCP_LISTEN || !lopt) {
+#else
+	if ((sk_listener->sk_state != TCP_LISTEN && !is_meta_sk(sk_listener)) ||
+	    !lopt) {
+#endif
 		reqsk_put(req);
 		return;
 	}
@@ -706,7 +719,13 @@ struct sock *inet_csk_clone_lock(const struct sock *sk,
 				 const struct request_sock *req,
 				 const gfp_t priority)
 {
+#if !defined(CONFIG_BCM_MPTCP) || !defined(CONFIG_BCM_KF_MPTCP)
 	struct sock *newsk = sk_clone_lock(sk, priority);
+#else
+	struct sock *newsk;
+
+	newsk = sk_clone_lock(sk, priority);
+#endif
 
 	if (newsk) {
 		struct inet_connection_sock *newicsk = inet_csk(newsk);
@@ -789,7 +808,12 @@ int inet_csk_listen_start(struct sock *sk, const int nr_table_entries)
 {
 	struct inet_sock *inet = inet_sk(sk);
 	struct inet_connection_sock *icsk = inet_csk(sk);
+#if !defined(CONFIG_BCM_MPTCP) || !defined(CONFIG_BCM_KF_MPTCP)
 	int rc = reqsk_queue_alloc(&icsk->icsk_accept_queue, nr_table_entries);
+#else
+	int rc = reqsk_queue_alloc(&icsk->icsk_accept_queue, nr_table_entries,
+				   GFP_KERNEL);
+#endif
 
 	if (rc != 0)
 		return rc;
@@ -845,9 +869,18 @@ void inet_csk_listen_stop(struct sock *sk)
 
 	while ((req = acc_req) != NULL) {
 		struct sock *child = req->sk;
+#if defined(CONFIG_BCM_MPTCP) && defined(CONFIG_BCM_KF_MPTCP)
+		bool mutex_taken = false;
+#endif
 
 		acc_req = req->dl_next;
 
+#if defined(CONFIG_BCM_MPTCP) && defined(CONFIG_BCM_KF_MPTCP)
+		if (is_meta_sk(child)) {
+			mutex_lock(&tcp_sk(child)->mpcb->mpcb_mutex);
+			mutex_taken = true;
+		}
+#endif
 		local_bh_disable();
 		bh_lock_sock(child);
 		WARN_ON(sock_owned_by_user(child));
@@ -875,6 +908,10 @@ void inet_csk_listen_stop(struct sock *sk)
 
 		bh_unlock_sock(child);
 		local_bh_enable();
+#if defined(CONFIG_BCM_MPTCP) && defined(CONFIG_BCM_KF_MPTCP)
+		if (mutex_taken)
+			mutex_unlock(&tcp_sk(child)->mpcb->mpcb_mutex);
+#endif
 		sock_put(child);
 
 		sk_acceptq_removed(sk);

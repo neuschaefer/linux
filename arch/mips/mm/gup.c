@@ -1,3 +1,10 @@
+#if (defined(CONFIG_BCM_KF_MIPS_BCM963XX) && defined(CONFIG_MIPS_BCM963XX))
+/* get_user_pages_fast() is not working properly on BMIPS4350, some times wrong
+ * data is seen when the pages returned by this fucntion are used. The problem might
+ * be related to cache flushing. Disabling this architure related function, and
+ * the kernel will fallback to use of get_user_pages(), see mm/util.c
+ */
+#else
 /*
  * Lockless get_user_pages_fast for MIPS
  *
@@ -314,3 +321,4 @@ slow_irqon:
 	}
 	return ret;
 }
+#endif

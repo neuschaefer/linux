@@ -2,6 +2,7 @@
 # Makefile for the linux kernel.
 #
 
+
 obj-y     = fork.o exec_domain.o panic.o \
 	    cpu.o exit.o softirq.o resource.o \
 	    sysctl.o sysctl_binary.o capability.o ptrace.o user.o \
@@ -89,6 +90,10 @@ obj-$(CONFIG_TRACEPOINTS) += trace/
 obj-$(CONFIG_IRQ_WORK) += irq_work.o
 obj-$(CONFIG_CPU_PM) += cpu_pm.o
 obj-$(CONFIG_BPF) += bpf/
+
+ifdef BCM_KF # defined(CONFIG_BCM_KF_LOG)
+obj-y += bcm_log.o
+endif # BCM_KF
 
 obj-$(CONFIG_PERF_EVENTS) += events/
 
