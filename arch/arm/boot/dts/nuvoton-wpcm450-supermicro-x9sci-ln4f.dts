@@ -90,23 +90,23 @@
 };
 
 &i2c1 {
-	status = "okay";
+	//status = "okay";
 };
 
 &i2c2 {
-	status = "okay";
+	//status = "okay";
 };
 
 &i2c3 {
-	status = "okay";
+	//status = "okay";
 };
 
 &i2c4 {
-	status = "okay";
+	//status = "okay";
 };
 
 &i2c5 {
-	status = "okay";
+	//status = "okay";
 };
 
 &pinctrl {
