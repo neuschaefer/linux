@@ -64,6 +64,22 @@
 	flash@0 {
 		reg = <0>;
 		compatible = "jedec,spi-nor";
+
+		partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			partition@0 {
+				label = "0M";
+				reg = <0 0x0f00000>;
+			};
+
+			partition@1000000 {
+				label = "16M";
+				reg = <0x1000000 0x1000000>;
+			};
+		};
 	};
 };
 
