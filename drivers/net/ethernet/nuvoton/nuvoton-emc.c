@@ -29,7 +29,7 @@
  *
  * CPU-owned TX descriptors are checked in the TX ISR and the TX tail pointer
  * is advanced. New TX descriptors are assigned to the EMC at the TX head, when
- * new frames are to be advanced.
+ * new frames are to be transmitted.
  *
  *
  * RX queue:            rx_tail
@@ -47,13 +47,12 @@
  */
 
 /*
+ * Not implemented so far:
+ * - copy-less TX/RX DMA
+ * - NAPI
+ *
  * TODO:
- * - implement copy-less TX/RX DMA
- * - less dev_*, better messages
  * - set DMARFC
- * - locking??
- * - napi
- * - research DMA view of main memory
  */
 
 #include <linux/clk.h>
@@ -92,6 +91,7 @@
 #define REG_DMARFC		0xa8	/* Maximum Receive Frame Control Register */
 #define REG_MIEN		0xac	/* MAC Interrupt Enable Register */
 #define REG_MISTA		0xb0	/* MAC Interrupt Status Register */
+#define REG_MGSTA		0xb4	/* MAC General Status Register */
 #define REG_CTXDSA		0xcc	/* Current Transmit Descriptor Start Address Register */
 #define REG_CTXBSA		0xd0	/* Current Transmit Buffer Start Address Register */
 #define REG_CRXDSA		0xd4	/* Current Receive Descriptor Start Address Register */
@@ -129,29 +129,43 @@
 
 /* MIEN - MAC Interrupt Enable Register */
 #define MIEN_RXINTR		BIT(0)
+#define MIEN_PTLE		BIT(3)
 #define MIEN_RXGD		BIT(4)
+#define MIEN_MMP		BIT(7)
+#define MIEN_DFOI		BIT(8)
 #define MIEN_RDU		BIT(10)
 #define MIEN_RXBERR		BIT(11)
 #define MIEN_TXINTR		BIT(16)
 #define MIEN_TXCP		BIT(18)
 #define MIEN_EXDEF		BIT(19)
 #define MIEN_TXABT		BIT(21)
+#define MIEN_LC			BIT(22)
 #define MIEN_TDU		BIT(23)
 #define MIEN_TXBERR		BIT(24)
 
 /* MISTA - MAC Interrupt Status Register */
 #define MISTA_RXINTR		MIEN_RXINTR
+#define MISTA_PTLE		MIEN_PTLE
 #define MISTA_RXGD		MIEN_RXGD
+#define MISTA_MMP		MIEN_MMP
+#define MISTA_DFOI		MIEN_DFOI
 #define MISTA_RDU		MIEN_RDU
 #define MISTA_RXBERR		MIEN_RXBERR
 #define MISTA_TXINTR		MIEN_TXINTR
 #define MISTA_TXCP		MIEN_TXCP
 #define MISTA_EXDEF		MIEN_EXDEF
 #define MISTA_TXABT		MIEN_TXABT
+#define MISTA_LC		MIEN_LC
 #define MISTA_TDU		MIEN_TDU
 #define MISTA_TXBERR		MIEN_TXBERR
 #define MISTA_RX_MASK		0x0000ffff
+#define MISTA_RX_ERRORS		(MISTA_TXBERR | MISTA_LC | MISTA_TXABT | MISTA_EXDEF)
 #define MISTA_TX_MASK		0xffff0000
+#define MISTA_TX_ERRORS		(MISTA_RXBERR | MISTA_DFOI | MISTA_MMP | MISTA_PTLE)
+
+/* MGSTA - MAC General Status Register */
+#define MGSTA_RXHA		BIT(1)
+#define MGSTA_TXHA		BIT(11)
 
 /* FFTCR - FIFO Threshold Control Register */
 #define FFTCR_TXTHD		(0x03 << 8)
@@ -180,10 +194,10 @@
 #define TX_STATUS_TXCP		BIT(19)
 
 /* Global settings for driver */
-#define RX_QUEUE_SIZE		50
+#define RX_QUEUE_SIZE		50    /* TODO: other defaults */
 #define TX_QUEUE_SIZE		10
-#define MAX_RBUFF_SZ		0x600 /* TODO: MAX_RX_FRAME or something */
-#define MAX_TBUFF_SZ		0x600
+#define MAX_RX_FRAME		0x600
+#define MAX_TX_FRAME		0x600
 #define TX_TIMEOUT		(HZ/2)
 #define MDIO_RETRIES		1000
 
@@ -206,17 +220,17 @@ struct emc_tx_desc {
 /* Hardware queue (RX) */
 struct emc_rx_queue {
 	struct emc_rx_desc desclist[RX_QUEUE_SIZE];
-	char buf[RX_QUEUE_SIZE][MAX_RBUFF_SZ];
+	char buf[RX_QUEUE_SIZE][MAX_RX_FRAME];
 };
 
 /* Hardware queue (TX) */
 struct emc_tx_queue {
 	struct emc_tx_desc desclist[TX_QUEUE_SIZE];
-	char buf[TX_QUEUE_SIZE][MAX_TBUFF_SZ];
+	char buf[TX_QUEUE_SIZE][MAX_TX_FRAME];
 };
 
 struct emc_priv {
-	/* subsystem relations */
+	/* Subsystem relations and hardware details */
 	struct platform_device *pdev;
 	struct clk *clk_main;
 	struct clk *clk_rmii;
@@ -226,9 +240,9 @@ struct emc_priv {
 	struct ncsi_dev *ncsi;
 	int rxirq;
 	int txirq;
-
-	/* hardware details */
 	void __iomem *reg;
+
+	/* Queues */
 	struct emc_rx_queue *rx_queue;
 	struct emc_tx_queue *tx_queue;
 	dma_addr_t rx_queue_phys;
@@ -259,7 +273,7 @@ static void emc_link_change(struct net_device *netdev)
 	writel(val, priv->reg + REG_MCMDR);
 }
 
-static void emc_set_link_mode_for_ncsi(struct emc_priv *priv)
+static void emc_hw_set_link_mode_for_ncsi(struct emc_priv *priv)
 {
 	unsigned int val;
 
@@ -271,7 +285,7 @@ static void emc_set_link_mode_for_ncsi(struct emc_priv *priv)
 	writel(val, priv->reg + REG_MCMDR);
 }
 
-static void emc_write_cam(struct emc_priv *priv,
+static void emc_hw_write_cam(struct emc_priv *priv,
 			  unsigned int index, const unsigned char *addr)
 {
 	unsigned int msw, lsw;
@@ -414,7 +428,7 @@ static void emc_init_cam(struct net_device *netdev)
 	struct emc_priv *priv = netdev_priv(netdev);
 	unsigned int val;
 
-	emc_write_cam(priv, 0, netdev->dev_addr);
+	emc_hw_write_cam(priv, 0, netdev->dev_addr);
 
 	val = readl(priv->reg + REG_CAMEN);
 	val |= CAMEN_CAM0EN;
@@ -453,7 +467,7 @@ static int emc_set_mac_address(struct net_device *netdev, void *addr)
 		return -EADDRNOTAVAIL;
 
 	dev_addr_set(netdev, address->sa_data);
-	emc_write_cam(priv, 0, netdev->dev_addr);
+	emc_hw_write_cam(priv, 0, netdev->dev_addr);
 
 	return 0;
 }
@@ -736,7 +750,7 @@ static int emc_open(struct net_device *netdev)
 	if (priv->phy)
 		phy_start(priv->phy);
 	else if (priv->ncsi) {
-		emc_set_link_mode_for_ncsi(priv);
+		emc_hw_set_link_mode_for_ncsi(priv);
 		netif_carrier_on(netdev);
 
 		err = ncsi_start_dev(priv->ncsi);
@@ -759,7 +773,7 @@ static void emc_set_rx_mode(struct net_device *netdev)
 		 * Promiscuous mode:
 		 *
 		 * Receive all unicast, multicast, broadcast packets, and
-		 * packets for own own unicast address.
+		 * packets for our own unicast address.
 		 */
 		rx_mode = CAMCMR_AUP | CAMCMR_AMP | CAMCMR_ABP | CAMCMR_ECMP;
 	} else if ((netdev->flags & IFF_ALLMULTI) || !netdev_mc_empty(netdev)) {
@@ -767,14 +781,14 @@ static void emc_set_rx_mode(struct net_device *netdev)
 		 * "Receive all multicast packets" mode:
 		 *
 		 * Receive all multicast, broadcast packets, and packets for
-		 * own own unicast address.
+		 * our own unicast address.
 		 */
 		rx_mode = CAMCMR_AMP | CAMCMR_ABP | CAMCMR_ECMP;
 	} else {
 		/*
 		 * Default mode:
 		 *
-		 * Receive all broadcast packets, and packets for own own
+		 * Receive all broadcast packets, and packets for our own
 		 * unicast address.
 		 */
 		rx_mode = CAMCMR_ECMP | CAMCMR_ABP;
@@ -809,7 +823,7 @@ static void emc_init_mac_address(struct net_device *netdev)
 	if (device_get_ethdev_address(&pdev->dev, netdev))
 		eth_hw_addr_random(netdev);
 
-	emc_write_cam(priv, 0, netdev->dev_addr);
+	emc_hw_write_cam(priv, 0, netdev->dev_addr);
 }
 
 static int emc_mdio_write(struct mii_bus *mdio, int phy_id, int reg, u16 data)
