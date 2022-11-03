@@ -60,6 +60,8 @@
 
 &fiu {
 	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&scs3_pins>;
 
 	flash@0 {
 		reg = <0>;
@@ -80,6 +82,11 @@
 				reg = <0x1000000 0x1000000>;
 			};
 		};
+	};
+
+	flash@3 {
+		reg = <3>;
+		compatible = "jedec,spi-nor";
 	};
 };
 
