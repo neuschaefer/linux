@@ -1562,6 +1562,20 @@ config SERIAL_SUNPLUS_CONSOLE
 	  you can alter that using a kernel command line option such as
 	  "console=ttySUPx".
 
+config SERIAL_MONTAGE
+	tristate "Montage UART support"
+	#depends on 
+	select SERIAL_CORE
+	help
+	  ...
+
+config SERIAL_MONTAGE_CONSOLE
+	bool "Console on Montage UART"
+	depends on SERIAL_MONTAGE
+	select SERIAL_CORE_CONSOLE
+	help
+	  ...
+
 endmenu
 
 config SERIAL_MCTRL_GPIO
