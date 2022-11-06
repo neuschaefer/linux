@@ -33,6 +33,7 @@ platform-$(CONFIG_SIBYTE_BCM1x55)	+= sibyte/
 platform-$(CONFIG_SIBYTE_BCM1x80)	+= sibyte/
 platform-$(CONFIG_SNI_RM)		+= sni/
 platform-$(CONFIG_MACH_TX49XX)		+= txx9/
+platform-$(CONFIG_MACH_MONTAGE)		+= montage/
 
 # include the platform specific files
 include $(patsubst %/, $(srctree)/arch/mips/%/Platform, $(platform-y))

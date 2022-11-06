@@ -1,0 +1,6 @@
+#
+# Montage
+#
+
+cflags-$(CONFIG_MACH_MONTAGE)	+= -I$(srctree)/arch/mips/include/asm/mach-montage
+load-$(CONFIG_MACH_MONTAGE)	= 0x80200000
