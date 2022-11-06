@@ -1,0 +1,25 @@
+// SPDX-License-Identifier: GPL-2.0
+/dts-v1/;
+
+#include "m88cs8001b.dtsi"
+
+/ {
+	model = "HS1168-8001-02B";
+
+	chosen {
+		stdout-path = "serial0";
+	};
+
+	aliases {
+		serial0 = <&serial0>;
+	};
+
+	memory@0 {
+		device_type = "memory";
+		reg = <0 0x04000000>;
+	};
+};
+
+&serial0 {
+	status = "okay";
+};

@@ -1,0 +1,51 @@
+// SPDX-License-Identifier: GPL-2.0
+
+/ {
+	compatible = "montage,m88cs8001b";
+	#address-cells = <1>;
+	#size-cells = <1>;
+
+	aliases {
+		serial0 = &serial0;
+		serial1 = &serial1;
+	};
+
+	cpus {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		cpu@0 {
+			compatible = "mips,mips24KEc";
+			device_type = "cpu";
+			reg = <0>;
+		};
+
+		cpu@1 {
+			compatible = "mips,mips24KEc";
+			device_type = "cpu";
+			reg = <1>;
+
+			// SMP is not yet supported
+			status = "disabled";
+		};
+	};
+
+	soc {
+		compatible = "simple-bus";
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges;
+
+		serial0: serial@1f540000 {
+			compatible = "montage,m88cs8001b-uart";
+			reg = <0x1f540000 0x1000>;
+			status = "disabled";
+		};
+
+		serial1: serial@1f550000 {
+			compatible = "montage,m88cs8001b-uart";
+			reg = <0x1f550000 0x1000>;
+			status = "disabled";
+		};
+	};
+};
