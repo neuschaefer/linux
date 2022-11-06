@@ -841,6 +841,8 @@ patternProperties:
     description: MNT Research GmbH
   "^modtronix,.*":
     description: Modtronix Engineering
+  "^montage,.*":
+    description: Montage LZ Technologies
   "^moortec,.*":
     description: Moortec Semiconductor Ltd.
   "^mosaixtech,.*":
