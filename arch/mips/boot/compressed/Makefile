@@ -49,6 +49,7 @@ vmlinuzobjs-$(CONFIG_SYS_SUPPORTS_ZBOOT_UART16550) += $(obj)/uart-16550.o
 vmlinuzobjs-$(CONFIG_SYS_SUPPORTS_ZBOOT_UART_PROM) += $(obj)/uart-prom.o
 vmlinuzobjs-$(CONFIG_MIPS_ALCHEMY)		   += $(obj)/uart-alchemy.o
 vmlinuzobjs-$(CONFIG_ATH79)			   += $(obj)/uart-ath79.o
+vmlinuzobjs-$(CONFIG_MACH_MONTAGE)		   += $(obj)/uart-montage.o
 endif
 
 vmlinuzobjs-$(CONFIG_KERNEL_XZ) += $(obj)/ashldi3.o
