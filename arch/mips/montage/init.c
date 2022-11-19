@@ -2,6 +2,7 @@
 
 #include <asm/bootinfo.h>
 #include <asm/prom.h>
+#include <asm/time.h>
 
 const char *get_system_type(void)
 {
@@ -26,5 +27,6 @@ void __init plat_mem_setup(void)
 
 void __init plat_time_init(void)
 {
-	pr_info("plat_time_init: TODO!!\n");
+	mips_hpt_frequency = 297000000;  // not sure about that, let's see
+	pr_info("plat_time_init: mips_hpt_frequency = %d\n", mips_hpt_frequency);
 }
