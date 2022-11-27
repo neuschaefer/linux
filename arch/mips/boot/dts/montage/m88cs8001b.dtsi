@@ -37,19 +37,39 @@
 		compatible = "mti,cpu-interrupt-controller";
 	};
 
+	clk27m: clock-27mhz {
+		/* 27 MHz dummy clock */
+		compatible = "fixed-clock";
+		clock-frequency = <27000000>;
+		#clock-cells = <0>;
+	};
+
 	soc {
 		compatible = "simple-bus";
 		#address-cells = <1>;
 		#size-cells = <1>;
 		ranges;
+		interrupt-parent = <&intc>;
 
 		intc: interrupt-controller@1f100000 {
 			compatible = "montage,m88cs8001b-intc";
-			reg = <0x1f100000 0x200>;
+			reg = <0x1f100000 0x80>;
 			interrupt-controller;
 			#interrupt-cells = <1>;
 			interrupt-parent = <&cpuintc>;
 			interrupts = <4>;
+		};
+
+		timer@1f100080 {
+			compatible = "montage,m88cs8001b-timer";
+			reg = <0x1f100080 0x80>;
+			interrupts = <0>, <1>, <2>, <3>;
+			clocks = <&clk27m>;
+		};
+
+		watchdog@1f100100 {
+			compatible = "montage,m88cs8001b-watchdog";
+			reg = <0x1f100100 0x80>;
 		};
 
 		serial0: serial@1f540000 {
