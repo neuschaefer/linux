@@ -51,6 +51,20 @@
 		ranges;
 		interrupt-parent = <&intc>;
 
+		usb0: usb@1f060020 {
+			compatible = "generic-ehci";
+			reg = <0x1f060020 0x100>;
+			interrupts = <30>;
+			status = "disabled";
+		};
+
+		usb1: usb@1f070020 {
+			compatible = "generic-ehci";
+			reg = <0x1f070020 0x100>;
+			interrupts = <31>;
+			status = "disabled";
+		};
+
 		intc: interrupt-controller@1f100000 {
 			compatible = "montage,m88cs8001b-intc";
 			reg = <0x1f100000 0x80>;
