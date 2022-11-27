@@ -2462,6 +2462,8 @@ static int __add_preferred_console(char *name, int idx, char *options,
 	struct console_cmdline *c;
 	int i;
 
+	pr_info("%s: %s\n", __func__, name);
+
 	/*
 	 *	See if this tty is not yet registered, and
 	 *	if we have a slot free.
@@ -3161,33 +3163,46 @@ static int try_enable_preferred_console(struct console *newcon,
 	struct console_cmdline *c;
 	int i, err;
 
+	pr_info("%s: %s\n", __func__, newcon->name);
+
 	for (i = 0, c = console_cmdline;
 	     i < MAX_CMDLINECONSOLES && c->name[0];
 	     i++, c++) {
+		pr_info("%s a\n", __func__);
 		if (c->user_specified != user_specified)
 			continue;
+		pr_info("%s b\n", __func__);
 		if (!newcon->match ||
 		    newcon->match(newcon, c->name, c->index, c->options) != 0) {
 			/* default matching */
+			pr_info("%s d\n", __func__);
 			BUILD_BUG_ON(sizeof(c->name) != sizeof(newcon->name));
+			pr_info("%s e: %s vs %s\n", __func__, c->name, newcon->name);
 			if (strcmp(c->name, newcon->name) != 0)
 				continue;
+			pr_info("%s f\n", __func__);
 			if (newcon->index >= 0 &&
 			    newcon->index != c->index)
 				continue;
+			pr_info("%s g\n", __func__);
 			if (newcon->index < 0)
 				newcon->index = c->index;
+			pr_info("%s h\n", __func__);
 
 			if (_braille_register_console(newcon, c))
 				return 0;
+			pr_info("%s i\n", __func__);
 
 			if (newcon->setup &&
 			    (err = newcon->setup(newcon, c->options)) != 0)
 				return err;
+			pr_info("%s j\n", __func__);
 		}
+		pr_info("%s c\n", __func__);
 		newcon->flags |= CON_ENABLED;
 		if (i == preferred_console)
 			newcon->flags |= CON_CONSDEV;
+		pr_info("%s found one: %s\n", __func__, newcon->name);
 		return 0;
 	}
 
@@ -3196,7 +3211,7 @@ static int try_enable_preferred_console(struct console *newcon,
 	 * without matching. Accept the pre-enabled consoles only when match()
 	 * and setup() had a chance to be called.
 	 */
-	if (newcon->flags & CON_ENABLED && c->user_specified ==	user_specified)
+	if (newcon->flags & CON_ENABLED && c->user_specified == user_specified)
 		return 0;
 
 	return -ENOENT;

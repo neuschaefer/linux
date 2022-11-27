@@ -55,6 +55,7 @@
 			compatible = "generic-ehci";
 			reg = <0x1f060020 0x100>;
 			interrupts = <30>;
+			has-transaction-translator;
 			status = "disabled";
 		};
 
@@ -62,6 +63,7 @@
 			compatible = "generic-ehci";
 			reg = <0x1f070020 0x100>;
 			interrupts = <31>;
+			has-transaction-translator;
 			status = "disabled";
 		};
 
@@ -89,12 +91,14 @@
 		serial0: serial@1f540000 {
 			compatible = "montage,m88cs8001b-uart";
 			reg = <0x1f540000 0x1000>;
+			interrupts = <26>;
 			status = "disabled";
 		};
 
 		serial1: serial@1f550000 {
 			compatible = "montage,m88cs8001b-uart";
 			reg = <0x1f550000 0x1000>;
+			interrupts = <27>;
 			status = "disabled";
 		};
 	};

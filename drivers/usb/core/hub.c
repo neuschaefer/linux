@@ -2986,7 +2986,7 @@ static int hub_port_reset(struct usb_hub *hub, int port1,
 			status = hub_port_wait_reset(hub, port1, udev, delay,
 								warm);
 			if (status && status != -ENOTCONN && status != -ENODEV)
-				dev_dbg(hub->intfdev,
+				dev_info(hub->intfdev,
 						"port_wait_reset: err = %d\n",
 						status);
 		}

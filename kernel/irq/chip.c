@@ -333,6 +333,7 @@ void irq_shutdown_and_deactivate(struct irq_desc *desc)
 
 void irq_enable(struct irq_desc *desc)
 {
+	pr_info("%s %px -> %lu\n", __func__, desc, desc->irq_data.hwirq);
 	if (!irqd_irq_disabled(&desc->irq_data)) {
 		unmask_irq(desc);
 	} else {
@@ -430,6 +431,7 @@ void mask_irq(struct irq_desc *desc)
 
 void unmask_irq(struct irq_desc *desc)
 {
+	pr_info("%s %px -> %lu\n", __func__, desc, desc->irq_data.hwirq);
 	if (!irqd_irq_masked(&desc->irq_data))
 		return;
 

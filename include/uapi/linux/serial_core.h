@@ -276,4 +276,7 @@
 /* Sunplus UART */
 #define PORT_SUNPLUS	123
 
+/* Montage UART */
+#define PORT_MONTAGE	124
+
 #endif /* _UAPILINUX_SERIAL_CORE_H */

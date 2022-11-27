@@ -2505,11 +2505,11 @@ uart_report_port(struct uart_driver *drv, struct uart_port *port)
 		break;
 	}
 
-	pr_info("%s%s%s at %s (irq = %d, base_baud = %d) is a %s\n",
+	pr_info("%s%s%s at %s (irq = %d, base_baud = %d) is a %s, port = %px\n",
 	       port->dev ? dev_name(port->dev) : "",
 	       port->dev ? ": " : "",
 	       port->name,
-	       address, port->irq, port->uartclk / 16, uart_type(port));
+	       address, port->irq, port->uartclk / 16, uart_type(port), port);
 
 	/* The magic multiplier feature is a bit obscure, so report it too.  */
 	if (port->flags & UPF_MAGIC_MULTIPLIER)
@@ -3052,35 +3052,43 @@ int uart_add_one_port(struct uart_driver *drv, struct uart_port *uport)
 	int ret = 0;
 	struct device *tty_dev;
 	int num_groups;
+	int line = 0;
 
 	if (uport->line >= drv->nr)
 		return -EINVAL;
 
+	pr_info("%s: %d\n", __func__, line++);
 	state = drv->state + uport->line;
 	port = &state->port;
 
+	pr_info("%s: %d\n", __func__, line++);
 	mutex_lock(&port_mutex);
 	mutex_lock(&port->mutex);
 	if (state->uart_port) {
 		ret = -EINVAL;
 		goto out;
 	}
+	pr_info("%s: %d\n", __func__, line++);
 
 	/* Link the port to the driver state table and vice versa */
+	pr_info("%s: %d\n", __func__, line++);
 	atomic_set(&state->refcount, 1);
 	init_waitqueue_head(&state->remove_wait);
 	state->uart_port = uport;
 	uport->state = state;
+	pr_info("%s: %d\n", __func__, line++);
 
 	state->pm_state = UART_PM_STATE_UNDEFINED;
 	uport->cons = drv->cons;
 	uport->minor = drv->tty_driver->minor_start + uport->line;
 	uport->name = kasprintf(GFP_KERNEL, "%s%d", drv->dev_name,
 				drv->tty_driver->name_base + uport->line);
+	pr_info("%s: %d\n", __func__, line++);
 	if (!uport->name) {
 		ret = -ENOMEM;
 		goto out;
 	}
+	pr_info("%s: %d\n", __func__, line++);
 
 	/*
 	 * If this port is in use as a console then the spinlock is already
@@ -3088,28 +3096,37 @@ int uart_add_one_port(struct uart_driver *drv, struct uart_port *uport)
 	 */
 	if (!uart_console_registered(uport))
 		uart_port_spin_lock_init(uport);
+	pr_info("%s: %d\n", __func__, line++);
 
 	if (uport->cons && uport->dev)
 		of_console_check(uport->dev->of_node, uport->cons->name, uport->line);
 
+	pr_info("%s: %d, drv=%px, uport=%px\n", __func__, line++, drv, uport);
 	tty_port_link_device(port, drv->tty_driver, uport->line);
+	pr_info("%s: %d\n", __func__, line++);
 	uart_configure_port(drv, state, uport);
+	pr_info("%s: %d\n", __func__, line++);
 
 	port->console = uart_console(uport);
+	pr_info("%s: %d\n", __func__, line++);
 
 	num_groups = 2;
 	if (uport->attr_group)
 		num_groups++;
+	pr_info("%s: %d\n", __func__, line++);
 
 	uport->tty_groups = kcalloc(num_groups, sizeof(*uport->tty_groups),
 				    GFP_KERNEL);
+	pr_info("%s: %d\n", __func__, line++);
 	if (!uport->tty_groups) {
 		ret = -ENOMEM;
 		goto out;
 	}
+	pr_info("%s: %d\n", __func__, line++);
 	uport->tty_groups[0] = &tty_dev_attr_group;
 	if (uport->attr_group)
 		uport->tty_groups[1] = uport->attr_group;
+	pr_info("%s: %d\n", __func__, line++);
 
 	/*
 	 * Register the port whether it's detected or not.  This allows
@@ -3117,17 +3134,20 @@ int uart_add_one_port(struct uart_driver *drv, struct uart_port *uport)
 	 */
 	tty_dev = tty_port_register_device_attr_serdev(port, drv->tty_driver,
 			uport->line, uport->dev, port, uport->tty_groups);
+	pr_info("%s: %d\n", __func__, line++);
 	if (!IS_ERR(tty_dev)) {
 		device_set_wakeup_capable(tty_dev, 1);
 	} else {
 		dev_err(uport->dev, "Cannot register tty device on line %d\n",
 		       uport->line);
 	}
+	pr_info("%s: %d\n", __func__, line++);
 
 	/*
 	 * Ensure UPF_DEAD is not set.
 	 */
 	uport->flags &= ~UPF_DEAD;
+	pr_info("%s: %d\n", __func__, line++);
 
  out:
 	mutex_unlock(&port->mutex);

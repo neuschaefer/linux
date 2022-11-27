@@ -22,6 +22,10 @@ static struct montage_intc *intc;
 
 static void montage_intc_init_hw(void)
 {
+	// Clear modes
+	for (int i = 0; i < 6; i++)
+		writel(0x77777777, intc->regs + MONTAGE_MODE(i));
+
 	// Mask all interrupts
 	writel(0xffffffff, intc->regs + MONTAGE_MASK(0));
 	writel(0xffffffff, intc->regs + MONTAGE_MASK(1));
@@ -39,6 +43,16 @@ static void montage_intc_set_mode(int hwirq, int mode)
 	writel(val, intc->regs + MONTAGE_MODE(index));
 }
 
+static int montage_intc_get_mode(int hwirq)
+{
+	int index = hwirq / 8;
+	int shift = (hwirq % 8) * 4;
+	u32 val;
+
+	val = readl(intc->regs + MONTAGE_MODE(index));
+	return (val >> shift) & 0xf;
+}
+
 static void montage_intc_irq_unmask(struct irq_data *d)
 {
 	int hwirq = irqd_to_hwirq(d);
@@ -46,12 +60,19 @@ static void montage_intc_irq_unmask(struct irq_data *d)
 	int shift = hwirq % 32;
 	u32 val;
 
-	pr_info("%s: hwirq=%lu\n", __func__, irqd_to_hwirq(d));
+	pr_info("%s: hwirq=%d\n", __func__, hwirq);
 
-	pr_info("%s: skip!\n", __func__);
-	return;
+	//pr_info("%s: skip!\n", __func__); return;
 
-	montage_intc_set_mode(hwirq, 3);
+	/*
+	 * TODO: don't hardcode.
+	 *
+	 * USB interrupts need to be configured with mode 1 instead of 3.
+	 */
+	if (hwirq == 30 || hwirq == 31)
+		montage_intc_set_mode(hwirq, 1);
+	else
+		montage_intc_set_mode(hwirq, 3);
 
 	val = readl(intc->regs + MONTAGE_MASK(index));
 	val &= ~BIT(shift);
@@ -65,7 +86,7 @@ static void montage_intc_irq_mask(struct irq_data *d)
 	int shift = hwirq % 32;
 	u32 val;
 
-	pr_info("%s: hwirq=%lu\n", __func__, irqd_to_hwirq(d));
+	pr_info("%s: hwirq=%d\n", __func__, hwirq);
 
 	val = readl(intc->regs + MONTAGE_MASK(index));
 	val |= BIT(shift);
@@ -79,24 +100,34 @@ static void montage_intc_ack(void)
 		cpu_relax();
 }
 
-static void montage_intc_irq_ack(struct irq_data *d)
+static int montage_intc_set_type(struct irq_data *d, unsigned int flow_type)
 {
-	pr_info("%s: hwirq=%lu\n", __func__, irqd_to_hwirq(d));
+	if ((flow_type & IRQ_TYPE_SENSE_MASK) != IRQ_TYPE_LEVEL_HIGH)
+		return -EINVAL;
 
-	montage_intc_ack();
+	return 0;
+}
+
+static void montage_intc_irq_eoi(struct irq_data *d)
+{
+	// nothing
 }
 
 static struct irq_chip montage_intc_irq_chip = {
 	.name		= "montage intc",
+	.irq_set_type	= montage_intc_set_type,
 	.irq_unmask	= montage_intc_irq_unmask,
 	.irq_mask	= montage_intc_irq_mask,
-	.irq_ack	= montage_intc_irq_ack,
+//	.irq_ack	= montage_intc_irq_ack,
+	.irq_eoi	= montage_intc_irq_eoi,
 };
 
 static int montage_intc_map(struct irq_domain *d, unsigned int irq, irq_hw_number_t hw)
 {
-	pr_info("%s %d!\n", __func__, d->hwirq);
-	irq_set_chip_and_handler(irq, &montage_intc_irq_chip, handle_level_irq);
+	pr_info("%s %u/%lu!\n", __func__, irq, hw);
+	irq_set_chip_and_handler(irq, &montage_intc_irq_chip, handle_fasteoi_irq);
+	irq_set_chip_data(irq, intc);
+	irq_set_probe(irq);
 
 	return 0;
 }
@@ -109,13 +140,20 @@ static const struct irq_domain_ops irq_domain_ops = {
 static void montage_intc_irq_handler(struct irq_desc *desc)
 {
 	unsigned int hwirq;
-	u32 cause;
+	bool ack_first;
 
-	cause = readl(intc->regs + MONTAGE_CAUSE);
-	pr_info("%s: cause=%d\n", __func__, cause);
+	hwirq = readl(intc->regs + MONTAGE_CAUSE);
+	//pr_info("%s: cause=%d\n", __func__, cause);
 
-	hwirq = cause;
+	ack_first = montage_intc_get_mode(hwirq) == 3;
+
+	if (ack_first)
+		montage_intc_ack();
+
 	generic_handle_domain_irq(intc->domain, hwirq);
+
+	if (!ack_first)
+		montage_intc_ack();
 }
 
 static int __init montage_intc_of_init(struct device_node *np,

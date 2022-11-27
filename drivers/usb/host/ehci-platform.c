@@ -153,7 +153,7 @@ static bool quirk_poll_check_port_status(struct ehci_hcd *ehci)
 }
 
 /**
- * quirk_poll_rebind_companion - rebind comanion device to recover
+ * quirk_poll_rebind_companion - rebind companion device to recover
  * @ehci: the ehci hcd pointer
  *
  * Since EHCI/OHCI controllers on R-Car Gen3 SoCs are possible to be getting

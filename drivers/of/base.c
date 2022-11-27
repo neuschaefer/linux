@@ -1918,6 +1918,7 @@ void of_alias_scan(void * (*dt_alloc)(u64 size, u64 align))
 						&name);
 		if (IS_ENABLED(CONFIG_PPC) && !name)
 			of_property_read_string(of_aliases, "stdout", &name);
+		pr_info("%s: stdout path is %s\n", __func__, name);
 		if (name)
 			of_stdout = of_find_node_opts_by_path(name, &of_stdout_options);
 		if (of_stdout)

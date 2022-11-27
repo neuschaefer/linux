@@ -214,7 +214,7 @@ struct gpio_desc;
  *	This call must not sleep
  *
  * @set_termios: ``void ()(struct uart_port *port, struct ktermios *new,
- *			struct ktermios *old)``
+ *			const struct ktermios *old)``
  *
  *	Change the @port parameters, including word length, parity, stop bits.
  *	Update @port->read_status_mask and @port->ignore_status_mask to
