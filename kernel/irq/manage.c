@@ -953,7 +953,7 @@ int __irq_set_trigger(struct irq_desc *desc, unsigned long flags)
 		 * IRQF_TRIGGER_* but the PIC does not support multiple
 		 * flow-types?
 		 */
-		pr_info("No set_type function for IRQ %d (%s)\n",
+		pr_debug("No set_type function for IRQ %d (%s)\n",
 			 irq_desc_get_irq(desc),
 			 chip ? (chip->name ? : "unknown") : "unknown");
 		return 0;
@@ -993,7 +993,6 @@ int __irq_set_trigger(struct irq_desc *desc, unsigned long flags)
 		pr_err("Setting trigger mode %lu for irq %u failed (%pS)\n",
 		       flags, irq_desc_get_irq(desc), chip->irq_set_type);
 	}
-	pr_info("%s: about to unmask %lu? %s\n", __func__, desc->irq_data.hwirq, unmask? "true":"false");
 	if (unmask)
 		unmask_irq(desc);
 	return ret;
@@ -1500,8 +1499,6 @@ __setup_irq(unsigned int irq, struct irq_desc *desc, struct irqaction *new)
 	struct irqaction *old, **old_ptr;
 	unsigned long flags, thread_mask = 0;
 	int ret, nested, shared = 0;
-
-	pr_info("%s: %lu\n", __func__, desc->irq_data.hwirq);
 
 	if (!desc)
 		return -EINVAL;
@@ -2146,12 +2143,8 @@ int request_threaded_irq(unsigned int irq, irq_handler_t handler,
 	struct irq_desc *desc;
 	int retval;
 
-	pr_info("%s: %u\n", __func__, irq);
-
-	if (irq == IRQ_NOTCONNECTED) {
-		pr_info("%s: exit (not connected)\n", __func__);
+	if (irq == IRQ_NOTCONNECTED)
 		return -ENOTCONN;
-	}
 
 	/*
 	 * Sanity-check: shared interrupts must pass in a real dev-ID,
@@ -2169,22 +2162,16 @@ int request_threaded_irq(unsigned int irq, irq_handler_t handler,
 	if (((irqflags & IRQF_SHARED) && !dev_id) ||
 	    ((irqflags & IRQF_SHARED) && (irqflags & IRQF_NO_AUTOEN)) ||
 	    (!(irqflags & IRQF_SHARED) && (irqflags & IRQF_COND_SUSPEND)) ||
-	    ((irqflags & IRQF_NO_SUSPEND) && (irqflags & IRQF_COND_SUSPEND))) {
-		pr_info("%s: exit due to bad flags\n", __func__);
+	    ((irqflags & IRQF_NO_SUSPEND) && (irqflags & IRQF_COND_SUSPEND)))
 		return -EINVAL;
-	}
 
 	desc = irq_to_desc(irq);
-	if (!desc) {
-		pr_info("%s: exit (can't convert to desc)\n", __func__);
+	if (!desc)
 		return -EINVAL;
-	}
 
 	if (!irq_settings_can_request(desc) ||
-	    WARN_ON(irq_settings_is_per_cpu_devid(desc))) {
-		pr_info("%s: exit (something something settings)\n", __func__);
+	    WARN_ON(irq_settings_is_per_cpu_devid(desc)))
 		return -EINVAL;
-	}
 
 	if (!handler) {
 		if (!thread_fn)
@@ -2205,12 +2192,10 @@ int request_threaded_irq(unsigned int irq, irq_handler_t handler,
 	retval = irq_chip_pm_get(&desc->irq_data);
 	if (retval < 0) {
 		kfree(action);
-		pr_info("%s: exit (pm_get failed)\n", __func__);
 		return retval;
 	}
 
 	retval = __setup_irq(irq, desc, action);
-	pr_info("%s: __setup_irq retval=%d\n", __func__, retval);
 
 	if (retval) {
 		irq_chip_pm_put(&desc->irq_data);
@@ -2237,7 +2222,6 @@ int request_threaded_irq(unsigned int irq, irq_handler_t handler,
 		enable_irq(irq);
 	}
 #endif
-	pr_info("%s: done!\n", __func__);
 	return retval;
 }
 EXPORT_SYMBOL(request_threaded_irq);
