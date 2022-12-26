@@ -467,6 +467,7 @@ static int simplefb_probe(struct platform_device *pdev)
 	info->var.xres_virtual = params.width;
 	info->var.yres_virtual = params.height;
 	info->var.bits_per_pixel = params.format->bits_per_pixel;
+	info->var.grayscale = params.format->fourcc;
 	info->var.red = params.format->red;
 	info->var.green = params.format->green;
 	info->var.blue = params.format->blue;

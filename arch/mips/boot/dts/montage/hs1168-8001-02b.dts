@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: GPL-2.0
 /dts-v1/;
 
+// Space for framebuffers:
+// - chroma @ 29 MiB, size 1 MiB, all gray
+// - luma   @ 30 MiB, size 2 MiB, for use by linux
+/memreserve/ 0x1d00000 0x300000;
+
 #include "m88cs8001b.dtsi"
 
 / {
@@ -8,6 +13,19 @@
 
 	chosen {
 		stdout-path = "serial0";
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges;
+
+		// Grayscale framebuffer at the 30 MiB mark.
+		framebuffer0: framebuffer@1e00000 {
+		      compatible = "simple-framebuffer";
+		      reg = <0x1e00000 (1920 * 1080)>;
+		      width = <1920>;
+		      height = <1080>;
+		      stride = <1920>;
+		      format = "gray8";
+	      };
 	};
 
 	memory@0 {
