@@ -21,4 +21,4 @@
 
 #include "debug.h"
 
-int g_debuglevel = DEBUGLEVEL;
+const int g_debuglevel = DEBUGLEVEL;

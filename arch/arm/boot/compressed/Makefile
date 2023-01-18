@@ -17,6 +17,7 @@ endif
 # string library code (-Os is enforced to keep it much smaller)
 OBJS		+= string.o
 CFLAGS_string.o	:= -Os
+CFLAGS_decompress.o := -DDEBUGLEVEL=7
 
 ifeq ($(CONFIG_ARM_VIRT_EXT),y)
 OBJS		+= hyp-stub.o

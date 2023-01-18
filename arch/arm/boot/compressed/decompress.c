@@ -34,6 +34,70 @@ extern size_t strlen(const char *s);
 extern int memcmp(const void *cs, const void *ct, size_t count);
 extern char * strchrnul(const char *, int);
 
+#if CONFIG_DEBUG_UNCOMPRESS
+extern void putc(char c);
+
+static void putc2(char c)
+{
+	if (c == '\n')
+		putc('\r');
+	putc(c);
+}
+
+void puts(const char *str)
+{
+	while (*str)
+		putc2(*str++);
+}
+
+void puthex4(uint8_t x)
+{
+	putc("0123456789abcdef"[x & 0xf]);
+}
+
+void puthex8(uint8_t x)
+{
+	puthex4(x >> 4);
+	puthex4(x);
+}
+
+void puthex16(uint16_t x)
+{
+	puthex8(x >> 8);
+	puthex8(x);
+}
+
+void puthex32(uint32_t x)
+{
+	puthex16(x >> 16);
+	puthex16(x);
+}
+
+void warn_slowpath_fmt(const char *file, const int line, unsigned taint, const char *fmt, ...)
+{
+	putc('>');
+	puts(file); puts(":"); puthex32(line);
+	if (fmt) {
+		puts(": ");
+		puts(fmt);
+	}
+	puts("\n");
+}
+
+#define assert(condition) do { \
+	if (!(condition)) { \
+		puts("assertion failure!\n"); \
+		puts(__stringify(condition)); \
+		puts("\n"); \
+		while (1) /* halt */; \
+	} \
+} while(0)
+
+#define ZSTD_DEPS_IO
+#define ZSTD_DEBUG_PRINT(fmt, ...) puts(fmt)
+
+#endif
+
 #ifdef CONFIG_KERNEL_GZIP
 #include "../../../../lib/decompress_inflate.c"
 #endif
