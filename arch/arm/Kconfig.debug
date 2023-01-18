@@ -1807,7 +1807,7 @@ config DEBUG_UART_8250_PALMCHIP
 
 config DEBUG_UNCOMPRESS
 	bool "Enable decompressor debugging via DEBUG_LL output"
-	depends on !ARCH_MULTIPLATFORM
+	depends on EXPERT || !ARCH_MULTIPLATFORM
 	depends on !(ARCH_FOOTBRIDGE || ARCH_RPC || ARCH_SA1100)
 	depends on DEBUG_LL && !DEBUG_OMAP2PLUS_UART && \
 		     (!DEBUG_TEGRA_UART || !ZBOOT_ROM) && \
@@ -1821,7 +1821,10 @@ config DEBUG_UNCOMPRESS
 	  When this option is set, the selected DEBUG_LL output method
 	  will be re-used for normal decompressor output on multiplatform
 	  kernels.
-	  
+
+	  WARNING: Enabling this option can make the kernel immediately
+	  unbootable, if the DEBUG_LL method is configured incorrectly for
+	  the target hardware.
 
 config UNCOMPRESS_INCLUDE
 	string
