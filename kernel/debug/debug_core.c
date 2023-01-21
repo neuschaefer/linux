@@ -117,6 +117,8 @@ static DEFINE_RAW_SPINLOCK(dbg_slave_lock);
 static atomic_t			masters_in_kgdb;
 static atomic_t			slaves_in_kgdb;
 atomic_t			kgdb_setting_breakpoint;
+atomic_t			kgdb_accessing_memory;
+atomic_t			kgdb_memory_access_failed;
 
 struct task_struct		*kgdb_usethread;
 struct task_struct		*kgdb_contthread;
@@ -519,6 +521,9 @@ static int kgdb_reenter_check(struct kgdb_state *ks)
 	if (atomic_read(&kgdb_active) != raw_smp_processor_id())
 		return 0;
 
+	if (atomic_read(&kgdb_accessing_memory) > 0)
+		return 0;
+
 	/* Panic on recursive debugger calls: */
 	exception_level++;
 	addr = kgdb_arch_pc(ks->ex_vector, ks->linux_regs);
@@ -685,6 +690,15 @@ return_normal:
 	 */
 	if (kgdb_skipexception(ks->ex_vector, ks->linux_regs))
 		goto kgdb_restore;
+
+	/*
+	 * Also don't enter if the exception happened during a kgdb-initiated
+	 * memory access.
+	 */
+	if (atomic_read(&kgdb_accessing_memory) > 0) {
+		atomic_inc(&kgdb_memory_access_failed);
+		goto kgdb_restore;
+	}
 
 	atomic_inc(&ignore_console_lock_warning);
 

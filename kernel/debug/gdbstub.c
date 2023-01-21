@@ -244,9 +244,16 @@ char *kgdb_mem2hex(char *mem, char *buf, int count)
 	 */
 	tmp = buf + count;
 
+	atomic_inc(&kgdb_accessing_memory);
 	err = copy_from_kernel_nofault(tmp, mem, count);
+	atomic_dec(&kgdb_accessing_memory);
 	if (err)
 		return NULL;
+
+	if (atomic_cmpxchg(&kgdb_memory_access_failed, 1, 0) == 1) {
+		return NULL;
+	}
+
 	while (count > 0) {
 		buf = hex_byte_pack(buf, *tmp);
 		tmp++;
@@ -266,6 +273,7 @@ int kgdb_hex2mem(char *buf, char *mem, int count)
 {
 	char *tmp_raw;
 	char *tmp_hex;
+	int err;
 
 	/*
 	 * We use the upper half of buf as an intermediate buffer for the
@@ -280,7 +288,15 @@ int kgdb_hex2mem(char *buf, char *mem, int count)
 		*tmp_raw |= hex_to_bin(*tmp_hex--) << 4;
 	}
 
-	return copy_to_kernel_nofault(mem, tmp_raw, count);
+	atomic_inc(&kgdb_accessing_memory);
+	err = copy_to_kernel_nofault(mem, tmp_raw, count);
+	atomic_dec(&kgdb_accessing_memory);
+
+	if (atomic_cmpxchg(&kgdb_memory_access_failed, 1, 0) == 1) {
+		return -EIO;
+	}
+
+	return err;
 }
 
 /*
