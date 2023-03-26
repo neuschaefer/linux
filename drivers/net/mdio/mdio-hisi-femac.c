@@ -76,6 +76,8 @@ static int hisi_femac_mdio_probe(struct platform_device *pdev)
 	struct hisi_femac_mdio_data *data;
 	int ret;
 
+	pr_info("%s\n", __func__);
+
 	bus = mdiobus_alloc_size(sizeof(*data));
 	if (!bus)
 		return -ENOMEM;
