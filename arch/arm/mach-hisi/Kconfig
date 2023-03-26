@@ -8,6 +8,8 @@ config ARCH_HISI
 	select POWER_RESET
 	select POWER_RESET_HISI
 	select POWER_SUPPLY
+	select ARM_TIMER_SP804
+	select ARM_VIC
 
 if ARCH_HISI
 

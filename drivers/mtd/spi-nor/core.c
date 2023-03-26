@@ -3629,6 +3629,8 @@ static int spi_nor_probe(struct spi_mem *spimem)
 	char *flash_name;
 	int ret;
 
+	pr_info("%s\n", __func__);
+
 	nor = devm_kzalloc(&spi->dev, sizeof(*nor), GFP_KERNEL);
 	if (!nor)
 		return -ENOMEM;

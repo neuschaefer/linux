@@ -514,10 +514,17 @@ static const struct acpi_device_id hisi_sfc_v3xx_acpi_ids[] = {
 };
 MODULE_DEVICE_TABLE(acpi, hisi_sfc_v3xx_acpi_ids);
 
+static const struct of_device_id hisi_sfc_v3xx_of_ids[] = {
+	{ .compatible = "hisilicon,hi3518-sfc", },
+	{}
+};
+MODULE_DEVICE_TABLE(of, hisi_sfc_v3xx_acpi_ids);
+
 static struct platform_driver hisi_sfc_v3xx_spi_driver = {
 	.driver = {
 		.name	= "hisi-sfc-v3xx",
 		.acpi_match_table = hisi_sfc_v3xx_acpi_ids,
+		.of_match_table = hisi_sfc_v3xx_of_ids,
 	},
 	.probe	= hisi_sfc_v3xx_probe,
 };

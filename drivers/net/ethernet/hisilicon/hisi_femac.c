@@ -692,8 +692,10 @@ static const struct net_device_ops hisi_femac_netdev_ops = {
 
 static void hisi_femac_core_reset(struct hisi_femac_priv *priv)
 {
-	reset_control_assert(priv->mac_rst);
-	reset_control_deassert(priv->mac_rst);
+	if (priv->mac_rst) {
+		reset_control_assert(priv->mac_rst);
+		reset_control_deassert(priv->mac_rst);
+	}
 }
 
 static void hisi_femac_sleep_us(u32 time_us)
@@ -716,17 +718,19 @@ static void hisi_femac_phy_reset(struct hisi_femac_priv *priv)
 	 * we must keep PHY in deassert state first and
 	 * then complete the hardware reset operation
 	 */
-	reset_control_deassert(priv->phy_rst);
-	hisi_femac_sleep_us(priv->phy_reset_delays[PRE_DELAY]);
+	if (priv->phy_rst) {
+		reset_control_deassert(priv->phy_rst);
+		hisi_femac_sleep_us(priv->phy_reset_delays[PRE_DELAY]);
 
-	reset_control_assert(priv->phy_rst);
-	/* delay some time to ensure reset ok,
-	 * this depends on PHY hardware feature
-	 */
-	hisi_femac_sleep_us(priv->phy_reset_delays[PULSE]);
-	reset_control_deassert(priv->phy_rst);
-	/* delay some time to ensure later MDIO access */
-	hisi_femac_sleep_us(priv->phy_reset_delays[POST_DELAY]);
+		reset_control_assert(priv->phy_rst);
+		/* delay some time to ensure reset ok,
+		 * this depends on PHY hardware feature
+		 */
+		hisi_femac_sleep_us(priv->phy_reset_delays[PULSE]);
+		reset_control_deassert(priv->phy_rst);
+		/* delay some time to ensure later MDIO access */
+		hisi_femac_sleep_us(priv->phy_reset_delays[POST_DELAY]);
+	}
 }
 
 static void hisi_femac_port_init(struct hisi_femac_priv *priv)
@@ -810,17 +814,19 @@ static int hisi_femac_drv_probe(struct platform_device *pdev)
 		goto out_free_netdev;
 	}
 
-	priv->mac_rst = devm_reset_control_get(dev, "mac");
+	priv->mac_rst = devm_reset_control_get_optional(dev, "mac");
+	pr_info("femac #41\n");
 	if (IS_ERR(priv->mac_rst)) {
 		ret = PTR_ERR(priv->mac_rst);
 		goto out_disable_clk;
 	}
 	hisi_femac_core_reset(priv);
 
-	priv->phy_rst = devm_reset_control_get(dev, "phy");
+	priv->phy_rst = devm_reset_control_get_optional(dev, "phy");
+	pr_info("femac #42\n");
 	if (IS_ERR(priv->phy_rst)) {
 		priv->phy_rst = NULL;
-	} else {
+	} else if (priv->phy_rst) {
 		ret = of_property_read_u32_array(node,
 						 PHY_RESET_DELAYS_PROPERTY,
 						 priv->phy_reset_delays,
@@ -830,6 +836,7 @@ static int hisi_femac_drv_probe(struct platform_device *pdev)
 		hisi_femac_phy_reset(priv);
 	}
 
+	pr_info("femac #43\n");
 	phy = of_phy_get_and_connect(ndev, node, hisi_femac_adjust_link);
 	if (!phy) {
 		dev_err(dev, "connect to PHY failed!\n");

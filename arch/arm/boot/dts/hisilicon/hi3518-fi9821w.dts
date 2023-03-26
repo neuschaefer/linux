@@ -1,0 +1,32 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2023 Jonathan Neuschäfer
+
+/dts-v1/;
+#include "hi3518.dtsi"
+
+/ {
+	model = "FOSCAM FI9821W";
+	compatible = "foscam,fi9821w", "hisilicon,hi3518";
+
+	memory@80000000 {
+		device_type = "memory";
+		reg = <0x80000000 0x10000000>;
+	};
+
+	chosen {
+		stdout-path = "serial0:115200n8";
+	};
+};
+
+&uart0 {
+	status = "okay";
+};
+
+&sfc {
+	status = "okay";
+
+	flash@0 {
+		reg = <0>;
+		compatible = "jedec,spi-nor";
+	};
+};

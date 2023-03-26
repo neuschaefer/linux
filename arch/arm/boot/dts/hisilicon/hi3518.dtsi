@@ -1,0 +1,154 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2023 Jonathan Neuschäfer
+
+/ {
+	#address-cells = <1>;
+	#size-cells = <1>;
+	interrupt-parent = <&vic0>;
+
+	cpus {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		cpu@0 {
+			device_type = "cpu";
+			compatible = "arm,arm926ej-s";
+			reg = <0>;
+		};
+	};
+
+	aliases {
+		serial0 = &uart0;
+		serial1 = &uart1;
+		serial2 = &uart2;
+	};
+
+	clk_24m: clock-24m {
+		compatible = "fixed-clock";
+		#clock-cells = <0>;
+		clock-frequency = <24000000>;
+		clock-accuracy = <100>;
+	};
+
+	clk_100m: clock-100m {
+		compatible = "fixed-clock";
+		#clock-cells = <0>;
+		clock-frequency = <100000000>;
+		clock-accuracy = <100>;
+	};
+
+	clk_400m: clock-400m {
+		compatible = "fixed-clock";
+		#clock-cells = <0>;
+		clock-frequency = <400000000>;
+		clock-accuracy = <100>;
+	};
+
+	soc {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		compatible = "simple-bus";
+		ranges;
+
+		sfc: spi@10010000 {
+			compatible = "hisilicon,hi3518-sfc";
+			reg = <0x10010000 0x1000>;
+			status = "disabled";
+			#address-cells = <1>;
+			#size-cells = <0>;
+		};
+
+		eth0: ethernet@10090000 {
+			compatible = "hisilicon,hisi-femac-v1";
+			reg = <0x10090000 0x1000>,<0x10091300 0x200>;
+			interrupts = <12>;
+			clocks = <&clk_400m>;
+			//resets = <&crg 0xec 0>,<&crg 0xec 3>;
+			//reset-names = "mac","phy";
+			//mac-address = [00 00 00 00 00 00];
+			phy-mode = "mii";
+			phy-handle = <&phy0>;
+			//hisilicon,phy-reset-delays-us = <10000 20000 20000>;
+		};
+
+		mdio: mdio@10091100 {
+			compatible = "hisilicon,hisi-femac-mdio";
+			reg = <0x10091100 0x10>;
+			clocks = <&clk_400m>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			phy0: phy@1 {
+				reg = <1>;
+			};
+		};
+
+		usb0: usb@100a0000 {
+			compatible = "generic-ohci";
+			reg = <0x100a0000 0x1000>;
+			interrupts = <16>;
+			clocks = <&clk_100m>;
+		};
+
+		usb1: usb@100b0000 {
+			compatible = "generic-ehci";
+			reg = <0x100b0000 0x1000>;
+			interrupts = <15>;
+			clocks = <&clk_100m>;
+		};
+
+		vic0: interrupt-controller@10140000 {
+			compatible = "arm,pl192-vic", "arm,primecell";
+			reg = <0x10140000 0x1000>;
+			interrupt-controller;
+			#interrupt-cells = <1>;
+		};
+
+		timer01: timer@20000000 {
+			compatible = "arm,sp804", "arm,primecell";
+			reg = <0x20000000 0x1000>;
+			clock-names = "apb_pclk";
+			clocks = <&clk_100m>;
+			interrupts = <3>;
+		};
+
+		timer23: timer@20010000 {
+			compatible = "arm,sp804", "arm,primecell";
+			reg = <0x20010000 0x1000>;
+			interrupts = <4>;
+			status = "disabled";
+		};
+
+		wdt0: watchdog@20040000 {
+			compatible = "arm,sp805", "arm,primecell";
+			reg = <0x20040000 0x1000>;
+			interrupts = <1>;
+			clocks = <&clk_100m>, <&clk_100m>;
+			clock-names = "wdog_clk", "apb_pclk";
+		};
+
+		uart0: serial@20080000 {
+			compatible = "arm,pl010", "arm,primecell";
+			reg = <0x20080000 0x1000>;
+			reg-io-width = <4>;
+			interrupts = <5>;
+			clock-names = "uart_clk", "apb_pclk";
+			clocks = <&clk_24m>, <&clk_400m>;
+			status = "disabled";
+		};
+
+		uart1: serial@20090000 {
+			compatible = "arm,pl010", "arm,primecell";
+			reg = <0x20090000 0x1000>;
+			interrupts = <5>;
+			status = "disabled";
+		};
+
+		uart2: serial@200a0000 {
+			compatible = "arm,pl011", "arm,primecell";
+			reg = <0x200a0000 0x1000>;
+			interrupts = <25>;
+			status = "disabled";
+		};
+	};
+};
