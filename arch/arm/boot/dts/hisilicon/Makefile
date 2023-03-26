@@ -1,4 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0
+dtb-$(CONFIG_ARCH_HI35xx_V5) += \
+	hi3518-fi9821w.dtb
 dtb-$(CONFIG_ARCH_HI36xx) += \
 	hi3620-hi4511.dtb
 dtb-$(CONFIG_ARCH_HIP01) += \
