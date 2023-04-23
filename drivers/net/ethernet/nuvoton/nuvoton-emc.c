@@ -50,9 +50,6 @@
  * Not implemented so far:
  * - copy-less TX/RX DMA
  * - NAPI
- *
- * TODO:
- * - set DMARFC
  */
 
 #include <linux/clk.h>
@@ -364,14 +361,6 @@ static int emc_init_desc(struct emc_priv *priv)
 	return 0;
 }
 
-static void emc_set_fifo_threshold(struct emc_priv *priv)
-{
-	unsigned int val;
-
-	val = FFTCR_TXTHD | FFTCR_BLENGTH;
-	writel(val, priv->reg + REG_FFTCR);
-}
-
 static void emc_hw_reset(struct emc_priv *priv)
 {
 	unsigned int val;
@@ -386,6 +375,57 @@ static void emc_hw_reset(struct emc_priv *priv)
 		;
 }
 
+static void emc_hw_init(struct net_device *netdev)
+{
+	struct emc_priv *priv = netdev_priv(netdev);
+	unsigned int val;
+
+	mutex_lock(&priv->mcmdr_mutex);
+	emc_hw_reset(priv);
+
+	/* Set FIFO thresholds */
+	val = FFTCR_TXTHD | FFTCR_BLENGTH;
+	writel(val, priv->reg + REG_FFTCR);
+
+	/* Enable interrupts */
+	val = MIEN_TXINTR | MIEN_RXINTR | MIEN_RXGD | MIEN_TXCP;
+	val |= MIEN_TXBERR | MIEN_RXBERR | MIEN_TXABT;
+	writel(val, priv->reg + REG_MIEN);
+
+	/* Initialize CAM */
+	emc_hw_write_cam(priv, 0, netdev->dev_addr);
+	val = CAMEN_CAM0EN;
+	writel(val, priv->reg + REG_CAMEN);
+	val = CAMCMR_ECMP | CAMCMR_ABP | CAMCMR_AMP;
+	writel(val, priv->reg + REG_CAMCMR);
+
+	/* Set max. size of received frames */
+	writel(MAX_RX_FRAME, priv->reg + REG_DMARFC);
+
+	/* Initialize MCMDR */
+	val = readl(priv->reg + REG_MCMDR);
+	val |= MCMDR_SPCRC | MCMDR_ACP;
+	writel(val, priv->reg + REG_MCMDR);
+
+	mutex_unlock(&priv->mcmdr_mutex);
+}
+
+static void emc_hw_enable_rxtx(struct emc_priv *priv, bool enable)
+{
+	unsigned int val;
+
+	mutex_lock(&priv->mcmdr_mutex);
+	val = readl(priv->reg + REG_MCMDR);
+
+	if (enable)
+		val |= MCMDR_RXON | MCMDR_TXON;
+	else
+		val &= ~(MCMDR_RXON | MCMDR_TXON);
+
+	writel(val, priv->reg + REG_MCMDR);
+	mutex_unlock(&priv->mcmdr_mutex);
+}
+
 static void emc_hw_trigger_rx(struct emc_priv *priv)
 {
 	writel(1, priv->reg + REG_RSDR);
@@ -396,32 +436,11 @@ static void emc_hw_trigger_tx(struct emc_priv *priv)
 	writel(1, priv->reg + REG_TSDR);
 }
 
-static void emc_hw_enable_interrupts(struct emc_priv *priv)
-{
-	unsigned int val;
-
-	val = MIEN_TXINTR | MIEN_RXINTR | MIEN_RXGD | MIEN_TXCP;
-	val |= MIEN_TXBERR | MIEN_RXBERR | MIEN_TXABT;
-
-	writel(val, priv->reg + REG_MIEN);
-}
-
 static void emc_hw_get_and_clear_int(struct emc_priv *priv,
 				  unsigned int mask, unsigned int *val)
 {
 	*val = readl(priv->reg + REG_MISTA) & mask;
 	writel(*val, priv->reg + REG_MISTA);
-}
-
-static void emc_hw_init_mcmdr(struct emc_priv *priv)
-{
-	unsigned int val;
-
-	val = readl(priv->reg + REG_MCMDR);
-	val |= MCMDR_SPCRC | MCMDR_ACP;
-	writel(val, priv->reg + REG_MCMDR);
-
-	mutex_unlock(&priv->mcmdr_mutex);
 }
 
 static void emc_hw_enable_mdio(struct emc_priv *priv, bool enable)
@@ -433,35 +452,6 @@ static void emc_hw_enable_mdio(struct emc_priv *priv, bool enable)
 		val |= MCMDR_ENMDC;
 	else
 		val &= ~MCMDR_ENMDC;
-	writel(val, priv->reg + REG_MCMDR);
-}
-
-static void emc_init_cam(struct net_device *netdev)
-{
-	struct emc_priv *priv = netdev_priv(netdev);
-	unsigned int val;
-
-	emc_hw_write_cam(priv, 0, netdev->dev_addr);
-
-	val = readl(priv->reg + REG_CAMEN);
-	val |= CAMEN_CAM0EN;
-	writel(val, priv->reg + REG_CAMEN);
-
-	val = CAMCMR_ECMP | CAMCMR_ABP | CAMCMR_AMP;
-	writel(val, priv->reg + REG_CAMCMR);
-}
-
-static void emc_hw_enable_rxtx(struct emc_priv *priv, bool enable)
-{
-	unsigned int val;
-
-	val = readl(priv->reg + REG_MCMDR);
-
-	if (enable)
-		val |= MCMDR_RXON | MCMDR_TXON;
-	else
-		val &= ~(MCMDR_RXON | MCMDR_TXON);
-
 	writel(val, priv->reg + REG_MCMDR);
 }
 
@@ -485,7 +475,7 @@ static int emc_set_mac_address(struct net_device *netdev, void *addr)
 	return 0;
 }
 
-static int emc_close(struct net_device *netdev)
+static int emc_stop(struct net_device *netdev)
 {
 	struct emc_priv *priv = netdev_priv(netdev);
 	struct platform_device *pdev = priv->pdev;
@@ -730,21 +720,14 @@ static int emc_open(struct net_device *netdev)
 	struct platform_device *pdev = priv->pdev;
 	int err;
 
-	clk_prepare_enable(priv->clk_main);
-	clk_prepare_enable(priv->clk_rmii);
 
 	priv->cur_tx = 0x0;
 	priv->finish_tx = 0x0;
 	priv->cur_rx = 0x0;
 
-	emc_hw_reset(priv);
-	emc_init_desc(priv);
-	emc_set_fifo_threshold(priv);
-	emc_set_descriptors(priv);
-	emc_init_cam(netdev);
-	emc_hw_init_mcmdr(priv);
-	emc_hw_enable_interrupts(priv);
-	emc_hw_enable_rxtx(priv, true);
+	err = emc_init_desc(priv);
+	if (err)
+		return err;
 
 	if (request_irq(priv->txirq, emc_tx_interrupt, 0x0, pdev->name, netdev)) {
 		dev_err(&pdev->dev, "register irq tx failed\n");
@@ -757,6 +740,13 @@ static int emc_open(struct net_device *netdev)
 		return -EAGAIN;
 	}
 
+	clk_prepare_enable(priv->clk_main);
+	clk_prepare_enable(priv->clk_rmii);
+
+	emc_hw_init(netdev);
+	emc_set_descriptors(priv);
+
+	emc_hw_enable_rxtx(priv, true);
 	netif_start_queue(netdev);
 	emc_hw_trigger_rx(priv);
 
@@ -822,7 +812,7 @@ static const struct ethtool_ops emc_ethtool_ops = {
 
 static const struct net_device_ops emc_netdev_ops = {
 	.ndo_open		= emc_open,
-	.ndo_stop		= emc_close,
+	.ndo_stop		= emc_stop,
 	.ndo_start_xmit		= emc_start_xmit,
 	.ndo_set_rx_mode	= emc_set_rx_mode,
 	.ndo_set_mac_address	= emc_set_mac_address,
