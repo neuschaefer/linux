@@ -49,7 +49,6 @@
 /*
  * Not implemented so far:
  * - copy-less TX/RX DMA
- * - NAPI
  */
 
 #include <linux/clk.h>
@@ -236,6 +235,7 @@ struct emc_priv {
 	struct mii_bus *mdio;
 	struct phy_device *phy;
 	struct ncsi_dev *ncsi;
+	struct napi_struct napi;
 	int rxirq;
 	int txirq;
 	void __iomem *reg;
@@ -442,6 +442,19 @@ static void emc_hw_get_and_clear_int(struct emc_priv *priv,
 	writel(*val, priv->reg + REG_MISTA);
 }
 
+static void emc_hw_enable_rx_irq(struct emc_priv *priv, bool enable)
+{
+	unsigned int val;
+
+	val = readl(priv->reg + REG_MIEN);
+	if (enable)
+		val |= MIEN_RXINTR;
+	else
+		val &= ~MIEN_RXINTR;
+	writel(val, priv->reg + REG_MIEN);
+}
+
+
 static void emc_hw_enable_mdio(struct emc_priv *priv, bool enable)
 {
 	unsigned int val;
@@ -485,6 +498,7 @@ static int emc_stop(struct net_device *netdev)
 		ncsi_stop_dev(priv->ncsi);
 
 	netif_stop_queue(netdev);
+	napi_disable(&priv->napi);
 
 	dma_free_coherent(&pdev->dev, sizeof(struct emc_rx_queue),
 					priv->rx_queue, priv->rx_queue_phys);
@@ -634,6 +648,9 @@ static irqreturn_t emc_rx_isr(int irq, void *dev_id)
 	if (status & MISTA_RX_ERRORS)
 		dev_err(&pdev->dev, "RX errors: %#08x\n", status);
 
+	emc_hw_enable_rx_irq(priv, false);
+	napi_schedule_irqoff(&priv->napi);
+
 	return IRQ_WAKE_THREAD;
 }
 
@@ -707,7 +724,7 @@ static void emc_netdev_rx(struct net_device *netdev)
 			skb->protocol = eth_type_trans(skb, netdev);
 			netdev->stats.rx_packets++;
 			netdev->stats.rx_bytes += length;
-			netif_rx(skb);
+			netif_receive_skb(skb);
 		} else {
 			emc_update_rx_error_stats(netdev, status);
 		}
@@ -724,9 +741,23 @@ static void emc_netdev_rx(struct net_device *netdev)
 
 static irqreturn_t emc_rx_threaded_isr(int irq, void *dev_id)
 {
-	emc_netdev_rx(dev_id);
+	struct net_device *netdev = dev_id;
+
+	emc_netdev_rx(netdev);
 
 	return IRQ_HANDLED;
+}
+
+static int emc_napi_poll(struct napi_struct *napi, int budget)
+{
+	struct emc_priv *priv = container_of(napi, struct emc_priv, napi);
+	struct net_device *netdev = priv->netdev;
+
+	emc_netdev_rx(netdev);
+	napi_complete(&priv->napi);
+	emc_hw_enable_rx_irq(priv, true);
+
+	return 0;
 }
 
 static int emc_open(struct net_device *netdev)
@@ -763,6 +794,7 @@ static int emc_open(struct net_device *netdev)
 	emc_set_descriptors(priv);
 
 	emc_hw_enable_rxtx(priv, true);
+	napi_enable(&priv->napi);
 	netif_start_queue(netdev);
 	emc_hw_trigger_rx(priv);
 
@@ -1009,6 +1041,8 @@ static int emc_probe(struct platform_device *pdev)
 	netdev->tx_queue_len = TX_QUEUE_SIZE;
 	netdev->watchdog_timeo = TX_TIMEOUT;
 	emc_init_mac_address(netdev);
+
+	netif_napi_add(netdev, &priv->napi, emc_napi_poll);
 
 	error = devm_register_netdev(&pdev->dev, netdev);
 	if (error != 0)
