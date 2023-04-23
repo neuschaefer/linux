@@ -361,7 +361,7 @@ static void emc_set_fifo_threshold(struct emc_priv *priv)
 	writel(val, priv->reg + REG_FFTCR);
 }
 
-static void emc_reset(struct emc_priv *priv)
+static void emc_hw_reset(struct emc_priv *priv)
 {
 	unsigned int val;
 
@@ -375,17 +375,17 @@ static void emc_reset(struct emc_priv *priv)
 		;
 }
 
-static void emc_trigger_rx(struct emc_priv *priv)
+static void emc_hw_trigger_rx(struct emc_priv *priv)
 {
 	writel(1, priv->reg + REG_RSDR);
 }
 
-static void emc_trigger_tx(struct emc_priv *priv)
+static void emc_hw_trigger_tx(struct emc_priv *priv)
 {
 	writel(1, priv->reg + REG_TSDR);
 }
 
-static void emc_enable_interrupts(struct emc_priv *priv)
+static void emc_hw_enable_interrupts(struct emc_priv *priv)
 {
 	unsigned int val;
 
@@ -395,14 +395,14 @@ static void emc_enable_interrupts(struct emc_priv *priv)
 	writel(val, priv->reg + REG_MIEN);
 }
 
-static void emc_get_and_clear_int(struct emc_priv *priv,
+static void emc_hw_get_and_clear_int(struct emc_priv *priv,
 				  unsigned int mask, unsigned int *val)
 {
 	*val = readl(priv->reg + REG_MISTA) & mask;
 	writel(*val, priv->reg + REG_MISTA);
 }
 
-static void emc_init_mcmdr(struct emc_priv *priv)
+static void emc_hw_init_mcmdr(struct emc_priv *priv)
 {
 	unsigned int val;
 
@@ -411,7 +411,7 @@ static void emc_init_mcmdr(struct emc_priv *priv)
 	writel(val, priv->reg + REG_MCMDR);
 }
 
-static void emc_enable_mdio(struct emc_priv *priv, bool enable)
+static void emc_hw_enable_mdio(struct emc_priv *priv, bool enable)
 {
 	unsigned int val;
 
@@ -438,7 +438,7 @@ static void emc_init_cam(struct net_device *netdev)
 	writel(val, priv->reg + REG_CAMCMR);
 }
 
-static void emc_enable_rxtx(struct emc_priv *priv, bool enable)
+static void emc_hw_enable_rxtx(struct emc_priv *priv, bool enable)
 {
 	unsigned int val;
 
@@ -524,7 +524,7 @@ static int emc_send_frame(struct net_device *netdev,
 	tx_desc->sl = cpu_to_le32(length & 0xffff);
 	tx_desc->mode = cpu_to_le32(TX_OWNER_EMC | TX_PADEN | TX_CRCAPP | TX_INTEN);
 
-	emc_trigger_tx(priv);
+	emc_hw_trigger_tx(priv);
 
 	if (++priv->cur_tx >= TX_QUEUE_SIZE)
 		priv->cur_tx = 0;
@@ -560,7 +560,7 @@ static irqreturn_t emc_tx_interrupt(int irq, void *dev_id)
 	unsigned int cur_entry, entry, status;
 	struct emc_tx_desc *tx_desc;
 
-	emc_get_and_clear_int(priv, MISTA_TX_MASK, &status);
+	emc_hw_get_and_clear_int(priv, MISTA_TX_MASK, &status);
 
 	cur_entry = readl(priv->reg + REG_CTXDSA);
 
@@ -696,11 +696,11 @@ static irqreturn_t emc_rx_interrupt(int irq, void *dev_id)
 	struct platform_device *pdev = priv->pdev;
 	unsigned int status;
 
-	emc_get_and_clear_int(priv, MISTA_RX_MASK, &status);
+	emc_hw_get_and_clear_int(priv, MISTA_RX_MASK, &status);
 
 	if (status & MISTA_RDU) {
 		emc_netdev_rx(netdev);
-		emc_trigger_rx(priv);
+		emc_hw_trigger_rx(priv);
 
 		return IRQ_HANDLED;
 	} else if (status & MISTA_RXBERR) {
@@ -724,14 +724,14 @@ static int emc_open(struct net_device *netdev)
 	priv->finish_tx = 0x0;
 	priv->cur_rx = 0x0;
 
-	emc_reset(priv);
+	emc_hw_reset(priv);
 	emc_init_desc(priv);
 	emc_set_fifo_threshold(priv);
 	emc_set_descriptors(priv);
 	emc_init_cam(netdev);
-	emc_init_mcmdr(priv);
-	emc_enable_interrupts(priv);
-	emc_enable_rxtx(priv, true);
+	emc_hw_init_mcmdr(priv);
+	emc_hw_enable_interrupts(priv);
+	emc_hw_enable_rxtx(priv, true);
 
 	if (request_irq(priv->txirq, emc_tx_interrupt, 0x0, pdev->name, netdev)) {
 		dev_err(&pdev->dev, "register irq tx failed\n");
@@ -745,7 +745,7 @@ static int emc_open(struct net_device *netdev)
 	}
 
 	netif_start_queue(netdev);
-	emc_trigger_rx(priv);
+	emc_hw_trigger_rx(priv);
 
 	if (priv->phy)
 		phy_start(priv->phy);
@@ -832,7 +832,7 @@ static int emc_mdio_write(struct mii_bus *mdio, int phy_id, int reg, u16 data)
 	unsigned int val, i;
 
 	clk_prepare_enable(priv->clk_main);
-	emc_enable_mdio(priv, true);
+	emc_hw_enable_mdio(priv, true);
 
 	writel(data, priv->reg + REG_MIID);
 
@@ -848,7 +848,7 @@ static int emc_mdio_write(struct mii_bus *mdio, int phy_id, int reg, u16 data)
 	if (i == MDIO_RETRIES)
 		dev_warn(&mdio->dev, "MDIO write timed out\n");
 
-	emc_enable_mdio(priv, false);
+	emc_hw_enable_mdio(priv, false);
 	clk_disable_unprepare(priv->clk_main);
 
 	return 0;
@@ -860,7 +860,7 @@ static int emc_mdio_read(struct mii_bus *mdio, int phy_id, int reg)
 	unsigned int val, i, data;
 
 	clk_prepare_enable(priv->clk_main);
-	emc_enable_mdio(priv, true);
+	emc_hw_enable_mdio(priv, true);
 
 	val = (phy_id << 0x08) | reg;
 	val |= MIIDA_BUSY | MIIDA_MDCCR_VAL;
@@ -878,7 +878,7 @@ static int emc_mdio_read(struct mii_bus *mdio, int phy_id, int reg)
 		data = readl(priv->reg + REG_MIID);
 	}
 
-	emc_enable_mdio(priv, false);
+	emc_hw_enable_mdio(priv, false);
 	clk_disable_unprepare(priv->clk_main);
 
 	return data;
