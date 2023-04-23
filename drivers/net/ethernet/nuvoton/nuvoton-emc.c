@@ -806,7 +806,11 @@ static void emc_get_drvinfo(struct net_device *netdev,
 }
 
 static const struct ethtool_ops emc_ethtool_ops = {
-	.get_drvinfo	= emc_get_drvinfo,
+	.get_drvinfo = emc_get_drvinfo,
+	.get_link = ethtool_op_get_link,
+	.get_ts_info = ethtool_op_get_ts_info,
+	.get_link_ksettings = phy_ethtool_get_link_ksettings,
+	.set_link_ksettings = phy_ethtool_set_link_ksettings,
 };
 
 static const struct net_device_ops emc_netdev_ops = {
