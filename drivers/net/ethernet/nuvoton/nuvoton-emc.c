@@ -232,6 +232,7 @@ struct emc_tx_queue {
 struct emc_priv {
 	/* Subsystem relations and hardware details */
 	struct platform_device *pdev;
+	struct net_device *netdev;
 	struct clk *clk_main;
 	struct clk *clk_rmii;
 	struct reset_control *reset;
@@ -250,6 +251,12 @@ struct emc_priv {
 	unsigned int cur_tx; // TODO: rename
 	unsigned int cur_rx;
 	unsigned int finish_tx;
+
+	/*
+	 * This lock specifically pretects against concurrent changes to the
+	 * MCMDR register, especially between reset (in emc_open) and MDIO.
+	 */
+	struct mutex mcmdr_mutex;
 };
 
 static void emc_link_change(struct net_device *netdev)
@@ -258,6 +265,7 @@ static void emc_link_change(struct net_device *netdev)
 	struct phy_device *phydev = netdev->phydev;
 	unsigned int val;
 
+	mutex_lock(&priv->mcmdr_mutex);
 	val = readl(priv->reg + REG_MCMDR);
 
 	if (phydev->speed == 100)
@@ -271,18 +279,21 @@ static void emc_link_change(struct net_device *netdev)
 		val &= ~MCMDR_FDUP;
 
 	writel(val, priv->reg + REG_MCMDR);
+	mutex_unlock(&priv->mcmdr_mutex);
 }
 
 static void emc_hw_set_link_mode_for_ncsi(struct emc_priv *priv)
 {
 	unsigned int val;
 
+	mutex_lock(&priv->mcmdr_mutex);
 	val = readl(priv->reg + REG_MCMDR);
 
 	/* Force 100 Mbit/s and full duplex */
 	val |= MCMDR_OPMOD | MCMDR_FDUP;
 
 	writel(val, priv->reg + REG_MCMDR);
+	mutex_unlock(&priv->mcmdr_mutex);
 }
 
 static void emc_hw_write_cam(struct emc_priv *priv,
@@ -409,6 +420,8 @@ static void emc_hw_init_mcmdr(struct emc_priv *priv)
 	val = readl(priv->reg + REG_MCMDR);
 	val |= MCMDR_SPCRC | MCMDR_ACP;
 	writel(val, priv->reg + REG_MCMDR);
+
+	mutex_unlock(&priv->mcmdr_mutex);
 }
 
 static void emc_hw_enable_mdio(struct emc_priv *priv, bool enable)
@@ -832,6 +845,7 @@ static int emc_mdio_write(struct mii_bus *mdio, int phy_id, int reg, u16 data)
 	unsigned int val, i;
 
 	clk_prepare_enable(priv->clk_main);
+	mutex_lock(&priv->mcmdr_mutex);
 	emc_hw_enable_mdio(priv, true);
 
 	writel(data, priv->reg + REG_MIID);
@@ -849,6 +863,7 @@ static int emc_mdio_write(struct mii_bus *mdio, int phy_id, int reg, u16 data)
 		dev_warn(&mdio->dev, "MDIO write timed out\n");
 
 	emc_hw_enable_mdio(priv, false);
+	mutex_unlock(&priv->mcmdr_mutex);
 	clk_disable_unprepare(priv->clk_main);
 
 	return 0;
@@ -860,6 +875,7 @@ static int emc_mdio_read(struct mii_bus *mdio, int phy_id, int reg)
 	unsigned int val, i, data;
 
 	clk_prepare_enable(priv->clk_main);
+	mutex_lock(&priv->mcmdr_mutex);
 	emc_hw_enable_mdio(priv, true);
 
 	val = (phy_id << 0x08) | reg;
@@ -879,6 +895,7 @@ static int emc_mdio_read(struct mii_bus *mdio, int phy_id, int reg)
 	}
 
 	emc_hw_enable_mdio(priv, false);
+	mutex_unlock(&priv->mcmdr_mutex);
 	clk_disable_unprepare(priv->clk_main);
 
 	return data;
@@ -940,6 +957,8 @@ static int emc_probe(struct platform_device *pdev)
 
 	priv = netdev_priv(netdev);
 	priv->pdev = pdev;
+	priv->netdev = netdev;
+	mutex_init(&priv->mcmdr_mutex);
 
 	priv->reg = devm_of_iomap(&pdev->dev, np, 0, &reg_size);
 	if (IS_ERR(priv->reg))
