@@ -191,8 +191,8 @@
 #define TX_STATUS_TXCP		BIT(19)
 
 /* Global settings for driver */
-#define RX_QUEUE_SIZE		50    /* TODO: other defaults */
-#define TX_QUEUE_SIZE		10
+#define RX_QUEUE_SIZE		64
+#define TX_QUEUE_SIZE		16
 #define MAX_RX_FRAME		0x600
 #define MAX_TX_FRAME		0x600
 #define TX_TIMEOUT		(HZ/2)
@@ -494,25 +494,26 @@ static int emc_stop(struct net_device *netdev)
 	clk_disable_unprepare(priv->clk_rmii);
 	clk_disable_unprepare(priv->clk_main);
 
-	free_irq(priv->txirq, netdev);
-	free_irq(priv->rxirq, netdev);
+	devm_free_irq(&pdev->dev, priv->txirq, netdev);
+	devm_free_irq(&pdev->dev, priv->rxirq, netdev);
 
 	return 0;
 }
 
-static int emc_send_frame(struct net_device *netdev,
-					unsigned char *data, int length)
+// TODO: reorder or something
+static dma_addr_t emc_tx_phys_desc(struct emc_priv *priv, size_t index);
+static dma_addr_t emc_tx_phys_buffer(struct emc_priv *priv, size_t index);
+
+static int emc_start_xmit(struct sk_buff *skb, struct net_device *netdev)
 {
-	struct emc_priv *priv;
-	struct emc_tx_desc *tx_desc;
-	struct platform_device *pdev;
-	unsigned char *buffer;
-
-	priv = netdev_priv(netdev);
-	pdev = priv->pdev;
-
-	tx_desc = &priv->tx_queue->desclist[priv->tx_head];
-	buffer = priv->tx_queue->buf[priv->tx_head];
+	struct emc_priv *priv = netdev_priv(netdev);
+	struct platform_device *pdev = priv->pdev;
+	struct emc_tx_desc *desc = &priv->tx_queue->desclist[priv->tx_head];
+	unsigned char *buffer = priv->tx_queue->buf[priv->tx_head];
+	dma_addr_t dma_buf = emc_tx_phys_buffer(priv, priv->tx_head);
+	dma_addr_t dma = emc_tx_phys_desc(priv, priv->tx_head);
+	unsigned char *data = skb->data;
+	int length = skb->len;
 
 	// TODO: wrong place for a magic number
 	// TODO: test how large a frame the hardware can actually handle
@@ -523,129 +524,182 @@ static int emc_send_frame(struct net_device *netdev,
 
 	memcpy(buffer, data, length);
 
-	tx_desc->sl = cpu_to_le32(length & 0xffff);
-	tx_desc->mode = cpu_to_le32(TX_OWNER_EMC | TX_PADEN | TX_CRCAPP | TX_INTEN);
+	dma_sync_single_for_device(&pdev->dev, dma_buf, length, DMA_TO_DEVICE);
+
+	desc->sl = cpu_to_le32(length & 0xffff);
+	wmb();
+	desc->mode = cpu_to_le32(TX_OWNER_EMC | TX_PADEN | TX_CRCAPP | TX_INTEN);
+	dma_sync_single_for_device(&pdev->dev, dma, sizeof(*desc), DMA_TO_DEVICE);
 
 	emc_hw_trigger_tx(priv);
 
 	if (++priv->tx_head >= TX_QUEUE_SIZE)
 		priv->tx_head = 0;
 
-	tx_desc = &priv->tx_queue->desclist[priv->tx_head];
-	if ((le32_to_cpu(tx_desc->mode) & TX_OWNER_MASK) == TX_OWNER_EMC)
+	desc = &priv->tx_queue->desclist[priv->tx_head];
+	if ((le32_to_cpu(desc->mode) & TX_OWNER_MASK) == TX_OWNER_EMC)
 		netif_stop_queue(netdev);
 
+	dev_consume_skb_irq(skb);
 	return 0;
 }
 
-// TODO: merge with previous function
-static int emc_start_xmit(struct sk_buff *skb, struct net_device *netdev)
-{
-	if (!(emc_send_frame(netdev, skb->data, skb->len))) {
-		dev_consume_skb_irq(skb);
-		return 0;
-	}
-	return -EAGAIN;
-}
-
-// TODO: simplify logic.
-//   - get interrupts
-//     - print stuff
-//     - resume netif
-//   - at reclaim head in TX queue:
-//     - while reclaimable: reclaim, next
-static irqreturn_t emc_tx_interrupt(int irq, void *dev_id)
+static irqreturn_t emc_tx_isr(int irq, void *dev_id)
 {
 	struct net_device *netdev = dev_id;
 	struct emc_priv *priv = netdev_priv(netdev);
 	struct platform_device *pdev = priv->pdev;
-	unsigned int cur_entry, entry, status;
-	struct emc_tx_desc *tx_desc;
+	unsigned int status;
 
 	emc_hw_get_and_clear_int(priv, MISTA_TX_MASK, &status);
 
-	cur_entry = readl(priv->reg + REG_CTXDSA);
+	if (status & MISTA_TX_ERRORS)
+		dev_err(&pdev->dev, "TX errors: %#08x\n", status);
 
-	entry = priv->tx_queue_phys +
-		offsetof(struct emc_tx_queue, desclist[priv->tx_tail]);
+	return IRQ_WAKE_THREAD;
+}
 
-	while (entry != cur_entry) {
-		tx_desc = &priv->tx_queue->desclist[priv->tx_tail];
+static dma_addr_t emc_tx_phys_desc(struct emc_priv *priv, size_t index)
+{
+	return priv->tx_queue_phys + offsetof(struct emc_tx_queue, desclist[index]);
+}
 
-		if (++priv->tx_tail >= TX_QUEUE_SIZE)
-			priv->tx_tail = 0;
+static dma_addr_t emc_tx_phys_buffer(struct emc_priv *priv, size_t index)
+{
+	return priv->tx_queue_phys + offsetof(struct emc_tx_queue, buf[index]);
+}
 
-		if (le32_to_cpu(tx_desc->sl) & TX_STATUS_TXCP) {
-			netdev->stats.tx_packets++;
-			netdev->stats.tx_bytes += le32_to_cpu(tx_desc->sl) & 0xffff;
-		} else {
-			netdev->stats.tx_errors++;
-		}
+static void emc_update_tx_stats(struct net_device *netdev, const struct emc_tx_desc *desc)
+{
+	if (le32_to_cpu(desc->sl) & TX_STATUS_TXCP) {
+		netdev->stats.tx_packets++;
+		netdev->stats.tx_bytes += le32_to_cpu(desc->sl) & 0xffff;
+	} else {
+		netdev->stats.tx_errors++;
+	}
+}
 
-		tx_desc->sl = 0x0;
-		tx_desc->mode = 0x0;
+static void emc_reset_tx_desc(struct emc_tx_desc *desc)
+{
+	desc->sl = cpu_to_le32(0);
+	wmb();
+	desc->mode = cpu_to_le32(0);
+}
 
-		if (netif_queue_stopped(netdev))
-			netif_wake_queue(netdev);
+static irqreturn_t emc_tx_threaded_isr(int irq, void *dev_id)
+{
+	struct net_device *netdev = dev_id;
+	struct emc_priv *priv = netdev_priv(netdev);
+	struct platform_device *pdev = priv->pdev;
 
-		entry = priv->tx_queue_phys +
-			offsetof(struct emc_tx_queue, desclist[priv->tx_tail]);
+	while (priv->tx_tail != priv->tx_head) {
+		struct emc_tx_desc *desc = &priv->tx_queue->desclist[priv->tx_tail];
+		dma_addr_t dma = emc_tx_phys_desc(priv, priv->tx_tail);
+
+		/* Fetch descriptor */
+		dma_sync_single_for_cpu(&pdev->dev, dma, sizeof(*desc), DMA_FROM_DEVICE);
+
+		/* End of loop? */
+		if ((le32_to_cpu(READ_ONCE(desc->mode)) & TX_OWNER_MASK) == TX_OWNER_EMC)
+			break;
+		rmb();
+
+		/* Update statistics */
+		emc_update_tx_stats(netdev, desc);
+
+		/* Return descriptor */
+		emc_reset_tx_desc(desc);
+		dma_sync_single_for_device(&pdev->dev, dma, sizeof(*desc), DMA_TO_DEVICE);
+
+		emc_hw_trigger_tx(priv);
+
+		priv->tx_tail = (priv->tx_tail + 1) % TX_QUEUE_SIZE;
 	}
 
-	if (status & MISTA_TDU) {
-		if (netif_queue_stopped(netdev))
-			netif_wake_queue(netdev);
-	} else if (status & MISTA_EXDEF) {
-		dev_err(&pdev->dev, "emc defer exceed interrupt\n");
-	} else if (status & MISTA_TXBERR) {
-		dev_err(&pdev->dev, "TX bus error!\n");
-	}
+	if (netif_queue_stopped(netdev))
+		netif_wake_queue(netdev);
 
 	return IRQ_HANDLED;
 }
 
-// TODO: simplify logic
-//   - get interrupts
-//     - print stuff?
-//   - at read head:
-//     - while CPU-owned:
-//       - get frame desc
-//         - update stats
-//         - process packet
-//           - DMA foo? avoid copy?
-//       - next
-static void emc_netdev_rx(struct net_device *netdev)
+static irqreturn_t emc_rx_isr(int irq, void *dev_id)
 {
-	struct emc_priv *priv;
-	struct emc_rx_desc *rx_desc;
-	struct platform_device *pdev;
-	struct sk_buff *skb;
-	unsigned char *data;
-	unsigned int length, status, val, entry;
+	struct net_device *netdev = dev_id;
+	struct emc_priv *priv = netdev_priv(netdev);
+	struct platform_device *pdev = priv->pdev;
+	unsigned int status;
 
-	priv = netdev_priv(netdev);
-	pdev = priv->pdev;
+	emc_hw_get_and_clear_int(priv, MISTA_RX_MASK, &status);
 
-	rx_desc = &priv->rx_queue->desclist[priv->rx_tail];
+	if (status & MISTA_RX_ERRORS)
+		dev_err(&pdev->dev, "RX errors: %#08x\n", status);
 
-	do {
-		val = readl(priv->reg + REG_CRXDSA);
+	return IRQ_WAKE_THREAD;
+}
 
-		entry = priv->rx_queue_phys +
-			offsetof(struct emc_rx_queue, desclist[priv->rx_tail]);
+static dma_addr_t emc_rx_phys_desc(struct emc_priv *priv, size_t index)
+{
+	return priv->rx_queue_phys + offsetof(struct emc_rx_queue, desclist[index]);
+}
 
-		if (val == entry)
+static void emc_update_rx_error_stats(struct net_device *netdev, u32 status)
+{
+	struct emc_priv *priv = netdev_priv(netdev);
+	struct platform_device *pdev = priv->pdev;
+
+	netdev->stats.rx_errors++;
+
+	if (status & RX_STATUS_RP) {
+		dev_err(&pdev->dev, "rx runt err\n");
+		netdev->stats.rx_length_errors++;
+	} else if (status & RX_STATUS_CRCE) {
+		dev_err(&pdev->dev, "rx crc err\n");
+		netdev->stats.rx_crc_errors++;
+	} else if (status & RX_STATUS_ALIE) {
+		dev_err(&pdev->dev, "rx alignment err\n");
+		netdev->stats.rx_frame_errors++;
+	} else if (status & RX_STATUS_PTLE) {
+		dev_err(&pdev->dev, "rx longer err\n");
+		netdev->stats.rx_over_errors++;
+	}
+}
+
+static void emc_reset_rx_desc(struct emc_rx_desc *desc)
+{
+	desc->reserved = cpu_to_le32(0);
+	rmb();
+	desc->sl = cpu_to_le32(RX_OWNER_EMC);
+}
+
+static irqreturn_t emc_rx_threaded_isr(int irq, void *dev_id)
+{
+	struct net_device *netdev = dev_id;
+	struct emc_priv *priv = netdev_priv(netdev);
+	struct platform_device *pdev = priv->pdev;
+
+	while (true) {
+		struct emc_rx_desc *desc = &priv->rx_queue->desclist[priv->rx_tail];
+		dma_addr_t dma = emc_rx_phys_desc(priv, priv->rx_tail);
+		u32 status, length;
+
+		/* Fetch descriptor */
+		dma_sync_single_for_cpu(&pdev->dev, dma, sizeof(*desc), DMA_FROM_DEVICE);
+		status = le32_to_cpu(desc->sl);
+		length = status & 0xffff;
+		rmb();
+
+		/* End of loop? */
+		if ((status & RX_OWNER_MASK) == RX_OWNER_EMC)
 			break;
 
-		status = le32_to_cpu(rx_desc->sl);
-		length = status & 0xffff;
-
+		/* Receive packet or report error */
 		if (status & RX_STATUS_RXGD) {
-			data = priv->rx_queue->buf[priv->rx_tail];
-			skb = netdev_alloc_skb(netdev, length + 2);
+			unsigned char *data = priv->rx_queue->buf[priv->rx_tail];
+			struct sk_buff *skb = netdev_alloc_skb(netdev, length + 2);
+
 			if (!skb) {
 				netdev->stats.rx_dropped++;
-				return;
+				return IRQ_HANDLED;
 			}
 
 			skb_reserve(skb, 2);
@@ -656,69 +710,27 @@ static void emc_netdev_rx(struct net_device *netdev)
 			netdev->stats.rx_bytes += length;
 			netif_rx(skb);
 		} else {
-			netdev->stats.rx_errors++;
-
-			if (status & RX_STATUS_RP) {
-				dev_err(&pdev->dev, "rx runt err\n");
-				netdev->stats.rx_length_errors++;
-			} else if (status & RX_STATUS_CRCE) {
-				dev_err(&pdev->dev, "rx crc err\n");
-				netdev->stats.rx_crc_errors++;
-			} else if (status & RX_STATUS_ALIE) {
-				dev_err(&pdev->dev, "rx alignment err\n");
-				netdev->stats.rx_frame_errors++;
-			} else if (status & RX_STATUS_PTLE) {
-				dev_err(&pdev->dev, "rx longer err\n");
-				netdev->stats.rx_over_errors++;
-			}
+			emc_update_rx_error_stats(netdev, status);
 		}
 
-		rx_desc->sl = cpu_to_le32(RX_OWNER_EMC);
-		rx_desc->reserved = cpu_to_le32(0);
+		/* Return descriptor */
+		emc_reset_rx_desc(desc);
+		dma_sync_single_for_device(&pdev->dev, dma, sizeof(*desc), DMA_TO_DEVICE);
 
-		if (++priv->rx_tail >= RX_QUEUE_SIZE)
-			priv->rx_tail = 0;
-
-		rx_desc = &priv->rx_queue->desclist[priv->rx_tail];
-
-	} while (1);
-}
-
-// TODO: centralize/fix list of RX interrupt bits
-// TODO: test RX/TX interrupt bits with loopback mode
-//       -  doc says:
-//         - The RXINTR is logic OR result of the bits 1~14 in MISTA register
-//           do logic AND with the corresponding bits in MIEN register.
-//         - The TXINTR is logic OR result of the bits 17~24 in MISTA register
-//           do logic AND with the corresponding bits in MIEN register.
-static irqreturn_t emc_rx_interrupt(int irq, void *dev_id)
-{
-	struct net_device *netdev = dev_id;
-	struct emc_priv *priv = netdev_priv(netdev);
-	struct platform_device *pdev = priv->pdev;
-	unsigned int status;
-
-	emc_hw_get_and_clear_int(priv, MISTA_RX_MASK, &status);
-
-	if (status & MISTA_RDU) {
-		emc_netdev_rx(netdev);
-		emc_hw_trigger_rx(priv);
-
-		return IRQ_HANDLED;
-	} else if (status & MISTA_RXBERR) {
-		dev_err(&pdev->dev, "RX bus error!\n");
+		priv->rx_tail = (priv->rx_tail + 1) % RX_QUEUE_SIZE;
 	}
 
-	emc_netdev_rx(netdev);
+	emc_hw_trigger_rx(priv);
+
 	return IRQ_HANDLED;
 }
+
 
 static int emc_open(struct net_device *netdev)
 {
 	struct emc_priv *priv = netdev_priv(netdev);
 	struct platform_device *pdev = priv->pdev;
 	int err;
-
 
 	priv->tx_head = 0x0;
 	priv->tx_tail = 0x0;
@@ -728,12 +740,14 @@ static int emc_open(struct net_device *netdev)
 	if (err)
 		return err;
 
-	if (request_irq(priv->txirq, emc_tx_interrupt, 0x0, pdev->name, netdev)) {
+	if (devm_request_threaded_irq(&pdev->dev, priv->txirq,
+				      emc_tx_isr, emc_tx_threaded_isr, 0, pdev->name, netdev)) {
 		dev_err(&pdev->dev, "register irq tx failed\n");
 		return -EAGAIN;
 	}
 
-	if (request_irq(priv->rxirq, emc_rx_interrupt, 0x0, pdev->name, netdev)) {
+	if (devm_request_threaded_irq(&pdev->dev, priv->rxirq,
+				      emc_rx_isr, emc_rx_threaded_isr, 0, pdev->name, netdev)) {
 		dev_err(&pdev->dev, "register irq rx failed\n");
 		free_irq(priv->txirq, netdev);
 		return -EAGAIN;
