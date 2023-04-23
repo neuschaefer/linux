@@ -245,9 +245,8 @@ struct emc_priv {
 	struct emc_tx_queue *tx_queue;
 	dma_addr_t rx_queue_phys;
 	dma_addr_t tx_queue_phys;
-	unsigned int cur_tx; // TODO: rename
-	unsigned int cur_rx;
-	unsigned int finish_tx;
+	unsigned int rx_tail;
+	unsigned int tx_head, tx_tail;
 
 	/*
 	 * This lock specifically pretects against concurrent changes to the
@@ -512,8 +511,8 @@ static int emc_send_frame(struct net_device *netdev,
 	priv = netdev_priv(netdev);
 	pdev = priv->pdev;
 
-	tx_desc = &priv->tx_queue->desclist[priv->cur_tx];
-	buffer = priv->tx_queue->buf[priv->cur_tx];
+	tx_desc = &priv->tx_queue->desclist[priv->tx_head];
+	buffer = priv->tx_queue->buf[priv->tx_head];
 
 	// TODO: wrong place for a magic number
 	// TODO: test how large a frame the hardware can actually handle
@@ -529,10 +528,10 @@ static int emc_send_frame(struct net_device *netdev,
 
 	emc_hw_trigger_tx(priv);
 
-	if (++priv->cur_tx >= TX_QUEUE_SIZE)
-		priv->cur_tx = 0;
+	if (++priv->tx_head >= TX_QUEUE_SIZE)
+		priv->tx_head = 0;
 
-	tx_desc = &priv->tx_queue->desclist[priv->cur_tx];
+	tx_desc = &priv->tx_queue->desclist[priv->tx_head];
 	if ((le32_to_cpu(tx_desc->mode) & TX_OWNER_MASK) == TX_OWNER_EMC)
 		netif_stop_queue(netdev);
 
@@ -568,13 +567,13 @@ static irqreturn_t emc_tx_interrupt(int irq, void *dev_id)
 	cur_entry = readl(priv->reg + REG_CTXDSA);
 
 	entry = priv->tx_queue_phys +
-		offsetof(struct emc_tx_queue, desclist[priv->finish_tx]);
+		offsetof(struct emc_tx_queue, desclist[priv->tx_tail]);
 
 	while (entry != cur_entry) {
-		tx_desc = &priv->tx_queue->desclist[priv->finish_tx];
+		tx_desc = &priv->tx_queue->desclist[priv->tx_tail];
 
-		if (++priv->finish_tx >= TX_QUEUE_SIZE)
-			priv->finish_tx = 0;
+		if (++priv->tx_tail >= TX_QUEUE_SIZE)
+			priv->tx_tail = 0;
 
 		if (le32_to_cpu(tx_desc->sl) & TX_STATUS_TXCP) {
 			netdev->stats.tx_packets++;
@@ -590,7 +589,7 @@ static irqreturn_t emc_tx_interrupt(int irq, void *dev_id)
 			netif_wake_queue(netdev);
 
 		entry = priv->tx_queue_phys +
-			offsetof(struct emc_tx_queue, desclist[priv->finish_tx]);
+			offsetof(struct emc_tx_queue, desclist[priv->tx_tail]);
 	}
 
 	if (status & MISTA_TDU) {
@@ -627,13 +626,13 @@ static void emc_netdev_rx(struct net_device *netdev)
 	priv = netdev_priv(netdev);
 	pdev = priv->pdev;
 
-	rx_desc = &priv->rx_queue->desclist[priv->cur_rx];
+	rx_desc = &priv->rx_queue->desclist[priv->rx_tail];
 
 	do {
 		val = readl(priv->reg + REG_CRXDSA);
 
 		entry = priv->rx_queue_phys +
-			offsetof(struct emc_rx_queue, desclist[priv->cur_rx]);
+			offsetof(struct emc_rx_queue, desclist[priv->rx_tail]);
 
 		if (val == entry)
 			break;
@@ -642,7 +641,7 @@ static void emc_netdev_rx(struct net_device *netdev)
 		length = status & 0xffff;
 
 		if (status & RX_STATUS_RXGD) {
-			data = priv->rx_queue->buf[priv->cur_rx];
+			data = priv->rx_queue->buf[priv->rx_tail];
 			skb = netdev_alloc_skb(netdev, length + 2);
 			if (!skb) {
 				netdev->stats.rx_dropped++;
@@ -677,10 +676,10 @@ static void emc_netdev_rx(struct net_device *netdev)
 		rx_desc->sl = cpu_to_le32(RX_OWNER_EMC);
 		rx_desc->reserved = cpu_to_le32(0);
 
-		if (++priv->cur_rx >= RX_QUEUE_SIZE)
-			priv->cur_rx = 0;
+		if (++priv->rx_tail >= RX_QUEUE_SIZE)
+			priv->rx_tail = 0;
 
-		rx_desc = &priv->rx_queue->desclist[priv->cur_rx];
+		rx_desc = &priv->rx_queue->desclist[priv->rx_tail];
 
 	} while (1);
 }
@@ -721,9 +720,9 @@ static int emc_open(struct net_device *netdev)
 	int err;
 
 
-	priv->cur_tx = 0x0;
-	priv->finish_tx = 0x0;
-	priv->cur_rx = 0x0;
+	priv->tx_head = 0x0;
+	priv->tx_tail = 0x0;
+	priv->rx_tail = 0x0;
 
 	err = emc_init_desc(priv);
 	if (err)
