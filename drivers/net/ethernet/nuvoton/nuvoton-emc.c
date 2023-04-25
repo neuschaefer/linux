@@ -671,9 +671,8 @@ static void emc_reset_rx_desc(struct emc_rx_desc *desc)
 	desc->sl = cpu_to_le32(RX_OWNER_EMC);
 }
 
-static irqreturn_t emc_rx_threaded_isr(int irq, void *dev_id)
+static void emc_netdev_rx(struct net_device *netdev)
 {
-	struct net_device *netdev = dev_id;
 	struct emc_priv *priv = netdev_priv(netdev);
 	struct platform_device *pdev = priv->pdev;
 
@@ -699,7 +698,7 @@ static irqreturn_t emc_rx_threaded_isr(int irq, void *dev_id)
 
 			if (!skb) {
 				netdev->stats.rx_dropped++;
-				return IRQ_HANDLED;
+				return;
 			}
 
 			skb_reserve(skb, 2);
@@ -721,10 +720,14 @@ static irqreturn_t emc_rx_threaded_isr(int irq, void *dev_id)
 	}
 
 	emc_hw_trigger_rx(priv);
+}
+
+static irqreturn_t emc_rx_threaded_isr(int irq, void *dev_id)
+{
+	emc_netdev_rx(dev_id);
 
 	return IRQ_HANDLED;
 }
-
 
 static int emc_open(struct net_device *netdev)
 {
