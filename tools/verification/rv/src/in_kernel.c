@@ -569,7 +569,7 @@ static int parse_arguments(char *monitor_name, int argc, char **argv)
 	config_my_pid = getpid();
 
 	while (1) {
-		static struct option long_options[] = {
+		static const struct option long_options[] = {
 			{"help",		no_argument,		0, 'h'},
 			{"reactor",		required_argument,	0, 'r'},
 			{"self",		no_argument,		0, 's'},
