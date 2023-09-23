@@ -40,7 +40,6 @@
 	refclk: clock-48mhz {
 		/* 48 MHz reference oscillator */
 		compatible = "fixed-clock";
-		clock-output-names = "ref";
 		clock-frequency = <48000000>;
 		#clock-cells = <0>;
 	};
