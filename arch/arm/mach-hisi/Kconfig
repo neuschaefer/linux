@@ -13,7 +13,7 @@ if ARCH_HISI
 
 menu "Hisilicon platform type"
 
-config ARCH_HI3xxx
+config ARCH_HI36xx
 	bool "Hisilicon Hi36xx family"
 	depends on ARCH_MULTI_V7
 	select CACHE_L2X0

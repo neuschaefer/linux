@@ -363,7 +363,7 @@ choice
 
 	config DEBUG_HI3620_UART
 		bool "Hisilicon HI3620 Debug UART"
-		depends on ARCH_HI3xxx
+		depends on ARCH_HI36xx
 		select DEBUG_UART_PL01X
 		help
 		  Say Y here if you want kernel low-level debugging support

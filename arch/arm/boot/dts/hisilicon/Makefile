@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-2.0
-dtb-$(CONFIG_ARCH_HI3xxx) += \
+dtb-$(CONFIG_ARCH_HI36xx) += \
 	hi3620-hi4511.dtb
 dtb-$(CONFIG_ARCH_HIP01) += \
 	hip01-ca9x2.dtb
