@@ -3,6 +3,7 @@ config ARCH_HISI
 	bool "Hisilicon SoC Support"
 	depends on ARCH_MULTI_V7 || (ARCH_MULTI_V5 && CPU_LITTLE_ENDIAN)
 	select ARM_AMBA
+	select ARM_VIC if ARCH_MULTI_V5
 	select ARM_GIC if ARCH_MULTI_V7
 	select ARM_TIMER_SP804
 	select POWER_RESET
@@ -12,6 +13,15 @@ config ARCH_HISI
 if ARCH_HISI
 
 menu "Hisilicon platform type"
+
+config ARCH_HI35xx_V5
+	bool "Hisilicon Hi35xx family (ARMv5)"
+	depends on ARCH_MULTI_V5
+	select PINCTRL
+	select PINCTRL_SINGLE
+	select ARM_TIMER_SP804
+	help
+	  Support for ARMv5 parts in the Hisilicon Hi35xx SoC family
 
 config ARCH_HI36xx
 	bool "Hisilicon Hi36xx family"
