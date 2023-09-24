@@ -157,5 +157,10 @@
 			interrupts = <25>;
 			status = "disabled";
 		};
+
+		pmx0: pinmux@200f0000 {
+			// See arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+			// and arch/arm64/boot/dts/hisilicon/hikey-pinctrl.dtsi
+		};
 	};
 };
