@@ -7,6 +7,14 @@ config COMMON_CLK_HI3516CV300
 	help
 	  Build the clock driver for hi3516cv300.
 
+config COMMON_CLK_HI3518A
+	tristate "Hi3518A Clock Driver"
+	depends on ARCH_HISI || COMPILE_TEST
+	select RESET_HISI
+	default ARCH_HISI
+	help
+	  Build the clock driver for Hi3518A.
+
 config COMMON_CLK_HI3519
 	tristate "Hi3519 Clock Driver"
 	depends on ARCH_HISI || COMPILE_TEST
