@@ -850,8 +850,8 @@ static void emc_set_rx_mode(struct net_device *netdev)
 static void emc_get_drvinfo(struct net_device *netdev,
 					struct ethtool_drvinfo *info)
 {
-	strlcpy(info->driver, DRV_MODULE_NAME, sizeof(info->driver));
-	strlcpy(info->version, DRV_MODULE_VERSION, sizeof(info->version));
+	strscpy(info->driver, DRV_MODULE_NAME, sizeof(info->driver));
+	strscpy(info->version, DRV_MODULE_VERSION, sizeof(info->version));
 }
 
 static const struct ethtool_ops emc_ethtool_ops = {
