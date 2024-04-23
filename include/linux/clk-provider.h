@@ -273,7 +273,9 @@ struct clk_ops {
  * @hw: parent clk_hw pointer (used for clk providers with internal clks)
  * @fw_name: parent name local to provider registering clk
  * @name: globally unique parent name (used as a fallback)
- * @index: parent index local to provider registering clk (if @fw_name absent)
+ * @index: parent index local to provider registering clk (if @fw_name absent).
+ *         Note that this is not an index into the provider's own clocks but
+ *         into its list of parents!
  */
 struct clk_parent_data {
 	const struct clk_hw	*hw;
