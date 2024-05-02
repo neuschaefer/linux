@@ -273,7 +273,9 @@ struct clk_ops {
  * @hw: parent clk_hw pointer (used for clk providers with internal clks)
  * @fw_name: parent name local to provider registering clk
  * @name: globally unique parent name (used as a fallback)
- * @index: parent index local to provider registering clk (if @fw_name absent)
+ * @index: parent index local to provider registering clk (if @fw_name absent).
+ *         Note that this is not an index into the provider's own clocks but
+ *         into its list of parents!
  */
 struct clk_parent_data {
 	const struct clk_hw	*hw;
@@ -930,6 +932,28 @@ struct clk *clk_register_divider_table(struct device *dev, const char *name,
 	__devm_clk_hw_register_divider((dev), NULL, (name), (parent_name),    \
 				       NULL, NULL, (flags), (reg), (shift),   \
 				       (width), (clk_divider_flags), (table), \
+				       (lock))
+
+/**
+ * devm_clk_hw_register_divider_table_parent_data - register a table based divider clock
+ * with the clock framework (devres variant)
+ * @dev: device registering this clock
+ * @name: name of this clock
+ * @parent_data: parent clk data
+ * @flags: framework-specific flags
+ * @reg: register address to adjust divider
+ * @shift: number of bits to shift the bitfield
+ * @width: width of the bitfield
+ * @clk_divider_flags: divider-specific flags for this clock
+ * @table: array of divider/value pairs ending with a div set to 0
+ * @lock: shared register lock for this clock
+ */
+#define devm_clk_hw_register_divider_table_parent_data(dev, name, parent_data, flags,   \
+						       reg, shift, width,               \
+						       clk_divider_flags, table, lock)  \
+	__devm_clk_hw_register_divider((dev), NULL, (name), NULL,                       \
+				       NULL, (parent_data), (flags), (reg), (shift),    \
+				       (width), (clk_divider_flags), (table),           \
 				       (lock))
 
 void clk_unregister_divider(struct clk *clk);

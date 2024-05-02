@@ -2,6 +2,7 @@
 // Copyright 2021 Jonathan Neuschäfer
 
 #include <dt-bindings/interrupt-controller/irq.h>
+#include <dt-bindings/clock/nuvoton,wpcm450-clk.h>
 
 / {
 	compatible = "nuvoton,wpcm450";
@@ -30,18 +31,30 @@
 		};
 	};
 
-	clk24m: clock-24mhz {
-		/* 24 MHz dummy clock */
+	refclk: clock-ref {
+		/* 48 MHz reference oscillator */
 		compatible = "fixed-clock";
-		clock-frequency = <24000000>;
+		clock-frequency = <48000000>;
 		#clock-cells = <0>;
 	};
 
-	refclk: clock-48mhz {
-		/* 48 MHz reference oscillator */
+	refclk_div2: clock-refdiv2 {
+		/*
+		 * reference oscillator divided by 2, as a workaround because
+		 * the npcm7xx-timer driver needs its clock earlier than the
+		 * clk-wpcm450 driver (as a platform driver) can provide it.
+		 */
+		compatible = "fixed-factor-clock";
+		clocks = <&refclk>;
+		#clock-cells = <0>;
+		clock-mult = <1>;
+		clock-div = <2>;
+	};
+
+	rmii_clk: clock-50mhz {
+		/* 50 MHz oscillator for RMII */
 		compatible = "fixed-clock";
-		clock-output-names = "ref";
-		clock-frequency = <48000000>;
+		clock-frequency = <50000000>;
 		#clock-cells = <0>;
 	};
 
@@ -66,12 +79,48 @@
 			#reset-cells = <1>;
 		};
 
+		ethernet0: ethernet@b0002000 {
+			compatible = "nuvoton,wpcm450-emc";
+			reg = <0xb0002000 0x1000>;
+			pinctrl-names = "default";
+			pinctrl-0 = <&r1err_pins>, <&r1md_pins>;
+			interrupts = <16 IRQ_TYPE_LEVEL_HIGH>,
+				     <15 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&clk WPCM450_CLK_EMC0>, <&rmii_clk>;
+			clock-names = "main", "RMII";
+			resets = <&clk WPCM450_RESET_EMC0>;
+			status = "disabled";
+
+			mdio0: mdio {
+				#address-cells = <1>;
+				#size-cells = <0>;
+			};
+		};
+
+		ethernet1: ethernet@b0003000 {
+			compatible = "nuvoton,wpcm450-emc";
+			reg = <0xb0003000 0x1000>;
+			pinctrl-names = "default";
+			pinctrl-0 = <&r2err_pins>, <&r2md_pins>;
+			interrupts = <18 IRQ_TYPE_LEVEL_HIGH>,
+				     <17 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&clk WPCM450_CLK_EMC1>, <&rmii_clk>;
+			clock-names = "main", "RMII";
+			resets = <&clk WPCM450_RESET_EMC1>;
+			status = "disabled";
+
+			mdio1: mdio {
+				#address-cells = <1>;
+				#size-cells = <0>;
+			};
+		};
+
 		serial0: serial@b8000000 {
 			compatible = "nuvoton,wpcm450-uart";
 			reg = <0xb8000000 0x20>;
 			reg-shift = <2>;
 			interrupts = <7 IRQ_TYPE_LEVEL_HIGH>;
-			clocks = <&clk24m>;
+			clocks = <&clk WPCM450_CLK_UART0>;
 			pinctrl-names = "default";
 			pinctrl-0 = <&bsp_pins>;
 			status = "disabled";
@@ -82,7 +131,7 @@
 			reg = <0xb8000100 0x20>;
 			reg-shift = <2>;
 			interrupts = <8 IRQ_TYPE_LEVEL_HIGH>;
-			clocks = <&clk24m>;
+			clocks = <&clk WPCM450_CLK_UART1>;
 			status = "disabled";
 		};
 
@@ -90,14 +139,15 @@
 			compatible = "nuvoton,wpcm450-timer";
 			interrupts = <12 IRQ_TYPE_LEVEL_HIGH>;
 			reg = <0xb8001000 0x1c>;
-			clocks = <&clk24m>;
+			clocks = <&refclk_div2>,
+				 <&refclk_div2>;
 		};
 
 		watchdog0: watchdog@b800101c {
 			compatible = "nuvoton,wpcm450-wdt";
 			interrupts = <1 IRQ_TYPE_LEVEL_HIGH>;
 			reg = <0xb800101c 0x4>;
-			clocks = <&clk24m>;
+			clocks = <&clk WPCM450_CLK_WDT>;
 		};
 
 		aic: interrupt-controller@b8002000 {
@@ -481,7 +531,7 @@
 			#size-cells = <0>;
 			reg = <0xc8000000 0x1000>, <0xc0000000 0x4000000>;
 			reg-names = "control", "memory";
-			clocks = <&clk 0>;
+			clocks = <&clk WPCM450_CLK_FIU>;
 			nuvoton,shm = <&shm>;
 			status = "disabled";
 		};

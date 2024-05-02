@@ -97,6 +97,24 @@
 	};
 };
 
+&ethernet0 {
+	status = "okay";
+	phy-mode = "rmii";
+	phy-handle = <&phy>;
+};
+
+&ethernet1 {
+	status = "okay";
+	use-ncsi;
+};
+
+&mdio0 {
+	phy: phy@5 {
+		compatible = "ethernet-phy-ieee802.3-c22";
+		reg = <5>;
+	};
+};
+
 &serial0 {
 	/*
 	 * Debug serial port. TX is exposed on the right pad of unpopulated
