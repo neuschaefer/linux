@@ -183,7 +183,7 @@ noname_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
 	 * that they use the default INTA line, if they are interrupt
 	 * driven at all).
 	 */
-	static char irq_tab[][5] = {
+	static const char irq_tab[][5] = {
 		/*INT A   B   C   D */
 		{ 3,  3,  3,  3,  3}, /* idsel  6 (53c810) */ 
 		{-1, -1, -1, -1, -1}, /* idsel  7 (SIO: PCI/ISA bridge) */
@@ -211,7 +211,7 @@ noname_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
 static inline int
 p2k_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
 {
-	static char irq_tab[][5] = {
+	static const char irq_tab[][5] = {
 		/*INT A   B   C   D */
 		{ 0,  0, -1, -1, -1}, /* idsel  6 (53c810) */
 		{-1, -1, -1, -1, -1}, /* idsel  7 (SIO: PCI/ISA bridge) */
