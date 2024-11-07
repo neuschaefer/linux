@@ -812,6 +812,8 @@ patternProperties:
     description: Laird PLC
   "^lamobo,.*":
     description: Ketai Huajie Technology Co., Ltd.
+  "^lancom,.*":
+    description: LANCOM Systems GmbH
   "^lantiq,.*":
     description: Lantiq Semiconductor
   "^lattice,.*":
