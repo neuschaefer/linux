@@ -44,13 +44,14 @@
 		reg = <0 0>;
 	};
 
-	localbus@e0005000 {
+	localbus: localbus@e0005000 {
 		#address-cells = <2>;
 		#size-cells = <1>;
 		compatible = "fsl,mpc8315-elbc", "fsl,elbc", "simple-bus";
 		reg = <0xe0005000 0x1000>;
 		interrupts = <77 IRQ_TYPE_LEVEL_LOW>;
 		interrupt-parent = <&ipic>;
+		status = "disabled";
 	};
 
 	immr@e0000000 {
@@ -62,13 +63,13 @@
 		reg = <0xe0000000 0x00000200>;
 		bus-frequency = <0>;
 
-		wdt@200 {
+		wdt: wdt@200 {
 			device_type = "watchdog";
 			compatible = "mpc83xx_wdt";
 			reg = <0x200 0x100>;
 		};
 
-		i2c@3000 {
+		i2c: i2c@3000 {
 			#address-cells = <1>;
 			#size-cells = <0>;
 			cell-index = <0>;
@@ -77,15 +78,17 @@
 			interrupts = <14 IRQ_TYPE_LEVEL_LOW>;
 			interrupt-parent = <&ipic>;
 			dfsrr;
+			status = "disabled";
 		};
 
-		spi@7000 {
+		spi: spi@7000 {
 			cell-index = <0>;
 			compatible = "fsl,spi";
 			reg = <0x7000 0x1000>;
 			interrupts = <16 IRQ_TYPE_LEVEL_LOW>;
 			interrupt-parent = <&ipic>;
 			mode = "cpu";
+			status = "disabled";
 		};
 
 		dma@82a8 {
@@ -127,7 +130,7 @@
 			};
 		};
 
-		usb@23000 {
+		usb: usb@23000 {
 			compatible = "fsl-usb2-dr";
 			reg = <0x23000 0x1000>;
 			#address-cells = <1>;
@@ -135,6 +138,7 @@
 			interrupt-parent = <&ipic>;
 			interrupts = <38 IRQ_TYPE_LEVEL_LOW>;
 			phy_type = "utmi";
+			status = "disabled";
 		};
 
 		enet0: ethernet@24000 {
@@ -151,12 +155,14 @@
 				     <33 IRQ_TYPE_LEVEL_LOW>,
 				     <34 IRQ_TYPE_LEVEL_LOW>;
 			interrupt-parent = <&ipic>;
+			status = "disabled";
 
-			mdio@520 {
+			mdio0: mdio@520 {
 				#address-cells = <1>;
 				#size-cells = <0>;
 				compatible = "fsl,gianfar-mdio";
 				reg = <0x520 0x20>;
+				status = "disabled";
 			};
 		};
 
@@ -174,12 +180,14 @@
 				     <36 IRQ_TYPE_LEVEL_LOW>,
 				     <37 IRQ_TYPE_LEVEL_LOW>;
 			interrupt-parent = <&ipic>;
+			status = "disabled";
 
-			mdio@520 {
+			mdio1: mdio@520 {
 				#address-cells = <1>;
 				#size-cells = <0>;
 				compatible = "fsl,gianfar-tbi";
 				reg = <0x520 0x20>;
+				status = "disabled";
 			};
 		};
 
