@@ -51,6 +51,7 @@
 		reg = <0xe0005000 0x1000>;
 		interrupts = <77 IRQ_TYPE_LEVEL_LOW>;
 		interrupt-parent = <&ipic>;
+		status = "disabled";
 	};
 
 	immr@e0000000 {
@@ -77,6 +78,7 @@
 			interrupts = <14 IRQ_TYPE_LEVEL_LOW>;
 			interrupt-parent = <&ipic>;
 			dfsrr;
+			status = "disabled";
 		};
 
 		spi: spi@7000 {
@@ -86,6 +88,7 @@
 			interrupts = <16 IRQ_TYPE_LEVEL_LOW>;
 			interrupt-parent = <&ipic>;
 			mode = "cpu";
+			status = "disabled";
 		};
 
 		dma@82a8 {
@@ -135,6 +138,7 @@
 			interrupt-parent = <&ipic>;
 			interrupts = <38 IRQ_TYPE_LEVEL_LOW>;
 			phy_type = "utmi";
+			status = "disabled";
 		};
 
 		enet0: ethernet@24000 {
@@ -151,12 +155,14 @@
 				     <33 IRQ_TYPE_LEVEL_LOW>,
 				     <34 IRQ_TYPE_LEVEL_LOW>;
 			interrupt-parent = <&ipic>;
+			status = "disabled";
 
 			mdio0: mdio@520 {
 				#address-cells = <1>;
 				#size-cells = <0>;
 				compatible = "fsl,gianfar-mdio";
 				reg = <0x520 0x20>;
+				status = "disabled";
 			};
 		};
 
@@ -174,12 +180,14 @@
 				     <36 IRQ_TYPE_LEVEL_LOW>,
 				     <37 IRQ_TYPE_LEVEL_LOW>;
 			interrupt-parent = <&ipic>;
+			status = "disabled";
 
 			mdio1: mdio@520 {
 				#address-cells = <1>;
 				#size-cells = <0>;
 				compatible = "fsl,gianfar-tbi";
 				reg = <0x520 0x20>;
+				status = "disabled";
 			};
 		};
 
@@ -191,6 +199,7 @@
 			clock-frequency = <133333333>;
 			interrupts = <9 IRQ_TYPE_LEVEL_LOW>;
 			interrupt-parent = <&ipic>;
+			status = "disabled";
 		};
 
 		serial1: serial@4600 {
@@ -201,6 +210,7 @@
 			clock-frequency = <133333333>;
 			interrupts = <10 IRQ_TYPE_LEVEL_LOW>;
 			interrupt-parent = <&ipic>;
+			status = "disabled";
 		};
 
 		security: crypto@30000 {
@@ -222,6 +232,7 @@
 			cell-index = <1>;
 			interrupts = <44 IRQ_TYPE_LEVEL_LOW>;
 			interrupt-parent = <&ipic>;
+			status = "disabled";
 		};
 
 		sata1: sata@19000 {
@@ -230,6 +241,7 @@
 			cell-index = <2>;
 			interrupts = <45 IRQ_TYPE_LEVEL_LOW>;
 			interrupt-parent = <&ipic>;
+			status = "disabled";
 		};
 
 		gtm1: timer@500 {
@@ -324,6 +336,7 @@
 		       0xe0008300 0x8>;		/* config space access registers */
 		compatible = "fsl,mpc8349-pci";
 		device_type = "pci";
+		status = "disabled";
 	};
 
 	pci1: pcie@e0009000 {
@@ -342,6 +355,7 @@
 				 0 0 0 3 &ipic 1 IRQ_TYPE_LEVEL_LOW
 				 0 0 0 4 &ipic 1 IRQ_TYPE_LEVEL_LOW>;
 		clock-frequency = <0>;
+		status = "disabled";
 	};
 
 	pci2: pcie@e000a000 {
@@ -360,5 +374,6 @@
 				 0 0 0 3 &ipic 2 IRQ_TYPE_LEVEL_LOW
 				 0 0 0 4 &ipic 2 IRQ_TYPE_LEVEL_LOW>;
 		clock-frequency = <0>;
+		status = "disabled";
 	};
 };

@@ -25,6 +25,8 @@
 	};
 
 	localbus@e0005000 {
+		status = "okay";
+
 		// CS0 and CS1 are swapped when
 		// booting from nand, but the
 		// addresses are the same.
@@ -83,8 +85,11 @@
 			tbi-handle = <&tbi0>;
 			phy-handle = < &phy0 >;
 			fsl,magic-packet;
+			status = "okay";
 
 			mdio@520 {
+				status = "okay";
+
 				phy0: ethernet-phy@0 {
 					interrupt-parent = <&ipic>;
 					interrupts = <20 IRQ_TYPE_LEVEL_LOW>;
@@ -108,8 +113,11 @@
 			tbi-handle = <&tbi1>;
 			phy-handle = < &phy1 >;
 			fsl,magic-packet;
+			status = "okay";
 
 			mdio@520 {
+				status = "okay";
+
 				tbi1: tbi-phy@11 {
 					reg = <0x11>;
 					device_type = "tbi-phy";
@@ -119,6 +127,8 @@
 	};
 
 	pcie@e0009000 {
+		status = "okay";
+
 		pcie@0 {
 			#address-cells = <3>;
 			#size-cells = <2>;
@@ -134,6 +144,8 @@
 	};
 
 	pcie@e000a000 {
+		status = "okay";
+
 		pcie@0 {
 			#address-cells = <3>;
 			#size-cells = <2>;
