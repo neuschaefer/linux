@@ -110,7 +110,8 @@ dtb-$(CONFIG_MPC830x_RDB) += \
 	mpc8308_p1m.dtb
 dtb-$(CONFIG_MPC831x_BOARDS) += \
 	mpc8313erdb.dtb \
-	mpc8315erdb.dtb
+	mpc8315erdb.dtb \
+	lancom-nwapp2.dtb
 dtb-$(CONFIG_MPC832x_RDB) += \
 	mpc832x_rdb.dtb
 dtb-$(CONFIG_MPC834x_ITX) += \
