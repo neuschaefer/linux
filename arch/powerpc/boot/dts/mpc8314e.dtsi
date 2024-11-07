@@ -1,0 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright 2024 J. Neuschäfer
+#include "mpc8315e.dtsi"
+
+/* MPC8314E does not support SATA */
+/delete-node/ &sata0;
+/delete-node/ &sata1;
