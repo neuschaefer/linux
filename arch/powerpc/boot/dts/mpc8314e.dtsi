@@ -1,0 +1,27 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+/*
+ * MPC8314E SoC devicetree: MPC8314 with security engine.
+ *
+ * Copyright 2007 Freescale Semiconductor Inc.
+ * Copyright 2024 J. Neuschäfer
+ */
+#include "mpc8314.dtsi"
+
+/ {
+	compatible = "fsl,mpc8314e";
+
+	immr@e0000000 {
+		security: crypto@30000 {
+			compatible = "fsl,sec3.3", "fsl,sec3.1", "fsl,sec3.0",
+				     "fsl,sec2.4", "fsl,sec2.2", "fsl,sec2.1",
+				     "fsl,sec2.0";
+			reg = <0x30000 0x10000>;
+			interrupts = <11 IRQ_TYPE_LEVEL_LOW>;
+			interrupt-parent = <&ipic>;
+			fsl,num-channels = <4>;
+			fsl,channel-fifo-len = <24>;
+			fsl,exec-units-mask = <0x97c>;
+			fsl,descriptor-types-mask = <0x3a30abf>;
+		};
+	};
+};
