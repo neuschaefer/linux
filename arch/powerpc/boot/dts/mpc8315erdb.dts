@@ -42,6 +42,8 @@
 };
 
 &localbus {
+	status = "okay";
+
 	// CS0 and CS1 are swapped when
 	// booting from nand, but the
 	// addresses are the same.
@@ -81,6 +83,8 @@
 };
 
 &i2c {
+	status = "okay";
+
 	rtc@68 {
 		compatible = "dallas,ds1339";
 		reg = <0x68>;
@@ -99,8 +103,11 @@
 	tbi-handle = <&tbi0>;
 	phy-handle = <&phy0>;
 	fsl,magic-packet;
+	status = "okay";
 
 	mdio@520 {
+		status = "okay";
+
 		phy0: ethernet-phy@0 {
 			interrupt-parent = <&ipic>;
 			interrupts = <20 IRQ_TYPE_LEVEL_LOW>;
@@ -124,8 +131,11 @@
 	tbi-handle = <&tbi1>;
 	phy-handle = <&phy1>;
 	fsl,magic-packet;
+	status = "okay";
 
 	mdio@520 {
+		status = "okay";
+
 		tbi1: tbi-phy@11 {
 			reg = <0x11>;
 			device_type = "tbi-phy";
@@ -134,6 +144,8 @@
 };
 
 &pci1 {
+	status = "okay";
+
 	pcie@0 {
 		#address-cells = <3>;
 		#size-cells = <2>;
@@ -149,6 +161,8 @@
 };
 
 &pci2 {
+	status = "okay";
+
 	pcie@0 {
 		#address-cells = <3>;
 		#size-cells = <2>;
@@ -161,4 +175,28 @@
 			  0x01000000 0 0x00000000
 			  0 0x00800000>;
 	};
+};
+
+&sata0 {
+	status = "okay";
+};
+
+&sata1 {
+	status = "okay";
+};
+
+&serial0 {
+	status = "okay";
+};
+
+&serial1 {
+	status = "okay";
+};
+
+&spi {
+	status = "okay";
+};
+
+&usb {
+	status = "okay";
 };
