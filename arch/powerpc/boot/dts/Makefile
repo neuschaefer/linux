@@ -6,5 +6,6 @@ dtb-$(CONFIG_OF_ALL_DTBS) := $(patsubst $(src)/%.dts,%.dtb, $(wildcard $(src)/*.
 
 dtb-$(CONFIG_MPC831x_BOARDS) += \
 	kmeter1.dtb \
+	lancom-nwapp2.dtb \
 	mpc8313erdb.dtb \
 	mpc8315erdb.dtb

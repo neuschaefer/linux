@@ -1,0 +1,269 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright 2024 J. Neuschäfer
+//
+// LANCOM NWAPP2, marketed as:
+// - LANCOM L-321agn Wireless (R2)
+// - LANCOM L-322agn dual Wireless (R2)
+// - LANCOM L-322E Wireless
+#include "mpc8314e.dtsi"
+
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/leds/common.h>
+#include <dt-bindings/input/input.h>
+
+/ {
+	compatible = "lancom,nwapp2", "fsl,mpc8314e";
+	model = "LANCOM NWAPP2";
+
+	memory {
+		reg = <0x00000000 0x08000000>;	// 128MB at 0
+	};
+
+	aliases {
+		serial0 = &serial0;
+		pci1 = &pci1;
+		pci2 = &pci2;
+	};
+
+	chosen {
+		stdout-path = "serial0:115200n8";
+	};
+
+	gpio-watchdog {
+		compatible = "linux,wdt-gpio";
+		gpios = <&gpio 18 GPIO_ACTIVE_LOW>;
+		hw_algo = "toggle";
+		hw_margin_ms = <1000>;
+		always-running;
+	};
+
+	gpio-restart {
+		compatible = "gpio-restart";
+		gpios = <&gpio 10 GPIO_ACTIVE_HIGH>;
+	};
+
+	gpio-keys {
+		compatible = "gpio-keys";
+
+		reset-button {
+			label = "Reset Button";
+			linux,code = <KEY_SETUP>;
+			gpios = <&gpio 1 GPIO_ACTIVE_LOW>;
+		};
+	};
+
+	gpio-leds {
+		compatible = "gpio-leds";
+
+		led_power_red: led-0 {
+			label = "red:power";
+			gpios = <&expander 0 GPIO_ACTIVE_HIGH>;
+			color = <LED_COLOR_ID_RED>;
+		};
+
+		led_power_green: led-1 {
+			label = "green:power";
+			gpios = <&expander 1 GPIO_ACTIVE_HIGH>;
+			color = <LED_COLOR_ID_GREEN>;
+		};
+
+		led_wlan_link_red: led-2 {
+			label = "red:wlan-link";
+			gpios = <&expander 2 GPIO_ACTIVE_LOW>;
+			color = <LED_COLOR_ID_RED>;
+		};
+
+		led_wlan_link_green: led-3 {
+			label = "green:wlan-link";
+			gpios = <&expander 3 GPIO_ACTIVE_LOW>;
+			color = <LED_COLOR_ID_GREEN>;
+		};
+
+		led_wlan_data_red: led-4 {
+			label = "red:wlan-data";
+			gpios = <&expander 4 GPIO_ACTIVE_HIGH>;
+			color = <LED_COLOR_ID_RED>;
+		};
+
+		led_eth_red: led-10 {
+			label = "red:eth";
+			gpios = <&expander 10 GPIO_ACTIVE_HIGH>;
+			color = <LED_COLOR_ID_RED>;
+		};
+
+		led_power_top_red: led-12 {
+			label = "red:power-top";
+			gpios = <&expander 12 GPIO_ACTIVE_LOW>;
+			color = <LED_COLOR_ID_RED>;
+		};
+
+		led_power_top_green: led-13 {
+			label = "green:power-top";
+			gpios = <&expander 13 GPIO_ACTIVE_LOW>;
+			color = <LED_COLOR_ID_GREEN>;
+		};
+
+		led_wlan_top_red: led-14 {
+			label = "red:wlan-top";
+			gpios = <&expander 14 GPIO_ACTIVE_LOW>;
+			color = <LED_COLOR_ID_RED>;
+		};
+
+		led_wlan_top_green: led-15 {
+			label = "green:wlan-top";
+			gpios = <&expander 15 GPIO_ACTIVE_LOW>;
+			color = <LED_COLOR_ID_GREEN>;
+		};
+	};
+
+	led-power {
+		compatible = "leds-group-multicolor";
+		label = "multicolor:power";
+		color = <LED_COLOR_ID_MULTI>;
+		function = LED_FUNCTION_POWER;
+		leds = <&led_power_red>, <&led_power_green>;
+	};
+
+	led-wlan-link {
+		compatible = "leds-group-multicolor";
+		label = "multicolor:wlan-link";
+		color = <LED_COLOR_ID_MULTI>;
+		function = LED_FUNCTION_WLAN;
+		leds = <&led_wlan_link_red>, <&led_wlan_link_green>;
+	};
+
+	led-wlan-data {
+		compatible = "leds-group-multicolor";
+		label = "multicolor:wlan-data";
+		color = <LED_COLOR_ID_MULTI>;
+		leds = <&led_wlan_data_red>;
+	};
+
+	led-eth {
+		compatible = "leds-group-multicolor";
+		label = "multicolor:eth";
+		color = <LED_COLOR_ID_MULTI>;
+		leds = <&led_eth_red>;
+	};
+
+	led-power-top {
+		compatible = "leds-group-multicolor";
+		label = "multicolor:power-top";
+		color = <LED_COLOR_ID_MULTI>;
+		function = LED_FUNCTION_POWER;
+		leds = <&led_power_top_red>, <&led_power_top_green>;
+	};
+
+	led-wlan-top {
+		compatible = "leds-group-multicolor";
+		label = "multicolor:wlan-top";
+		color = <LED_COLOR_ID_MULTI>;
+		leds = <&led_wlan_top_red>, <&led_wlan_top_green>;
+	};
+};
+
+&gpio {
+	gpio-line-names =
+		/*  0 -  7 */ "DEBUG#", "RESET_BTN#", "", "EXP_LATCH", "", "", "", "PCIE_RST#",
+		/*  8 - 15 */ "", "", "BOARD_RST", "", "", "", "", "",
+		/* 16 - 23 */ "", "", "WDT_TOGGLE", "", "", "", "PHY_RST#", "",
+		/* 24 - 31 */ "", "", "", "", "", "", "", "";
+};
+
+&localbus {
+	status = "okay";
+	ranges = <0x0 0x0 0xfe000000 0x00008000>;
+
+	nand@0,0 {
+		compatible = "fsl,mpc8315-fcm-nand",
+			     "fsl,elbc-fcm-nand";
+		reg = <0x0 0x0 0x2000>;
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			partition@0 {
+				label = "loader1";
+				reg = <0x0 0x8000>;
+				read-only;
+			};
+
+			partition@8000 {
+				label = "loader2";
+				reg = <0x8000 0x78000>;
+				read-only;
+			};
+
+			// 0x80000:0xf80000 is designated "loader spare" by
+			// vendor firmware, but we re-use it for our purposes.
+
+			partition@80000 {
+				label = "u-boot-env";
+				reg = <0x80000 0x80000>;
+			};
+
+			partition@100000 {
+				label = "loader-spare";
+				reg = <0x100000 0xf00000>;
+			};
+
+			partition@1000000 {
+				label = "fs";
+				reg = <0x1000000 0xf000000>;
+				/* YAFFS2 filesystem */
+			};
+		};
+	};
+};
+
+&enet0 {
+	status = "okay";
+	phy-handle = <&phy>;
+	phy-mode = "rgmii-id";
+};
+
+&mdio0 {
+	compatible = "fsl,gianfar-mdio";
+	status = "okay";
+
+	phy: ethernet-phy@1 {
+		/* Atheros AR8032 */
+		compatible = "ethernet-phy-ieee802.3-c22";
+		reg = <1>;
+		reset-gpios = <&gpio 22 GPIO_ACTIVE_LOW>;
+	};
+};
+
+&pci1 {
+	status = "okay";
+	ranges = <0x02000000 0 0x88000000 0x88000000 0 0x02000000>,
+		 <0x01000000 0 0x00000000 0xc9080000 0 0x00800000>;
+};
+
+&pci2 {
+	status = "okay";
+	ranges = <0x02000000 0 0x88000000 0x8c000000 0 0x02000000>,
+		 <0x01000000 0 0x00000000 0xc9900000 0 0x00800000>;
+};
+
+&serial0 {
+	status = "okay";
+};
+
+&spi {
+	status = "okay";
+	cs-gpios = <&gpio 3 GPIO_ACTIVE_LOW>;
+
+	expander: gpio-controller@0 {
+		compatible = "fairchild,74hc595"; /* Onsemi MC74HC595A */
+		reg = <0>;
+		spi-max-frequency = <5000000>;
+		gpio-controller;
+		#gpio-cells = <2>;
+		registers-number = <2>;
+	};
+};
