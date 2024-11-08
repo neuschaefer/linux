@@ -88,6 +88,8 @@
 			interrupts = <16 IRQ_TYPE_LEVEL_LOW>;
 			interrupt-parent = <&ipic>;
 			mode = "cpu";
+			#address-cells = <1>;
+			#size-cells = <0>;
 			status = "disabled";
 		};
 
