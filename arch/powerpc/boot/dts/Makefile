@@ -108,7 +108,7 @@ dtb-$(CONFIG_MGCOGE) += \
 dtb-$(CONFIG_MPC830x_RDB) += \
 	mpc8308rdb.dtb \
 	mpc8308_p1m.dtb
-dtb-$(CONFIG_MPC831x_RDB) += \
+dtb-$(CONFIG_MPC831x_BOARDS) += \
 	mpc8313erdb.dtb \
 	mpc8315erdb.dtb
 dtb-$(CONFIG_MPC832x_RDB) += \
