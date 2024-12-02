@@ -94,18 +94,14 @@ void __init mpc83xx_ipic_init_IRQ(void)
 
 static const struct of_device_id of_bus_ids[] __initconst = {
 	{ .type = "soc", },
-	{ .compatible = "soc", },
 	{ .compatible = "simple-bus" },
 	{ .compatible = "gianfar" },
-	{ .compatible = "gpio-leds", },
-	{ .type = "qe", },
-	{ .compatible = "fsl,qe", },
 	{},
 };
 
 int __init mpc83xx_declare_of_platform_devices(void)
 {
-	of_platform_bus_probe(NULL, of_bus_ids, NULL);
+	of_platform_populate(NULL, of_bus_ids, NULL, NULL);
 	return 0;
 }
 
