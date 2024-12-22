@@ -225,7 +225,7 @@ KBUILD_CFLAGS += $(cflags-y)
 all: zImage
 
 # With make 3.82 we cannot mix normal and wildcard targets
-BOOT_TARGETS1 := zImage zImage.initrd uImage
+BOOT_TARGETS1 := zImage zImage.initrd uImage image.fit
 BOOT_TARGETS2 := zImage% dtbImage% treeImage.% cuImage.% simpleImage.% uImage.%
 
 PHONY += $(BOOT_TARGETS1) $(BOOT_TARGETS2)
@@ -237,6 +237,7 @@ $(BOOT_TARGETS1): vmlinux
 $(BOOT_TARGETS2): vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) $(patsubst %,$(boot)/%,$@)
 
+image.fit: dtbs
 
 PHONY += bootwrapper_install
 bootwrapper_install:
