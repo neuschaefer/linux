@@ -9,6 +9,7 @@
 
 / {
 	compatible = "fsl,mpc8315erdb";
+	model = "MPC8315E-RDB";
 
 	aliases {
 		ethernet0 = &enet0;
