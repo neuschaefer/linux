@@ -12951,6 +12951,14 @@ S:	Maintained
 F:	include/net/l3mdev.h
 F:	net/l3mdev
 
+LANCOM BOARD SUPPORT
+M:	J. Neuschäfer <j.ne@posteo.net>
+L:	linuxppc-dev@lists.ozlabs.org
+F:	arch/powerpc/boot/dts/lancom-*.dts
+F:	arch/powerpc/boot/dts/mpc831*
+K:	lancom
+K:	LANCOM
+
 LANDLOCK SECURITY MODULE
 M:	Mickaël Salaün <mic@digikod.net>
 R:	Günther Noack <gnoack@google.com>
