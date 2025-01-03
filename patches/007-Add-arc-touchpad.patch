@@ -1,0 +1,20 @@
+--- a/drivers/input/misc/Kconfig	2019-02-24 18:53:42.270049140 +0100
++++ b/drivers/input/misc/Kconfig	2019-03-05 17:27:58.290658434 +0100
+@@ -812,4 +812,10 @@
+ 	  To compile this driver as a module, choose M here: the
+ 	  module will be called drv2667-haptics.
+ 
++config INPUT_ARC_TOUCHPAD
++	tristate "ARC TOUCHPAD fake driver"
++	depends on INPUT && I2C
++	help
++	  Use for touch pad test	  
++
+ endif
+--- a/drivers/input/misc/Makefile	2019-02-24 18:53:42.270049140 +0100
++++ b/drivers/input/misc/Makefile	2019-03-05 17:27:58.290658434 +0100
+@@ -77,3 +77,4 @@
+ obj-$(CONFIG_INPUT_XEN_KBDDEV_FRONTEND)	+= xen-kbdfront.o
+ obj-$(CONFIG_INPUT_YEALINK)		+= yealink.o
+ obj-$(CONFIG_INPUT_IDEAPAD_SLIDEBAR)	+= ideapad_slidebar.o
++obj-$(CONFIG_INPUT_ARC_TOUCHPAD)	+= arc-touchpad.o

@@ -1,0 +1,16 @@
+001-Modify-dts-config.patch -p1
+002-Modify-kernel-config.patch -p1
+003-Set-soc-to-long-frame-sync.patch -p1
+004-Add-ext-amp-feature.patch -p1
+005-Increase-console-loglevel.patch -p1
+006-Add-led-driver.patch -p1
+007-Add-arc-touchpad.patch -p1
+008-Remove-annoying-message.patch -p1
+010-dts-new-openprom.patch -p1
+011-rootfs-support-rsa-pss-padding.patch -p1
+011-enable-dm-verity-kernel-restart.patch -p1
+013-dm-verity-bootflags-updater.patch -p1
+0001-dvfs.patch -p1
+020-throttle-add-2-level.patch -p1
+001-Add-keyboard-driver-to-dts.patch -p1
+0001-try-to-fix-encrypted-squashfs-cache-issue.patch -p1

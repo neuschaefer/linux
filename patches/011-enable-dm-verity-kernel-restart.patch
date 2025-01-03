@@ -1,0 +1,13 @@
+--- a/init/nfsb/do_mounts_nfsb.c
++++ b/init/nfsb/do_mounts_nfsb.c
+@@ -274,7 +274,9 @@ static dev_t __init dm_setup_nfsb(struct nfsb_header *hdr, dev_t *dev)
+ 	dm_lock_md_type(md);
+ 	/* Add the NFSB verity target to the table. */
+ 	target_params = kmalloc(384, GFP_KERNEL);
+-	snprintf(target_params, 384, "%u %s %s %u %u %u %ld %s %s %s",
++	/* Enable kernel restart when dm-verity detected corruption */
++	//snprintf(target_params, 384, "%u %s %s %u %u %u %ld %s %s %s",
++	snprintf(target_params, 384, "%u %s %s %u %u %u %ld %s %s %s 1 restart_on_corruption",
+ 		 nfsb_hash_type(hdr), DEV_NFSB, DEV_NFSB,
+ 		 data_blocksize, hash_blocksize, nfsb_data_blockcount(hdr),
+ 		 fs_size / hash_blocksize, nfsb_hash_algo(hdr),

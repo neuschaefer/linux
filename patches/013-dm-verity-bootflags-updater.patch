@@ -1,0 +1,171 @@
+Index: v4.4/arch/arm/configs/aud8516m3v4_emmc_32b_defconfig
+===================================================================
+--- v4.4.orig/arch/arm/configs/aud8516m3v4_emmc_32b_defconfig
++++ v4.4/arch/arm/configs/aud8516m3v4_emmc_32b_defconfig
+@@ -209,6 +209,7 @@ CONFIG_BLK_DEV_DM=y
+ # CONFIG_DM_NFSB is not set
+ CONFIG_DM_CRYPT=y
+ CONFIG_DM_VERITY=y
++CONFIG_DM_VERITY_ARC_BOOTFLAGS_UPDATER=y
+ CONFIG_DM_VERITY_FEC=y
+ CONFIG_NETDEVICES=y
+ CONFIG_IFB=y
+Index: v4.4/drivers/md/Kconfig
+===================================================================
+--- v4.4.orig/drivers/md/Kconfig
++++ v4.4/drivers/md/Kconfig
+@@ -458,6 +458,15 @@ config DM_VERITY
+ 
+ 	  If unsure, say N.
+ 
++config DM_VERITY_ARC_BOOTFLAGS_UPDATER
++	bool "Arcadyan bootflags updater support"
++	depends on DM_VERITY
++	---help---
++	  This updater will update LK bootflags when the block was
++	  detected as corrupted.
++
++	  If unsure, say N.
++
+ config DM_VERITY_FEC
+ 	bool "Verity forward error correction support"
+ 	depends on DM_VERITY
+Index: v4.4/drivers/md/Makefile
+===================================================================
+--- v4.4.orig/drivers/md/Makefile
++++ v4.4/drivers/md/Makefile
+@@ -58,6 +58,7 @@ obj-$(CONFIG_DM_ZERO)		+= dm-zero.o
+ obj-$(CONFIG_DM_RAID)	+= dm-raid.o
+ obj-$(CONFIG_DM_THIN_PROVISIONING)	+= dm-thin-pool.o
+ obj-$(CONFIG_DM_VERITY)		+= dm-verity.o
++obj-$(CONFIG_DM_VERITY_ARC_BOOTFLAGS_UPDATER)	+= dm-verity-arc-bootflags-updater.o
+ obj-$(CONFIG_DM_CACHE)		+= dm-cache.o
+ obj-$(CONFIG_DM_CACHE_MQ)	+= dm-cache-mq.o
+ obj-$(CONFIG_DM_CACHE_SMQ)	+= dm-cache-smq.o
+@@ -74,4 +75,4 @@ ifeq ($(CONFIG_DM_VERITY_FEC),y)
+ dm-verity-objs			+= dm-verity-fec.o
+ endif
+ 
+-ccflags-$(CONFIG_MTK_SECURITY_ENHANCEMENT) += -I$(srctree)/drivers/misc/mediatek/skeyprovider
+\ No newline at end of file
++ccflags-$(CONFIG_MTK_SECURITY_ENHANCEMENT) += -I$(srctree)/drivers/misc/mediatek/skeyprovider
+Index: v4.4/drivers/md/dm-verity-arc-bootflags-updater.c
+===================================================================
+--- /dev/null
++++ v4.4/drivers/md/dm-verity-arc-bootflags-updater.c
+@@ -0,0 +1,69 @@
++#include "dm-verity-arc-bootflags-updater.h"
++
++struct boot_flags {
++        int last_boot;
++        int upgradeA;
++        int upgradeB;
++        int current_boot;
++        int bootcountA;
++        int bootcountB;
++};
++
++static ssize_t arc_kernel_write(struct file *file, const char *buf, size_t count,
++			    loff_t *pos)
++{
++	mm_segment_t old_fs;
++	ssize_t res;
++
++	old_fs = get_fs();
++	set_fs(get_ds());
++	/* The cast to a user pointer is valid due to the set_fs() */
++	res = vfs_write(file, (__force const char __user *)buf, count, pos);
++	set_fs(old_fs);
++	vfs_fsync(file, 0);
++	return res;
++}
++
++int arc_lk_bootflags_updater(void)
++{
++	struct file *fp;
++	struct boot_flags flags;
++	int offset = 0;
++	int ret, iUpdated = 0;
++	size_t length = (size_t ) sizeof(struct boot_flags);
++	int result = -1;
++	loff_t pos = 0;
++	ssize_t ret_write;
++	/*open the file in read mode*/
++	fp = filp_open(BLK_DEV_PATH, O_RDWR, 0);
++	if (IS_ERR(fp)) {
++		printk(KERN_ALERT "Cannot open the file %ld\n", PTR_ERR(fp));
++		return result;
++	}
++	printk("Opened the file successfully\n");
++	/*Read the data to the end of the file*/
++	ret = kernel_read(fp, 0, (char *)&flags, (unsigned long)length);
++	if (ret > 0) {
++		printk(KERN_ALERT "flags.current_boot %d, flags.bootcountA %d, flags.bootcountB %d\n", flags.current_boot, flags.bootcountA, flags.bootcountB);
++		if(flags.current_boot==0 && flags.bootcountA > 0) {
++			flags.bootcountA = 0;
++			iUpdated = 1;
++			printk(KERN_ALERT "bootcountA = 0\n");
++		} else if(flags.current_boot==1 && flags.bootcountB > 0) {
++			flags.bootcountB = 0;
++			iUpdated = 1;
++			printk(KERN_ALERT "bootcountB = 0\n");
++		}
++		if(iUpdated == 1) {
++			ret_write = arc_kernel_write(fp, (const char *)&flags, length, &pos);
++			if(ret_write != length)
++				printk(KERN_ALERT "Kernel write failed, %ld %ld\n", ret_write, length);
++
++			printk(KERN_ALERT "kernenl_write return value %ld\n", ret_write);
++			result = 0;
++		}
++	}
++	filp_close(fp, NULL);
++	return result;
++}
++
+Index: v4.4/drivers/md/dm-verity-arc-bootflags-updater.h
+===================================================================
+--- /dev/null
++++ v4.4/drivers/md/dm-verity-arc-bootflags-updater.h
+@@ -0,0 +1,12 @@
++#ifndef ARC_BOOT_FLAGS_UPDATE_H
++#define ARC_BOOT_FLAGS_UPDATE_H
++
++#include <linux/fs.h>
++#include <linux/uaccess.h>
++
++#define BLK_DEV_PATH "/dev/mmcblk0p5"
++
++extern int arc_lk_bootflags_updater(void);
++static ssize_t arc_kernel_write(struct file *file, const char *buf, size_t count,
++                            loff_t *pos);
++#endif /* ARC_BOOT_FLAGS_UPDATE_H */
+Index: v4.4/drivers/md/dm-verity-target.c
+===================================================================
+--- v4.4.orig/drivers/md/dm-verity-target.c
++++ v4.4/drivers/md/dm-verity-target.c
+@@ -16,7 +16,9 @@
+ 
+ #include "dm-verity.h"
+ #include "dm-verity-fec.h"
+-
++#if defined(CONFIG_DM_VERITY_ARC_BOOTFLAGS_UPDATER)
++#include "dm-verity-arc-bootflags-updater.h"
++#endif
+ #include <linux/module.h>
+ #include <linux/reboot.h>
+ 
+@@ -233,8 +235,12 @@ out:
+ 	if (v->mode == DM_VERITY_MODE_LOGGING)
+ 		return 0;
+ 
+-	if (v->mode == DM_VERITY_MODE_RESTART)
++	if (v->mode == DM_VERITY_MODE_RESTART) {
++#if defined(CONFIG_DM_VERITY_ARC_BOOTFLAGS_UPDATER)
++		arc_lk_bootflags_updater();
++#endif
+ 		kernel_restart("dm-verity device corrupted");
++	}
+ 
+ 	return 1;
+ }

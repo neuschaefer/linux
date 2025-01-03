@@ -1,0 +1,262 @@
+--- a/sound/soc/mediatek/mt8167/mt8167s-som.c	2019-03-25 11:33:52.451659939 +0100
++++ b/sound/soc/mediatek/mt8167/mt8167s-som.c	2019-03-25 11:33:16.571658152 +0100
+@@ -31,6 +31,8 @@
+ 
+ enum PINCTRL_PIN_STATE {
+ 	PIN_STATE_DEFAULT = 0,
++	PIN_STATE_EXTAMP_ON,
++	PIN_STATE_EXTAMP_OFF,
+ 	PIN_STATE_MAX
+ };
+ 
+@@ -97,10 +99,14 @@
+ 	struct regulator *tdmadc_1p8_supply;
+ 	struct regulator *tdmadc_3p3_supply;
+ 	struct soc_ctlx_res ctlx_res;
++	uint32_t hp_spk_amp_warmup_time_us;
++	uint32_t hp_spk_amp_shutdown_time_us;
+ };
+ 
+ static const char * const mt8167s_som_pinctrl_pin_str[PIN_STATE_MAX] = {
+ 	"default",
++	"extamp_on",
++	"extamp_off",
+ };
+ 
+ static SOC_ENUM_SINGLE_EXT_DECL(pcm_state_enums, pcm_state_func);
+@@ -267,6 +273,74 @@
+ 	return 0;
+ }
+ 
++static void mt8516_codec_ext_hp_amp_turn_on(struct snd_soc_card *card)
++{
++	struct mt8167s_som_priv *card_data = snd_soc_card_get_drvdata(card);
++
++	int ret = 0;
++	if (IS_ERR(card_data->pin_states[PIN_STATE_EXTAMP_ON]))
++		return;
++
++	ret = pinctrl_select_state(card_data->pinctrl,
++		card_data->pin_states[PIN_STATE_EXTAMP_ON]);
++	printk("amp_turn_on\n");
++
++	if (ret)
++		dev_err(card->dev, "%s failed to select state %d\n",
++		__func__, ret);
++	//usleep(1000000);
++	
++	if (card_data->hp_spk_amp_warmup_time_us > 0)
++		usleep_range(card_data->hp_spk_amp_warmup_time_us,
++		card_data->hp_spk_amp_warmup_time_us + 1);
++		
++
++
++}
++static void mt8516_codec_ext_hp_amp_turn_off(struct snd_soc_card *card)
++{
++	struct mt8167s_som_priv *card_data = snd_soc_card_get_drvdata(card);
++	int ret = 0;
++	if (IS_ERR(card_data->pin_states[PIN_STATE_EXTAMP_OFF]))
++		return;
++	printk("mt8516_codec_ext_hp_amp_turn_off\n");
++	ret = pinctrl_select_state(card_data->pinctrl,
++		card_data->pin_states[PIN_STATE_EXTAMP_OFF]);
++	if (ret)
++		dev_err(card->dev, "%s failed to select state %d\n",
++		__func__, ret);
++	//usleep(1000000);
++	if (card_data->hp_spk_amp_shutdown_time_us > 0)
++		usleep_range(card_data->hp_spk_amp_shutdown_time_us,
++		card_data->hp_spk_amp_shutdown_time_us + 1);
++}
++
++/* HP Spk Amp */
++static int mt8516_codec_hp_spk_amp_event(struct snd_soc_dapm_widget *w,
++	struct snd_kcontrol *kcontrol, int event)
++{
++	struct snd_soc_dapm_context *dapm = w->dapm;
++	struct snd_soc_card *card = dapm->card;
++
++	dev_err(card->dev, "%s, event %d\n", __func__, event);
++
++	switch (event) {
++		case SND_SOC_DAPM_POST_PMU:
++			mt8516_codec_ext_hp_amp_turn_on(card);
++			break;
++		case SND_SOC_DAPM_PRE_PMD:
++			mt8516_codec_ext_hp_amp_turn_off(card);
++			break;
++			default:
++			break;
++	}
++
++	return 0;
++}
++
++/* HP Ext Amp Switch */
++static const struct snd_kcontrol_new mt8516_codec_hp_ext_amp_switch_ctrl =
++	SOC_DAPM_SINGLE_VIRT("Switch", 1);
+ 
+ static const struct snd_kcontrol_new mt8167s_som_soc_controls[] = {
+ 	/* for third party app use */
+@@ -566,10 +640,10 @@
+ 		.name = "HDMI BE",
+ 		.cpu_dai_name = "HDMIO",
+ 		.no_pcm = 1,
+-		//.codec_name = "snd-soc-dummy",
+-		//.codec_dai_name = "snd-soc-dummy-dai",
+-		.codec_name = "tas5782m",
+-		.codec_dai_name = "tas5782m-i2s",
++		.codec_name = "snd-soc-dummy",
++		.codec_dai_name = "snd-soc-dummy-dai",
++		//.codec_name = "tas5782m",
++		//.codec_dai_name = "tas5782m-i2s",
+ 		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
+ 			   SND_SOC_DAIFMT_CBS_CFS,
+ 		.dpcm_playback = 1,
+@@ -616,7 +690,7 @@
+ 		.no_pcm = 1,
+ 		.codec_name = "snd-soc-dummy",
+ 		.codec_dai_name = "snd-soc-dummy-dai",
+-		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
++		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_IB_NF |
+ 							 SND_SOC_DAIFMT_CBS_CFS,
+ 		.dpcm_capture = 1,
+ 	},
+@@ -624,10 +698,10 @@
+ 		.name = "I2S BE",
+ 		.cpu_dai_name = "I2S",
+ 		.no_pcm = 1,
+-		//.codec_name = "snd-soc-dummy",
+-		//.codec_dai_name = "snd-soc-dummy-dai",
+-		.codec_name = "tas5782m",
+-		.codec_dai_name = "tas5782m-i2s",
++		.codec_name = "snd-soc-dummy",
++		.codec_dai_name = "snd-soc-dummy-dai",
++		//.codec_name = "tas5782m",
++		//.codec_dai_name = "tas5782m-i2s",
+ 		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
+ 				SND_SOC_DAIFMT_CBS_CFS,
+ 		.dpcm_playback = 1,
+@@ -667,6 +741,16 @@
+ 		.codec_dai_name = "snd-soc-dummy-dai",
+ 		.dpcm_playback = 1,
+ 	},
++	{
++		.name = "PCM0 BE",
++		.cpu_dai_name = "PCM0",
++		.no_pcm = 1,
++		.codec_name = "snd-soc-dummy",
++		.codec_dai_name = "snd-soc-dummy-dai",
++		.dpcm_playback = 1,
++		.dpcm_capture = 1,
++		.symmetric_rates = 1,
++	},
+ };
+ 
+ static const struct snd_soc_dapm_widget mt8167s_som_dapm_widgets[] = {
+@@ -674,6 +758,9 @@
+ 	SND_SOC_DAPM_OUTPUT("External I2S out"),
+ 	SND_SOC_DAPM_INPUT("External Line In2"),
+ 	SND_SOC_DAPM_OUTPUT("External I2S out2"),
++	SND_SOC_DAPM_SWITCH("HP Ext Amp",SND_SOC_NOPM, 0, 0, &mt8516_codec_hp_ext_amp_switch_ctrl),
++	SND_SOC_DAPM_SPK("HP Spk Amp", mt8516_codec_hp_spk_amp_event),
++
+ };
+ 
+ static const struct snd_soc_dapm_route mt8167s_som_audio_map[] = {
+@@ -681,6 +768,12 @@
+ 	{"I2S Capture", NULL, "External Line In2"},
+ 	{"External I2S out", NULL, "I2S Playback"},
+ 	{"External I2S out2", NULL, "2ND I2S Playback"},
++	
++	{"HP Ext Amp", "Switch", "AU_LOL"},
++	//{"HP Ext Amp", "Switch", "AU_HPR"},
++	
++	//{"HP Spk Amp", NULL, "HP Ext Amp"},
++	{"HP Spk Amp", NULL, "HP Ext Amp"},
+ };
+ 
+ static int mt8167s_som_suspend_post(struct snd_soc_card *card)
+@@ -736,11 +829,16 @@
+ 	struct mt8167s_som_priv *card_data;
+ 	int ret = 0;
+ 	int i;
+-	printk("mt8167s_som_gpio_probe!!\r\n");
++	printk("mt8167s_som_gpio_probe!! %d\r\n", __LINE__);
+ 
+ 	card_data = snd_soc_card_get_drvdata(card);
+-
++	if(!card_data) {
++		printk("card_data is NULL!!!! %d\r\n", __LINE__);
++		goto exit;		
++	}
++	printk("mt8167s_som_gpio_probe!! %d\r\n", __LINE__);
+ 	card_data->pinctrl = devm_pinctrl_get(card->dev);
++	printk("mt8167s_som_gpio_probe!! %d\r\n", __LINE__);
+ 	if (IS_ERR(card_data->pinctrl)) {
+ 		ret = PTR_ERR(card_data->pinctrl);
+ 		dev_err(card->dev, "%s pinctrl_get failed %d\n",
+@@ -748,6 +846,7 @@
+ 		goto exit;
+ 	}
+ 
++	printk("mt8167s_som_gpio_probe!! %d\r\n", __LINE__);
+ 	for (i = 0 ; i < PIN_STATE_MAX ; i++) {
+ 		card_data->pin_states[i] =
+ 			pinctrl_lookup_state(card_data->pinctrl,
+@@ -759,6 +858,7 @@
+ 		}
+ 	}
+ 	/* default state */
++	printk("mt8167s_som_gpio_probe!! %d\r\n", __LINE__);
+ 	if (!IS_ERR(card_data->pin_states[PIN_STATE_DEFAULT])) {
+ 		ret = pinctrl_select_state(card_data->pinctrl,
+ 				card_data->pin_states[PIN_STATE_DEFAULT]);
+@@ -846,7 +946,7 @@
+ {
+ 	struct snd_soc_card *card = &mt8167s_som_card;
+ 	struct device_node *platform_node;
+-	struct device_node *codec_node;
++	//struct device_node *codec_node;
+ 	struct device_node *tdmin_adc_node;
+ 	int ret, i;
+ 	struct mt8167s_som_priv *card_data;
+@@ -859,12 +959,13 @@
+ 		return -EINVAL;
+ 	}
+ 
+-	codec_node = of_parse_phandle(pdev->dev.of_node,
++	/*codec_node = of_parse_phandle(pdev->dev.of_node,
+ 					 "mediatek,audio-codec", 0);
+ 	if (!codec_node) {
+ 		dev_err(&pdev->dev, "Property 'audio-codec' missing or invalid\n");
+ 		return -EINVAL;
+ 	}
++	*/
+ 
+ 	tdmin_adc_node = of_parse_phandle(pdev->dev.of_node,
+ 					 "mediatek,tdmin-adc", 0);
+@@ -887,7 +988,7 @@
+ 		}
+ 		if (mt8167s_som_dais[i].codec_name)
+ 			continue;
+-		mt8167s_som_dais[i].codec_of_node = codec_node;
++		//mt8167s_som_dais[i].codec_of_node = codec_node;
+ 	}
+ 
+ 	card->dev = &pdev->dev;
+@@ -907,6 +1008,13 @@
+ 	mt8167s_som_regulator_probe(card);
+ 	mt8167s_som_gpio_probe(card);
+ 
++	of_property_read_u32(pdev->dev.of_node,
++		"mediatek,hp-spk-amp-warmup-time-us",
++		&card_data->hp_spk_amp_warmup_time_us);
++	of_property_read_u32(pdev->dev.of_node,
++		"mediatek,hp-spk-amp-shutdown-time-us",
++		&card_data->hp_spk_amp_shutdown_time_us);
++
+ 	ret = devm_snd_soc_register_card(&pdev->dev, card);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "%s snd_soc_register_card fail %d\n",

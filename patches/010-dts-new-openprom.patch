@@ -1,0 +1,36 @@
+Index: v4.4/arch/arm/boot/dts/mediatek/aud8516m3v4_emmc_32b.dts
+===================================================================
+--- v4.4.orig/arch/arm/boot/dts/mediatek/aud8516m3v4_emmc_32b.dts
++++ v4.4/arch/arm/boot/dts/mediatek/aud8516m3v4_emmc_32b.dts
+@@ -18,6 +18,7 @@
+ #include "mt8167.dtsi"
+ #include "mt8516-dcdc.dtsi"
+ #include "mt6392.dtsi"
++#include "mt8516-openprom.dtsi"
+ #include <dt-bindings/gpio/gpio.h>
+ / {
+ 	/*
+Index: v4.4/arch/arm/boot/dts/mediatek/mt8516-openprom.dtsi
+===================================================================
+--- /dev/null
++++ v4.4/arch/arm/boot/dts/mediatek/mt8516-openprom.dtsi
+@@ -0,0 +1,19 @@
++/*
++ * Mediatek's PMIC MT6392 device tree source
++ * Copyright (c) 2016 MediaTek Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++/ {
++	openprom {
++		model = "mt8516";
++	};
++
++};

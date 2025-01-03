@@ -1,0 +1,46 @@
+From e072c1ab9071bf3a1ba2f77fa3170b9fd72cbf58 Mon Sep 17 00:00:00 2001
+From: Maxime Hemion <maxime.hemion@softathome.com>
+Date: Wed, 22 May 2019 17:28:42 +0200
+Subject: [PATCH] Add-led-driver
+
+---
+ drivers/leds/Kconfig  | 10 ++++++++++
+ drivers/leds/Makefile |  1 +
+ 2 files changed, 11 insertions(+)
+
+diff --git a/drivers/leds/Kconfig b/drivers/leds/Kconfig
+index b1ab8bdf8251..73eb15328b70 100644
+--- a/drivers/leds/Kconfig
++++ b/drivers/leds/Kconfig
+@@ -296,6 +296,16 @@ config LEDS_LP8860
+ 	  on the LP8860 4 channel LED driver using the I2C communication
+ 	  bus.
+ 
++config LEDS_ARC
++	tristate "Arcadyan LED support for the TI LP5018 4 channel LED driver"
++	depends on LEDS_CLASS && REGMAP_I2C
++	help
++	  If you say yes here you get support for the Arcadyan TI LP5018 4 
++	  channel LED driver.
++	  This option enables support for the display cluster LEDs
++	  on the Arcadyan LP5018 4 channel LED driver using the I2C 
++	  communication bus.
++
+ config LEDS_CLEVO_MAIL
+ 	tristate "Mail LED on Clevo notebook"
+ 	depends on LEDS_CLASS
+diff --git a/drivers/leds/Makefile b/drivers/leds/Makefile
+index 92ab5b3f8d6e..b6215041737e 100644
+--- a/drivers/leds/Makefile
++++ b/drivers/leds/Makefile
+@@ -29,6 +29,7 @@ obj-$(CONFIG_LEDS_LP3944)		+= leds-lp3944.o
+ obj-$(CONFIG_LEDS_LP55XX_COMMON)	+= leds-lp55xx-common.o
+ obj-$(CONFIG_LEDS_LP5521)		+= leds-lp5521.o
+ obj-$(CONFIG_LEDS_LP5523)		+= leds-lp5523.o
++obj-$(CONFIG_LEDS_ARC)			+= leds-arc.o
+ obj-$(CONFIG_LEDS_LP5523)		+= leds_debugfs.o
+ obj-$(CONFIG_LEDS_LP5562)		+= leds-lp5562.o
+ obj-$(CONFIG_LEDS_LP8501)		+= leds-lp8501.o
+-- 
+2.17.1
+

@@ -1,0 +1,12 @@
+--- a/include/linux/printk.h	2019-02-24 18:53:42.286049216 +0100
++++ b/include/linux/printk.h	2019-02-23 12:11:11.907391109 +0100
+@@ -89,7 +89,8 @@
+ #define CONSOLE_LOGLEVEL_SILENT  0 /* Mum's the word */
+ #define CONSOLE_LOGLEVEL_MIN	 1 /* Minimum loglevel we let people use */
+ #define CONSOLE_LOGLEVEL_QUIET	 4 /* Shhh ..., when booted with "quiet" */
+-#define CONSOLE_LOGLEVEL_DEFAULT 7 /* anything MORE serious than KERN_DEBUG */
++//#define CONSOLE_LOGLEVEL_DEFAULT 7 /* anything MORE serious than KERN_DEBUG */
++#define CONSOLE_LOGLEVEL_DEFAULT 3 /* To avoid dumping too much message from console */
+ #define CONSOLE_LOGLEVEL_DEBUG	10 /* issue debug messages */
+ #define CONSOLE_LOGLEVEL_MOTORMOUTH 15	/* You can't shut this one up */
+ 

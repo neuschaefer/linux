@@ -1,0 +1,83 @@
+Subject: [PATCH] import 001-Add-keyboard-driver-to-dts.patch
+
+---
+
+--- a/arch/arm/boot/dts/mediatek/aud8516m3v4_emmc_32b.dts	2019-04-10 12:16:22.611027383 +0200
++++ b/arch/arm/boot/dts/mediatek/aud8516m3v4_emmc_32b.dts	2019-04-10 12:13:54.195019991 +0200
+@@ -144,19 +144,12 @@
+ 
+ 		button@0 {
+ 			debounce_interval = <50>;
+-			gpios = <&pio 9 1>; /* active low */
+-			label = "reset";
+-			linux,input-type = <0x1>; /* key */
+-			linux,code = <116>; /* power */
+-		};
+-		button@1 {
+-			debounce_interval = <50>;
+ 			gpios = <&pio 50 0>; /* active high */
+ 			label = "adet";
+ 			linux,input-type = <0x5>; /* switch */
+ 			linux,code = <2>; /* HEADPHONE_INSERT */
+ 		};
+-		button@2 {
++		button@1 {
+ 			gpios = <&pio 6 0>; /* active high */
+ 			interrupt-parent = <&pio>;
+ 			interrupts = <6 IRQ_TYPE_EDGE_FALLING>;
+@@ -381,6 +374,18 @@
+ 		rst-gpio = <&pio 68 0>;
+ 		dmic-en =<1>;// 0 for amic, 1 for dmic
+ 	};
++
++	mt8167-touchpad@0a {
++		compatible = "mt8167-touchpad";
++		reg = <0x0a>;
++		debounce_interval = <50>;
++		gpio-reset = <&pio 9 1>;
++		interrupt-parent = <&pio>;
++		interrupts = <25 0x1>;
++		interrupt-controller;
++		#interrupt-cells = <2>;
++		sah,linux-keycodes = <115 143 114 113>; /* list of keycodes for the touchpad buttons */
++	};
+ };
+ 
+ &i2c2 {
+
+--- a/drivers/input/keyboard/Kconfig	2019-02-25 14:33:33.150120327 +0100
++++ b/drivers/input/keyboard/Kconfig	2019-02-23 12:11:12.931396095 +0100
+@@ -729,4 +729,12 @@
+ 	  To compile this driver as a module, choose M here: the
+ 	  module will be called pmic-keys.
+ 
++config KEYBOARD_ARC_TOUCHPAD
++	tristate "MediaTek Touchpad key Support"
++	help
++	  Say Y here if you want to use the touchpad keys. If unuse, say N.
++
++	  To compile this driver as a module, choose M here: the
++	  module will be called mt8167-touchpad.
++
+ endif
+
+--- a/drivers/input/keyboard/Makefile	2019-02-25 14:33:33.150120327 +0100
++++ b/drivers/input/keyboard/Makefile	2019-02-23 12:11:12.931396095 +0100
+@@ -65,3 +65,4 @@
+ obj-$(CONFIG_KEYBOARD_W90P910)		+= w90p910_keypad.o
+ obj-$(CONFIG_KEYBOARD_MTK)		+= mediatek/
+ obj-$(CONFIG_KEYBOARD_MTK_PMIC) 	+= mtk_pmic_keys.o
++obj-$(CONFIG_KEYBOARD_ARC_TOUCHPAD) += mt8167_touchpad.o
+
+--- a/arch/arm/configs/aud8516m3v4_emmc_32b_defconfig
++++ b/arch/arm/configs/aud8516m3v4_emmc_32b_defconfig
+@@ -217,7 +217,8 @@ CONFIG_IP_ADVANCED_ROUTER=y
+ # CONFIG_IPV6 is not set
+ CONFIG_INPUT_UINPUT=y
+ CONFIG_INPUT_MISC=y
+-CONFIG_INPUT_ARC_TOUCHPAD=y
++# CONFIG_INPUT_ARC_TOUCHPAD is not set
++CONFIG_KEYBOARD_ARC_TOUCHPAD=y
+ CONFIG_INPUT_EVDEV=y
+ CONFIG_INET_IPCOMP=y
+ CONFIG_INET_ESP=y

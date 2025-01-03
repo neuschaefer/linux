@@ -1,0 +1,74 @@
+From 348e1e71fd574b5b299b8784621e8a99e02af3a3 Mon Sep 17 00:00:00 2001
+From: Xiaoqing Liu <Xiaoqing.Liu@mediatek.com>
+Date: Tue, 09 Jul 2019 10:15:01 +0800
+Subject: [PATCH] DVFS: Add nore freqs for dvfs
+
+Add two freqs for dynamic scaling
+
+Test: build pass
+
+Change-Id: I0a9c1b302b63c9ea78c1f0fbc83aee5821142c50
+Signed-off-by: Xiaoqing Liu <Xiaoqing.Liu@mediatek.com>
+CR-Id: AUTO00040610
+Feature: DVFS (Dynamic Voltage and Frequency Scaling)
+(cherry picked from commit 26d97d4e28dbe9bd1efb470cbc736e38894d3498)
+---
+
+diff --git a/arch/arm/boot/dts/mediatek/mt8167.dtsi b/arch/arm/boot/dts/mediatek/mt8167.dtsi
+index 3258a4e..477dd9c 100644
+--- a/arch/arm/boot/dts/mediatek/mt8167.dtsi
++++ b/arch/arm/boot/dts/mediatek/mt8167.dtsi
+@@ -44,14 +44,22 @@
+ 			opp-microvolt = <1150000>;
+ 		};
+ 		opp02 {
+-			opp-hz = /bits/ 64 <1040000000>;
++			opp-hz = /bits/ 64 <845000000>;
+ 			opp-microvolt = <1200000>;
+ 		};
+ 		opp03 {
++			opp-hz = /bits/ 64 <942500000>;
++			opp-microvolt = <1200000>;
++		};
++		opp04 {
++			opp-hz = /bits/ 64 <1040000000>;
++			opp-microvolt = <1200000>;
++		};
++		opp05 {
+ 			opp-hz = /bits/ 64 <1196000000>;
+ 			opp-microvolt = <1250000>;
+ 		};
+-		opp04 {
++		opp06 {
+ 			opp-hz = /bits/ 64 <1300000000>;
+ 			opp-microvolt = <1300000>;
+ 		};
+diff --git a/arch/arm64/boot/dts/mediatek/mt8167.dtsi b/arch/arm64/boot/dts/mediatek/mt8167.dtsi
+index 14245ba..79d6ce8 100644
+--- a/arch/arm64/boot/dts/mediatek/mt8167.dtsi
++++ b/arch/arm64/boot/dts/mediatek/mt8167.dtsi
+@@ -44,14 +44,22 @@
+ 			opp-microvolt = <1150000>;
+ 		};
+ 		opp02 {
+-			opp-hz = /bits/ 64 <1040000000>;
++			opp-hz = /bits/ 64 <845000000>;
+ 			opp-microvolt = <1200000>;
+ 		};
+ 		opp03 {
++			opp-hz = /bits/ 64 <942500000>;
++			opp-microvolt = <1200000>;
++		};
++		opp04 {
++			opp-hz = /bits/ 64 <1040000000>;
++			opp-microvolt = <1200000>;
++		};
++		opp05 {
+ 			opp-hz = /bits/ 64 <1196000000>;
+ 			opp-microvolt = <1250000>;
+ 		};
+-		opp04 {
++		opp06 {
+ 			opp-hz = /bits/ 64 <1300000000>;
+ 			opp-microvolt = <1300000>;
+ 		};

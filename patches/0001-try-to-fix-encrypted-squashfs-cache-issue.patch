@@ -1,0 +1,203 @@
+From 841dee3801a86e36bd88e73b193d778bb2778409 Mon Sep 17 00:00:00 2001
+From: Yang Xu <yang.xu@mediatek.com>
+Date: Sun, 28 Apr 2019 11:34:28 +0800
+Subject: [PATCH] [ALPS02227160] secure boot: support encrypted squashfs
+
+fix squashfs cache page issue
+
+Test: build pass
+
+Change-Id: I04c3b7272ac3e234f53453e7616b11dfb370f32a
+Feature: secure boot
+Signed-off-by: Yang Xu <yang.xu@mediatek.com>
+CR-Id: ALPS02227160
+---
+ fs/squashfs/block.c | 131 +++++++++++++++++++++++++++++++++++++---------------
+ 1 file changed, 93 insertions(+), 38 deletions(-)
+
+diff --git a/fs/squashfs/block.c b/fs/squashfs/block.c
+index fd59071..4e5cb14 100644
+--- a/fs/squashfs/block.c
++++ b/fs/squashfs/block.c
+@@ -83,46 +83,79 @@ static struct buffer_head *get_block_length(struct super_block *sb,
+ 
+ #ifdef CONFIG_MTK_SECURITY_ENHANCEMENT
+ static struct mtk_crypto_ctx *crypto_ctx;
+-static struct buffer_head ** create_crypto_buffer_head(struct buffer_head **bh, int n, int size)
++
++static void dump_hex(const char *str, const void *vbuf, size_t len)
+ {
+-	int i;
+-	struct buffer_head **cbh;
+-	char* cbh_buffer;
+-
+-	cbh = kcalloc(n, sizeof(*cbh), GFP_KERNEL);
+-	cbh_buffer = kcalloc(n, size, GFP_KERNEL);
+-
+-	for(i=0; i < n; i++) {
+-		cbh[i] = kzalloc(sizeof(struct buffer_head), GFP_KERNEL);
+-		cbh[i]->b_data = &cbh_buffer[i*size];
+-		memcpy(cbh[i]->b_data, bh[i]->b_data, size);
+-		put_bh(bh[i]);
++	/*a string and then
++	  *16 bytes per line with
++	  *1 space in middle and newline at end (and null)
++	  */
++	char line[8*2 + 1 + 8*2 + 1 + 1];
++	const u8 *buf = (const u8 *)vbuf;
++	size_t i;
++
++	//WARN_ON(len % 16);
++	printk(KERN_ERR"%s (%zu bytes):\n", str, len);
++	for (i = 0; i < len; i += 16) {
++		snprintf(line, sizeof(line),
++			 "%02x%02x%02x%02x%02x%02x%02x%02x %02x%02x%02x%02x%02x%02x%02x%02x\n",
++			 buf[i], buf[i + 1], buf[i + 2], buf[i + 3],
++			 buf[i + 4], buf[i + 5], buf[i + 6], buf[i + 7],
++			 buf[i + 8], buf[i + 9], buf[i + 10], buf[i + 11],
++			 buf[i + 12], buf[i + 13], buf[i + 14], buf[i + 15]);
++		printk(KERN_ERR"%s", line);
+ 	}
+-
+-	kfree(bh);
+-	return cbh;
+ }
+ 
+-static void free_crypto_buffer_head(struct buffer_head **bh, int n)
++static char* get_buffer_from_bhlist(struct buffer_head **bh, int n, int size, int offset, int length)
+ {
+-	int i = 0;
++	int avail, k = 0;
++	char *buffer, *buffer_p;
++	int o_len = length;
++
++	buffer_p = buffer = kzalloc(length,GFP_KERNEL);
++
++	while (k < n) {
++		get_bh(bh[k]);
++		get_bh(bh[k]); //get_bh two times for put_buffer two times
++		avail = min(length, size - offset);
++		length -= avail;
++		memcpy(buffer_p, bh[k]->b_data + offset, avail);
++		buffer_p += avail;
++		offset = 0;
++		k++;
++	}
++	return buffer;
++}
+ 
+-	kfree(bh[0]->b_data);
+-	for(i=0; i < n; i++) {
+-		kfree(bh[i]);
++static void put_buffer_to_bhlist(struct buffer_head **bh, int n, int size, int offset, int length, char* buffer)
++{
++	int avail, k = 0;
++	char* buffer_p = buffer;
++	int o_len = length;
++
++	while (k < n) {
++		avail = min(length, size - offset);
++		length -= avail;
++		memcpy(bh[k]->b_data + offset, buffer_p, avail);
++		buffer_p += avail;
++		offset = 0;
++		put_bh(bh[k]);
++		k++;
+ 	}
+ }
+ 
+-static void decrypt_crypto_buffer(struct squashfs_sb_info *msblk, struct buffer_head **bh, int offset, int length)
++static int decrypt_crypto_buffer(struct squashfs_sb_info *msblk, char* src_buf, char* dest_buf, int length)
+ {
+ 	struct crypto_option *crypto_opts = msblk->crypto_option;
+ 
+ 	unsigned char* src;
+ 	unsigned char* dest;
+ 	int len = 0;
++	int ret = 0;
+ 
+-	src = bh[0]->b_data + offset;
+-	dest = src;
++	src = src_buf;
++	dest = dest_buf;
+ 	len = length/16*16;
+ 
+ 	if(crypto_ctx == NULL) {
+@@ -131,21 +164,27 @@ static void decrypt_crypto_buffer(struct squashfs_sb_info *msblk, struct buffer_
+ 	}
+ 
+ 	if(crypto_opts->key_mode == 1) {
+-			mtk_crypto_aes_with_keymode(crypto_ctx, 2, 1,
+-								AES_OP_MODE_DEC, crypto_opts->aes_iv,
+-								crypto_opts->encrypted_aes_key, CRYPTO_AES_KEY_SIZE,
+-								src, dest,
+-								len);
++		ret = mtk_crypto_aes_with_keymode(crypto_ctx, 2, 1,
++				AES_OP_MODE_DEC, crypto_opts->aes_iv,
++				crypto_opts->encrypted_aes_key, CRYPTO_AES_KEY_SIZE,
++				src, dest,
++				len);
+ 	}
+ 
+ 	if(crypto_opts->key_mode == 2) {
+-		mtk_crypto_aes_with_keymode(crypto_ctx, 1, 1,
+-						    AES_OP_MODE_DEC, crypto_opts->aes_iv,
+-						    crypto_opts->encrypted_aes_key, CRYPTO_AES_KEY_SIZE,
+-						    src, dest,
+-						    len);
++		ret = mtk_crypto_aes_with_keymode(crypto_ctx, 1, 1,
++			    AES_OP_MODE_DEC, crypto_opts->aes_iv,
++			    crypto_opts->encrypted_aes_key, CRYPTO_AES_KEY_SIZE,
++			    src, dest,
++			    len);
+ 	}
++
++	if (length - len > 0)
++		memcpy(dest_buf + len, src_buf + len, length - len);
++
++	return ret;
+ }
++
+ #endif
+ 
+ /*
+@@ -237,16 +276,32 @@ int squashfs_read_data(struct super_block *sb, u64 index, int length,
+ 
+ 	if (compressed) {
+ #ifdef CONFIG_MTK_SECURITY_ENHANCEMENT
++		char* orig_buffer = NULL;
++		char* decrypted_buffer = NULL;
++		int orig_len = length;
+ 		if(msblk->crypto_option != NULL) {
+-			bh = create_crypto_buffer_head(bh, b, msblk->devblksize);
+-			decrypt_crypto_buffer(msblk, bh, offset, length);
++			orig_buffer = get_buffer_from_bhlist(bh, b, msblk->devblksize, offset, orig_len);
++			decrypted_buffer = kzalloc(orig_len,GFP_KERNEL);
++			if (decrypt_crypto_buffer(msblk, orig_buffer, decrypted_buffer, orig_len) != 0) {
++				printk(KERN_ERR "decrypt_crypto_buffer fail!\n");
++				WARN_ON(1);
++			}
++			put_buffer_to_bhlist(bh, b, msblk->devblksize, offset, orig_len, decrypted_buffer);
+ 		}
+ #endif
+ 		length = squashfs_decompress(msblk, bh, b, offset, length,
+ 			output);
+ #ifdef CONFIG_MTK_SECURITY_ENHANCEMENT
+-		if(msblk->crypto_option != NULL)
+-			free_crypto_buffer_head(bh, b);
++		if(msblk->crypto_option != NULL) {
++			put_buffer_to_bhlist(bh, b, msblk->devblksize, offset, orig_len, orig_buffer);
++			if(length < 0) {
++				dump_hex("orgi_buffer", orig_buffer, orig_len);
++				dump_hex("decrypted_buffer", decrypted_buffer, orig_len);
++				WARN_ON(1);
++			}
++			kfree(orig_buffer);
++			kfree(decrypted_buffer);
++		}
+ #endif
+ 		if (length < 0)
+ 			goto read_failure;
+-- 
+1.9.1
+

@@ -1,0 +1,12 @@
+--- a/sound/soc/mediatek/mt8167/mt8167-afe-pcm.c	2019-02-25 09:51:12.976379145 +0100
++++ b/sound/soc/mediatek/mt8167/mt8167-afe-pcm.c	2019-02-23 12:11:11.907391109 +0100
+@@ -777,6 +777,9 @@
+ 	val |= AFE_DAIBT_CON0_DATA_DRY;
+ 
+ 	regmap_update_bits(afe->regmap, AFE_DAIBT_CON0, 0x1208, val);
++	//Set to Long Frame Sync (8bits)
++	regmap_update_bits(afe->regmap, AFE_DAIBT_CON0, 0x4, 0x4);
++	regmap_update_bits(afe->regmap, AFE_DAIBT_CON0, 0x70, 0x70);
+ 
+ 	return 0;
+ }

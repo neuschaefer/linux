@@ -1,0 +1,31 @@
+From 622c9f9ff8f841862a0893ee71c19d75c6f07d05 Mon Sep 17 00:00:00 2001
+From: Cong Chen <sin_congchen@mediatek.com>
+Date: Fri, 10 May 2019 11:20:44 +0800
+Subject: [PATCH] dvfs [ALPSxxxxxxxx]
+
+Change-Id: I8dca118ea19850b7c4d807266ec5d93bc24d07f4
+CR-Id:
+Feature:
+---
+ drivers/misc/mediatek/base/power/mt8167/mtk_power_throttle.c | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/drivers/misc/mediatek/base/power/mt8167/mtk_power_throttle.c b/drivers/misc/mediatek/base/power/mt8167/mtk_power_throttle.c
+index 3f25729..eb23f29 100644
+--- a/drivers/misc/mediatek/base/power/mt8167/mtk_power_throttle.c
++++ b/drivers/misc/mediatek/base/power/mt8167/mtk_power_throttle.c
+@@ -348,6 +348,11 @@ void mt_cpufreq_thermal_protect(unsigned int limited_power)
+ 					limited_max_freq = p->power_tbl[i].cpufreq_khz;
+ 					found = 1;
+ 					ncpu = 0; /* for break outer loop */
++					if (p->power_tbl[i].cpufreq_power == 0) {
++						/*invalid power level*/
++						limited_max_ncpu = p->power_tbl[i-1].cpufreq_ncpu;
++						limited_max_freq = p->power_tbl[i-1].cpufreq_khz;
++					}
+ 					break;
+ 				}
+ 			}
+-- 
+1.9.1
+
