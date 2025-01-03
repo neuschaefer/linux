@@ -47,6 +47,7 @@ static irqreturn_t fsl_sai_isr(int irq, void *devid)
 	struct device *dev = &sai->pdev->dev;
 	u32 flags, xcsr, mask;
 	bool irq_none = true;
+	unsigned long irq_flags;
 
 	/*
 	 * Both IRQ status bits and IRQ mask bits are in the xCSR but
@@ -71,9 +72,20 @@ static irqreturn_t fsl_sai_isr(int irq, void *devid)
 		dev_warn(dev, "isr: Tx Frame sync error detected\n");
 
 	if (flags & FSL_SAI_CSR_FEF) {
-		dev_warn(dev, "isr: Transmit underrun detected\n");
-		/* FIFO reset for safety */
-		xcsr |= FSL_SAI_CSR_FR;
+		spin_lock_irqsave(&sai->dma_lock, irq_flags);
+		if (sai->substream[TX]) {
+			dev_warn_ratelimited(dev, "isr: Transmit underrun detected\n");
+			snd_pcm_stop_xrun(sai->substream[TX]);
+		}
+		spin_unlock_irqrestore(&sai->dma_lock, irq_flags);
+
+		/*
+		 * deactivate underrun interrupt,
+		 * we have triggered a restart, and it will get
+		 * setup again
+		 */
+		regmap_update_bits(sai->regmap, FSL_SAI_TCSR,
+				   FSL_SAI_CSR_FEIE, 0);
 	}
 
 	if (flags & FSL_SAI_CSR_FWF)
@@ -82,11 +94,11 @@ static irqreturn_t fsl_sai_isr(int irq, void *devid)
 	if (flags & FSL_SAI_CSR_FRF)
 		dev_dbg(dev, "isr: Transmit FIFO watermark has been reached\n");
 
-	flags &= FSL_SAI_CSR_xF_W_MASK;
-	xcsr &= ~FSL_SAI_CSR_xF_MASK;
-
-	if (flags)
-		regmap_write(sai->regmap, FSL_SAI_TCSR, flags | xcsr);
+	/*
+	 * write 1 to clear the flags bits
+	 */
+	regmap_update_bits(sai->regmap, FSL_SAI_TCSR,
+			   FSL_SAI_CSR_xF_W_MASK, flags);
 
 irq_rx:
 	/* Rx IRQ */
@@ -105,9 +117,20 @@ irq_rx:
 		dev_warn(dev, "isr: Rx Frame sync error detected\n");
 
 	if (flags & FSL_SAI_CSR_FEF) {
-		dev_warn(dev, "isr: Receive overflow detected\n");
-		/* FIFO reset for safety */
-		xcsr |= FSL_SAI_CSR_FR;
+		spin_lock_irqsave(&sai->dma_lock, irq_flags);
+		if (sai->substream[RX]) {
+			dev_warn_ratelimited(dev, "isr: Receive overflow detected\n");
+			snd_pcm_stop_xrun(sai->substream[RX]);
+		}
+		spin_unlock_irqrestore(&sai->dma_lock, irq_flags);
+
+		/*
+		 * deactivate overrun interrupt,
+		 * we have triggered a restart, and it will get
+		 * setup again
+		 */
+		regmap_update_bits(sai->regmap, FSL_SAI_RCSR,
+				   FSL_SAI_CSR_FEIE, 0);
 	}
 
 	if (flags & FSL_SAI_CSR_FWF)
@@ -116,11 +139,11 @@ irq_rx:
 	if (flags & FSL_SAI_CSR_FRF)
 		dev_dbg(dev, "isr: Receive FIFO watermark has been reached\n");
 
-	flags &= FSL_SAI_CSR_xF_W_MASK;
-	xcsr &= ~FSL_SAI_CSR_xF_MASK;
-
-	if (flags)
-		regmap_write(sai->regmap, FSL_SAI_RCSR, flags | xcsr);
+	/*
+	 * write 1 to clear the flags bits
+	 */
+	regmap_update_bits(sai->regmap, FSL_SAI_RCSR,
+			   FSL_SAI_CSR_xF_W_MASK, flags);
 
 out:
 	if (irq_none)
@@ -136,6 +159,8 @@ static int fsl_sai_set_dai_tdm_slot(struct snd_soc_dai *cpu_dai, u32 tx_mask,
 
 	sai->slots = slots;
 	sai->slot_width = slot_width;
+	sai->tx_mask = tx_mask;
+	sai->rx_mask = rx_mask;
 
 	return 0;
 }
@@ -166,6 +191,8 @@ static int fsl_sai_set_dai_sysclk_tr(struct snd_soc_dai *cpu_dai,
 
 	regmap_update_bits(sai->regmap, FSL_SAI_xCR2(tx),
 			   FSL_SAI_CR2_MSEL_MASK, val_cr2);
+
+	sai->half_rate_hack = (freq == 1);
 
 	return 0;
 }
@@ -413,6 +440,7 @@ static int fsl_sai_hw_params(struct snd_pcm_substream *substream,
 	u32 val_cr4 = 0, val_cr5 = 0;
 	u32 slots = (channels == 1) ? 2 : channels;
 	u32 slot_width = word_width;
+	unsigned int rate;
 	int ret;
 
 	if (sai->slots)
@@ -422,8 +450,11 @@ static int fsl_sai_hw_params(struct snd_pcm_substream *substream,
 		slot_width = sai->slot_width;
 
 	if (!sai->is_slave_mode) {
-		ret = fsl_sai_set_bclk(cpu_dai, tx,
-				slots * slot_width * params_rate(params));
+		rate = slots * slot_width * params_rate(params);
+		if (sai->half_rate_hack)
+			rate /= 2;
+
+		ret = fsl_sai_set_bclk(cpu_dai, tx, rate);
 		if (ret)
 			return ret;
 
@@ -466,7 +497,7 @@ static int fsl_sai_hw_params(struct snd_pcm_substream *substream,
 				FSL_SAI_CR5_WNW_MASK | FSL_SAI_CR5_W0W_MASK |
 				FSL_SAI_CR5_FBT_MASK, val_cr5);
 			regmap_write(sai->regmap, FSL_SAI_TMR,
-				~0UL - ((1 << channels) - 1));
+				~sai->tx_mask);
 		} else if (!sai->synchronous[RX] && sai->synchronous[TX] && tx) {
 			regmap_update_bits(sai->regmap, FSL_SAI_RCR4,
 				FSL_SAI_CR4_SYWD_MASK | FSL_SAI_CR4_FRSZ_MASK,
@@ -475,7 +506,7 @@ static int fsl_sai_hw_params(struct snd_pcm_substream *substream,
 				FSL_SAI_CR5_WNW_MASK | FSL_SAI_CR5_W0W_MASK |
 				FSL_SAI_CR5_FBT_MASK, val_cr5);
 			regmap_write(sai->regmap, FSL_SAI_RMR,
-				~0UL - ((1 << channels) - 1));
+				~sai->rx_mask);
 		}
 	}
 
@@ -485,7 +516,10 @@ static int fsl_sai_hw_params(struct snd_pcm_substream *substream,
 	regmap_update_bits(sai->regmap, FSL_SAI_xCR5(tx),
 			   FSL_SAI_CR5_WNW_MASK | FSL_SAI_CR5_W0W_MASK |
 			   FSL_SAI_CR5_FBT_MASK, val_cr5);
-	regmap_write(sai->regmap, FSL_SAI_xMR(tx), ~0UL - ((1 << channels) - 1));
+	if (tx)
+		regmap_write(sai->regmap, FSL_SAI_TMR, ~sai->tx_mask);
+	else
+		regmap_write(sai->regmap, FSL_SAI_RMR, ~sai->rx_mask);
 
 	return 0;
 }
@@ -587,6 +621,13 @@ static int fsl_sai_trigger(struct snd_pcm_substream *substream, int cmd,
 				regmap_write(sai->regmap, FSL_SAI_TCSR, 0);
 				regmap_write(sai->regmap, FSL_SAI_RCSR, 0);
 			}
+		} else {
+			/*
+			 * the other stream is still running
+			 * dont disturb it, but reset our FIFO here
+			 */
+			regmap_update_bits(sai->regmap, FSL_SAI_xCSR(tx),
+					   FSL_SAI_CSR_FR, FSL_SAI_CSR_FR);
 		}
 		break;
 	default:
@@ -603,6 +644,13 @@ static int fsl_sai_startup(struct snd_pcm_substream *substream,
 	bool tx = substream->stream == SNDRV_PCM_STREAM_PLAYBACK;
 	struct device *dev = &sai->pdev->dev;
 	int ret;
+
+	if (sai->is_stream_opened[tx])
+		return -EBUSY;
+	else
+		sai->is_stream_opened[tx] = true;
+
+	sai->substream[tx] = substream;
 
 	ret = clk_prepare_enable(sai->bus_clk);
 	if (ret) {
@@ -624,10 +672,16 @@ static void fsl_sai_shutdown(struct snd_pcm_substream *substream,
 {
 	struct fsl_sai *sai = snd_soc_dai_get_drvdata(cpu_dai);
 	bool tx = substream->stream == SNDRV_PCM_STREAM_PLAYBACK;
+	unsigned long irq_flags;
 
-	regmap_update_bits(sai->regmap, FSL_SAI_xCR3(tx), FSL_SAI_CR3_TRCE, 0);
-
-	clk_disable_unprepare(sai->bus_clk);
+	if (sai->is_stream_opened[tx]) {
+		regmap_update_bits(sai->regmap, FSL_SAI_xCR3(tx), FSL_SAI_CR3_TRCE, 0);
+		clk_disable_unprepare(sai->bus_clk);
+		spin_lock_irqsave(&sai->dma_lock, irq_flags);
+		sai->is_stream_opened[tx] = false;
+		sai->substream[tx] = NULL;
+		spin_unlock_irqrestore(&sai->dma_lock, irq_flags);
+	}
 }
 
 static const struct snd_soc_dai_ops fsl_sai_pcm_dai_ops = {
@@ -651,6 +705,7 @@ static int fsl_sai_dai_probe(struct snd_soc_dai *cpu_dai)
 	/* Clear SR bit to finish the reset */
 	regmap_write(sai->regmap, FSL_SAI_TCSR, 0);
 	regmap_write(sai->regmap, FSL_SAI_RCSR, 0);
+	regmap_write(sai->regmap, FSL_SAI_TCSR, BIT(29));
 
 	regmap_update_bits(sai->regmap, FSL_SAI_TCR1, FSL_SAI_CR1_RFW_MASK,
 			   FSL_SAI_MAXBURST_TX * 2);
@@ -802,6 +857,7 @@ static int fsl_sai_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	sai->pdev = pdev;
+	spin_lock_init(&sai->dma_lock);
 
 	if (of_device_is_compatible(np, "fsl,imx6sx-sai") ||
 	    of_device_is_compatible(np, "fsl,imx6ul-sai"))
@@ -844,6 +900,8 @@ static int fsl_sai_probe(struct platform_device *pdev)
 			sai->mclk_clk[i] = NULL;
 		}
 	}
+
+	sai->slots = 2;
 
 	irq = platform_get_irq(pdev, 0);
 	if (irq < 0) {

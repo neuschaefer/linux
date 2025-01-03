@@ -140,11 +140,19 @@ struct fsl_sai {
 	bool is_dsp_mode;
 	bool sai_on_imx;
 	bool synchronous[2];
+	bool is_stream_opened[2];
+	bool half_rate_hack;
+	struct snd_pcm_substream *substream[2];
+	spinlock_t dma_lock;
 
 	unsigned int mclk_id[2];
 	unsigned int mclk_streams;
+
 	unsigned int slots;
 	unsigned int slot_width;
+
+	u32 tx_mask;
+	u32 rx_mask;
 
 	struct snd_dmaengine_dai_dma_data dma_params_rx;
 	struct snd_dmaengine_dai_dma_data dma_params_tx;

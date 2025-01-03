@@ -9,7 +9,6 @@ config MTD_NAND_ECC_SMC
 	  Software ECC according to the Smart Media Specification.
 	  The original Linux implementation had byte 0 and 1 swapped.
 
-
 menuconfig MTD_NAND
 	tristate "NAND Device Support"
 	depends on MTD
@@ -564,3 +563,5 @@ config MTD_NAND_MTK
 	  This controller is found on mt27xx, mt81xx, mt65xx SoCs.
 
 endif # MTD_NAND
+
+source "drivers/mtd/nand/spi/Kconfig"

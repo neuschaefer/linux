@@ -2630,6 +2630,11 @@ static snd_pcm_sframes_t snd_pcm_playback_rewind(struct snd_pcm_substream *subst
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	snd_pcm_sframes_t ret;
 
+	/* rewind is not working properly with fsl_sai based
+	 * dma engines, just return 0 (not rwound)
+	 */
+	return 0;
+
 	if (frames == 0)
 		return 0;
 
@@ -2647,6 +2652,11 @@ static snd_pcm_sframes_t snd_pcm_capture_rewind(struct snd_pcm_substream *substr
 {
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	snd_pcm_sframes_t ret;
+
+	/* rewind is not working properly with fsl_sai based
+	 * dma engines, just return 0 (not rwound)
+	 */
+	return 0;
 
 	if (frames == 0)
 		return 0;

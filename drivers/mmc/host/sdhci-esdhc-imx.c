@@ -167,19 +167,19 @@ static struct esdhc_soc_data usdhc_imx6q_data = {
 
 static struct esdhc_soc_data usdhc_imx6sl_data = {
 	.flags = ESDHC_FLAG_USDHC | ESDHC_FLAG_STD_TUNING
-			| ESDHC_FLAG_HAVE_CAP1 | ESDHC_FLAG_ERR004536
-			| ESDHC_FLAG_HS200,
+		| ESDHC_FLAG_HAVE_CAP1 | ESDHC_FLAG_ERR004536
+		| ESDHC_FLAG_HS200,
 };
 
 static struct esdhc_soc_data usdhc_imx6sx_data = {
 	.flags = ESDHC_FLAG_USDHC | ESDHC_FLAG_STD_TUNING
-			| ESDHC_FLAG_HAVE_CAP1 | ESDHC_FLAG_HS200,
+		| ESDHC_FLAG_HAVE_CAP1 | ESDHC_FLAG_HS200,
 };
 
 static struct esdhc_soc_data usdhc_imx7d_data = {
 	.flags = ESDHC_FLAG_USDHC | ESDHC_FLAG_STD_TUNING
-			| ESDHC_FLAG_HAVE_CAP1 | ESDHC_FLAG_HS200
-			| ESDHC_FLAG_HS400,
+		| ESDHC_FLAG_HAVE_CAP1 | ESDHC_FLAG_HS200
+		| ESDHC_FLAG_HS400,
 };
 
 struct pltfm_imx_data {
@@ -338,7 +338,7 @@ static u32 esdhc_readl_le(struct sdhci_host *host, int reg)
 		    ((val & SDHCI_INT_RESPONSE) == SDHCI_INT_RESPONSE)) {
 			val &= ~SDHCI_INT_RESPONSE;
 			writel(SDHCI_INT_RESPONSE, host->ioaddr +
-						   SDHCI_INT_STATUS);
+			       SDHCI_INT_STATUS);
 			imx_data->multiblock_status = NO_CMD_PENDING;
 		}
 	}
@@ -353,7 +353,7 @@ static void esdhc_writel_le(struct sdhci_host *host, u32 val, int reg)
 	u32 data;
 
 	if (unlikely(reg == SDHCI_INT_ENABLE || reg == SDHCI_SIGNAL_ENABLE ||
-			reg == SDHCI_INT_STATUS)) {
+		     reg == SDHCI_INT_STATUS)) {
 		if ((val & SDHCI_INT_CARD_INT) && !esdhc_is_usdhc(imx_data)) {
 			/*
 			 * Clear and then set D3CD bit to avoid missing the
@@ -377,21 +377,21 @@ static void esdhc_writel_le(struct sdhci_host *host, u32 val, int reg)
 	}
 
 	if (unlikely((imx_data->socdata->flags & ESDHC_FLAG_MULTIBLK_NO_INT)
-				&& (reg == SDHCI_INT_STATUS)
-				&& (val & SDHCI_INT_DATA_END))) {
-			u32 v;
-			v = readl(host->ioaddr + ESDHC_VENDOR_SPEC);
-			v &= ~ESDHC_VENDOR_SPEC_SDIO_QUIRK;
-			writel(v, host->ioaddr + ESDHC_VENDOR_SPEC);
+		     && (reg == SDHCI_INT_STATUS)
+		     && (val & SDHCI_INT_DATA_END))) {
+		u32 v;
+		v = readl(host->ioaddr + ESDHC_VENDOR_SPEC);
+		v &= ~ESDHC_VENDOR_SPEC_SDIO_QUIRK;
+		writel(v, host->ioaddr + ESDHC_VENDOR_SPEC);
 
-			if (imx_data->multiblock_status == MULTIBLK_IN_PROCESS)
-			{
-				/* send a manual CMD12 with RESPTYP=none */
-				data = MMC_STOP_TRANSMISSION << 24 |
-				       SDHCI_CMD_ABORTCMD << 16;
-				writel(data, host->ioaddr + SDHCI_TRANSFER_MODE);
-				imx_data->multiblock_status = WAIT_FOR_INT;
-			}
+		if (imx_data->multiblock_status == MULTIBLK_IN_PROCESS)
+		{
+			/* send a manual CMD12 with RESPTYP=none */
+			data = MMC_STOP_TRANSMISSION << 24 |
+				SDHCI_CMD_ABORTCMD << 16;
+			writel(data, host->ioaddr + SDHCI_TRANSFER_MODE);
+			imx_data->multiblock_status = WAIT_FOR_INT;
+		}
 	}
 
 	writel(val, host->ioaddr + reg);
@@ -514,9 +514,9 @@ static void esdhc_writew_le(struct sdhci_host *host, u16 val, int reg)
 		return;
 	case SDHCI_TRANSFER_MODE:
 		if ((imx_data->socdata->flags & ESDHC_FLAG_MULTIBLK_NO_INT)
-				&& (host->cmd->opcode == SD_IO_RW_EXTENDED)
-				&& (host->cmd->data->blocks > 1)
-				&& (host->cmd->data->flags & MMC_DATA_READ)) {
+		    && (host->cmd->opcode == SD_IO_RW_EXTENDED)
+		    && (host->cmd->data->blocks > 1)
+		    && (host->cmd->data->flags & MMC_DATA_READ)) {
 			u32 v;
 			v = readl(host->ioaddr + ESDHC_VENDOR_SPEC);
 			v |= ESDHC_VENDOR_SPEC_SDIO_QUIRK;
@@ -645,7 +645,7 @@ static void esdhc_writeb_le(struct sdhci_host *host, u8 val, int reg)
 				 */
 				new_val = readl(host->ioaddr + ESDHC_MIX_CTRL);
 				writel(new_val & ESDHC_MIX_CTRL_TUNING_MASK,
-						host->ioaddr + ESDHC_MIX_CTRL);
+				       host->ioaddr + ESDHC_MIX_CTRL);
 				imx_data->is_ddr = 0;
 			}
 		} else if (val & SDHCI_RESET_DATA) {
@@ -691,7 +691,7 @@ static inline void esdhc_pltfm_set_clock(struct sdhci_host *host,
 		if (esdhc_is_usdhc(imx_data)) {
 			val = readl(host->ioaddr + ESDHC_VENDOR_SPEC);
 			writel(val & ~ESDHC_VENDOR_SPEC_FRC_SDCLK_ON,
-					host->ioaddr + ESDHC_VENDOR_SPEC);
+			       host->ioaddr + ESDHC_VENDOR_SPEC);
 		}
 		return;
 	}
@@ -712,11 +712,11 @@ static inline void esdhc_pltfm_set_clock(struct sdhci_host *host,
 
 	temp = sdhci_readl(host, ESDHC_SYSTEM_CONTROL);
 	temp &= ~(ESDHC_CLOCK_IPGEN | ESDHC_CLOCK_HCKEN | ESDHC_CLOCK_PEREN
-		| ESDHC_CLOCK_MASK);
+		  | ESDHC_CLOCK_MASK);
 	sdhci_writel(host, temp, ESDHC_SYSTEM_CONTROL);
 
 	while (host_clock / (16 * pre_div * ddr_pre_div) > clock &&
-			pre_div < 256)
+	       pre_div < 256)
 		pre_div *= 2;
 
 	while (host_clock / (div * pre_div * ddr_pre_div) > clock && div < 16)
@@ -731,14 +731,14 @@ static inline void esdhc_pltfm_set_clock(struct sdhci_host *host,
 
 	temp = sdhci_readl(host, ESDHC_SYSTEM_CONTROL);
 	temp |= (ESDHC_CLOCK_IPGEN | ESDHC_CLOCK_HCKEN | ESDHC_CLOCK_PEREN
-		| (div << ESDHC_DIVIDER_SHIFT)
-		| (pre_div << ESDHC_PREDIV_SHIFT));
+		 | (div << ESDHC_DIVIDER_SHIFT)
+		 | (pre_div << ESDHC_PREDIV_SHIFT));
 	sdhci_writel(host, temp, ESDHC_SYSTEM_CONTROL);
 
 	if (esdhc_is_usdhc(imx_data)) {
 		val = readl(host->ioaddr + ESDHC_VENDOR_SPEC);
 		writel(val | ESDHC_VENDOR_SPEC_FRC_SDCLK_ON,
-		host->ioaddr + ESDHC_VENDOR_SPEC);
+		       host->ioaddr + ESDHC_VENDOR_SPEC);
 	}
 
 	mdelay(1);
@@ -755,7 +755,7 @@ static unsigned int esdhc_pltfm_get_ro(struct sdhci_host *host)
 		return mmc_gpio_get_ro(host->mmc);
 	case ESDHC_WP_CONTROLLER:
 		return !(readl(host->ioaddr + SDHCI_PRESENT_STATE) &
-			       SDHCI_WRITE_PROTECT);
+			 SDHCI_WRITE_PROTECT);
 	case ESDHC_WP_NONE:
 		break;
 	}
@@ -792,12 +792,12 @@ static void esdhc_prepare_tuning(struct sdhci_host *host, u32 val)
 
 	reg = readl(host->ioaddr + ESDHC_MIX_CTRL);
 	reg |= ESDHC_MIX_CTRL_EXE_TUNE | ESDHC_MIX_CTRL_SMPCLK_SEL |
-			ESDHC_MIX_CTRL_FBCLK_SEL;
+		ESDHC_MIX_CTRL_FBCLK_SEL;
 	writel(reg, host->ioaddr + ESDHC_MIX_CTRL);
 	writel(val << 8, host->ioaddr + ESDHC_TUNE_CTRL_STATUS);
 	dev_dbg(mmc_dev(host->mmc),
 		"tuning with delay 0x%x ESDHC_TUNE_CTRL_STATUS 0x%x\n",
-			val, readl(host->ioaddr + ESDHC_TUNE_CTRL_STATUS));
+		val, readl(host->ioaddr + ESDHC_TUNE_CTRL_STATUS));
 }
 
 static void esdhc_post_tuning(struct sdhci_host *host)
@@ -847,7 +847,7 @@ static int esdhc_executing_tuning(struct sdhci_host *host, u32 opcode)
 }
 
 static int esdhc_change_pinstate(struct sdhci_host *host,
-						unsigned int uhs)
+				 unsigned int uhs)
 {
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
 	struct pltfm_imx_data *imx_data = sdhci_pltfm_priv(pltfm_host);
@@ -856,9 +856,9 @@ static int esdhc_change_pinstate(struct sdhci_host *host,
 	dev_dbg(mmc_dev(host->mmc), "change pinctrl state for uhs %d\n", uhs);
 
 	if (IS_ERR(imx_data->pinctrl) ||
-		IS_ERR(imx_data->pins_default) ||
-		IS_ERR(imx_data->pins_100mhz) ||
-		IS_ERR(imx_data->pins_200mhz))
+	    IS_ERR(imx_data->pins_default) ||
+	    IS_ERR(imx_data->pins_100mhz) ||
+	    IS_ERR(imx_data->pins_200mhz))
 		return -EINVAL;
 
 	switch (uhs) {
@@ -902,7 +902,7 @@ static void esdhc_set_strobe_dll(struct sdhci_host *host)
 
 		/* force a reset on strobe dll */
 		writel(ESDHC_STROBE_DLL_CTRL_RESET,
-			host->ioaddr + ESDHC_STROBE_DLL_CTRL);
+		       host->ioaddr + ESDHC_STROBE_DLL_CTRL);
 		/*
 		 * enable strobe dll ctrl and adjust the delay target
 		 * for the uSDHC loopback read clock
@@ -915,32 +915,10 @@ static void esdhc_set_strobe_dll(struct sdhci_host *host)
 		v = readl(host->ioaddr + ESDHC_STROBE_DLL_STATUS);
 		if (!(v & ESDHC_STROBE_DLL_STS_REF_LOCK))
 			dev_warn(mmc_dev(host->mmc),
-				"warning! HS400 strobe DLL status REF not lock!\n");
+				 "warning! HS400 strobe DLL status REF not lock!\n");
 		if (!(v & ESDHC_STROBE_DLL_STS_SLV_LOCK))
 			dev_warn(mmc_dev(host->mmc),
-				"warning! HS400 strobe DLL status SLV not lock!\n");
-	}
-}
-
-static void esdhc_reset_tuning(struct sdhci_host *host)
-{
-	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-	struct pltfm_imx_data *imx_data = sdhci_pltfm_priv(pltfm_host);
-	u32 ctrl;
-
-	/* Reset the tuning circuit */
-	if (esdhc_is_usdhc(imx_data)) {
-		if (imx_data->socdata->flags & ESDHC_FLAG_MAN_TUNING) {
-			ctrl = readl(host->ioaddr + ESDHC_MIX_CTRL);
-			ctrl &= ~ESDHC_MIX_CTRL_SMPCLK_SEL;
-			ctrl &= ~ESDHC_MIX_CTRL_FBCLK_SEL;
-			writel(ctrl, host->ioaddr + ESDHC_MIX_CTRL);
-			writel(0, host->ioaddr + ESDHC_TUNE_CTRL_STATUS);
-		} else if (imx_data->socdata->flags & ESDHC_FLAG_STD_TUNING) {
-			ctrl = readl(host->ioaddr + SDHCI_AUTO_CMD_STATUS);
-			ctrl &= ~ESDHC_MIX_CTRL_SMPCLK_SEL;
-			writel(ctrl, host->ioaddr + SDHCI_AUTO_CMD_STATUS);
-		}
+				 "warning! HS400 strobe DLL status SLV not lock!\n");
 	}
 }
 
@@ -987,10 +965,6 @@ static void esdhc_set_uhs_signaling(struct sdhci_host *host, unsigned timing)
 		/* update clock after enable DDR for strobe DLL lock */
 		host->ops->set_clock(host, host->clock);
 		esdhc_set_strobe_dll(host);
-		break;
-	case MMC_TIMING_LEGACY:
-	default:
-		esdhc_reset_tuning(host);
 		break;
 	}
 

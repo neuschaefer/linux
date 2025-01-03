@@ -124,6 +124,8 @@ static const char * const iio_modifier_names[] = {
 	[IIO_MOD_Q] = "q",
 	[IIO_MOD_CO2] = "co2",
 	[IIO_MOD_VOC] = "voc",
+	[IIO_MOD_LIGHT_VISIBLE] = "light",
+	[IIO_MOD_LIGHT_DARK] = "dark",
 };
 
 /* relies on pairs of these shared then separate */

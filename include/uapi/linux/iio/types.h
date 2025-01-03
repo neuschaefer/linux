@@ -84,6 +84,8 @@ enum iio_modifier {
 	IIO_MOD_CO2,
 	IIO_MOD_VOC,
 	IIO_MOD_LIGHT_UV,
+	IIO_MOD_LIGHT_VISIBLE,
+	IIO_MOD_LIGHT_DARK,
 };
 
 enum iio_event_type {

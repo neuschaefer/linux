@@ -11,12 +11,99 @@
 #include <linux/slab.h>
 #include <linux/irqchip.h>
 #include <linux/syscore_ops.h>
+#include <soc/imx/revision.h>
 
 #define IMR_NUM			4
 #define GPC_MAX_IRQS            (IMR_NUM * 32)
 
 #define GPC_IMR1_CORE0		0x30
 #define GPC_IMR1_CORE1		0x40
+
+#define GPC_CPU_PGC_SW_PUP_REQ  0xf0
+#define GPC_PU_PGC_SW_PUP_REQ   0xf8
+#define GPC_CPU_PGC_SW_PDN_REQ  0xfc
+
+#define BM_CPU_PGC_SW_PDN_PUP_REQ_CORE1_A7      0x2
+#define BM_GPC_PGC_PCG          0x1
+
+#define GPC_PGC_C0              0x800
+#define GPC_PGC_C0_PUPSCR       0x804
+#define GPC_PGC_SCU_TIMING      0x890
+#define GPC_PGC_C1              0x840
+
+#define IMR_NUM                 4
+#define GPC_MAX_IRQS            (IMR_NUM * 32)
+#define GPC_LPCR_A7_BSC         0x0
+#define GPC_LPCR_A7_AD          0x4
+#define GPC_LPCR_M4             0x8
+#define GPC_SLPCR               0x14
+#define GPC_MLPCR               0x20
+#define GPC_PGC_ACK_SEL_A7      0x24
+#define GPC_MISC                0x2c
+#define GPC_IMR1_CORE0          0x30
+#define GPC_IMR1_CORE1          0x40
+#define GPC_IMR1_M4             0x50
+#define GPC_SLOT0_CFG           0xb0
+#define GPC_PGC_CPU_MAPPING     0xec
+#define GPC_CPU_PGC_SW_PUP_REQ  0xf0
+#define GPC_PU_PGC_SW_PUP_REQ   0xf8
+#define GPC_CPU_PGC_SW_PDN_REQ  0xfc
+#define GPC_PU_PGC_SW_PDN_REQ   0x104
+#define GPC_GTOR                0x124
+#define GPC_PGC_C0              0x800
+#define GPC_PGC_C0_PUPSCR       0x804
+#define GPC_PGC_SCU_TIMING      0x890
+#define GPC_PGC_C1              0x840
+#define GPC_PGC_C1_PUPSCR       0x844
+#define GPC_PGC_SCU             0x880
+#define GPC_PGC_FM              0xa00
+#define GPC_PGC_MIPI_PHY        0xc00
+#define GPC_PGC_PCIE_PHY        0xc40
+#define GPC_PGC_USB_OTG1_PHY    0xc80
+#define GPC_PGC_USB_OTG2_PHY    0xcc0
+#define GPC_PGC_USB_HSIC_PHY    0xd00
+
+
+#define BM_LPCR_A7_BSC_IRQ_SRC_A7_WAKEUP        0x70000000
+#define BM_LPCR_A7_BSC_CPU_CLK_ON_LPM           0x4000
+#define BM_LPCR_A7_BSC_LPM1                     0xc
+#define BM_LPCR_A7_BSC_LPM0                     0x3
+#define BP_LPCR_A7_BSC_LPM1                     2
+#define BP_LPCR_A7_BSC_LPM0                     0
+#define BM_LPCR_M4_MASK_DSM_TRIGGER             0x80000000
+#define BM_SLPCR_EN_DSM                         0x80000000
+#define BM_SLPCR_RBC_EN                         0x40000000
+#define BM_SLPCR_REG_BYPASS_COUNT               0x3f000000
+#define BM_SLPCR_VSTBY                          0x4
+#define BM_SLPCR_SBYOS                          0x2
+#define BM_SLPCR_BYPASS_PMIC_READY              0x1
+#define BM_SLPCR_EN_A7_FASTWUP_WAIT_MODE        0x10000
+#define BM_LPCR_A7_AD_L2PGE                     0x10000
+#define BM_LPCR_A7_AD_EN_C1_PUP                 0x800
+#define BM_LPCR_A7_AD_EN_C1_IRQ_PUP             0x400
+#define BM_LPCR_A7_AD_EN_C0_PUP                 0x200
+#define BM_LPCR_A7_AD_EN_C0_IRQ_PUP             0x100
+#define BM_LPCR_A7_AD_EN_PLAT_PDN               0x10
+#define BM_LPCR_A7_AD_EN_C1_PDN                 0x8
+#define BM_LPCR_A7_AD_EN_C1_WFI_PDN             0x4
+#define BM_LPCR_A7_AD_EN_C0_PDN                 0x2
+#define BM_LPCR_A7_AD_EN_C0_WFI_PDN             0x1
+
+#define BM_CPU_PGC_SW_PDN_PUP_REQ_CORE1_A7      0x2
+#define BM_GPC_PGC_PCG                          0x1
+#define BM_GPC_PGC_CORE_PUPSCR                  0x7fff80
+
+#define BM_GPC_PGC_ACK_SEL_A7_DUMMY_PUP_ACK     0x80000000
+#define BM_GPC_PGC_ACK_SEL_A7_DUMMY_PDN_ACK     0x8000
+#define BM_GPC_MLPCR_MEMLP_CTL_DIS              0x1
+
+#define BP_LPCR_A7_BSC_IRQ_SRC                  28
+
+#define MAX_SLOT_NUMBER                         10
+#define A7_LPM_WAIT                             0x5
+#define A7_LPM_STOP                             0xa
+
+static void __iomem *gpc_base;
 
 struct gpcv2_irqchip_data {
 	struct raw_spinlock	rlock;
@@ -27,6 +114,33 @@ struct gpcv2_irqchip_data {
 };
 
 static struct gpcv2_irqchip_data *imx_gpcv2_instance;
+
+static inline void imx_gpcv2_set_m_core_pgc(bool enable, u32 offset)
+{
+        u32 val = readl_relaxed(gpc_base + offset) & (~BM_GPC_PGC_PCG);
+
+        if (enable)
+                val |= BM_GPC_PGC_PCG;
+
+        writel_relaxed(val, gpc_base + offset);
+}
+
+void imx_gpcv2_set_core1_pdn_pup_by_software(bool pdn)
+{
+	u32 offset = pdn ? GPC_CPU_PGC_SW_PDN_REQ : GPC_CPU_PGC_SW_PUP_REQ;
+	u32 val;
+
+	imx_gpcv2_set_m_core_pgc(true, GPC_PGC_C1);
+
+	val = readl_relaxed(gpc_base + offset);
+	val |= BM_CPU_PGC_SW_PDN_PUP_REQ_CORE1_A7;
+	writel_relaxed(val, gpc_base + offset);
+
+	while (((readl_relaxed(gpc_base + offset)) &
+	       BM_CPU_PGC_SW_PDN_PUP_REQ_CORE1_A7) != 0);
+
+	imx_gpcv2_set_m_core_pgc(false, GPC_PGC_C1);
+}
 
 /*
  * Interface for the low level wakeup code.
@@ -212,7 +326,7 @@ static int __init imx_gpcv2_irqchip_init(struct device_node *node,
 {
 	struct irq_domain *parent_domain, *domain;
 	struct gpcv2_irqchip_data *cd;
-	int i;
+	int i, val;
 
 	if (!parent) {
 		pr_err("%pOF: no parent, giving up\n", node);
@@ -239,6 +353,7 @@ static int __init imx_gpcv2_irqchip_init(struct device_node *node,
 		kfree(cd);
 		return -ENOMEM;
 	}
+	gpc_base = cd->gpc_base;
 
 	domain = irq_domain_add_hierarchy(parent_domain, 0, GPC_MAX_IRQS,
 				node, &gpcv2_irqchip_data_domain_ops, cd);
@@ -265,6 +380,54 @@ static int __init imx_gpcv2_irqchip_init(struct device_node *node,
 	 * DSM by mistake.
 	 */
 	writel_relaxed(~0x1, cd->gpc_base + cd->cpu2wakeup);
+
+	/* only external IRQs to wake up LPM and core 0/1 */
+	val = readl_relaxed(gpc_base + GPC_LPCR_A7_BSC);
+	val |= BM_LPCR_A7_BSC_IRQ_SRC_A7_WAKEUP;
+	writel_relaxed(val, gpc_base + GPC_LPCR_A7_BSC);
+
+	/* mask m4 dsm trigger if M4 NOT enabled */
+	/* m4 is disabled during boot up
+	 * use "if (!imx_src_is_m4_enabled())" in future
+	 */
+	writel_relaxed(readl_relaxed(gpc_base + GPC_LPCR_M4) |
+		BM_LPCR_M4_MASK_DSM_TRIGGER, gpc_base + GPC_LPCR_M4);
+
+	/* set mega/fast mix in A7 domain */
+	writel_relaxed(0x1, gpc_base + GPC_PGC_CPU_MAPPING);
+	/* set SCU timing */
+	writel_relaxed((0x59 << 10) | 0x5B | (0x2 << 20),
+		gpc_base + GPC_PGC_SCU_TIMING);
+
+	/* set C0/C1 power up timming per design requirement */
+	val = readl_relaxed(gpc_base + GPC_PGC_C0_PUPSCR);
+	val &= ~BM_GPC_PGC_CORE_PUPSCR;
+	val |= (0x1A << 7);
+	writel_relaxed(val, gpc_base + GPC_PGC_C0_PUPSCR);
+
+	val = readl_relaxed(gpc_base + GPC_PGC_C1_PUPSCR);
+	val &= ~BM_GPC_PGC_CORE_PUPSCR;
+	val |= (0x1A << 7);
+	writel_relaxed(val, gpc_base + GPC_PGC_C1_PUPSCR);
+
+	val = readl_relaxed(gpc_base + GPC_SLPCR);
+	val &= ~(BM_SLPCR_EN_DSM);
+
+	/* m4 is disabled during boot up
+	 * use "if (!imx_src_is_m4_enabled())" in future
+	 */
+	val &= ~(BM_SLPCR_VSTBY | BM_SLPCR_RBC_EN |
+		 BM_SLPCR_SBYOS | BM_SLPCR_BYPASS_PMIC_READY);
+
+	val |= BM_SLPCR_EN_A7_FASTWUP_WAIT_MODE;
+	writel_relaxed(val, gpc_base + GPC_SLPCR);
+
+	if (imx_get_soc_revision() == IMX_CHIP_REVISION_1_0) {
+		/* disable memory low power mode */
+		val = readl_relaxed(gpc_base + GPC_MLPCR);
+		val |= BM_GPC_MLPCR_MEMLP_CTL_DIS;
+		writel_relaxed(val, gpc_base + GPC_MLPCR);
+	}
 
 	imx_gpcv2_instance = cd;
 	register_syscore_ops(&imx_gpcv2_syscore_ops);

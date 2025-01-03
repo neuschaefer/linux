@@ -536,6 +536,9 @@ config SND_SOC_DA732X
 config SND_SOC_DA9055
 	tristate
 
+config SND_SOC_DCX81
+	tristate "DCX81 Dect Codec"
+
 config SND_SOC_DIO2125
 	tristate "Dioo DIO2125 Amplifier"
 	select GPIOLIB
@@ -1065,6 +1068,9 @@ config SND_SOC_WM8955
 config SND_SOC_WM8960
 	tristate "Wolfson Microelectronics WM8960 CODEC"
 	depends on I2C
+
+config SND_SOC_XMOS
+	tristate
 
 config SND_SOC_WM8961
 	tristate

@@ -111,6 +111,7 @@ static const char *const imx7d_dt_compat[] __initconst = {
 };
 
 DT_MACHINE_START(IMX7D, "Freescale i.MX7 Dual (Device Tree)")
+	.smp            = smp_ops(imx_smp_ops),
 	.init_irq	= imx7d_init_irq,
 	.init_machine	= imx7d_init_machine,
 	.dt_compat	= imx7d_dt_compat,

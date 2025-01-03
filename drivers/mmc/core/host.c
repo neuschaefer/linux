@@ -348,7 +348,7 @@ EXPORT_SYMBOL(mmc_of_parse);
  */
 struct mmc_host *mmc_alloc_host(int extra, struct device *dev)
 {
-	int err;
+	int hostidx;
 	struct mmc_host *host;
 
 	host = kzalloc(sizeof(struct mmc_host) + extra, GFP_KERNEL);
@@ -358,13 +358,16 @@ struct mmc_host *mmc_alloc_host(int extra, struct device *dev)
 	/* scanning will be enabled when we're ready */
 	host->rescan_disable = 1;
 
-	err = ida_simple_get(&mmc_host_ida, 0, 0, GFP_KERNEL);
-	if (err < 0) {
-		kfree(host);
-		return NULL;
+	hostidx = of_alias_get_id(dev->of_node, "mmc");
+	if (hostidx < 0 || ida_simple_get(&mmc_host_ida, hostidx, hostidx + 1, GFP_KERNEL) < 0) {
+		hostidx = ida_simple_get(&mmc_host_ida, 0, 0, GFP_KERNEL);
+		if (hostidx < 0) {
+			kfree(host);
+			return NULL;
+		}
 	}
 
-	host->index = err;
+	host->index = hostidx;
 
 	dev_set_name(&host->class_dev, "mmc%d", host->index);
 

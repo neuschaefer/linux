@@ -60,6 +60,7 @@ void imx_gpc_check_dt(void);
 void imx_gpc_set_arm_power_in_lpm(bool power_off);
 void imx_gpc_set_arm_power_up_timing(u32 sw2iso, u32 sw);
 void imx_gpc_set_arm_power_down_timing(u32 sw2iso, u32 sw);
+void imx_gpcv2_set_core1_pdn_pup_by_software(bool pdn);
 void imx25_pm_init(void);
 void imx27_pm_init(void);
 

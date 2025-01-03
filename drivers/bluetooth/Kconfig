@@ -31,6 +31,13 @@ config BT_HCIBTUSB
 	  Say Y here to compile support for Bluetooth USB devices into the
 	  kernel or say M to compile it as module (btusb).
 
+config BT_RTKBTUSB
+	tristate "RTK HCI USB driver"
+	depends on USB
+	default y
+	help
+		RTK Bluetooth HCI USB driver.
+
 config BT_HCIBTUSB_BCM
 	bool "Broadcom protocol support"
 	depends on BT_HCIBTUSB

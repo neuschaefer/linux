@@ -1,0 +1,21 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * Device Tree Source for Smarthup Speaker
+ *
+ * Copyright (C) 2019 Deutsche Telekom AG
+ *   Author: Linutronix GmbH
+ */
+
+/dts-v1/;
+
+#include "imx7d-smarthub.dtsi"
+
+&uart1 {
+  /* disable UART for prod build */
+  status = "disabled";
+};
+
+&usbotg1 {
+  /* diable OTG port for prod build */
+  status = "disabled";
+};
