@@ -24,7 +24,7 @@
  * 	node 3:  0xd8000000 - 0xdfffffff
  */
 #define MAX_PHYSMEM_BITS	32
-#define SECTION_SIZE_BITS	27
+#define SECTION_SIZE_BITS	26
 
 /*
  * Cache flushing area - SA1100 zero bank

@@ -249,6 +249,9 @@ static int clk_disable_unused(void)
 		pr_warn("clk: Not disabling unused clocks\n");
 		return 0;
 	}
+	#if defined(CONFIG_MACH_MT6799)
+	return 0;
+	#endif
 
 	clk_prepare_lock();
 
@@ -431,6 +434,15 @@ bool clk_hw_is_enabled(const struct clk_hw *hw)
 {
 	return clk_core_is_enabled(hw->core);
 }
+
+bool __clk_is_prepared(struct clk *clk)
+{
+	if (!clk)
+		return false;
+
+	return clk_core_is_prepared(clk->core);
+}
+EXPORT_SYMBOL_GPL(__clk_is_prepared);
 
 bool __clk_is_enabled(struct clk *clk)
 {

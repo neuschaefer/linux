@@ -67,6 +67,7 @@
 #include <linux/vmalloc.h>
 #include <linux/export.h>
 #include <linux/string.h>
+#include <asm/div64.h>
 
 #define BBT_BLOCK_GOOD		0x00
 #define BBT_BLOCK_WORN		0x01

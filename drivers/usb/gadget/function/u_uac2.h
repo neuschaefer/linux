@@ -39,4 +39,18 @@ struct f_uac2_opts {
 	int				refcnt;
 };
 
+struct f_uac2_hw_params {
+	int				p_chmask;
+	int				p_srate;
+	int				p_ssize;
+	int				c_chmask;
+	int				c_srate;
+	int				c_ssize;
+};
+
+struct f_uac2_alt {
+	int chmask;
+	int slot;
+};
+
 #endif

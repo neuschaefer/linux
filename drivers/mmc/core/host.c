@@ -32,8 +32,6 @@
 #include "slot-gpio.h"
 #include "pwrseq.h"
 
-#define cls_dev_to_mmc_host(d)	container_of(d, struct mmc_host, class_dev)
-
 static DEFINE_IDR(mmc_host_idr);
 static DEFINE_SPINLOCK(mmc_host_lock);
 
@@ -314,6 +312,9 @@ struct mmc_host *mmc_alloc_host(int extra, struct device *dev)
 {
 	int err;
 	struct mmc_host *host;
+#ifdef CONFIG_MTK_EMMC_CQ_SUPPORT
+	int i;
+#endif
 
 	host = kzalloc(sizeof(struct mmc_host) + extra, GFP_KERNEL);
 	if (!host)
@@ -364,6 +365,25 @@ struct mmc_host *mmc_alloc_host(int extra, struct device *dev)
 	host->max_blk_size = 512;
 	host->max_blk_count = PAGE_CACHE_SIZE / 512;
 
+#ifdef CONFIG_MTK_EMMC_CQ_SUPPORT
+	host->align_size = 4;
+
+	for (i = 0; i < EMMC_MAX_QUEUE_DEPTH; i++)
+		host->areq_que[i] = NULL;
+	atomic_set(&host->areq_cnt, 0);
+	host->areq_cur = NULL;
+	host->done_mrq = NULL;
+	host->state = 0;
+
+	INIT_LIST_HEAD(&host->cmd_que);
+	INIT_LIST_HEAD(&host->dat_que);
+	spin_lock_init(&host->cmd_que_lock);
+	spin_lock_init(&host->dat_que_lock);
+	spin_lock_init(&host->que_lock);
+
+	init_waitqueue_head(&host->cmp_que);
+#endif
+
 	return host;
 }
 
@@ -394,8 +414,13 @@ int mmc_add_host(struct mmc_host *host)
 	mmc_add_host_debugfs(host);
 #endif
 
+#ifdef CONFIG_BLOCK
+	mmc_latency_hist_sysfs_init(host);
+#endif
+
 	mmc_start_host(host);
-	register_pm_notifier(&host->pm_notify);
+	if (!(host->pm_flags & MMC_PM_IGNORE_PM_NOTIFY))
+		register_pm_notifier(&host->pm_notify);
 
 	return 0;
 }
@@ -412,11 +437,17 @@ EXPORT_SYMBOL(mmc_add_host);
  */
 void mmc_remove_host(struct mmc_host *host)
 {
-	unregister_pm_notifier(&host->pm_notify);
+	if (!(host->pm_flags & MMC_PM_IGNORE_PM_NOTIFY))
+		unregister_pm_notifier(&host->pm_notify);
+
 	mmc_stop_host(host);
 
 #ifdef CONFIG_DEBUG_FS
 	mmc_remove_host_debugfs(host);
+#endif
+
+#ifdef CONFIG_BLOCK
+	mmc_latency_hist_sysfs_exit(host);
 #endif
 
 	device_del(&host->class_dev);

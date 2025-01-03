@@ -382,6 +382,7 @@ use_internal_clk:
 }
 EXPORT_SYMBOL_GPL(lp55xx_is_extclk_used);
 
+static int gpio_enable_flag = false;
 int lp55xx_init_device(struct lp55xx_chip *chip)
 {
 	struct lp55xx_platform_data *pdata;
@@ -397,19 +398,24 @@ int lp55xx_init_device(struct lp55xx_chip *chip)
 	if (!pdata || !cfg)
 		return -EINVAL;
 
-	if (gpio_is_valid(pdata->enable_gpio)) {
-		ret = devm_gpio_request_one(dev, pdata->enable_gpio,
-					    GPIOF_DIR_OUT, "lp5523_enable");
-		if (ret < 0) {
-			dev_err(dev, "could not acquire enable gpio (err=%d)\n",
-				ret);
-			goto err;
+	if (false == gpio_enable_flag)
+	{
+	    if (gpio_is_valid(pdata->enable_gpio))
+	    {
+                ret = devm_gpio_request_one(dev, pdata->enable_gpio,GPIOF_DIR_OUT, "lp5523_enable");
+                if (ret < 0) {
+                    dev_err(dev, "could not acquire enable gpio (err=%d)\n",
+			ret);
+		    goto err;
 		}
-
+		dev_err(dev, "acquire enable gpio (ret=%d) successfully.\n", ret);
 		gpio_set_value(pdata->enable_gpio, 0);
 		usleep_range(1000, 2000); /* Keep enable down at least 1ms */
 		gpio_set_value(pdata->enable_gpio, 1);
 		usleep_range(1000, 2000); /* 500us abs min. */
+		//gpio_free(pdata->enable_gpio);
+		}
+		gpio_enable_flag = true;
 	}
 
 	lp55xx_reset_device(chip);
@@ -445,6 +451,7 @@ EXPORT_SYMBOL_GPL(lp55xx_init_device);
 void lp55xx_deinit_device(struct lp55xx_chip *chip)
 {
 	struct lp55xx_platform_data *pdata = chip->pdata;
+	gpio_enable_flag = false;
 
 	if (chip->clk)
 		clk_disable_unprepare(chip->clk);

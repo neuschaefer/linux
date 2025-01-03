@@ -136,6 +136,16 @@ struct mmc_request {
 	struct completion	completion;
 	void			(*done)(struct mmc_request *);/* completion function */
 	struct mmc_host		*host;
+#ifdef CONFIG_MTK_EMMC_CQ_SUPPORT
+	struct mmc_async_req	*areq;
+	int			flags;
+	struct list_head	link;
+	struct list_head	hlist;
+#endif
+	ktime_t			io_start;
+#ifdef CONFIG_BLOCK
+	int			lat_hist_enabled;
+#endif
 };
 
 struct mmc_card;
@@ -195,6 +205,15 @@ extern void mmc_put_card(struct mmc_card *card);
 extern int mmc_flush_cache(struct mmc_card *);
 
 extern int mmc_detect_card_removed(struct mmc_host *host);
+
+#if defined(CONFIG_MMC_FFU)
+extern int mmc_reinit_oldcard(struct mmc_host *host);
+#endif
+
+#ifdef CONFIG_MTK_EMMC_CQ_SUPPORT
+extern int mmc_blk_cmdq_switch(struct mmc_card *card, int enable);
+#endif
+
 
 /**
  *	mmc_claim_host - exclusively claim a host

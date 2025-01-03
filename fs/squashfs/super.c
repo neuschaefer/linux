@@ -221,6 +221,10 @@ static int squashfs_fill_super(struct super_block *sb, void *data, int silent)
 		goto failed_mount;
 	}
 
+#ifdef CONFIG_MTK_SECURITY_ENHANCEMENT
+	msblk->crypto_option = squashfs_get_crypto_option(sb, flags);
+#endif
+
 	/* Handle xattrs */
 	sb->s_xattr = squashfs_xattr_handlers;
 	xattr_id_table_start = le64_to_cpu(sblk->xattr_id_table_start);

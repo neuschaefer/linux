@@ -4,6 +4,7 @@
 #include <linux/spinlock.h>
 
 #include <linux/mm.h>
+#include <linux/migrate.h>
 #include <linux/pagemap.h>
 #include <linux/rmap.h>
 #include <linux/swap.h>
@@ -58,6 +59,16 @@ static int follow_pfn_pte(struct vm_area_struct *vma, unsigned long address,
 	return -EEXIST;
 }
 
+/*
+ * FOLL_FORCE can write to even unwritable pte's, but only
+ * after we've gone through a COW cycle and they are dirty.
+ */
+static inline bool can_follow_write_pte(pte_t pte, unsigned int flags)
+{
+	return pte_write(pte) ||
+		((flags & FOLL_FORCE) && (flags & FOLL_COW) && pte_dirty(pte));
+}
+
 static struct page *follow_page_pte(struct vm_area_struct *vma,
 		unsigned long address, pmd_t *pmd, unsigned int flags)
 {
@@ -92,7 +103,7 @@ retry:
 	}
 	if ((flags & FOLL_NUMA) && pte_protnone(pte))
 		goto no_page;
-	if ((flags & FOLL_WRITE) && !pte_write(pte)) {
+	if ((flags & FOLL_WRITE) && !can_follow_write_pte(pte, flags)) {
 		pte_unmap_unlock(ptep, ptl);
 		return NULL;
 	}
@@ -293,7 +304,8 @@ unmap:
  * If it is, *@nonblocking will be set to 0 and -EBUSY returned.
  */
 static int faultin_page(struct task_struct *tsk, struct vm_area_struct *vma,
-		unsigned long address, unsigned int *flags, int *nonblocking)
+		unsigned long address, unsigned int gup_flags,
+		unsigned int *flags, int *nonblocking)
 {
 	struct mm_struct *mm = vma->vm_mm;
 	unsigned int fault_flags = 0;
@@ -302,6 +314,10 @@ static int faultin_page(struct task_struct *tsk, struct vm_area_struct *vma,
 	/* mlock all present pages, but do not fault in new pages */
 	if ((*flags & (FOLL_POPULATE | FOLL_MLOCK)) == FOLL_MLOCK)
 		return -ENOENT;
+
+	if (gup_flags & FOLL_DURABLE)
+		fault_flags = FAULT_FLAG_NO_CMA;
+
 	/* For mm_populate(), just skip the stack guard page. */
 	if ((*flags & FOLL_POPULATE) &&
 			(stack_guard_page_start(vma, address) ||
@@ -352,7 +368,7 @@ static int faultin_page(struct task_struct *tsk, struct vm_area_struct *vma,
 	 * reCOWed by userspace write).
 	 */
 	if ((ret & VM_FAULT_WRITE) && !(vma->vm_flags & VM_WRITE))
-		*flags &= ~FOLL_WRITE;
+		*flags |= FOLL_COW;
 	return 0;
 }
 
@@ -360,8 +376,21 @@ static int check_vma_flags(struct vm_area_struct *vma, unsigned long gup_flags)
 {
 	vm_flags_t vm_flags = vma->vm_flags;
 
+#ifdef CONFIG_MTK_EXTMEM
+	if (vm_flags & (VM_IO | VM_PFNMAP)) {
+		/*
+		* Would pass VM_IO | VM_DONTEXPAND | VM_PFNMAP.
+		* (for Reserved Physical Memory PFN Mapping Usage)
+		*/
+		if (!((vma->vm_flags&VM_IO) &&
+			(vma->vm_flags&VM_DONTEXPAND) &&
+			(vma->vm_flags&VM_PFNMAP)))
+			return -EFAULT;
+	}
+#else
 	if (vm_flags & (VM_IO | VM_PFNMAP))
 		return -EFAULT;
+#endif
 
 	if (gup_flags & FOLL_WRITE) {
 		if (!(vm_flags & VM_WRITE)) {
@@ -392,6 +421,45 @@ static int check_vma_flags(struct vm_area_struct *vma, unsigned long gup_flags)
 			return -EFAULT;
 	}
 	return 0;
+}
+
+/**
+ * replace_cma_page() - migrate page out of CMA page blocks
+ * @page:	source page to be migrated
+ *
+ * Returns either the old page (if migration was not possible) or the pointer
+ * to the newly allocated page (with additional reference taken).
+ *
+ * get_user_pages() might take a reference to a page for a long period of time,
+ * what prevent such page from migration. This is fatal to the preffered usage
+ * pattern of CMA pageblocks. This function replaces the given user page with
+ * a new one allocated from NON-MOVABLE pageblock, so locking CMA page can be
+ * avoided.
+ */
+static inline struct page *migrate_replace_cma_page(struct page *page)
+{
+	struct page *newpage = alloc_page(GFP_HIGHUSER);
+
+	if (!newpage)
+		goto out;
+
+	/*
+	 * Take additional reference to the new page to ensure it won't get
+	 * freed after migration procedure end.
+	 */
+	get_page_foll(newpage);
+
+	if (migrate_replace_page(page, newpage) == 0)
+		return newpage;
+
+	put_page(newpage);
+	__free_page(newpage);
+out:
+	/*
+	 * Migration errors in case of get_user_pages() might not
+	 * be fatal to CMA itself, so better don't fail here.
+	 */
+	return page;
 }
 
 /**
@@ -511,8 +579,8 @@ retry:
 		page = follow_page_mask(vma, start, foll_flags, &page_mask);
 		if (!page) {
 			int ret;
-			ret = faultin_page(tsk, vma, start, &foll_flags,
-					nonblocking);
+			ret = faultin_page(tsk, vma, start, gup_flags,
+					&foll_flags, nonblocking);
 			switch (ret) {
 			case 0:
 				goto retry;
@@ -535,6 +603,10 @@ retry:
 		} else if (IS_ERR(page)) {
 			return i ? i : PTR_ERR(page);
 		}
+
+		if ((gup_flags & FOLL_DURABLE) && is_cma_page(page))
+			page = migrate_replace_cma_page(page);
+
 		if (pages) {
 			pages[i] = page;
 			flush_anon_page(vma, page, start);
@@ -860,6 +932,15 @@ long get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 				       pages, vmas, NULL, false, FOLL_TOUCH);
 }
 EXPORT_SYMBOL(get_user_pages);
+
+long get_user_pages_durable(struct task_struct *tsk, struct mm_struct *mm,
+		unsigned long start, unsigned long nr_pages, int write,
+		int force, struct page **pages, struct vm_area_struct **vmas)
+{
+	return __get_user_pages_locked(tsk, mm, start, nr_pages, write, force,
+				       pages, vmas, NULL, false, FOLL_TOUCH | FOLL_DURABLE);
+}
+EXPORT_SYMBOL(get_user_pages_durable);
 
 /**
  * populate_vma_page_range() -  populate a range of pages in the vma.

@@ -49,6 +49,9 @@ extern void *squashfs_read_table(struct super_block *, u64, int);
 /* decompressor.c */
 extern const struct squashfs_decompressor *squashfs_lookup_decompressor(int);
 extern void *squashfs_decompressor_setup(struct super_block *, unsigned short);
+#ifdef CONFIG_MTK_SECURITY_ENHANCEMENT
+extern void* squashfs_get_crypto_option(struct super_block *sb, unsigned short flags);
+#endif
 
 /* decompressor_xxx.c */
 extern void *squashfs_decompressor_create(struct squashfs_sb_info *, void *);

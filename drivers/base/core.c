@@ -2052,6 +2052,7 @@ void device_shutdown(void)
 		dev = list_entry(devices_kset->list.prev, struct device,
 				kobj.entry);
 
+		dev_info(dev, "get device\n");
 		/*
 		 * hold reference count of device's parent to
 		 * prevent it from being freed because parent's
@@ -2076,11 +2077,11 @@ void device_shutdown(void)
 		pm_runtime_barrier(dev);
 
 		if (dev->bus && dev->bus->shutdown) {
-			if (initcall_debug)
+			if (1)
 				dev_info(dev, "shutdown\n");
 			dev->bus->shutdown(dev);
 		} else if (dev->driver && dev->driver->shutdown) {
-			if (initcall_debug)
+			if (1)
 				dev_info(dev, "shutdown\n");
 			dev->driver->shutdown(dev);
 		}

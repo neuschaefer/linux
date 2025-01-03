@@ -70,7 +70,7 @@ static int rtc_suspend(struct device *dev)
 
 	getnstimeofday64(&old_system);
 	old_rtc.tv_sec = rtc_tm_to_time64(&tm);
-
+	old_rtc.tv_nsec = 0;
 
 	/*
 	 * To avoid drift caused by repeated suspend/resumes,

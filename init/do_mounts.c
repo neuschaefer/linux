@@ -566,13 +566,67 @@ void __init prepare_namespace(void)
 	wait_for_device_probe();
 
 	md_run_setup();
+	dm_run_setup();
+
+#ifdef CONFIG_MTD_VERITY
+	{
+		extern int mtd_verity(int mtd_num);
+		extern int bdev_verity(dev_t rootfs_dev);
+		extern int get_rootfs_mtd_num(void);
+		int rootfs_mtd_num;
+
+		pr_err("[rootfs_check]checking rootfs integrity...\n");
+#ifdef CONFIG_MTD_NAND
+		rootfs_mtd_num = get_rootfs_mtd_num();
+		if(rootfs_mtd_num >= 0)
+		{
+			// nand case
+			if(mtd_verity(get_rootfs_mtd_num())!=0)
+			{
+				goto verity_fail;
+			}
+		} else
+#endif
+		{
+			//emmc case
+			dev_t rootfs_dev;
+			struct block_device* rootfs_blk;
+
+			while (driver_probe_done() != 0 ||
+				(rootfs_dev = name_to_dev_t(saved_root_name)) == 0)
+			{
+				pr_err("[rootfs_check] wait for %s...\n",saved_root_name);
+				msleep(100);
+			}
+
+			rootfs_blk = blkdev_get_by_dev(rootfs_dev,FMODE_READ|FMODE_WRITE,NULL);
+			set_device_ro(rootfs_blk,1);
+
+			if(bdev_verity(rootfs_dev)!=0)
+			{
+				goto verity_fail;
+			}
+		}
+
+		goto verity_pass;
+
+	verity_fail:
+		panic("[rootfs_check] rootfs cannot pass integrity check,system hang...\n");
+	verity_pass:
+		pr_err("[rootfs_check]rootfs pass integrity check,boot continue...\n");
+	}
+#endif
 
 	if (saved_root_name[0]) {
 		root_device_name = saved_root_name;
 		if (!strncmp(root_device_name, "mtd", 3) ||
 		    !strncmp(root_device_name, "ubi", 3)) {
+#if defined(CONFIG_DM_NFSB)
+			panic("MTD and UBI devices not supported when NFSB is required.");
+#else
 			mount_block_root(root_device_name, root_mountflags);
 			goto out;
+#endif
 		}
 		ROOT_DEV = name_to_dev_t(root_device_name);
 		if (strncmp(root_device_name, "/dev/", 5) == 0)
@@ -596,6 +650,11 @@ void __init prepare_namespace(void)
 
 	if (is_floppy && rd_doload && rd_load_disk(0))
 		ROOT_DEV = Root_RAM0;
+
+#if defined(CONFIG_DM_NFSB)
+	/* If this succeeds, the ROOT_DEV will have changed. */
+	ROOT_DEV = dm_mount_nfsb(ROOT_DEV);
+#endif
 
 	mount_root();
 out:

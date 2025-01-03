@@ -1,7 +1,6 @@
 #
 # Makefile for misc devices that really don't fit anywhere else.
 #
-
 obj-$(CONFIG_IBM_ASM)		+= ibmasm/
 obj-$(CONFIG_AD525X_DPOT)	+= ad525x_dpot.o
 obj-$(CONFIG_AD525X_DPOT_I2C)	+= ad525x_dpot-i2c.o
@@ -56,3 +55,6 @@ obj-$(CONFIG_GENWQE)		+= genwqe/
 obj-$(CONFIG_ECHO)		+= echo/
 obj-$(CONFIG_VEXPRESS_SYSCFG)	+= vexpress-syscfg.o
 obj-$(CONFIG_CXL_BASE)		+= cxl/
+obj-$(CONFIG_UID_CPUTIME) += uid_cputime.o
+obj-$(CONFIG_MEDIATEK_SOLUTION)	+= mediatek/
+obj-$(CONFIG_MEMORY_STATE_TIME) += memory_state_time.o

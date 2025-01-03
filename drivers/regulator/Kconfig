@@ -453,6 +453,15 @@ config REGULATOR_MT6311
 	  This driver supports the control of different power rails of device
 	  through regulator interface.
 
+config REGULATOR_MT6392
+	tristate "MediaTek MT6392 PMIC"
+	depends on MFD_MT6397
+	help
+	  Say y here to select this option to enable the power regulator of
+	  MediaTek MT6392 PMIC.
+	  This driver supports the control of different power rails of device
+	  through regulator interface.
+
 config REGULATOR_MT6397
 	tristate "MediaTek MT6397 PMIC"
 	depends on MFD_MT6397
@@ -461,6 +470,14 @@ config REGULATOR_MT6397
 	  MediaTek MT6397 PMIC.
 	  This driver supports the control of different power rails of device
 	  through regulator interface.
+
+config REGULATOR_MTK
+	bool "MTK regulator subsystem"
+	help
+	  Say Y here to select this option to enable
+	  mtk_regulator framework.
+	  This framework is for linux and non-linux regulator driver
+	  more easy to use for regulator users.
 
 config REGULATOR_PALMAS
 	tristate "TI Palmas PMIC Regulators"
@@ -580,6 +597,16 @@ config REGULATOR_RT5033
 	  This adds support for voltage and current regulators in Richtek
 	  RT5033 PMIC. The device supports multiple regulators like
 	  current source, LDO and Buck.
+
+config REGULATOR_RT5738
+	tristate "Richtek RT5738 Regulators"
+	depends on I2C
+	select REGMAP_I2C
+	help
+	 This driver supports RT5738 voltage regulator.
+	 The chip supports 3A output current.
+	 The operation mode and output voltage is configurable
+	 via I2C bus.
 
 config REGULATOR_S2MPA01
 	tristate "Samsung S2MPA01 voltage regulator"

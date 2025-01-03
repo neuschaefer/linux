@@ -18,6 +18,7 @@
  *  Assorted race fixes, rewrite of ext4_get_block() by Al Viro, 2000
  */
 
+#define DEBUG 1
 #include <linux/fs.h>
 #include <linux/time.h>
 #include <linux/highuid.h>
@@ -37,6 +38,7 @@
 #include <linux/printk.h>
 #include <linux/slab.h>
 #include <linux/bitops.h>
+#include <mt-plat/mtk_blocktag.h>
 
 #include "ext4_jbd2.h"
 #include "xattr.h"
@@ -44,6 +46,7 @@
 #include "truncate.h"
 
 #include <trace/events/ext4.h>
+#include <trace/events/android_fs.h>
 
 #define MPAGE_DA_EXTENT_TAIL 0x01
 
@@ -1016,6 +1019,8 @@ static int ext4_write_begin(struct file *file, struct address_space *mapping,
 	pgoff_t index;
 	unsigned from, to;
 
+	trace_android_fs_datawrite_start(inode, pos, len,
+					 current->pid, current->comm);
 	trace_ext4_write_begin(inode, pos, len, flags);
 	/*
 	 * Reserve one block more for addition to orphan list in case
@@ -1118,6 +1123,8 @@ retry_journal:
 		return ret;
 	}
 	*pagep = page;
+	mtk_btag_pidlog_write_begin(*pagep);
+
 	return ret;
 }
 
@@ -1152,6 +1159,7 @@ static int ext4_write_end(struct file *file,
 	int ret = 0, ret2;
 	int i_size_changed = 0;
 
+	trace_android_fs_datawrite_end(inode, pos, len);
 	trace_ext4_write_end(inode, pos, len, copied);
 	if (ext4_test_inode_state(inode, EXT4_STATE_ORDERED_MODE)) {
 		ret = ext4_jbd2_file_inode(handle, inode);
@@ -1260,6 +1268,7 @@ static int ext4_journalled_write_end(struct file *file,
 	unsigned from, to;
 	int size_changed = 0;
 
+	trace_android_fs_datawrite_end(inode, pos, len);
 	trace_ext4_journalled_write_end(inode, pos, len, copied);
 	from = pos & (PAGE_CACHE_SIZE - 1);
 	to = from + len;
@@ -1874,6 +1883,14 @@ static int ext4_writepage(struct page *page,
 	else
 		len = PAGE_CACHE_SIZE;
 
+	if (!page_has_buffers(page)) {
+		pr_warn("%s: page %p doesn't have buffers, flag: %lx. task flag: %x\n",
+			__func__, page, page->flags, current->flags);
+		redirty_page_for_writepage(wbc, page);
+		unlock_page(page);
+		return 0;
+	}
+
 	page_bufs = page_buffers(page);
 	/*
 	 * We cannot do block allocation or other extent handling in this
@@ -2425,6 +2442,13 @@ static int mpage_prepare_extent_to_map(struct mpage_da_data *mpd)
 			/* Add all dirty buffers to mpd */
 			lblk = ((ext4_lblk_t)page->index) <<
 				(PAGE_CACHE_SHIFT - blkbits);
+#ifdef CONFIG_SDCARD_FS
+			if (!page_has_buffers(page)) {
+				unsigned blocksize = mpd->inode->i_sb->s_blocksize;
+
+				create_empty_buffers(page, blocksize, 0);
+			}
+#endif
 			head = page_buffers(page);
 			err = mpage_process_page_bufs(mpd, head, head, lblk);
 			if (err <= 0)
@@ -2727,6 +2751,8 @@ static int ext4_da_write_begin(struct file *file, struct address_space *mapping,
 					len, flags, pagep, fsdata);
 	}
 	*fsdata = (void *)0;
+	trace_android_fs_datawrite_start(inode, pos, len,
+					 current->pid, current->comm);
 	trace_ext4_da_write_begin(inode, pos, len, flags);
 
 	if (ext4_test_inode_state(inode, EXT4_STATE_MAY_INLINE_DATA)) {
@@ -2845,6 +2871,7 @@ static int ext4_da_write_end(struct file *file,
 		return ext4_write_end(file, mapping, pos,
 				      len, copied, page, fsdata);
 
+	trace_android_fs_datawrite_end(inode, pos, len);
 	trace_ext4_da_write_end(inode, pos, len, copied);
 	start = pos & (PAGE_CACHE_SIZE - 1);
 	end = start + copied - 1;
@@ -3333,12 +3360,31 @@ static ssize_t ext4_direct_IO(struct kiocb *iocb, struct iov_iter *iter,
 	if (ext4_has_inline_data(inode))
 		return 0;
 
+	if (trace_android_fs_dataread_start_enabled() &&
+	    (iov_iter_rw(iter) == READ))
+		trace_android_fs_dataread_start(inode, offset, count,
+						current->pid,
+						current->comm);
+	if (trace_android_fs_datawrite_start_enabled() &&
+	    (iov_iter_rw(iter) == WRITE))
+		trace_android_fs_datawrite_start(inode, offset, count,
+						 current->pid,
+						 current->comm);
+
 	trace_ext4_direct_IO_enter(inode, offset, count, iov_iter_rw(iter));
 	if (ext4_test_inode_flag(inode, EXT4_INODE_EXTENTS))
 		ret = ext4_ext_direct_IO(iocb, iter, offset);
 	else
 		ret = ext4_ind_direct_IO(iocb, iter, offset);
 	trace_ext4_direct_IO_exit(inode, offset, count, iov_iter_rw(iter), ret);
+
+	if (trace_android_fs_dataread_start_enabled() &&
+	    (iov_iter_rw(iter) == READ))
+		trace_android_fs_dataread_end(inode, offset, count);
+	if (trace_android_fs_datawrite_start_enabled() &&
+	    (iov_iter_rw(iter) == WRITE))
+		trace_android_fs_datawrite_end(inode, offset, count);
+
 	return ret;
 }
 

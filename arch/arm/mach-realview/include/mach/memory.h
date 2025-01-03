@@ -41,7 +41,7 @@
 #endif
 
 #define MAX_PHYSMEM_BITS	32
-#define SECTION_SIZE_BITS	28
+#define SECTION_SIZE_BITS	26
 
 /* bank page offsets */
 #define PAGE_OFFSET1	(PAGE_OFFSET + 0x10000000)

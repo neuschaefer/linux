@@ -18,7 +18,7 @@
 
 #ifdef CONFIG_SPARSEMEM
 #define MAX_PHYSMEM_BITS	48
-#define SECTION_SIZE_BITS	30
+#define SECTION_SIZE_BITS	27
 #endif
 
 #endif

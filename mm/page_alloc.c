@@ -68,6 +68,10 @@
 #include <asm/div64.h>
 #include "internal.h"
 
+#if defined(CONFIG_DMAUSER_PAGES)
+#include <mt-plat/aee.h>
+#endif
+
 /* prevent >1 _updater_ of zone percpu pageset ->high and ->batch fields */
 static DEFINE_MUTEX(pcp_batch_high_lock);
 #define MIN_PERCPU_PAGELIST_FRACTION	(8)
@@ -142,6 +146,8 @@ static inline void set_pcppage_migratetype(struct page *page, int migratetype)
 {
 	page->index = migratetype;
 }
+
+struct kernel_reserve_meminfo kernel_reserve_meminfo;
 
 #ifdef CONFIG_PM_SLEEP
 /*
@@ -238,8 +244,20 @@ compound_page_dtor * const compound_page_dtors[] = {
 #endif
 };
 
+/*
+ * Try to keep at least this much lowmem free.  Do not allow normal
+ * allocations below this point, only high priority ones. Automatically
+ * tuned according to the amount of memory in the system.
+ */
 int min_free_kbytes = 1024;
 int user_min_free_kbytes = -1;
+
+/*
+ * Extra memory for the system to try freeing. Used to temporarily
+ * free memory, to make space for new workloads. Anyone can allocate
+ * down to the min watermarks controlled by min_free_kbytes above.
+ */
+int extra_free_kbytes = 0;
 
 static unsigned long __meminitdata nr_kernel_pages;
 static unsigned long __meminitdata nr_all_pages;
@@ -1304,6 +1322,37 @@ void __init init_cma_reserved_pageblock(struct page *page)
 
 	adjust_managed_page_count(page, pageblock_nr_pages);
 }
+
+#ifdef CONFIG_ZONE_MOVABLE_CMA
+void __init free_cma_reserved_pageblock(struct page *page)
+{
+	unsigned i = pageblock_nr_pages;
+	struct page *p = page;
+
+	do {
+		__ClearPageReserved(p);
+		set_page_count(p, 0);
+	} while (++p, --i);
+
+	set_pageblock_migratetype(page, MIGRATE_MOVABLE);
+
+	if (pageblock_order >= MAX_ORDER) {
+		i = pageblock_nr_pages;
+		p = page;
+		do {
+			set_page_refcounted(p);
+			__free_pages(p, MAX_ORDER - 1);
+			p += MAX_ORDER_NR_PAGES;
+		} while (i -= MAX_ORDER_NR_PAGES);
+	} else {
+		set_page_refcounted(page);
+		__free_pages(page, pageblock_order);
+	}
+
+	adjust_managed_page_count(page, pageblock_nr_pages);
+}
+#endif
+
 #endif
 
 /*
@@ -1813,6 +1862,12 @@ static struct page *__rmqueue(struct zone *zone, unsigned int order,
 				int migratetype, gfp_t gfp_flags)
 {
 	struct page *page;
+
+#ifdef CONFIG_ZONE_MOVABLE_CMA
+	/* No fallback for page allocation on ZONE_MOVABLE */
+	if (zone_idx(zone) == ZONE_MOVABLE)
+		migratetype = MIGRATE_CMA;
+#endif
 
 	page = __rmqueue_smallest(zone, order, migratetype);
 	if (unlikely(!page)) {
@@ -2379,6 +2434,9 @@ static bool __zone_watermark_ok(struct zone *z, unsigned int order,
 	long min = mark;
 	int o;
 	const int alloc_harder = (alloc_flags & ALLOC_HARDER);
+#ifdef CONFIG_CMA
+	long free_cma = 0;
+#endif
 
 	/* free_pages may go negative - that's OK */
 	free_pages -= (1 << order) - 1;
@@ -2399,7 +2457,13 @@ static bool __zone_watermark_ok(struct zone *z, unsigned int order,
 #ifdef CONFIG_CMA
 	/* If allocation can't use CMA areas don't use free CMA pages */
 	if (!(alloc_flags & ALLOC_CMA))
-		free_pages -= zone_page_state(z, NR_FREE_CMA_PAGES);
+		free_cma = zone_page_state(z, NR_FREE_CMA_PAGES);
+
+	/* If it is ZONE_MOVABLE and alloc_flags is 0, don't count the number of free_cma */
+	if (IS_ENABLED(CONFIG_ZONE_MOVABLE_CMA) && zone_idx(z) == ZONE_MOVABLE)
+		free_cma = !!(alloc_flags) ? free_cma : 0;
+
+	free_pages -= free_cma;
 #endif
 
 	/*
@@ -3197,13 +3261,45 @@ __alloc_pages_nodemask(gfp_t gfp_mask, unsigned int order,
 	struct zoneref *preferred_zoneref;
 	struct page *page = NULL;
 	unsigned int cpuset_mems_cookie;
+#if defined(CONFIG_DMAUSER_PAGES) || defined(CONFIG_ZONE_MOVABLE_CMA)
+	int alloc_flags = ALLOC_WMARK_LOW|ALLOC_CPUSET;
+#else
 	int alloc_flags = ALLOC_WMARK_LOW|ALLOC_CPUSET|ALLOC_FAIR;
+#endif
+#ifdef CONFIG_DMAUSER_PAGES
+	static DEFINE_RATELIMIT_STATE(dmawarn, (180 * HZ), 1);
+#endif
 	gfp_t alloc_mask; /* The gfp_t that was actually used for allocation */
+#ifndef CONFIG_ZONE_MOVABLE_CMA
 	struct alloc_context ac = {
 		.high_zoneidx = gfp_zone(gfp_mask),
 		.nodemask = nodemask,
 		.migratetype = gfpflags_to_migratetype(gfp_mask),
 	};
+#else
+	struct alloc_context ac = {
+		.nodemask = nodemask,
+	};
+
+	/* special case:
+	 *
+	 * __GFP_HIGHMEM | __GFP_MOVABLE | __GFP_CMA =>
+	 *  first  time: DMA
+	 *  second time: MOVABLE -> DMA
+	 * __GFP_HIGHMEM | __GFP_CMA =>
+	 *  first  time: MOVABLE -> DMA
+	 *  second time: MOVABLE -> DMA
+	 */
+	if ((gfp_mask & (GFP_ZONEMASK | __GFP_CMA)) == (__GFP_HIGHMEM | __GFP_CMA)) {
+		gfp_mask |= __GFP_MOVABLE;
+
+		ac.high_zoneidx = gfp_zone(gfp_mask);
+		ac.migratetype = gfpflags_to_migratetype(gfp_mask);
+	} else {
+		ac.high_zoneidx = gfp_zone(gfp_mask & ~__GFP_MOVABLE);
+		ac.migratetype = gfpflags_to_migratetype(gfp_mask);
+	}
+#endif
 
 	gfp_mask &= gfp_allowed_mask;
 
@@ -3222,8 +3318,14 @@ __alloc_pages_nodemask(gfp_t gfp_mask, unsigned int order,
 	if (unlikely(!zonelist->_zonerefs->zone))
 		return NULL;
 
-	if (IS_ENABLED(CONFIG_CMA) && ac.migratetype == MIGRATE_MOVABLE)
+	if (IS_ENABLED(CONFIG_CMA) && ac.migratetype == MIGRATE_MOVABLE) {
+		if (gfp_mask & __GFP_CMA) {
+			/* Assign high watermakr for __GFP_CMA page allocation */
+			alloc_flags &= ~ALLOC_WMARK_MASK;
+			alloc_flags |= ALLOC_WMARK_HIGH;
+		}
 		alloc_flags |= ALLOC_CMA;
+	}
 
 retry_cpuset:
 	cpuset_mems_cookie = read_mems_allowed_begin();
@@ -3253,6 +3355,8 @@ retry_cpuset:
 		 */
 		alloc_mask = memalloc_noio_flags(gfp_mask);
 		ac.spread_dirty_pages = false;
+		/* reassign gfp_flags */
+		ac.high_zoneidx = gfp_zone(gfp_mask);
 
 		page = __alloc_pages_slowpath(alloc_mask, order, &ac);
 	}
@@ -3271,6 +3375,16 @@ out:
 	 */
 	if (unlikely(!page && read_mems_allowed_retry(cpuset_mems_cookie)))
 		goto retry_cpuset;
+
+#if defined(CONFIG_DMAUSER_PAGES)
+	/*
+	 * make sure DMA pages cannot be allocated to non-GFP_DMA users
+	 */
+	if (page && !(gfp_mask & GFP_DMA) && (page_zonenum(page) == OPT_ZONE_DMA)) {
+		if (__ratelimit(&dmawarn))
+			aee_kernel_warning("large memory", "out of high-end memory");
+	}
+#endif
 
 	return page;
 }
@@ -3703,9 +3817,16 @@ static void show_migration_types(unsigned char type)
  */
 void show_free_areas(unsigned int filter)
 {
+	static unsigned long show_free_areas_timeout;
 	unsigned long free_pcp = 0;
 	int cpu;
 	struct zone *zone;
+
+	/* Reduce logs */
+	if (time_before(jiffies, show_free_areas_timeout))
+		return;
+
+	show_free_areas_timeout = jiffies + HZ;
 
 	for_each_populated_zone(zone) {
 		if (skip_free_areas_node(filter, zone_to_nid(zone)))
@@ -4564,7 +4685,10 @@ static int zone_batchsize(struct zone *zone)
 	 *
 	 * OK, so we don't know how big the cache is.  So guess.
 	 */
-	batch = zone->managed_pages / 1024;
+	if (IS_ENABLED(CONFIG_ZONE_MOVABLE_CMA) && zone_idx(zone) == ZONE_MOVABLE)
+		batch = zone->present_pages / 1024;
+	else
+		batch = zone->managed_pages / 1024;
 	if (batch * PAGE_SIZE > 512 * 1024)
 		batch = (512 * 1024) / PAGE_SIZE;
 	batch /= 4;		/* We effectively *= 4 below */
@@ -5317,6 +5441,9 @@ static void __init_refok alloc_node_mem_map(struct pglist_data *pgdat)
 			map = memblock_virt_alloc_node_nopanic(size,
 							       pgdat->node_id);
 		pgdat->node_mem_map = map + offset;
+#if defined(CONFIG_MTK_MEMCFG) && defined(CONFIG_FLATMEM)
+		mem_map_size = size;
+#endif
 	}
 #ifndef CONFIG_NEED_MULTIPLE_NODES
 	/*
@@ -5894,6 +6021,20 @@ void __init mem_init_print_info(const char *str)
 	       totalhigh_pages << (PAGE_SHIFT-10),
 #endif
 	       str ? ", " : "", str ? str : "");
+
+		kernel_reserve_meminfo.available = nr_free_pages() << (PAGE_SHIFT - 10);
+		kernel_reserve_meminfo.total = physpages << (PAGE_SHIFT - 10);
+		kernel_reserve_meminfo.kernel_code = codesize >> 10;
+		kernel_reserve_meminfo.rwdata = datasize >> 10;
+		kernel_reserve_meminfo.rodata = rosize >> 10;
+		kernel_reserve_meminfo.init = (init_data_size + init_code_size) >> 10;
+		kernel_reserve_meminfo.bss = bss_size >> 10;
+		kernel_reserve_meminfo.reserved =
+			(physpages - totalram_pages) << (PAGE_SHIFT-10);
+
+#ifdef CONFIG_HIGHMEM
+		kernel_reserve_meminfo.highmem = totalhigh_pages << (PAGE_SHIFT - 10);
+#endif
 }
 
 /**
@@ -6037,22 +6178,35 @@ static void setup_per_zone_lowmem_reserve(void)
 static void __setup_per_zone_wmarks(void)
 {
 	unsigned long pages_min = min_free_kbytes >> (PAGE_SHIFT - 10);
+	unsigned long pages_low = extra_free_kbytes >> (PAGE_SHIFT - 10);
 	unsigned long lowmem_pages = 0;
 	struct zone *zone;
 	unsigned long flags;
 
 	/* Calculate total number of !ZONE_HIGHMEM pages */
 	for_each_zone(zone) {
+		if (IS_ENABLED(CONFIG_ZONE_MOVABLE_CMA)) {
+			int zone_off = (char *)zone - (char *)zone->zone_pgdat->node_zones;
+
+			if (zone_off == ZONE_MOVABLE * sizeof(*zone))
+				continue;
+		}
 		if (!is_highmem(zone))
 			lowmem_pages += zone->managed_pages;
 	}
 
 	for_each_zone(zone) {
-		u64 tmp;
+		u64 min, low;
 
 		spin_lock_irqsave(&zone->lock, flags);
-		tmp = (u64)pages_min * zone->managed_pages;
-		do_div(tmp, lowmem_pages);
+		min = (u64)pages_min * zone->managed_pages;
+		do_div(min, lowmem_pages);
+		low = (u64)pages_low * zone->managed_pages;
+		if (IS_ENABLED(CONFIG_ZONE_MOVABLE_CMA))
+			do_div(low, lowmem_pages);
+		else
+			do_div(low, vm_total_pages);
+
 		if (is_highmem(zone)) {
 			/*
 			 * __GFP_HIGH and PF_MEMALLOC allocations usually don't
@@ -6073,11 +6227,13 @@ static void __setup_per_zone_wmarks(void)
 			 * If it's a lowmem zone, reserve a number of pages
 			 * proportionate to the zone's size.
 			 */
-			zone->watermark[WMARK_MIN] = tmp;
+			zone->watermark[WMARK_MIN] = min;
 		}
 
-		zone->watermark[WMARK_LOW]  = min_wmark_pages(zone) + (tmp >> 2);
-		zone->watermark[WMARK_HIGH] = min_wmark_pages(zone) + (tmp >> 1);
+		zone->watermark[WMARK_LOW]  = min_wmark_pages(zone) +
+					low + (min >> 2);
+		zone->watermark[WMARK_HIGH] = min_wmark_pages(zone) +
+					low + (min >> 1);
 
 		__mod_zone_page_state(zone, NR_ALLOC_BATCH,
 			high_wmark_pages(zone) - low_wmark_pages(zone) -
@@ -6200,7 +6356,7 @@ core_initcall(init_per_zone_wmark_min)
 /*
  * min_free_kbytes_sysctl_handler - just a wrapper around proc_dointvec() so
  *	that we can call two helper functions whenever min_free_kbytes
- *	changes.
+ *	or extra_free_kbytes changes.
  */
 int min_free_kbytes_sysctl_handler(struct ctl_table *table, int write,
 	void __user *buffer, size_t *length, loff_t *ppos)

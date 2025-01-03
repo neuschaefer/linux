@@ -772,7 +772,7 @@ static void __init request_standard_resources(const struct machine_desc *mdesc)
 	struct resource *res;
 
 	kernel_code.start   = virt_to_phys(_text);
-	kernel_code.end     = virt_to_phys(_etext - 1);
+	kernel_code.end     = virt_to_phys(__init_begin - 1);
 	kernel_data.start   = virt_to_phys(_sdata);
 	kernel_data.end     = virt_to_phys(_end - 1);
 
@@ -941,7 +941,11 @@ void __init setup_arch(char **cmdline_p)
 	if (!mdesc)
 		mdesc = setup_machine_tags(__atags_pointer, __machine_arch_type);
 	machine_desc = mdesc;
+#ifdef CONFIG_OF
+	machine_name = of_flat_dt_get_machine_name();
+#else
 	machine_name = mdesc->name;
+#endif
 	dump_stack_set_arch_desc("%s", mdesc->name);
 
 	if (mdesc->reboot_mode != REBOOT_HARD)
@@ -1081,6 +1085,9 @@ static int c_show(struct seq_file *m, void *v)
 	int i, j;
 	u32 cpuid;
 
+	/* a hint message to notify that some process reads /proc/cpuinfo */
+	pr_err("Dump cpuinfo\n");
+
 	for_each_online_cpu(i) {
 		/*
 		 * glibc reads /proc/cpuinfo to determine the number of
@@ -1089,6 +1096,10 @@ static int c_show(struct seq_file *m, void *v)
 		 */
 		seq_printf(m, "processor\t: %d\n", i);
 		cpuid = is_smp() ? per_cpu(cpu_data, i).cpuid : read_cpuid_id();
+
+		/* backward-compatibility for thrid-party applications */
+		seq_printf(m, "Processor\t: %s rev %d (%s)\n",
+			   cpu_name, cpuid & 15, elf_platform);
 		seq_printf(m, "model name\t: %s rev %d (%s)\n",
 			   cpu_name, cpuid & 15, elf_platform);
 

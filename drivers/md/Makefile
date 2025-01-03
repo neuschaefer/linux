@@ -2,6 +2,10 @@
 # Makefile for the kernel software RAID and LVM drivers.
 #
 
+ifeq ($(CONFIG_MTK_HW_FDE_AES),y)
+ccflags-y += -I$(srctree)/drivers/misc/mediatek/fde_aes/$(MTK_PLATFORM)
+endif
+
 dm-mod-y	+= dm.o dm-table.o dm-target.o dm-linear.o dm-stripe.o \
 		   dm-ioctl.o dm-io.o dm-kcopyd.o dm-sysfs.o dm-stats.o
 dm-multipath-y	+= dm-path-selector.o dm-mpath.o
@@ -16,12 +20,13 @@ dm-cache-mq-y   += dm-cache-policy-mq.o
 dm-cache-smq-y   += dm-cache-policy-smq.o
 dm-cache-cleaner-y += dm-cache-policy-cleaner.o
 dm-era-y	+= dm-era-target.o
+dm-verity-y	+= dm-verity-target.o
 md-mod-y	+= md.o bitmap.o
 raid456-y	+= raid5.o raid5-cache.o
 
 # Note: link order is important.  All raid personalities
-# and must come before md.o, as they each initialise 
-# themselves, and md.o may use the personalities when it 
+# and must come before md.o, as they each initialise
+# themselves, and md.o may use the personalities when it
 # auto-initialised.
 
 obj-$(CONFIG_MD_LINEAR)		+= linear.o
@@ -59,7 +64,14 @@ obj-$(CONFIG_DM_CACHE_SMQ)	+= dm-cache-smq.o
 obj-$(CONFIG_DM_CACHE_CLEANER)	+= dm-cache-cleaner.o
 obj-$(CONFIG_DM_ERA)		+= dm-era.o
 obj-$(CONFIG_DM_LOG_WRITES)	+= dm-log-writes.o
+obj-$(CONFIG_DM_ANDROID_VERITY) += dm-android-verity.o
 
 ifeq ($(CONFIG_DM_UEVENT),y)
 dm-mod-objs			+= dm-uevent.o
 endif
+
+ifeq ($(CONFIG_DM_VERITY_FEC),y)
+dm-verity-objs			+= dm-verity-fec.o
+endif
+
+ccflags-$(CONFIG_MTK_SECURITY_ENHANCEMENT) += -I$(srctree)/drivers/misc/mediatek/skeyprovider

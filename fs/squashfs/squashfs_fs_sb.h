@@ -53,6 +53,26 @@ struct squashfs_cache_entry {
 	struct squashfs_page_actor	*actor;
 };
 
+#ifdef CONFIG_MTK_SECURITY_ENHANCEMENT
+#define CRYPTO_AES_KEY_SIZE (32)
+#define CRYPTO_AES_IV_SIZE (16)
+#define CRYPTO_OPTION_OFFSET (256)
+#define LEN_KEYNAME (8)
+#define CRYPTO_OPTION_MAGIC  (0x85168516)
+struct crypto_option {
+	int magic;
+	int is_enc;
+	int comp_opt_exist;
+	// key_mode
+	// 1. encrypted aes key is encrypted by vendor key and store in encrypted_aes_key
+	// 2. enctyped aes key is enctyped by per-device key and store in another partition(default is sec_ro)
+	int key_mode;
+	unsigned char key_name[LEN_KEYNAME];
+	unsigned char encrypted_aes_key[CRYPTO_AES_KEY_SIZE];
+	unsigned char aes_iv[CRYPTO_AES_IV_SIZE];
+};
+#endif
+
 struct squashfs_sb_info {
 	const struct squashfs_decompressor	*decompressor;
 	int					devblksize;
@@ -76,5 +96,8 @@ struct squashfs_sb_info {
 	long long				bytes_used;
 	unsigned int				inodes;
 	int					xattr_ids;
+#ifdef CONFIG_MTK_SECURITY_ENHANCEMENT
+	struct crypto_option *crypto_option;
+#endif
 };
 #endif

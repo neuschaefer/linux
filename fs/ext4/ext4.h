@@ -2267,6 +2267,7 @@ struct page *ext4_encrypt(struct inode *inode,
 			  struct page *plaintext_page);
 int ext4_decrypt(struct page *page);
 int ext4_encrypted_zeroout(struct inode *inode, struct ext4_extent *ex);
+extern const struct dentry_operations ext4_encrypted_d_ops;
 
 #ifdef CONFIG_EXT4_FS_ENCRYPTION
 int ext4_init_crypto(void);
@@ -2464,7 +2465,8 @@ extern int ext4_mb_add_groupinfo(struct super_block *sb,
 		ext4_group_t i, struct ext4_group_desc *desc);
 extern int ext4_group_add_blocks(handle_t *handle, struct super_block *sb,
 				ext4_fsblk_t block, unsigned long count);
-extern int ext4_trim_fs(struct super_block *, struct fstrim_range *);
+extern int ext4_trim_fs(struct super_block *, struct fstrim_range *,
+				unsigned long blkdev_flags);
 
 /* inode.c */
 int ext4_inode_is_fast_symlink(struct inode *inode);

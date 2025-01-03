@@ -154,6 +154,16 @@ bool have_governor_per_policy(void)
 }
 EXPORT_SYMBOL_GPL(have_governor_per_policy);
 
+bool cpufreq_driver_is_slow(void)
+{
+#ifdef CONFIG_CPU_FREQ_SCHED_ASSIST
+	return false;
+#else
+	return !(cpufreq_driver->flags & CPUFREQ_DRIVER_FAST);
+#endif
+}
+EXPORT_SYMBOL_GPL(cpufreq_driver_is_slow);
+
 struct kobject *get_governor_parent_kobj(struct cpufreq_policy *policy)
 {
 	if (have_governor_per_policy())
@@ -347,6 +357,72 @@ static void adjust_jiffies(unsigned long val, struct cpufreq_freqs *ci)
 #endif
 }
 
+/*********************************************************************
+ *               FREQUENCY INVARIANT CPU CAPACITY                    *
+ *********************************************************************/
+
+static DEFINE_PER_CPU(unsigned long, freq_scale) = SCHED_CAPACITY_SCALE;
+static DEFINE_PER_CPU(unsigned long, max_freq_scale) = SCHED_CAPACITY_SCALE;
+
+static void
+scale_freq_capacity(struct cpufreq_policy *policy, struct cpufreq_freqs *freqs)
+{
+	unsigned long cur = freqs ? freqs->new : policy->cur;
+	unsigned long scale = (cur << SCHED_CAPACITY_SHIFT) / policy->max;
+	struct cpufreq_cpuinfo *cpuinfo = &policy->cpuinfo;
+	int cpu;
+#ifdef CONFIG_HOTPLUG_CPU
+	int cid;
+	struct cpumask cls_cpus;
+#endif
+
+	pr_debug("cpus %*pbl cur/cur max freq %lu/%u kHz freq scale %lu\n",
+		 cpumask_pr_args(policy->cpus), cur, policy->max, scale);
+
+#ifdef CONFIG_HOTPLUG_CPU
+	cid = arch_get_cluster_id(policy->cpu);
+	arch_get_cluster_cpus(&cls_cpus, cid);
+
+	for_each_cpu(cpu, &cls_cpus) {
+		per_cpu(freq_scale, cpu) = scale;
+		arch_scale_set_max_freq(cpu, policy->max);
+	}
+
+#else
+	for_each_cpu(cpu, policy->cpus) {
+		per_cpu(freq_scale, cpu) = scale;
+		arch_scale_set_max_freq(cpu, policy->max);
+	}
+
+	if (freqs)
+		return;
+#endif
+
+	scale = (policy->max << SCHED_CAPACITY_SHIFT) / cpuinfo->max_freq;
+
+	pr_debug("cpus %*pbl cur max/max freq %u/%u kHz max freq scale %lu\n",
+		 cpumask_pr_args(policy->cpus), policy->max, cpuinfo->max_freq,
+		 scale);
+
+#ifdef CONFIG_HOTPLUG_CPU
+	for_each_cpu(cpu, policy->cpus)
+		per_cpu(max_freq_scale, cpu) = scale;
+#else
+	for_each_cpu(cpu, &cls_cpus)
+		per_cpu(max_freq_scale, cpu) = scale;
+#endif
+}
+
+unsigned long cpufreq_scale_freq_capacity(struct sched_domain *sd, int cpu)
+{
+	return per_cpu(freq_scale, cpu);
+}
+
+unsigned long cpufreq_scale_max_freq_capacity(int cpu)
+{
+	return per_cpu(max_freq_scale, cpu);
+}
+
 static void __cpufreq_notify_transition(struct cpufreq_policy *policy,
 		struct cpufreq_freqs *freqs, unsigned int state)
 {
@@ -449,6 +525,8 @@ wait:
 	policy->transition_task = current;
 
 	spin_unlock(&policy->transition_lock);
+
+	scale_freq_capacity(policy, freqs);
 
 	cpufreq_notify_transition(policy, freqs, CPUFREQ_PRECHANGE);
 }
@@ -2126,8 +2204,11 @@ static int cpufreq_set_policy(struct cpufreq_policy *policy,
 	blocking_notifier_call_chain(&cpufreq_policy_notifier_list,
 			CPUFREQ_NOTIFY, new_policy);
 
+	scale_freq_capacity(new_policy, NULL);
+
 	policy->min = new_policy->min;
 	policy->max = new_policy->max;
+	trace_cpu_frequency_limits(policy->max, policy->min, policy->cpu);
 
 	pr_debug("new min and max freqs are %u - %u kHz\n",
 		 policy->min, policy->max);

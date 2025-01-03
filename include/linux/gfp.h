@@ -36,6 +36,7 @@ struct vm_area_struct;
 #define ___GFP_OTHER_NODE	0x800000u
 #define ___GFP_WRITE		0x1000000u
 #define ___GFP_KSWAPD_RECLAIM	0x2000000u
+#define ___GFP_CMA	0x4000000u
 /* If the above are modified, __GFP_BITS_SHIFT may need updating */
 
 /*
@@ -182,8 +183,18 @@ struct vm_area_struct;
 #define __GFP_NOTRACK_FALSE_POSITIVE (__GFP_NOTRACK)
 #define __GFP_OTHER_NODE ((__force gfp_t)___GFP_OTHER_NODE)
 
+/*
+ * MTK defined modifiers
+ *
+ * __GFP_CMA grant the access permission of CMA memroy region.
+ *   MOVABLE ZONE cover cma memory region, for avoid pinned page on cma
+ *   memory block that lead to migration fail. Do not mark that suspicious
+ *   page allocation with __GFP_CMA.
+ */
+#define __GFP_CMA ((__force gfp_t)___GFP_CMA)
+
 /* Room for N __GFP_FOO bits */
-#define __GFP_BITS_SHIFT 26
+#define __GFP_BITS_SHIFT 27
 #define __GFP_BITS_MASK ((__force gfp_t)((1 << __GFP_BITS_SHIFT) - 1))
 
 /*
@@ -244,8 +255,13 @@ struct vm_area_struct;
 #define GFP_USER	(__GFP_RECLAIM | __GFP_IO | __GFP_FS | __GFP_HARDWALL)
 #define GFP_DMA		__GFP_DMA
 #define GFP_DMA32	__GFP_DMA32
+#ifdef CONFIG_DMAUSER_PAGES
+#define GFP_HIGHUSER	(GFP_USER | GFP_DMA)
+#define GFP_HIGHUSER_MOVABLE	(GFP_HIGHUSER)
+#else
 #define GFP_HIGHUSER	(GFP_USER | __GFP_HIGHMEM)
 #define GFP_HIGHUSER_MOVABLE	(GFP_HIGHUSER | __GFP_MOVABLE)
+#endif
 #define GFP_TRANSHUGE	((GFP_HIGHUSER_MOVABLE | __GFP_COMP | \
 			 __GFP_NOMEMALLOC | __GFP_NORETRY | __GFP_NOWARN) & \
 			 ~__GFP_KSWAPD_RECLAIM)
@@ -363,8 +379,14 @@ static inline enum zone_type gfp_zone(gfp_t flags)
 	int bit = (__force int) (flags & GFP_ZONEMASK);
 
 	z = (GFP_ZONE_TABLE >> (bit * ZONES_SHIFT)) &
-					 ((1 << ZONES_SHIFT) - 1);
+		((1 << ZONES_SHIFT) - 1);
 	VM_BUG_ON((GFP_ZONE_BAD >> bit) & 1);
+	/* used for limit - only the flags with __GFP_CMA can go into ZONE_MOVABLE */
+
+	/* do not allocate at ZONE_MOVABLE without __GFP_CMA */
+	if (IS_ENABLED(CONFIG_ZONE_MOVABLE_CMA))
+		if (z == ZONE_MOVABLE && !(flags & __GFP_CMA))
+			z -= 1;
 	return z;
 }
 
@@ -548,6 +570,9 @@ extern void free_contig_range(unsigned long pfn, unsigned nr_pages);
 
 /* CMA stuff */
 extern void init_cma_reserved_pageblock(struct page *page);
+#ifdef CONFIG_ZONE_MOVABLE_CMA
+extern void free_cma_reserved_pageblock(struct page *page);
+#endif
 
 #endif
 

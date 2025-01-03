@@ -18,7 +18,7 @@
 #ifndef _ARCH_ARM64_ASM_BUG_H
 #define _ARCH_ARM64_ASM_BUG_H
 
-#include <asm/debug-monitors.h>
+#include <asm/brk-imm.h>
 
 #ifdef CONFIG_GENERIC_BUG
 #define HAVE_ARCH_BUG
@@ -56,6 +56,7 @@ _BUGVERBOSE_LOCATION(__FILE__, __LINE__)		\
 } while (0)
 
 #define __WARN_TAINT(taint) _BUG_FLAGS(BUGFLAG_TAINT(taint))
+#undef __WARN_TAINT
 
 #endif /* ! CONFIG_GENERIC_BUG */
 

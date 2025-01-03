@@ -36,6 +36,7 @@
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/partitions.h>
 #include <linux/mtd/map.h>
+#include <linux/vmalloc.h>
 
 #include <asm/uaccess.h>
 
@@ -212,16 +213,14 @@ static ssize_t mtdchar_read(struct file *file, char __user *buf, size_t count,
 			if (copy_to_user(buf, kbuf, retlen)) {
 				kfree(kbuf);
 				return -EFAULT;
-			}
-			else
+			} else
 				total_retlen += retlen;
 
 			count -= retlen;
 			buf += retlen;
 			if (retlen == 0)
 				count = 0;
-		}
-		else {
+		} else {
 			kfree(kbuf);
 			return ret;
 		}
@@ -308,8 +307,7 @@ static ssize_t mtdchar_write(struct file *file, const char __user *buf, size_t c
 			total_retlen += retlen;
 			count -= retlen;
 			buf += retlen;
-		}
-		else {
+		} else {
 			kfree(kbuf);
 			return ret;
 		}

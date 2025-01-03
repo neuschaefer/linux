@@ -38,6 +38,10 @@
 #include "decompressor.h"
 #include "page_actor.h"
 
+#ifdef CONFIG_MTK_SECURITY_ENHANCEMENT
+#include "tz_mtk_crypto_api.h"
+#endif
+
 /*
  * Read the metadata block length, this is stored in the first two
  * bytes of the metadata block.
@@ -77,6 +81,72 @@ static struct buffer_head *get_block_length(struct super_block *sb,
 	return bh;
 }
 
+#ifdef CONFIG_MTK_SECURITY_ENHANCEMENT
+static struct mtk_crypto_ctx *crypto_ctx;
+static struct buffer_head ** create_crypto_buffer_head(struct buffer_head **bh, int n, int size)
+{
+	int i;
+	struct buffer_head **cbh;
+	char* cbh_buffer;
+
+	cbh = kcalloc(n, sizeof(*cbh), GFP_KERNEL);
+	cbh_buffer = kcalloc(n, size, GFP_KERNEL);
+
+	for(i=0; i < n; i++) {
+		cbh[i] = kzalloc(sizeof(struct buffer_head), GFP_KERNEL);
+		cbh[i]->b_data = &cbh_buffer[i*size];
+		memcpy(cbh[i]->b_data, bh[i]->b_data, size);
+		put_bh(bh[i]);
+	}
+
+	kfree(bh);
+	return cbh;
+}
+
+static void free_crypto_buffer_head(struct buffer_head **bh, int n)
+{
+	int i = 0;
+
+	kfree(bh[0]->b_data);
+	for(i=0; i < n; i++) {
+		kfree(bh[i]);
+	}
+}
+
+static void decrypt_crypto_buffer(struct squashfs_sb_info *msblk, struct buffer_head **bh, int offset, int length)
+{
+	struct crypto_option *crypto_opts = msblk->crypto_option;
+
+	unsigned char* src;
+	unsigned char* dest;
+	int len = 0;
+
+	src = bh[0]->b_data + offset;
+	dest = src;
+	len = length/16*16;
+
+	if(crypto_ctx == NULL) {
+		crypto_ctx = kzalloc(sizeof(struct mtk_crypto_ctx), GFP_KERNEL);
+		mtk_crypto_ctx_init(crypto_ctx);
+	}
+
+	if(crypto_opts->key_mode == 1) {
+			mtk_crypto_aes_with_keymode(crypto_ctx, 2, 1,
+								AES_OP_MODE_DEC, crypto_opts->aes_iv,
+								crypto_opts->encrypted_aes_key, CRYPTO_AES_KEY_SIZE,
+								src, dest,
+								len);
+	}
+
+	if(crypto_opts->key_mode == 2) {
+		mtk_crypto_aes_with_keymode(crypto_ctx, 1, 1,
+						    AES_OP_MODE_DEC, crypto_opts->aes_iv,
+						    crypto_opts->encrypted_aes_key, CRYPTO_AES_KEY_SIZE,
+						    src, dest,
+						    len);
+	}
+}
+#endif
 
 /*
  * Read and decompress a metadata block or datablock.  Length is non-zero
@@ -166,8 +236,18 @@ int squashfs_read_data(struct super_block *sb, u64 index, int length,
 	}
 
 	if (compressed) {
+#ifdef CONFIG_MTK_SECURITY_ENHANCEMENT
+		if(msblk->crypto_option != NULL) {
+			bh = create_crypto_buffer_head(bh, b, msblk->devblksize);
+			decrypt_crypto_buffer(msblk, bh, offset, length);
+		}
+#endif
 		length = squashfs_decompress(msblk, bh, b, offset, length,
 			output);
+#ifdef CONFIG_MTK_SECURITY_ENHANCEMENT
+		if(msblk->crypto_option != NULL)
+			free_crypto_buffer_head(bh, b);
+#endif
 		if (length < 0)
 			goto read_failure;
 	} else {

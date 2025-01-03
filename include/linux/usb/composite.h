@@ -223,6 +223,12 @@ struct usb_function {
 	int			(*get_status)(struct usb_function *);
 	int			(*func_suspend)(struct usb_function *,
 						u8 suspend_opt);
+
+#if defined(CONFIG_MTK_MD_DIRECT_TETHERING_SUPPORT) || defined(CONFIG_MTK_MD_DIRECT_LOGGING_SUPPORT)
+	int			(*md_msg_hdlr)(struct usb_function *f, int msg_id, void *data);
+	bool			(*md_status_qry)(struct usb_function *f);
+#endif
+
 	/* private: */
 	/* internals */
 	struct list_head		list;
@@ -574,6 +580,7 @@ struct usb_function_instance {
 	struct config_group group;
 	struct list_head cfs_list;
 	struct usb_function_driver *fd;
+	struct usb_function *f;
 	int (*set_inst_name)(struct usb_function_instance *inst,
 			      const char *name);
 	void (*free_func_inst)(struct usb_function_instance *inst);

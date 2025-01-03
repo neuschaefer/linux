@@ -1278,6 +1278,19 @@ static int usbhid_probe(struct usb_interface *intf, const struct usb_device_id *
 	dbg_hid("HID probe called for ifnum %d\n",
 			intf->altsetting->desc.bInterfaceNumber);
 
+#ifdef CONFIG_USB_IGNORE_MOUSE_KBD
+	if (intf->cur_altsetting->desc.bInterfaceProtocol ==
+			USB_INTERFACE_PROTOCOL_MOUSE) {
+		pr_warn("mouse: ignore it!\n");
+		goto err_ignore_hid;
+	}
+	if (intf->cur_altsetting->desc.bInterfaceProtocol ==
+			USB_INTERFACE_PROTOCOL_KEYBOARD) {
+		pr_warn("keyboard: ignore it!\n");
+		goto err_ignore_hid;
+	}
+#endif
+
 	for (n = 0; n < interface->desc.bNumEndpoints; n++)
 		if (usb_endpoint_is_int_in(&interface->endpoint[n].desc))
 			has_in++;
@@ -1359,6 +1372,12 @@ static int usbhid_probe(struct usb_interface *intf, const struct usb_device_id *
 	}
 
 	return 0;
+
+#ifdef CONFIG_USB_IGNORE_MOUSE_KBD
+err_ignore_hid:
+	return -ENODEV;
+#endif
+
 err_free:
 	kfree(usbhid);
 err:

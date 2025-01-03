@@ -31,6 +31,7 @@ struct ipv6_devconf {
 	__s32		accept_ra_defrtr;
 	__s32		accept_ra_min_hop_limit;
 	__s32		accept_ra_pinfo;
+	__s32		ra_info_flag;
 	__s32		ignore_routes_with_linkdown;
 #ifdef CONFIG_IPV6_ROUTER_PREF
 	__s32		accept_ra_rtr_pref;
@@ -39,6 +40,7 @@ struct ipv6_devconf {
 	__s32		accept_ra_rt_info_max_plen;
 #endif
 #endif
+	__s32		accept_ra_rt_table;
 	__s32		proxy_ndp;
 	__s32		accept_source_route;
 	__s32		accept_ra_from_local;

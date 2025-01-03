@@ -44,6 +44,13 @@ config USB_HIDDEV
 
 	  If unsure, say Y.
 
+config USB_IGNORE_MOUSE_KBD
+	bool "ignore USB Mouse and Keyboard"
+	depends on USB_HID
+	---help---
+	  Say Y if you want to disable USB HID mouse and keyboard. It's
+	  a good way to prevent some hid devices.
+
 menu "USB HID Boot Protocol drivers"
 	depends on USB!=n && USB_HID!=y && EXPERT
 

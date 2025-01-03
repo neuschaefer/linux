@@ -17,7 +17,7 @@ config SND_SOC_ALL_CODECS
 	select SND_SOC_L3
 	select SND_SOC_AB8500_CODEC if ABX500_CORE
 	select SND_SOC_AC97_CODEC
-	select SND_SOC_AD1836 if SPI_MASTER
+	select SND_SOC_AD1836 if SPI_MASTERRT5509
 	select SND_SOC_AD193X_SPI if SPI_MASTER
 	select SND_SOC_AD193X_I2C if I2C
 	select SND_SOC_AD1980 if SND_SOC_AC97_BUS
@@ -179,6 +179,7 @@ config SND_SOC_ALL_CODECS
 	select SND_SOC_WM9705 if SND_SOC_AC97_BUS
 	select SND_SOC_WM9712 if SND_SOC_AC97_BUS
 	select SND_SOC_WM9713 if SND_SOC_AC97_BUS
+	select SND_SOC_RT5509 if I2C
         help
           Normally ASoC codec drivers are only built if a machine driver which
           uses them is also built since they are only usable with a machine
@@ -422,6 +423,18 @@ config SND_SOC_CS4349
 	tristate "Cirrus Logic CS4349 CODEC"
 	depends on I2C
 
+config SND_SOC_CS4382A
+	tristate
+
+config SND_SOC_TAS5751
+	tristate
+	
+config SND_SOC_TAS5782M
+	tristate	
+	
+config SND_SOC_TLV320WN
+	tristate
+		
 config SND_SOC_CX20442
 	tristate
 	depends on TTY
@@ -892,6 +905,9 @@ config SND_SOC_WM9712
 config SND_SOC_WM9713
 	tristate
 
+config SND_SOC_MT8167_CODEC
+	tristate
+
 # Amp
 config SND_SOC_LM4857
 	tristate
@@ -915,4 +931,17 @@ config SND_SOC_TPA6130A2
 	tristate "Texas Instruments TPA6130A2 headphone amplifier"
 	depends on I2C
 
+config SND_SOC_RT5509
+	tristate "Richtek RT5509 Smart AMP"
+	depends on I2C
+	select RT_REGMAP
+
 endmenu
+
+config SND_SOC_MAX98926
+	bool "MAXIM 98926 CODEC"
+	default n
+	help
+	  for max98926 codec,enable this config will
+	  add max98926 codec driver.
+

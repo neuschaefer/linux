@@ -90,11 +90,73 @@ const struct squashfs_decompressor *squashfs_lookup_decompressor(int id)
 	return decompressor[i];
 }
 
+#ifdef CONFIG_MTK_SECURITY_ENHANCEMENT
+#include <skeyprovider.h>
+void* squashfs_get_crypto_option(struct super_block *sb, unsigned short flags)
+{
+	struct squashfs_sb_info *msblk = sb->s_fs_info;
+	void *buffer = NULL;
+	struct crypto_option *crypto_opts = NULL;
+	struct squashfs_page_actor *actor = NULL;
+	int length = 0;
+
+	/*
+	 * Read decompressor specific options from file system if present
+	 */
+	if (SQUASHFS_COMP_OPTS(flags)) {
+		buffer = kmalloc(PAGE_CACHE_SIZE, GFP_KERNEL);
+		if (buffer == NULL) {
+			crypto_opts = ERR_PTR(-ENOMEM);
+			goto out;
+		}
+
+		actor = squashfs_page_actor_init(&buffer, 1, 0);
+		if (actor == NULL) {
+			crypto_opts = ERR_PTR(-ENOMEM);
+			goto out;
+		}
+
+		length = squashfs_read_data(sb,
+			sizeof(struct squashfs_super_block), 0, NULL, actor);
+
+		if (length < 0) {
+			crypto_opts = ERR_PTR(length);
+			goto out;
+		}
+	}
+
+	if(buffer == NULL)
+		goto out;
+
+	crypto_opts = kmalloc(sizeof(struct crypto_option), GFP_KERNEL);
+	memcpy(crypto_opts, (char*)buffer + CRYPTO_OPTION_OFFSET, sizeof(struct crypto_option));
+
+	if(crypto_opts->magic != CRYPTO_OPTION_MAGIC) {
+		pr_err("squashfs is plain\n");
+		kfree(crypto_opts);
+		crypto_opts = NULL;
+	} else {
+		pr_err("squashfs is encrypted with keymode %d\n", crypto_opts->key_mode);
+		if(crypto_opts->key_mode == 2) {
+			if(get_encrypted_key(crypto_opts->key_name, crypto_opts->encrypted_aes_key, CRYPTO_AES_KEY_SIZE)) {
+				pr_err("error: can not found skey with name %s and len %d\n", crypto_opts->key_name, CRYPTO_AES_KEY_SIZE);
+			}
+		}
+	}
+out:
+	kfree(actor);
+	kfree(buffer);
+	return crypto_opts;
+}
+#endif
 
 static void *get_comp_opts(struct super_block *sb, unsigned short flags)
 {
 	struct squashfs_sb_info *msblk = sb->s_fs_info;
 	void *buffer = NULL, *comp_opts;
+#ifdef CONFIG_MTK_SECURITY_ENHANCEMENT
+	struct crypto_option *crypto_opts;
+#endif
 	struct squashfs_page_actor *actor = NULL;
 	int length = 0;
 
@@ -123,6 +185,16 @@ static void *get_comp_opts(struct super_block *sb, unsigned short flags)
 		}
 	}
 
+#ifdef CONFIG_MTK_SECURITY_ENHANCEMENT
+	crypto_opts = squashfs_get_crypto_option(sb, flags);
+
+	if(crypto_opts != NULL && crypto_opts->comp_opt_exist == 0) {
+		kfree(buffer);
+		buffer = NULL;
+		length = 0;
+	}
+#endif
+
 	comp_opts = squashfs_comp_opts(msblk, buffer, length);
 
 out:
@@ -130,7 +202,6 @@ out:
 	kfree(buffer);
 	return comp_opts;
 }
-
 
 void *squashfs_decompressor_setup(struct super_block *sb, unsigned short flags)
 {

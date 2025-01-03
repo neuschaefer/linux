@@ -1156,6 +1156,9 @@ static void ndisc_router_discovery(struct sk_buff *skb)
 		in6_dev->if_flags |= IF_RA_RCVD;
 	}
 
+	/*add for VzW feature : remove IF_RS_VZW_SENT flag*/
+	if (in6_dev->if_flags & IF_RS_VZW_SENT)
+		in6_dev->if_flags &= ~IF_RS_VZW_SENT;
 	/*
 	 * Remember the managed/otherconf flags from most recently
 	 * received RA message (RFC 2462) -- yoshfuji
@@ -1408,12 +1411,28 @@ skip_routeinfo:
 		}
 	}
 
+	if (in6_dev->if_flags & IF_RA_OTHERCONF) {
+		pr_info("[mtk_net]receive RA with o bit!\n");
+		in6_dev->cnf.ra_info_flag = 1;
+	}
+	if (in6_dev->if_flags & IF_RA_MANAGED) {
+		pr_info("[mtk_net]receive RA with m bit!\n");
+		in6_dev->cnf.ra_info_flag = 2;
+	}
+
 	if (ndopts.nd_useropts) {
 		struct nd_opt_hdr *p;
 		for (p = ndopts.nd_useropts;
 		     p;
 		     p = ndisc_next_useropt(p, ndopts.nd_useropts_end)) {
 			ndisc_ra_useropt(skb, p);
+
+			/* only clear ra_info_flag when O bit is set */
+			 if ((p->nd_opt_type == ND_OPT_RDNSS) && (in6_dev->cnf.ra_info_flag == 1)) {
+				pr_info("[mtk_net]RDNSS, ignore RA with o bit!\n");
+				in6_dev->cnf.ra_info_flag = 0;
+			}
+
 		}
 	}
 

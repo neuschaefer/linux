@@ -116,6 +116,56 @@ static void release_task_mempolicy(struct proc_maps_private *priv)
 }
 #endif
 
+static void seq_print_vma_name(struct seq_file *m, struct vm_area_struct *vma)
+{
+	const char __user *name = vma_get_anon_name(vma);
+	struct mm_struct *mm = vma->vm_mm;
+
+	unsigned long page_start_vaddr;
+	unsigned long page_offset;
+	unsigned long num_pages;
+	unsigned long max_len = NAME_MAX;
+	int i;
+
+	page_start_vaddr = (unsigned long)name & PAGE_MASK;
+	page_offset = (unsigned long)name - page_start_vaddr;
+	num_pages = DIV_ROUND_UP(page_offset + max_len, PAGE_SIZE);
+
+	seq_puts(m, "[anon:");
+
+	for (i = 0; i < num_pages; i++) {
+		int len;
+		int write_len;
+		const char *kaddr;
+		long pages_pinned;
+		struct page *page;
+
+		pages_pinned = get_user_pages(current, mm, page_start_vaddr,
+				1, 0, 0, &page, NULL);
+		if (pages_pinned < 1) {
+			seq_puts(m, "<fault>]");
+			return;
+		}
+
+		kaddr = (const char *)kmap(page);
+		len = min(max_len, PAGE_SIZE - page_offset);
+		write_len = strnlen(kaddr + page_offset, len);
+		seq_write(m, kaddr + page_offset, write_len);
+		kunmap(page);
+		put_page(page);
+
+		/* if strnlen hit a null terminator then we're done */
+		if (write_len != len)
+			break;
+
+		max_len -= len;
+		page_offset = 0;
+		page_start_vaddr += PAGE_SIZE;
+	}
+
+	seq_putc(m, ']');
+}
+
 static void vma_stop(struct proc_maps_private *priv)
 {
 	struct mm_struct *mm = priv->mm;
@@ -343,6 +393,11 @@ show_map_vma(struct seq_file *m, struct vm_area_struct *vma, int is_pid)
 
 		if (is_stack(priv, vma, is_pid))
 			name = "[stack]";
+
+		if (vma_get_anon_name(vma)) {
+			seq_pad(m, ' ');
+			seq_print_vma_name(m, vma);
+		}
 	}
 
 done:
@@ -441,6 +496,12 @@ struct mem_size_stats {
 	unsigned long shared_hugetlb;
 	unsigned long private_hugetlb;
 	u64 pss;
+#ifdef CONFIG_SWAP
+	u64 pswap;
+#endif
+#ifdef CONFIG_ZNDSWAP
+	u64 pswap_zndswap;
+#endif
 	u64 swap_pss;
 };
 
@@ -490,17 +551,22 @@ static void smaps_pte_entry(pte_t *pte, unsigned long addr,
 
 		if (!non_swap_entry(swpent)) {
 			int mapcount;
+			u64 pss_delta = (u64)PAGE_SIZE << PSS_SHIFT;
 
 			mss->swap += PAGE_SIZE;
 			mapcount = swp_swapcount(swpent);
-			if (mapcount >= 2) {
-				u64 pss_delta = (u64)PAGE_SIZE << PSS_SHIFT;
-
+			if (mapcount >= 2)
 				do_div(pss_delta, mapcount);
-				mss->swap_pss += pss_delta;
-			} else {
-				mss->swap_pss += (u64)PAGE_SIZE << PSS_SHIFT;
-			}
+			mss->swap_pss += pss_delta;
+#ifdef CONFIG_ZNDSWAP
+			/* It indicates 2ndswap ONLY */
+			if (swp_type(swpent) == 1UL)
+				mss->pswap_zndswap += pss_delta;
+			else
+				mss->pswap += pss_delta;
+#else
+			mss->pswap += pss_delta;
+#endif
 		} else if (is_migration_entry(swpent))
 			page = migration_entry_to_page(swpent);
 	}
@@ -667,6 +733,12 @@ static int show_smap(struct seq_file *m, void *v, int is_pid)
 
 	show_map_vma(m, vma, is_pid);
 
+	if (vma_get_anon_name(vma)) {
+		seq_puts(m, "Name:           ");
+		seq_print_vma_name(m, vma);
+		seq_putc(m, '\n');
+	}
+
 	seq_printf(m,
 		   "Size:           %8lu kB\n"
 		   "Rss:            %8lu kB\n"
@@ -681,6 +753,12 @@ static int show_smap(struct seq_file *m, void *v, int is_pid)
 		   "Shared_Hugetlb: %8lu kB\n"
 		   "Private_Hugetlb: %7lu kB\n"
 		   "Swap:           %8lu kB\n"
+#ifdef CONFIG_SWAP
+		   "PSwap:          %8lu kB\n"
+#endif
+#ifdef CONFIG_ZNDSWAP
+		   "PSwap_zndswap:  %8lu kB\n"
+#endif
 		   "SwapPss:        %8lu kB\n"
 		   "KernelPageSize: %8lu kB\n"
 		   "MMUPageSize:    %8lu kB\n"
@@ -698,6 +776,12 @@ static int show_smap(struct seq_file *m, void *v, int is_pid)
 		   mss.shared_hugetlb >> 10,
 		   mss.private_hugetlb >> 10,
 		   mss.swap >> 10,
+#ifdef CONFIG_SWAP
+		   (unsigned long)(mss.pswap >> (10 + PSS_SHIFT)),
+#endif
+#ifdef CONFIG_ZNDSWAP
+		   (unsigned long)(mss.pswap_zndswap >> (10 + PSS_SHIFT)),
+#endif
 		   (unsigned long)(mss.swap_pss >> (10 + PSS_SHIFT)),
 		   vma_kernel_pagesize(vma) >> 10,
 		   vma_mmu_pagesize(vma) >> 10,

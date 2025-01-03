@@ -1,14 +1,21 @@
 #
 # Makefile for the linux kernel.
 #
+subdir-ccflags-y += -Werror
+ifdef CONFIG_MTPROF
+ccflags-y += -Idrivers/misc/mediatek/mtprof/
+endif
+ifdef CONFIG_MTK_RAM_CONSOLE
+ccflags-y += -Idrivers/misc/mediatek/include/mt-plat/
+endif
+
+subdir-ccflags-y += -Werror
 
 obj-y                          := main.o version.o mounts.o
-ifneq ($(CONFIG_BLK_DEV_INITRD),y)
 obj-y                          += noinitramfs.o
-else
 obj-$(CONFIG_BLK_DEV_INITRD)   += initramfs.o
-endif
 obj-$(CONFIG_GENERIC_CALIBRATE_DELAY) += calibrate.o
+obj-$(CONFIG_MTD_VERITY) += rootfs_check/rsa.o rootfs_check/mtd_verity.o
 
 ifneq ($(CONFIG_ARCH_INIT_TASK),y)
 obj-y                          += init_task.o
@@ -18,6 +25,8 @@ mounts-y			:= do_mounts.o
 mounts-$(CONFIG_BLK_DEV_RAM)	+= do_mounts_rd.o
 mounts-$(CONFIG_BLK_DEV_INITRD)	+= do_mounts_initrd.o
 mounts-$(CONFIG_BLK_DEV_MD)	+= do_mounts_md.o
+mounts-$(CONFIG_BLK_DEV_DM)	+= do_mounts_dm.o
+mounts-$(CONFIG_DM_NFSB)	+= nfsb/do_mounts_nfsb.o nfsb/nfsb.o nfsb/rsa.o
 
 # dependencies on generated files need to be listed explicitly
 $(obj)/version.o: include/generated/compile.h

@@ -1,0 +1,79 @@
+/*
+ * Mediatek's PMIC MT6392 device tree source
+ * Copyright (c) 2016 MediaTek Inc.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+/ {
+	eth_fixed_3v3: fixedregulator@4 {
+		compatible = "regulator-fixed";
+		regulator-name = "eth_power";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+	};
+
+	vproc_fixed_power: fixedregulator@5 {
+		compatible = "regulator-fixed";
+		regulator-name = "vproc_power";
+		regulator-min-microvolt = <1150000>;
+		regulator-max-microvolt = <1150000>;
+	};
+
+	nfi_fixed_3v3: fixedregulator@6 {
+		compatible = "regulator-fixed";
+		regulator-name = "nfi_power";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+	};
+
+	core_fixed_power: fixedregulator@7 {
+		compatible = "regulator-fixed";
+		regulator-name = "core_power";
+		regulator-min-microvolt = <1150000>;
+		regulator-max-microvolt = <1150000>;
+	};
+
+	cs4382a_fixed_3v3: fixedregulator@8 {
+		compatible = "regulator-fixed";
+		regulator-name = "cs4382a_3v3_power";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+	};
+
+	tdmadc_fixed_1v8: fixedregulator@9 {
+		compatible = "regulator-fixed";
+		regulator-name = "tdmadc_1v8__power";
+		regulator-min-microvolt = <1800000>;
+		regulator-max-microvolt = <1800000>;
+	};
+
+	tdmadc_fixed_2v8: fixedregulator@10 {
+		compatible = "regulator-fixed";
+		regulator-name = "tdmadc_2v8__power";
+		regulator-min-microvolt = <2800000>;
+		regulator-max-microvolt = <2800000>;
+	};
+
+	pcm1861_fixed_1v8: fixedregulator@11 {
+		compatible = "regulator-fixed";
+		regulator-name = "pcm1861_1v8__power";
+		regulator-min-microvolt = <1800000>;
+		regulator-max-microvolt = <1800000>;
+	};
+
+	pcm1861_fixed_3v3: fixedregulator@12 {
+		compatible = "regulator-fixed";
+		regulator-name = "pcm1861_3v3__power";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+	};
+
+
+};

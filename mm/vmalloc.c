@@ -437,12 +437,18 @@ nocache:
 		addr = ALIGN(first->va_end, align);
 		if (addr + size < addr)
 			goto overflow;
-
+		/*
 		if (list_is_last(&first->list, &vmap_area_list))
 			goto found;
 
 		first = list_entry(first->list.next,
 				struct vmap_area, list);
+		*/
+		n = rb_next(&first->rb_node);
+		if (n)
+			first = rb_entry(n, struct vmap_area, rb_node);
+		else
+			goto found;
 	}
 
 found:
@@ -599,6 +605,7 @@ void set_iounmap_nonlazy(void)
  * Returns with *start = min(*start, lowest purged address)
  *              *end = max(*end, highest purged address)
  */
+#define MAX_LAZY_VMAP 3000	/* max number vmap_area to purge at a time */
 static void __purge_vmap_area_lazy(unsigned long *start, unsigned long *end,
 					int sync, int force_flush)
 {
@@ -607,6 +614,7 @@ static void __purge_vmap_area_lazy(unsigned long *start, unsigned long *end,
 	struct vmap_area *va;
 	struct vmap_area *n_va;
 	int nr = 0;
+	int cnt = 0;
 
 	/*
 	 * If sync is 0 but force_flush is 1, we'll go sync anyway but callers
@@ -633,6 +641,9 @@ static void __purge_vmap_area_lazy(unsigned long *start, unsigned long *end,
 			list_add_tail(&va->purge_list, &valist);
 			va->flags |= VM_LAZY_FREEING;
 			va->flags &= ~VM_LAZY_FREE;
+			cnt++;
+			if (!sync && !force_flush && (cnt >= MAX_LAZY_VMAP))
+				break;
 		}
 	}
 	rcu_read_unlock();
@@ -937,6 +948,7 @@ static void *vb_alloc(unsigned long size, gfp_t gfp_mask)
 	struct vmap_block *vb;
 	void *vaddr = NULL;
 	unsigned int order;
+	int purge = 0;
 
 	BUG_ON(offset_in_page(size));
 	BUG_ON(size > PAGE_SIZE*VMAP_MAX_ALLOC);
@@ -957,6 +969,9 @@ static void *vb_alloc(unsigned long size, gfp_t gfp_mask)
 
 		spin_lock(&vb->lock);
 		if (vb->free < (1UL << order)) {
+			/* free left too small, handle as fragmented scenario */
+			if (vb->free + vb->dirty == VMAP_BBMAP_BITS && vb->dirty != VMAP_BBMAP_BITS)
+				purge = 1;
 			spin_unlock(&vb->lock);
 			continue;
 		}
@@ -973,6 +988,9 @@ static void *vb_alloc(unsigned long size, gfp_t gfp_mask)
 		spin_unlock(&vb->lock);
 		break;
 	}
+
+	if (purge)
+		purge_fragmented_blocks(smp_processor_id());
 
 	put_cpu_var(vmap_block_queue);
 	rcu_read_unlock();

@@ -22,6 +22,9 @@
 
 /*-- Configurable parameters */
 
+/* Is totalram_pages less than SUPPOSED_TOTALRAM, promote its default size */
+#define SUPPOSED_TOTALRAM	0x20000	/* 512MB */
+
 /*
  * Pages that compress to size greater than this are stored
  * uncompressed in memory.
@@ -119,4 +122,15 @@ struct zram {
 	 */
 	bool claim; /* Protected by bdev->bd_mutex */
 };
+
+/* mlog */
+unsigned long zram_mlog(void);
+
+#ifdef CONFIG_HWZRAM_DRV
+extern unsigned long hwzram_mem_used_total(void);
+#ifdef CONFIG_PROC_FS
+extern void hwzraminfo_proc_show(struct seq_file *m, void *v);
+#endif
+#endif
+
 #endif

@@ -19,12 +19,12 @@
 #include <linux/regmap.h>
 #include <linux/pinctrl/pinconf-generic.h>
 
-#define NO_EINT_SUPPORT    255
-#define MT_EDGE_SENSITIVE           0
-#define MT_LEVEL_SENSITIVE          1
-#define EINT_DBNC_SET_DBNC_BITS     4
-#define EINT_DBNC_RST_BIT           (0x1 << 1)
-#define EINT_DBNC_SET_EN            (0x1 << 0)
+#define NO_EINT_SUPPORT         255
+#define MT_EDGE_SENSITIVE       0
+#define MT_LEVEL_SENSITIVE      1
+#define EINT_DBNC_SET_DBNC_BITS 4
+#define EINT_DBNC_RST_BIT       (0x1 << 1)
+#define EINT_DBNC_SET_EN        (0x1 << 0)
 
 #define MTK_PINCTRL_NOT_SUPPORT	(0xffff)
 
@@ -44,7 +44,7 @@ struct mtk_desc_pin {
 	const struct mtk_desc_function	*functions;
 };
 
-#define MTK_PIN(_pin, _pad, _chip, _eint, ...)		\
+#define MTK_PIN(_pin, _pad, _chip, _eint, ...)			\
 	{							\
 		.pin = _pin,					\
 		.eint = _eint,					\
@@ -52,10 +52,10 @@ struct mtk_desc_pin {
 			__VA_ARGS__, { } },			\
 	}
 
-#define MTK_EINT_FUNCTION(_eintmux, _eintnum)				\
+#define MTK_EINT_FUNCTION(_eintmux, _eintnum)			\
 	{							\
-		.eintmux = _eintmux,					\
-		.eintnum = _eintnum,					\
+		.eintmux = _eintmux,				\
+		.eintnum = _eintnum,				\
 	}
 
 #define MTK_FUNCTION(_val, _name)				\
@@ -223,6 +223,22 @@ struct mtk_eint_offsets {
  * @port_mask: The mask of register.
  * @port_align: Provide clear register and set register step.
  */
+
+extern int mt_set_gpio_mode(unsigned long pin, unsigned long mode);
+extern int mt_set_gpio_driving(unsigned long pin, unsigned long strength);
+extern int mt_set_gpio_dir(unsigned long pin, unsigned long dir);
+extern int mt_get_gpio_dir(unsigned long pin);
+extern int mt_get_gpio_out(unsigned long pin);
+extern int mt_set_gpio_out(unsigned long pin, unsigned long output);
+extern int mt_get_gpio_in(unsigned long pin);
+extern int mt_set_gpio_ies(unsigned long pin, unsigned long enable);
+extern int mt_set_gpio_smt(unsigned long pin, unsigned long enable);
+extern int mt_set_gpio_slew_rate(unsigned long pin, unsigned long enable);
+extern int mt_set_gpio_pull_enable(unsigned long pin, unsigned long enable);
+extern int mt_set_gpio_pull_select(unsigned long pin, unsigned long select);
+extern int mt_set_gpio_pull_resistor(unsigned long pin, unsigned long resistors);
+
+
 struct mtk_pinctrl_devdata {
 	const struct mtk_desc_pin	*pins;
 	unsigned int				npins;
@@ -234,6 +250,25 @@ struct mtk_pinctrl_devdata {
 			unsigned char align, bool isup, unsigned int arg);
 	int (*spec_ies_smt_set)(struct regmap *reg, unsigned int pin,
 			unsigned char align, int value, enum pin_config_param arg);
+	void (*spec_pinmux_set)(struct regmap *reg, unsigned int pin,
+			unsigned int mode);
+	void (*spec_dir_set)(unsigned int *reg_addr, unsigned int pin);
+	int (*spec_pull_get)(struct regmap *reg, unsigned int pin);
+	int (*spec_ies_get)(struct regmap *reg, unsigned int pin);
+	int (*spec_smt_get)(struct regmap *reg, unsigned int pin);
+	int (*spec_set_gpio_mode)(unsigned long pin, unsigned long mode);
+	int (*mt_set_gpio_dir)(unsigned long pin, unsigned long dir);
+	int (*mt_get_gpio_dir)(unsigned long pin);
+	int (*mt_get_gpio_out)(unsigned long pin);
+	int (*mt_set_gpio_out)(unsigned long pin, unsigned long output);
+	int (*mt_set_gpio_driving)(unsigned long pin, unsigned long strength);
+	int (*mt_get_gpio_in)(unsigned long pin);
+	int (*mt_set_gpio_ies)(unsigned long pin, unsigned long enable);
+	int (*mt_set_gpio_smt)(unsigned long pin, unsigned long enable);
+	int (*mt_set_gpio_slew_rate)(unsigned long pin, unsigned long enable);
+	int (*mt_set_gpio_pull_enable)(unsigned long pin, unsigned long enable);
+	int (*mt_set_gpio_pull_select)(unsigned long pin, unsigned long select);
+	int (*mt_set_gpio_pull_resistor)(unsigned long pin, unsigned long resistors);
 	unsigned int dir_offset;
 	unsigned int ies_offset;
 	unsigned int smt_offset;
@@ -254,19 +289,19 @@ struct mtk_pinctrl_devdata {
 };
 
 struct mtk_pinctrl {
-	struct regmap	*regmap1;
-	struct regmap	*regmap2;
+	struct regmap *regmap1;
+	struct regmap *regmap2;
 	struct pinctrl_desc pctl_desc;
-	struct device           *dev;
-	struct gpio_chip	*chip;
-	struct mtk_pinctrl_group	*groups;
-	unsigned			ngroups;
-	const char          **grp_names;
-	struct pinctrl_dev      *pctl_dev;
-	const struct mtk_pinctrl_devdata  *devdata;
-	void __iomem		*eint_reg_base;
-	struct irq_domain	*domain;
-	int			*eint_dual_edges;
+	struct device *dev;
+	struct gpio_chip *chip;
+	struct mtk_pinctrl_group *groups;
+	unsigned ngroups;
+	const char **grp_names;
+	struct pinctrl_dev *pctl_dev;
+	const struct mtk_pinctrl_devdata *devdata;
+	void __iomem *eint_reg_base;
+	struct irq_domain *domain;
+	int *eint_dual_edges;
 	u32 *wake_mask;
 	u32 *cur_mask;
 };
@@ -284,6 +319,18 @@ int mtk_pconf_spec_set_ies_smt_range(struct regmap *regmap,
 		const struct mtk_pin_ies_smt_set *ies_smt_infos, unsigned int info_num,
 		unsigned int pin, unsigned char align, int value);
 
-extern const struct dev_pm_ops mtk_eint_pm_ops;
+int mtk_spec_pull_get_samereg(struct regmap *regmap,
+		const struct mtk_pin_spec_pupd_set_samereg *pupd_infos,
+		unsigned int info_num, unsigned int pin);
 
+int mtk_spec_get_ies_smt_range(struct regmap *regmap,
+		const struct mtk_pin_ies_smt_set *ies_smt_infos,
+		unsigned int info_num,
+		unsigned int pin);
+
+extern const struct dev_pm_ops mtk_eint_pm_ops;
+#ifdef CONFIG_MTK_EIC
+void mt_eint_set_hw_debounce(unsigned int eint_num, unsigned int ms);
+unsigned int mt_gpio_to_irq(unsigned gpio);
+#endif
 #endif /* __PINCTRL_MTK_COMMON_H */

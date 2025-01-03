@@ -90,7 +90,7 @@ config OF_PCI_IRQ
 	  OpenFirmware PCI IRQ routing helpers
 
 config OF_MTD
-	depends on MTD
+	depends on MTD || MTD48
 	def_bool y
 
 config OF_RESERVED_MEM

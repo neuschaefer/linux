@@ -27,6 +27,9 @@
 #include <linux/completion.h>
 #include <linux/cpufreq.h>
 #include <linux/irq_work.h>
+#ifdef CONFIG_TRUSTY
+#include <linux/irqdomain.h>
+#endif
 
 #include <linux/atomic.h>
 #include <asm/smp.h>
@@ -47,9 +50,14 @@
 #include <asm/virt.h>
 #include <asm/mach/arch.h>
 #include <asm/mpu.h>
+#include <mt-plat/mtk_ram_console.h>
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/ipi.h>
+
+#ifdef CONFIG_MTK_SCHED_MONITOR
+#include "mtk_sched_mon.h"
+#endif
 
 /*
  * as from 2.5, kernels no longer have an init_tasks structure
@@ -73,8 +81,16 @@ enum ipi_msg_type {
 	IPI_CPU_STOP,
 	IPI_IRQ_WORK,
 	IPI_COMPLETION,
+#ifdef CONFIG_TRUSTY
+	IPI_CUSTOM_FIRST,
+	IPI_CUSTOM_LAST,
+#endif
 	IPI_CPU_BACKTRACE = 15,
 };
+
+#ifdef CONFIG_TRUSTY
+struct irq_domain *ipi_custom_irq_domain;
+#endif
 
 static DECLARE_COMPLETION(cpu_running);
 
@@ -189,12 +205,16 @@ int platform_can_hotplug_cpu(unsigned int cpu)
 	if (smp_ops.cpu_can_disable)
 		return smp_ops.cpu_can_disable(cpu);
 
+#ifdef CONFIG_MACH_MT6757
+	return 1;
+#else
 	/*
 	 * By default, allow disabling all CPUs except the first one,
 	 * since this is special on a lot of platforms, e.g. because
 	 * of clock tick interrupts.
 	 */
 	return cpu != 0;
+#endif
 }
 
 /*
@@ -205,6 +225,8 @@ int __cpu_disable(void)
 	unsigned int cpu = smp_processor_id();
 	int ret;
 
+	aee_rr_rec_hotplug_footprint(cpu, 71);
+
 	ret = platform_cpu_disable(cpu);
 	if (ret)
 		return ret;
@@ -214,11 +236,13 @@ int __cpu_disable(void)
 	 * and we must not schedule until we're ready to give up the cpu.
 	 */
 	set_cpu_online(cpu, false);
+	aee_rr_rec_hotplug_footprint(cpu, 72);
 
 	/*
 	 * OK - migrate IRQs away from this CPU
 	 */
 	migrate_irqs();
+	aee_rr_rec_hotplug_footprint(cpu, 73);
 
 	/*
 	 * Flush user cache and TLB mappings, and then remove this CPU
@@ -228,9 +252,12 @@ int __cpu_disable(void)
 	 * to write-back dirty lines to unified caches shared by all CPUs.
 	 */
 	flush_cache_louis();
+	aee_rr_rec_hotplug_footprint(cpu, 74);
 	local_flush_tlb_all();
+	aee_rr_rec_hotplug_footprint(cpu, 75);
 
 	clear_tasks_mm_cpumask(cpu);
+	aee_rr_rec_hotplug_footprint(cpu, 76);
 
 	return 0;
 }
@@ -272,9 +299,13 @@ void arch_cpu_idle_dead(void)
 {
 	unsigned int cpu = smp_processor_id();
 
+	aee_rr_rec_hotplug_footprint(cpu, 51);
+
 	idle_task_exit();
+	aee_rr_rec_hotplug_footprint(cpu, 52);
 
 	local_irq_disable();
+	aee_rr_rec_hotplug_footprint(cpu, 53);
 
 	/*
 	 * Flush the data out of the L1 cache for this CPU.  This must be
@@ -283,6 +314,7 @@ void arch_cpu_idle_dead(void)
 	 * *this* CPU and power down its cache.
 	 */
 	flush_cache_louis();
+	aee_rr_rec_hotplug_footprint(cpu, 54);
 
 	/*
 	 * Tell __cpu_die() that this CPU is now safe to dispose of.  Once
@@ -290,6 +322,7 @@ void arch_cpu_idle_dead(void)
 	 * from this CPU and its cache by platform_cpu_kill().
 	 */
 	complete(&cpu_died);
+	aee_rr_rec_hotplug_footprint(cpu, 55);
 
 	/*
 	 * Ensure that the cache lines associated with that completion are
@@ -298,6 +331,7 @@ void arch_cpu_idle_dead(void)
 	 * CPU waiting for this one.
 	 */
 	flush_cache_louis();
+	aee_rr_rec_hotplug_footprint(cpu, 56);
 
 	/*
 	 * The actual CPU shutdown procedure is at least platform (if not
@@ -353,6 +387,8 @@ asmlinkage void secondary_start_kernel(void)
 	struct mm_struct *mm = &init_mm;
 	unsigned int cpu;
 
+	aee_rr_rec_hotplug_footprint(cpu, 1);
+
 	/*
 	 * The identity mapping is uncached (strongly ordered), so
 	 * switch away from it before attempting any exclusive accesses.
@@ -361,34 +397,44 @@ asmlinkage void secondary_start_kernel(void)
 	local_flush_bp_all();
 	enter_lazy_tlb(mm, current);
 	local_flush_tlb_all();
+	aee_rr_rec_hotplug_footprint(cpu, 2);
 
 	/*
 	 * All kernel threads share the same mm context; grab a
 	 * reference and switch to it.
 	 */
 	cpu = smp_processor_id();
+	aee_rr_rec_hotplug_footprint(cpu, 3);
 	atomic_inc(&mm->mm_count);
 	current->active_mm = mm;
 	cpumask_set_cpu(cpu, mm_cpumask(mm));
+	aee_rr_rec_hotplug_footprint(cpu, 4);
 
 	cpu_init();
+	aee_rr_rec_hotplug_footprint(cpu, 5);
 
 	pr_debug("CPU%u: Booted secondary processor\n", cpu);
 
 	preempt_disable();
+	aee_rr_rec_hotplug_footprint(cpu, 6);
 	trace_hardirqs_off();
+	aee_rr_rec_hotplug_footprint(cpu, 7);
 
 	/*
 	 * Give the platform a chance to do its own initialisation.
 	 */
 	if (smp_ops.smp_secondary_init)
 		smp_ops.smp_secondary_init(cpu);
+	aee_rr_rec_hotplug_footprint(cpu, 8);
 
 	notify_cpu_starting(cpu);
+	aee_rr_rec_hotplug_footprint(cpu, 9);
 
 	calibrate_delay();
+	aee_rr_rec_hotplug_footprint(cpu, 10);
 
 	smp_store_cpu_info(cpu);
+	aee_rr_rec_hotplug_footprint(cpu, 11);
 
 	/*
 	 * OK, now it's safe to let the boot CPU continue.  Wait for
@@ -396,16 +442,21 @@ asmlinkage void secondary_start_kernel(void)
 	 * before we continue - which happens after __cpu_up returns.
 	 */
 	set_cpu_online(cpu, true);
+	aee_rr_rec_hotplug_footprint(cpu, 12);
 	complete(&cpu_running);
+	aee_rr_rec_hotplug_footprint(cpu, 13);
 
 	local_irq_enable();
+	aee_rr_rec_hotplug_footprint(cpu, 14);
 	local_fiq_enable();
+	aee_rr_rec_hotplug_footprint(cpu, 15);
 	local_abt_enable();
 
 	/*
 	 * OK, it's off to the idle thread for us
 	 */
 	cpu_startup_entry(CPUHP_ONLINE);
+	aee_rr_rec_hotplug_footprint(cpu, 16);
 }
 
 void __init smp_cpus_done(unsigned int max_cpus)
@@ -600,12 +651,22 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
 
 	switch (ipinr) {
 	case IPI_WAKEUP:
+#ifdef CONFIG_MTK_SCHED_MONITOR
+		mt_trace_ISR_start(ipinr);
+		mt_trace_ISR_end(ipinr);
+#endif
 		break;
 
 #ifdef CONFIG_GENERIC_CLOCKEVENTS_BROADCAST
 	case IPI_TIMER:
 		irq_enter();
+#ifdef CONFIG_MTK_SCHED_MONITOR
+		mt_trace_ISR_start(ipinr);
+#endif
 		tick_receive_broadcast();
+#ifdef CONFIG_MTK_SCHED_MONITOR
+		mt_trace_ISR_end(ipinr);
+#endif
 		irq_exit();
 		break;
 #endif
@@ -616,43 +677,84 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
 
 	case IPI_CALL_FUNC:
 		irq_enter();
+#ifdef CONFIG_MTK_SCHED_MONITOR
+		mt_trace_ISR_start(ipinr);
+#endif
 		generic_smp_call_function_interrupt();
+#ifdef CONFIG_MTK_SCHED_MONITOR
+		mt_trace_ISR_end(ipinr);
+#endif
 		irq_exit();
 		break;
 
 	case IPI_CALL_FUNC_SINGLE:
 		irq_enter();
+#ifdef CONFIG_MTK_SCHED_MONITOR
+		mt_trace_ISR_start(ipinr);
+#endif
 		generic_smp_call_function_single_interrupt();
+#ifdef CONFIG_MTK_SCHED_MONITOR
+		mt_trace_ISR_end(ipinr);
+#endif
 		irq_exit();
 		break;
 
 	case IPI_CPU_STOP:
 		irq_enter();
+#ifdef CONFIG_MTK_SCHED_MONITOR
+		mt_trace_ISR_start(ipinr);
+#endif
 		ipi_cpu_stop(cpu);
+#ifdef CONFIG_MTK_SCHED_MONITOR
+		mt_trace_ISR_end(ipinr);
+#endif
 		irq_exit();
 		break;
 
 #ifdef CONFIG_IRQ_WORK
 	case IPI_IRQ_WORK:
 		irq_enter();
+#ifdef CONFIG_MTK_SCHED_MONITOR
+		mt_trace_ISR_start(ipinr);
+#endif
 		irq_work_run();
+#ifdef CONFIG_MTK_SCHED_MONITOR
+		mt_trace_ISR_end(ipinr);
+#endif
 		irq_exit();
 		break;
 #endif
 
 	case IPI_COMPLETION:
 		irq_enter();
+#ifdef CONFIG_MTK_SCHED_MONITOR
+		mt_trace_ISR_start(ipinr);
+#endif
 		ipi_complete(cpu);
+#ifdef CONFIG_MTK_SCHED_MONITOR
+		mt_trace_ISR_end(ipinr);
+#endif
 		irq_exit();
 		break;
 
 	case IPI_CPU_BACKTRACE:
 		irq_enter();
+#ifdef CONFIG_MTK_SCHED_MONITOR
+		mt_trace_ISR_start(ipinr);
+#endif
 		nmi_cpu_backtrace(regs);
+#ifdef CONFIG_MTK_SCHED_MONITOR
+		mt_trace_ISR_end(ipinr);
+#endif
 		irq_exit();
 		break;
 
 	default:
+#ifdef CONFIG_TRUSTY
+		if (ipinr >= IPI_CUSTOM_FIRST && ipinr <= IPI_CUSTOM_LAST)
+			handle_domain_irq(ipi_custom_irq_domain, ipinr, regs);
+		else
+#endif
 		pr_crit("CPU%u: Unknown IPI message 0x%x\n",
 		        cpu, ipinr);
 		break;
@@ -662,6 +764,69 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
 		trace_ipi_exit_rcuidle(ipi_types[ipinr]);
 	set_irq_regs(old_regs);
 }
+
+#ifdef CONFIG_TRUSTY
+static void custom_ipi_enable(struct irq_data *data)
+{
+	/*
+	 * Always trigger a new ipi on enable. This only works for clients
+	 * that then clear the ipi before unmasking interrupts.
+	 */
+	smp_cross_call(cpumask_of(smp_processor_id()), data->irq);
+}
+
+static void custom_ipi_disable(struct irq_data *data)
+{
+}
+
+static struct irq_chip custom_ipi_chip = {
+	.name                   = "CustomIPI",
+	.irq_enable             = custom_ipi_enable,
+	.irq_disable            = custom_ipi_disable,
+};
+
+static void handle_custom_ipi_irq(struct irq_desc *desc)
+{
+	unsigned int irq = irq_desc_get_irq(desc);
+
+	if (!desc->action) {
+		pr_crit("CPU%u: Unknown IPI message 0x%x, no custom handler\n",
+			smp_processor_id(), irq);
+		return;
+	}
+
+	if (!cpumask_test_cpu(smp_processor_id(), desc->percpu_enabled))
+		return; /* IPIs may not be maskable in hardware */
+
+	handle_percpu_devid_irq(desc);
+}
+
+static int __init smp_custom_ipi_init(void)
+{
+	int ipinr;
+
+	/* alloc descs for these custom ipis/irqs before using them */
+	irq_alloc_descs(IPI_CUSTOM_FIRST, 0,
+		IPI_CUSTOM_LAST - IPI_CUSTOM_FIRST + 1, 0);
+
+	for (ipinr = IPI_CUSTOM_FIRST; ipinr <= IPI_CUSTOM_LAST; ipinr++) {
+		irq_set_percpu_devid(ipinr);
+		irq_set_chip_and_handler(ipinr, &custom_ipi_chip,
+					handle_custom_ipi_irq);
+		/* set_irq_flags(ipinr, IRQF_VALID | IRQF_NOAUTOEN); */
+		/* irq_set_status_flags(ipinr, IRQ_NOAUTOEN); */
+		irq_modify_status(ipinr, IRQ_NOREQUEST, IRQ_NOPROBE | IRQ_NOAUTOEN);
+	}
+	ipi_custom_irq_domain = irq_domain_add_legacy(NULL,
+					IPI_CUSTOM_LAST - IPI_CUSTOM_FIRST + 1,
+					IPI_CUSTOM_FIRST, IPI_CUSTOM_FIRST,
+					&irq_domain_simple_ops,
+					&custom_ipi_chip);
+
+	return 0;
+}
+core_initcall(smp_custom_ipi_init);
+#endif
 
 void smp_send_reschedule(int cpu)
 {

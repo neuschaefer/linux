@@ -31,6 +31,7 @@ enum rc_type {
 	RC_TYPE_RC6_MCE		= 16,	/* MCE (Philips RC6-6A-32 subtype) protocol */
 	RC_TYPE_SHARP		= 17,	/* Sharp protocol */
 	RC_TYPE_XMP		= 18,	/* XMP protocol */
+	RC_TYPE_RCMM		= 19,	/* RCMM protocol */
 };
 
 #define RC_BIT_NONE		0
@@ -53,6 +54,7 @@ enum rc_type {
 #define RC_BIT_RC6_MCE		(1 << RC_TYPE_RC6_MCE)
 #define RC_BIT_SHARP		(1 << RC_TYPE_SHARP)
 #define RC_BIT_XMP		(1 << RC_TYPE_XMP)
+#define RC_BIT_RCMM		(1 << RC_TYPE_RCMM)
 
 #define RC_BIT_ALL	(RC_BIT_UNKNOWN | RC_BIT_OTHER | \
 			 RC_BIT_RC5 | RC_BIT_RC5X | RC_BIT_RC5_SZ | \
@@ -61,7 +63,7 @@ enum rc_type {
 			 RC_BIT_NEC | RC_BIT_SANYO | RC_BIT_MCE_KBD | \
 			 RC_BIT_RC6_0 | RC_BIT_RC6_6A_20 | RC_BIT_RC6_6A_24 | \
 			 RC_BIT_RC6_6A_32 | RC_BIT_RC6_MCE | RC_BIT_SHARP | \
-			 RC_BIT_XMP)
+			 RC_BIT_XMP | RC_BIT_RCMM)
 
 
 #define RC_SCANCODE_UNKNOWN(x)			(x)
