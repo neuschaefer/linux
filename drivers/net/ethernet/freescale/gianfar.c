@@ -76,6 +76,7 @@
 #include <linux/of_address.h>
 #include <linux/of_irq.h>
 #include <linux/of_mdio.h>
+#include <linux/of_platform.h>
 #include <linux/ip.h>
 #include <linux/tcp.h>
 #include <linux/udp.h>
@@ -811,7 +812,7 @@ static int gfar_of_init(struct platform_device *ofdev, struct net_device **pdev)
 	/* Find the TBI PHY.  If it's not there, we don't support SGMII */
 	priv->tbi_node = of_parse_phandle(np, "tbi-handle", 0);
 
-	return 0;
+	return devm_of_platform_populate(&ofdev->dev);
 
 err_grp_init:
 	unmap_group_regs(priv);
