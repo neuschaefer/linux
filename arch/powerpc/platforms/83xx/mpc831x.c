@@ -27,8 +27,15 @@ static void __init mpc831x_setup_arch(void)
 }
 
 static const char *board[] __initdata = {
+	/* Reference design boards */
 	"MPC8313ERDB",
 	"fsl,mpc8315erdb",
+
+	/* Generic chip compatibles */
+	"fsl,mpc8315e",
+	"fsl,mpc8315",
+	"fsl,mpc8314e",
+	"fsl,mpc8314",
 	NULL
 };
 
