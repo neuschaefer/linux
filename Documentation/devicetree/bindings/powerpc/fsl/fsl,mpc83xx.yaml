@@ -51,6 +51,12 @@ properties:
       - description: MPC8308 P1M board
         const: denx,mpc8308_p1m
 
+      - description: MPC8314E based boards
+        items:
+          - enum:
+              - lancom,nwapp2
+          - const: fsl,mpc8314e
+
 patternProperties:
   "^soc@.*$":
     type: object
