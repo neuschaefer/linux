@@ -477,6 +477,44 @@
 			gpio-ranges = <&pinctrl_cbus 0 0 120>;
 		};
 
+		hdmi_hpd_pins: hdmi-hpd {
+			mux {
+				groups = "hdmi_hpd";
+				function = "hdmi";
+				bias-disable;
+			};
+		};
+
+		hdmi_i2c_pins: hdmi-i2c {
+			mux {
+				groups = "hdmi_sda", "hdmi_scl";
+				function = "hdmi";
+				bias-disable;
+			};
+		};
+
+		i2c_b_pins: i2c-b {
+			mux {
+				groups = "i2c_sda_b", "i2c_sck_b";
+				function = "i2c_b";
+				bias-disable;
+			};
+		};
+
+		pwm_c_dv9_pins: pwm-c-dv9 {
+			mux {
+				groups = "pwm_c_dv9";
+				function = "pwm_c";
+			};
+		};
+
+		pwm_d_pins: pwm-d {
+			mux {
+				groups = "pwm_d";
+				function = "pwm_d";
+			};
+		};
+
 		sd_a_pins: sd-a {
 			mux {
 				groups = "sd_d0_a", "sd_d1_a", "sd_d2_a",
@@ -519,6 +557,16 @@
 					 "sdxc_clk_b", "sdxc_cmd_b";
 				function = "sdxc_b";
 				bias-pull-up;
+			};
+		};
+
+		sdxc_c_pins: sdxc-c {
+			mux {
+				groups = "sdxc_d0_c", "sdxc_d13_c",
+					"sdxc_clk_c", "sdxc_cmd_c",
+					"sdxc_d47_c";
+				function = "sdxc_c";
+				bias_pull_up;
 			};
 		};
 
