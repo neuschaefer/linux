@@ -27,6 +27,7 @@ properties:
         items:
           - enum:
               - minix,neo-x8
+              - tcu,fernsehfee3
               - tronsmart,s82
           - const: amlogic,meson8
 
