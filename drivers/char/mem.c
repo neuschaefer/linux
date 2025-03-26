@@ -47,6 +47,9 @@ static inline unsigned long size_inside_page(unsigned long start,
 #ifndef ARCH_HAS_VALID_PHYS_ADDR_RANGE
 static inline int valid_phys_addr_range(phys_addr_t addr, size_t count)
 {
+#error "not built"
+	pr_info("addr(%lx) + count(%zx) <= hi(%lx)?\n",
+			addr, count, __pa(high_memory));
 	return addr + count <= __pa(high_memory);
 }
 
