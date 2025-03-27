@@ -270,6 +270,7 @@ unlock:
 }
 EXPORT_SYMBOL_GPL(amvdec_remove_ts);
 
+#if 0
 static void dst_buf_done(struct amvdec_session *sess,
 			 struct vb2_v4l2_buffer *vbuf,
 			 u32 field, u64 timestamp,
@@ -478,3 +479,4 @@ void amvdec_abort(struct amvdec_session *sess)
 	vb2_queue_error(&sess->m2m_ctx->out_q_ctx.q);
 }
 EXPORT_SYMBOL_GPL(amvdec_abort);
+#endif

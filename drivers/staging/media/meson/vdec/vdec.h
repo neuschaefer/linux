@@ -14,6 +14,7 @@
 #include <media/v4l2-ctrls.h>
 #include <media/v4l2-device.h>
 #include <linux/soc/amlogic/meson-canvas.h>
+#include <linux/miscdevice.h>
 
 #include "vdec_platform.h"
 
@@ -76,6 +77,10 @@ struct amvdec_core {
 	struct device *dev_dec;
 	const struct vdec_platform *platform;
 
+	int dev_id;
+	char dev_name[10];
+	struct miscdevice miscdev;
+
 	struct meson_canvas *canvas;
 
 	struct clk *dos_parser_clk;
@@ -86,8 +91,10 @@ struct amvdec_core {
 
 	struct reset_control *esparser_reset;
 
+#if 0
 	struct video_device *vdev_dec;
 	struct v4l2_device v4l2_dev;
+#endif
 
 	struct amvdec_session *cur_sess;
 	struct mutex lock;

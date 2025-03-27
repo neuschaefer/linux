@@ -13,6 +13,7 @@
 #include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <linux/kthread.h>
+#include <linux/idr.h>
 #include <media/v4l2-ioctl.h>
 #include <media/v4l2-event.h>
 #include <media/v4l2-ctrls.h>
@@ -21,8 +22,11 @@
 #include <media/videobuf2-dma-contig.h>
 
 #include "vdec.h"
+#include "ioctl.h"
 #include "esparser.h"
 #include "vdec_helpers.h"
+
+static DEFINE_IDA(dev_nrs);
 
 struct dummy_buf {
 	struct vb2_v4l2_buffer vb;
@@ -32,6 +36,7 @@ struct dummy_buf {
 /* 16 MiB for parsed bitstream swap exchange */
 #define SIZE_VIFIFO SZ_16M
 
+#if 0
 static u32 get_output_size(u32 width, u32 height)
 {
 	return ALIGN(width * height, SZ_64K);
@@ -74,20 +79,22 @@ static int vdec_recycle_thread(void *data)
 
 	return 0;
 }
+#endif
 
-static int vdec_poweron(struct amvdec_session *sess)
+static int vdec_poweron(struct amvdec_core *core)
 {
 	int ret;
-	struct amvdec_ops *vdec_ops = sess->fmt_out->vdec_ops;
 
-	ret = clk_prepare_enable(sess->core->dos_parser_clk);
+	ret = clk_prepare_enable(core->dos_parser_clk);
 	if (ret)
 		return ret;
 
-	ret = clk_prepare_enable(sess->core->dos_clk);
+	ret = clk_prepare_enable(core->dos_clk);
 	if (ret)
 		goto disable_dos_parser;
 
+	return 0;
+#if 0
 	ret = vdec_ops->start(sess);
 	if (ret)
 		goto disable_dos;
@@ -97,13 +104,15 @@ static int vdec_poweron(struct amvdec_session *sess)
 	return 0;
 
 disable_dos:
-	clk_disable_unprepare(sess->core->dos_clk);
+	clk_disable_unprepare(core->dos_clk);
+#endif
 disable_dos_parser:
-	clk_disable_unprepare(sess->core->dos_parser_clk);
+	clk_disable_unprepare(core->dos_parser_clk);
 
 	return ret;
 }
 
+#if 0
 static void vdec_wait_inactive(struct amvdec_session *sess)
 {
 	/* We consider 50ms with no IRQ to be inactive. */
@@ -111,22 +120,15 @@ static void vdec_wait_inactive(struct amvdec_session *sess)
 				       msecs_to_jiffies(50)))
 		msleep(25);
 }
+#endif
 
-static void vdec_poweroff(struct amvdec_session *sess)
+static void vdec_poweroff(struct amvdec_core *core)
 {
-	struct amvdec_ops *vdec_ops = sess->fmt_out->vdec_ops;
-	struct amvdec_codec_ops *codec_ops = sess->fmt_out->codec_ops;
-
-	sess->should_stop = 1;
-	vdec_wait_inactive(sess);
-	if (codec_ops->drain)
-		codec_ops->drain(sess);
-
-	vdec_ops->stop(sess);
-	clk_disable_unprepare(sess->core->dos_clk);
-	clk_disable_unprepare(sess->core->dos_parser_clk);
+	clk_disable_unprepare(core->dos_clk);
+	clk_disable_unprepare(core->dos_parser_clk);
 }
 
+#if 0
 static void
 vdec_queue_recycle(struct amvdec_session *sess, struct vb2_buffer *vb)
 {
@@ -954,6 +956,7 @@ static const struct v4l2_file_operations vdec_fops = {
 	.poll = v4l2_m2m_fop_poll,
 	.mmap = v4l2_m2m_fop_mmap,
 };
+#endif
 
 static irqreturn_t vdec_isr(int irq, void *data)
 {
@@ -974,7 +977,8 @@ static irqreturn_t vdec_threaded_isr(int irq, void *data)
 }
 
 static const struct of_device_id vdec_dt_match[] = {
-	{ .compatible = "amlogic,gxbb-vdec",
+	{ .compatible = "amlogic,gxbb-vdec", },
+#if 0
 	  .data = &vdec_platform_gxbb },
 	{ .compatible = "amlogic,gxm-vdec",
 	  .data = &vdec_platform_gxm },
@@ -986,14 +990,70 @@ static const struct of_device_id vdec_dt_match[] = {
 	  .data = &vdec_platform_g12a },
 	{ .compatible = "amlogic,sm1-vdec",
 	  .data = &vdec_platform_sm1 },
+#endif
 	{}
 };
 MODULE_DEVICE_TABLE(of, vdec_dt_match);
 
+static long vdec_dev_ioctl(struct file *file, unsigned int cmd, unsigned long data)
+{
+	struct amvdec_core *core = container_of(file->private_data, struct amvdec_core, miscdev);
+	void __user *arg = (void __user *)data;
+	struct vdec_rw rw;
+	int err;
+
+	switch (cmd) {
+	case VDEC_START:
+		return vdec_poweron(core);
+	case VDEC_STOP:
+		vdec_poweroff(core);
+		return 0;
+	case VDEC_READ:
+		err = copy_from_user(arg, &rw, sizeof(rw));
+		if (err)
+			return err;
+
+		switch (rw.bus) {
+		case VDEC_BUS_DOS:
+			rw.value = amvdec_read_dos(core, rw.reg);
+			break;
+		case VDEC_BUS_AO:
+			err = regmap_read(core->regmap_ao, rw.reg, &rw.value);
+			if (err)
+				return err;
+			break;
+		}
+		return copy_to_user(arg, &rw, sizeof(rw));
+	case VDEC_WRITE:
+		err = copy_from_user(arg, &rw, sizeof(rw));
+		if (err)
+			return err;
+
+		switch (rw.bus) {
+		case VDEC_BUS_DOS:
+			amvdec_write_dos(core, rw.reg, rw.value);
+			break;
+		case VDEC_BUS_AO:
+			regmap_write(core->regmap_ao, rw.reg, rw.value);
+			break;
+		}
+		return 0;
+	default:
+		return -EINVAL;
+	}
+}
+
+static const struct file_operations vdec_fops = {
+	.owner = THIS_MODULE,
+	.unlocked_ioctl = vdec_dev_ioctl,
+	//.open = vdec_open,
+	//.release = vdec_close,
+	.compat_ioctl = compat_ptr_ioctl,
+};
+
 static int vdec_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
-	struct video_device *vdev;
 	struct amvdec_core *core;
 	const struct of_device_id *of_id;
 	int irq;
@@ -1029,6 +1089,7 @@ static int vdec_probe(struct platform_device *pdev)
 	of_id = of_match_node(vdec_dt_match, dev->of_node);
 	core->platform = of_id->data;
 
+	if (core->platform)
 	if (core->platform->revision == VDEC_REVISION_G12A ||
 	    core->platform->revision == VDEC_REVISION_SM1) {
 		core->vdec_hevcf_clk = devm_clk_get(dev, "vdec_hevcf");
@@ -1062,10 +1123,25 @@ static int vdec_probe(struct platform_device *pdev)
 	if (ret)
 		return ret;
 
+#if 0
 	ret = esparser_init(pdev, core);
 	if (ret)
 		return ret;
+#endif
 
+	ret = ida_alloc(&dev_nrs, GFP_KERNEL);
+	if (ret < 0)
+		return ret;
+	core->dev_id = ret;
+
+	snprintf(core->dev_name, sizeof(core->dev_name), "vdec%d", core->dev_id);
+	core->miscdev.minor = MISC_DYNAMIC_MINOR;
+	core->miscdev.name = core->dev_name;
+	core->miscdev.fops = &vdec_fops;
+	core->miscdev.parent = dev;
+	return misc_register(&core->miscdev);
+
+#if 0
 	ret = v4l2_device_register(dev, &core->v4l2_dev);
 	if (ret) {
 		dev_err(dev, "Couldn't register v4l2 device\n");
@@ -1105,14 +1181,19 @@ err_vdev_release:
 	video_device_release(vdev);
 	v4l2_device_unregister(&core->v4l2_dev);
 	return ret;
+#endif
 }
 
 static void vdec_remove(struct platform_device *pdev)
 {
 	struct amvdec_core *core = platform_get_drvdata(pdev);
 
+	misc_deregister(&core->miscdev);
+
+#if 0
 	video_unregister_device(core->vdev_dec);
 	v4l2_device_unregister(&core->v4l2_dev);
+#endif
 }
 
 static struct platform_driver meson_vdec_driver = {
