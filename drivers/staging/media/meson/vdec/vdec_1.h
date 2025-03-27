@@ -9,6 +9,10 @@
 
 #include "vdec.h"
 
+int vdec_1_start(struct amvdec_core *core);
+int vdec_1_stop(struct amvdec_core *core);
+int vdec_1_load_program(struct amvdec_core *core, void __user *program, size_t size);
+
 extern struct amvdec_ops vdec_1_ops;
 
 #endif
