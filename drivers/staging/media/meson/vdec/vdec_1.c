@@ -22,6 +22,7 @@
 
 #define MC_SIZE			(4096 * 4)
 
+#if 0
 static int
 vdec_1_load_firmware(struct amvdec_session *sess, const char *fwname)
 {
@@ -82,6 +83,52 @@ release_firmware:
 	release_firmware(fw);
 	return ret;
 }
+#endif
+
+int vdec_1_load_program(struct amvdec_core *core, void __user *program, size_t size)
+{
+	struct device *dev = core->dev_dec;
+	static void *mc_addr;
+	static dma_addr_t mc_addr_map;
+	int ret;
+	u32 i = 1000;
+
+	mc_addr = dma_alloc_coherent(core->dev, MC_SIZE,
+				     &mc_addr_map, GFP_KERNEL);
+	if (!mc_addr)
+		return -ENOMEM;
+
+	if (size < MC_SIZE) {
+		// it's ok, we just fill the rest with zeroes
+		memset(mc_addr, 0, MC_SIZE);
+	}
+
+
+	ret = copy_from_user(mc_addr, program, MC_SIZE);
+	if (ret)
+		goto free_mc;
+
+	amvdec_write_dos(core, MPSR, 0);
+	amvdec_write_dos(core, CPSR, 0);
+
+	amvdec_clear_dos_bits(core, MDEC_PIC_DC_CTRL, BIT(31));
+
+	amvdec_write_dos(core, IMEM_DMA_ADR, mc_addr_map);
+	amvdec_write_dos(core, IMEM_DMA_COUNT, MC_SIZE / 4);
+	amvdec_write_dos(core, IMEM_DMA_CTRL, (0x8000 | (7 << 16)));
+
+	while (--i && amvdec_read_dos(core, IMEM_DMA_CTRL) & 0x8000);
+
+	if (i == 0) {
+		dev_err(dev, "Firmware load fail (DMA hang?)\n");
+		ret = -EINVAL;
+		goto free_mc;
+	}
+
+free_mc:
+	dma_free_coherent(core->dev, MC_SIZE, mc_addr, mc_addr_map);
+	return ret;
+}
 
 static int vdec_1_stbuf_power_up(struct amvdec_session *sess)
 {
@@ -129,11 +176,8 @@ static u32 vdec_1_vififo_level(struct amvdec_session *sess)
 	return amvdec_read_dos(core, VLD_MEM_VIFIFO_LEVEL);
 }
 
-static void __vdec_1_stop(struct amvdec_session *sess)
+static void __vdec_1_stop(struct amvdec_core *core)
 {
-	struct amvdec_core *core = sess->core;
-	struct amvdec_codec_ops *codec_ops = sess->fmt_out->codec_ops;
-
 	amvdec_write_dos(core, MPSR, 0);
 	amvdec_write_dos(core, CPSR, 0);
 	amvdec_write_dos(core, ASSIST_MBOX1_MASK, 0);
@@ -157,27 +201,20 @@ static void __vdec_1_stop(struct amvdec_session *sess)
 	else
 		regmap_update_bits(core->regmap_ao, AO_RTI_GEN_PWR_SLEEP0,
 				   GEN_PWR_VDEC_1, GEN_PWR_VDEC_1);
-
-	if (sess->priv)
-		codec_ops->stop(sess);
 }
 
-static int vdec_1_stop(struct amvdec_session *sess)
+int vdec_1_stop(struct amvdec_core *core)
 {
-	struct amvdec_core *core = sess->core;
-
-	__vdec_1_stop(sess);
+	__vdec_1_stop(core);
 
 	clk_disable_unprepare(core->vdec_1_clk);
 
 	return 0;
 }
 
-static int vdec_1_start(struct amvdec_session *sess)
+int vdec_1_start(struct amvdec_core *core)
 {
 	int ret;
-	struct amvdec_core *core = sess->core;
-	struct amvdec_codec_ops *codec_ops = sess->fmt_out->codec_ops;
 
 	/* Configure the vdec clk to the maximum available */
 	clk_set_rate(core->vdec_1_clk, 666666666);
@@ -186,7 +223,7 @@ static int vdec_1_start(struct amvdec_session *sess)
 		return ret;
 
 	/* Enable power for VDEC_1 */
-	if (core->platform->revision == VDEC_REVISION_SM1)
+	if (false && core->platform->revision == VDEC_REVISION_SM1)
 		regmap_update_bits(core->regmap_ao, AO_RTI_GEN_PWR_SLEEP0,
 				   GEN_PWR_VDEC_1_SM1, 0);
 	else
@@ -203,7 +240,7 @@ static int vdec_1_start(struct amvdec_session *sess)
 	/* enable VDEC Memories */
 	amvdec_write_dos(core, DOS_MEM_PD_VDEC, 0);
 	/* Remove VDEC1 Isolation */
-	if (core->platform->revision == VDEC_REVISION_SM1)
+	if (false && core->platform->revision == VDEC_REVISION_SM1)
 		regmap_update_bits(core->regmap_ao, AO_RTI_GEN_PWR_ISO0,
 				   GEN_PWR_VDEC_1_SM1, 0);
 	else
@@ -214,6 +251,7 @@ static int vdec_1_start(struct amvdec_session *sess)
 	amvdec_write_dos(core, GCLK_EN, 0x3ff);
 	amvdec_clear_dos_bits(core, MDEC_PIC_DC_CTRL, BIT(31));
 
+#if 0
 	vdec_1_stbuf_power_up(sess);
 
 	ret = vdec_1_load_firmware(sess, sess->fmt_out->firmware_path);
@@ -238,18 +276,21 @@ static int vdec_1_start(struct amvdec_session *sess)
 	amvdec_write_dos(core, MPSR, 1);
 	/* Let the firmware settle */
 	usleep_range(10, 20);
+#endif
 
 	return 0;
 
 stop:
-	__vdec_1_stop(sess);
+	__vdec_1_stop(core);
 	clk_disable_unprepare(core->vdec_1_clk);
 	return ret;
 }
 
+#if 0
 struct amvdec_ops vdec_1_ops = {
 	.start = vdec_1_start,
 	.stop = vdec_1_stop,
 	.conf_esparser = vdec_1_conf_esparser,
 	.vififo_level = vdec_1_vififo_level,
 };
+#endif
