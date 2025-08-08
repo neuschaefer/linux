@@ -757,11 +757,11 @@ static int sun8i_dwmac_reset(struct stmmac_priv *priv)
 	v = readl(priv->ioaddr + EMAC_BASIC_CTL1);
 	writel(v | 0x01, priv->ioaddr + EMAC_BASIC_CTL1);
 
-	/* The timeout was previoulsy set to 10ms, but some board (OrangePI0)
+	/* The timeout was previously set to 10ms, but some board (OrangePI0)
 	 * need more if no cable plugged. 100ms seems OK
 	 */
 	err = readl_poll_timeout(priv->ioaddr + EMAC_BASIC_CTL1, v,
-				 !(v & 0x01), 100, 100000);
+				 !(v & 0x01), 100, 1000000);
 
 	if (err) {
 		dev_err(priv->device, "EMAC reset timeout\n");
@@ -1179,7 +1179,7 @@ static int sun8i_dwmac_probe(struct platform_device *pdev)
 	if (IS_ERR(gmac->regulator)) {
 		if (PTR_ERR(gmac->regulator) == -EPROBE_DEFER)
 			return -EPROBE_DEFER;
-		dev_info(dev, "No regulator found\n");
+		dev_info(dev, "No regulator found: %pe\n", gmac->regulator);
 		gmac->regulator = NULL;
 	}
 
