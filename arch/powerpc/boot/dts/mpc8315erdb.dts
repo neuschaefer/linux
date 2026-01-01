@@ -92,7 +92,7 @@
 		};
 	};
 
-	immr@e0000000 {
+	soc@e0000000 {
 		#address-cells = <1>;
 		#size-cells = <1>;
 		device_type = "soc";
