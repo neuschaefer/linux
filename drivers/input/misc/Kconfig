@@ -745,6 +745,26 @@ config INPUT_WM831X_ON
 	  To compile this driver as a module, choose M here: the module
 	  will be called wm831x_on.
 
+config INPUT_WIIEXT
+	tristate "Wii extension devices"
+	depends on INPUT && I2C
+	select MFD_CORE
+	help
+	  Support the Wii extension bus, located at the bottom end of Wii
+	  Remotes.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called wiiext.
+
+if INPUT_WIIEXT
+
+config INPUT_WIIEXT_NUNCHUK
+	tristate "Nunchuk"
+	help
+	  Support Nunchuk devices.
+
+endif
+
 config INPUT_PCAP
 	tristate "Motorola EZX PCAP misc input events"
 	depends on EZX_PCAP
