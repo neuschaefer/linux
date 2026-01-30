@@ -84,3 +84,14 @@
 	/* eMMC is missing pull-ups */
 	bias-pull-up;
 };
+
+/// patches
+
+&i2c0 {
+	status = "okay";
+
+	input@52 {
+		compatible = "nintendo,wiiext";
+		reg = <0x52>;
+	};
+};
