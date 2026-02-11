@@ -1,0 +1,296 @@
+menu	"Capri SoC based Machine types"
+	depends on ARCH_CAPRI
+
+choice
+	prompt "Capri SoC based board type"
+	default MACH_CAPRI_FPGA
+
+config MACH_CAPRI_BASE
+	bool "Support Broadcom Capri base board"
+	help
+	  Support for the Broadcom Capri base board.
+
+config MACH_CAPRI_STONE
+	bool "Support Broadcom Capri Stone FF/DK board"
+	help
+	  Support for the Broadcom Capri Stone FF/DK board.
+
+config MACH_CAPRI_FPGA
+	bool "Support Broadcom Capri FPGA board"
+	help
+	  Support for the Broadcom Capri FPGA platform.
+
+config MACH_CAPRI_RAY
+	bool "Support Broadcom Capri RAY board"
+	help
+	  Support for the Broadcom Capri RAY board.
+
+config MACH_CAPRI_RAY_NAND
+	bool "Support Broadcom Capri RAY board with NAND"
+	help
+	  Support for the Broadcom Capri RAY board with NAND instead of eMMC.
+
+config MACH_CAPRI_TABLET
+	bool "Support Broadcom Capri Tablet (BRT) board"
+	help
+	  Support for the Broadcom Capri Tablet (BRT) board.
+
+config MACH_CAPRI_CUSTOM_BOARDS_SUPPORT
+        bool "Support Custom Capri boards"
+        help
+          Support for the Custom Capri board designs.
+
+config MACH_CAPRI_SS
+	bool "Support Broadcom Capri SS FF/DK board"
+	help
+	  Support for the Broadcom Capri SS FF/DK board.
+config MACH_CAPRI_M500
+	bool "Support Broadcom Capri for M500"
+	help
+	  Support for the Broadcom Capri M500 board.
+
+endchoice
+
+choice
+	prompt "Capri chip variant"
+	default CAPRI_11140
+
+config CAPRI_11130
+	bool "BCM11130"
+
+config CAPRI_11140
+	bool "BCM11140"
+
+config CAPRI_11351
+	bool "BCM11351"
+
+config CAPRI_28145
+	bool "BCM28145"
+
+config CAPRI_28155
+	bool "BCM28155"
+
+endchoice
+
+config LITTLE_MODE
+        bool "Little Memory Controller Mode"
+        help
+          Support the Little mode.
+
+config LITTLE_MEMC_QOS
+        bool "Enable Memory Controller QOS in Little Mode"
+        depends on LITTLE_MODE
+        help
+          Enable Memory Controller QOS in Little mode.
+
+config SUSPEND_INVALID
+	bool "Set Suspend Invalid"
+	depends on SUSPEND
+	help
+	  Make kernel to advertise all suspend states as invalid.
+
+config IPC
+	bool "Inter-Processor Communication (IPC)"
+	default n
+	help
+	  Support for IPC.
+
+config MAP_SDMA
+	bool "MAP SDMA"
+	default n
+        select PL330 if (MAP_SDMA)
+        select MAP_DMA_MMAP
+	help
+	  Support for the SDMA driver.
+config MAP_AADMA
+   bool "MAP CAPH AADMA"
+   help
+      Support for the CAPH Audio Asynchronous DMA driver
+
+config MAP_SSASW
+   bool "MAP CAPH SSASW"
+   help
+      Support for the CAPH Synchronous Audio Switch driver     
+
+config MAP_SDMA_SECURE_MODE
+	bool "MAP SDMA operate in secure mode"
+	depends on MAP_SDMA
+	default n
+	help
+	  Support for the SDMA driver in secure mode.
+
+config MAP_DMA_MMAP
+	bool "MAP Memory Map utilities"
+	default n
+	help
+	  Support for memory map utilities to prepare memory for DMA.
+
+config MAP_DMA_TEST
+	tristate "MAP DMA Test Driver"
+	depends on MAP_SDMA || DMAC_PL330
+	default n
+	help
+	  Select 'm' to build DMA test driver as a loadable module.
+
+config MAP_AADMA
+	bool "MAP CAPH AADMA"
+	default n
+	help
+	  Support for the CAPH Audio Asynchronous DMA driver
+
+config MAP_SSASW
+	bool "MAP CAPH SSASW"
+	default n
+	help
+	  Support for the CAPH Synchronous Audio Switch driver
+
+config MAP_AUDIOH_CHAL
+	bool "MAP AUDIOH CHAL"
+	default n
+	help
+	  Support for CHAL libraries for Audio Hub
+
+config MAP_PCM_CHAL
+	bool "MAP PCM CHAL"
+	default n
+	help
+	  Support for CHAL libraries for PCM
+
+config MAP_CIR_CHAL
+	bool "MAP CIR CHAL"
+	default n
+	help
+	  Support for CHAL libraries for CIR
+
+config MAP_NAND_CHAL
+	bool "MAP NAND CHAL"
+	default n
+	help
+	  Support for CHAL libraries for NAND
+
+config CAPRI_DORMANT_MODE
+	   depends on KONA_SECURE_MONITOR_CALL
+       bool "Enable dormant mode support for Capri platform"
+       help
+	Say Y if you want to enable dormant mode support for Capri platform
+
+config CAPRI_PWRMGR_USE_DUMMY_SEQ
+	bool "Use dummy PWRMGR HW I2C sequencer"
+	default n
+	help
+	Say Y if you want to use dummy PWRMGR HW I2C sequencer
+
+config CAPRI_PM_TEST
+   bool "Test PM Command for capriray"
+   depends on MACH_CAPRI_RAY
+   help
+      Say Y if you want to enable pm test command.
+
+config CAPRI_156M
+       bool "Enable 156M for Capri platform"
+       default n
+       help
+        Enable 156M clock in Capri platform due
+        to ASIC workaround on going, enable
+        156M will have 5 opps, otherwise
+        only 4 opps
+
+config BCM_HWCAPRI_1605
+       bool "Enable HWCAPRI_1605 workaround"
+       default n
+       help
+        Enable HWCAPRI_1605 workaround
+        to set L2 divider to 2
+        for normal case should be 3
+        wait for ASIC fix
+
+config BCM_HWCAPRI_1508
+	bool "Enable workaround for CAPRI JIRA 1508"
+	default y
+	help
+	 Say Y to enable CAPRI JIRA 1508 workaround
+	 Refer JIRA DB for
+         more info on
+         this JIRA
+
+config MACH_CAPRI_ESUB_ENABLE
+       bool "Enable ESUB CCU support for Capri platform"
+       default n
+       help
+	Support MAP esub ccu in Capri platform
+
+config CAPRI_PI_MGR_DISABLE_POLICY_CHANGE
+	bool "Enable debug flag to disable PI policy change by default"
+	depends on KONA_PI_MGR
+	default n
+	help
+	  Debug flag to diable PI policy change by default. All PI
+	  policy will be set to wakeup policy 7
+
+
+config CAPRI_DISABLE_LP_VOLT_CHANGE
+	bool "Disable voltage change for Lower Power Mode"
+	default n
+	help
+	  Disable voltage change for lower power mode. This is for debug
+	  purpose during DVFS test.
+
+config CAPRI_DELAYED_PM_INIT
+       depends on ARCH_CAPRI
+       bool "Enable support for delayed PM init."
+       default n
+       help
+       Say Y if you want to enable support for delayed PM init. Android/user
+       space can complete the PM init by writing to sysfs. Once this trigger
+       is recieved, all the PIs start changing policies, arm can enter LPM and
+       arm dfs is allowed.
+
+
+config CAPRI_PM_A1
+	bool "Enable PM A1"
+	default n
+	help
+	  Disable disable A0 workaround.
+
+config KONA_SECURE_MONITOR_CALL
+	bool "Execute in non-secure mode using Kona secure monitor"
+	default y
+	help
+	  Select this option if you are running with a bootloader that
+	  has configured the ARM to run in non-secure mode and provides
+	  a secure monitor implementation to access secure registers
+	  and peripherals.
+
+config CAPRI_WA_HWJIRA_1573
+	depends on ARCH_CAPRI
+	bool "Enable workaround for CAPRI JIRA 1573"
+	default y
+	help
+	  Say Y to enable CAPRI JIRA 1573 workaround
+	  Refer JIRA DB for more info on this JIRA
+
+config CAPRI_WA_HWJIRA_1590
+	depends on ARCH_CAPRI
+	bool "Enable workaround for CAPRI JIRA 1590"
+	default y
+	help
+	  Say Y to enable CAPRI JIRA 1590 workaround
+	  Refer JIRA DB for more info on this JIRA
+
+config CAPRI_WA_HWJIRA_1584
+	depends on ARCH_CAPRI
+	bool "Enable workaround for CAPRI JIRA 1584"
+	default y
+	help
+	  Say Y to enable CAPRI JIRA 1584 workaround
+	  Refer JIRA DB for more info on this JIRA
+
+config CDEBUGGER
+	depends on ARCH_CAPRI
+	bool "Enable Ramdump dump Feature on 281XX "
+	default n
+
+endmenu
+
+source "arch/arm/mach-capri/custom_boards/Kconfig"
+

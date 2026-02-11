@@ -66,6 +66,14 @@ struct timecounter {
 };
 
 /**
+ * get_clocksource - get a clocksource by its name
+ * @name:	Name of the clocksource to get
+ *
+ * Get a clocksource by its name
+ */
+struct clocksource *get_clocksource(const char *name);
+
+/**
  * cyclecounter_cyc2ns - converts cycle counter cycles to nanoseconds
  * @tc:		Pointer to cycle counter.
  * @cycles:	Cycles

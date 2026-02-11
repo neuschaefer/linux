@@ -12,6 +12,7 @@ obj-$(CONFIG_USB_IMX)		+= imx_udc.o
 obj-$(CONFIG_USB_GOKU)		+= goku_udc.o
 obj-$(CONFIG_USB_OMAP)		+= omap_udc.o
 obj-$(CONFIG_USB_S3C2410)	+= s3c2410_udc.o
+obj-$(CONFIG_USB_BCMRING_UDC)	+= bcm_udc_dwc.o
 obj-$(CONFIG_USB_AT91)		+= at91_udc.o
 obj-$(CONFIG_USB_ATMEL_USBA)	+= atmel_usba_udc.o
 obj-$(CONFIG_USB_FSL_USB2)	+= fsl_usb2_udc.o
@@ -29,6 +30,7 @@ obj-$(CONFIG_USB_PXA_U2O)	+= mv_udc.o
 mv_udc-y			:= mv_udc_core.o mv_udc_phy.o
 obj-$(CONFIG_USB_CI13XXX_MSM)	+= ci13xxx_msm.o
 obj-$(CONFIG_USB_FUSB300)	+= fusb300_udc.o
+obj-$(CONFIG_USB_DWC_OTG)	+= dwc_otg/
 
 #
 # USB gadget drivers
@@ -49,6 +51,7 @@ g_dbgp-y			:= dbgp.o
 g_nokia-y			:= nokia.o
 g_webcam-y			:= webcam.o
 g_ncm-y				:= ncm.o
+g_android-y			:= android.o
 
 obj-$(CONFIG_USB_ZERO)		+= g_zero.o
 obj-$(CONFIG_USB_AUDIO)		+= g_audio.o
@@ -67,3 +70,14 @@ obj-$(CONFIG_USB_G_MULTI)	+= g_multi.o
 obj-$(CONFIG_USB_G_NOKIA)	+= g_nokia.o
 obj-$(CONFIG_USB_G_WEBCAM)	+= g_webcam.o
 obj-$(CONFIG_USB_G_NCM)		+= g_ncm.o
+obj-$(CONFIG_USB_G_ANDROID)	+= g_android.o
+obj-$(CONFIG_USB_ANDROID)	+= android.o
+obj-$(CONFIG_USB_ANDROID_ACM)	+= f_acm.o u_serial.o
+obj-$(CONFIG_USB_ANDROID_ADB)	+= f_adb.o
+obj-$(CONFIG_USB_ANDROID_MASS_STORAGE)	+= f_mass_storage.o
+obj-$(CONFIG_USB_ANDROID_MTP)	+= f_mtp.o
+obj-$(CONFIG_USB_ANDROID_RNDIS)	+= f_rndis.o u_ether.o
+obj-$(CONFIG_USB_ANDROID_ACCESSORY)	+= f_accessory.o
+obj-$(CONFIG_USB_BRCM)	+= brcm.o f_acm.o u_serial.o f_mass_storage.o f_rndis.o u_ether.o
+obj-$(CONFIG_USB_ANDROID_OBEX)	+= f_obex.o
+

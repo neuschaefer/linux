@@ -156,6 +156,7 @@ static struct inode *mqueue_get_inode(struct super_block *sb,
 		mq_bytes = (mq_msg_tblsz +
 			(info->attr.mq_maxmsg * info->attr.mq_msgsize));
 
+		gr_learn_resource(current, RLIMIT_MSGQUEUE, u->mq_bytes + mq_bytes, 1);
 		spin_lock(&mq_lock);
 		if (u->mq_bytes + mq_bytes < u->mq_bytes ||
 		    u->mq_bytes + mq_bytes > task_rlimit(p, RLIMIT_MSGQUEUE)) {
@@ -385,7 +386,7 @@ static ssize_t mqueue_read_file(struct file *filp, char __user *u_data,
 	return ret;
 }
 
-static int mqueue_flush_file(struct file *filp, fl_owner_t id)
+static int mqueue_release_file (struct inode *node, struct file *filp)
 {
 	struct mqueue_inode_info *info = MQUEUE_I(filp->f_path.dentry->d_inode);
 
@@ -1227,7 +1228,7 @@ static const struct inode_operations mqueue_dir_inode_operations = {
 };
 
 static const struct file_operations mqueue_file_operations = {
-	.flush = mqueue_flush_file,
+	.release = mqueue_release_file,
 	.poll = mqueue_poll_file,
 	.read = mqueue_read_file,
 	.llseek = default_llseek,

@@ -675,12 +675,12 @@ struct rtl8169_private {
 	struct mdio_ops {
 		void (*write)(void __iomem *, int, int);
 		int (*read)(void __iomem *, int);
-	} mdio_ops;
+	} __no_const mdio_ops;
 
 	struct pll_power_ops {
 		void (*down)(struct rtl8169_private *);
 		void (*up)(struct rtl8169_private *);
-	} pll_power_ops;
+	} __no_const pll_power_ops;
 
 	struct jumbo_ops {
 		void (*enable)(struct rtl8169_private *);

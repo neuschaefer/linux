@@ -390,7 +390,8 @@ static const unsigned short seq_el_on[] = {
 
 static int ld9040_spi_write_byte(struct ld9040 *lcd, int addr, int data)
 {
-	u16 buf[1];
+	/* KONA SPI requires tx/rx buffer to be 8-byte aligned. */
+	u16 __attribute__ ((aligned(8))) buf[1];
 	struct spi_message msg;
 
 	struct spi_transfer xfer = {
@@ -605,6 +606,8 @@ static int ld9040_power(struct ld9040 *lcd, int power)
 	return ret;
 }
 
+
+
 static int ld9040_set_power(struct lcd_device *ld, int power)
 {
 	struct ld9040 *lcd = lcd_get_data(ld);
@@ -769,10 +772,11 @@ static int ld9040_resume(struct spi_device *spi)
 	int ret = 0;
 	struct ld9040 *lcd = dev_get_drvdata(&spi->dev);
 
+	
 	lcd->power = FB_BLANK_POWERDOWN;
 
 	ret = ld9040_power(lcd, FB_BLANK_UNBLANK);
-
+	
 	return ret;
 }
 #else

@@ -51,100 +51,101 @@ static int last_stack_tracer_enabled;
 static inline void
 check_stack(unsigned long ip, unsigned long *stack)
 {
-	unsigned long this_size, flags;
-	unsigned long *p, *top, *start;
-	static int tracer_frame;
-	int frame_size = ACCESS_ONCE(tracer_frame);
-	int i;
+    unsigned long this_size, flags;
+    unsigned long *p, *top, *start;
+    static int tracer_frame;
+    int frame_size = ACCESS_ONCE(tracer_frame);
+    int i;
 
-	this_size = ((unsigned long)stack) & (THREAD_SIZE-1);
-	this_size = THREAD_SIZE - this_size;
-	/* Remove the frame of the tracer */
-	this_size -= frame_size;
+    this_size = ((unsigned long)stack) & (THREAD_SIZE-1);
+    this_size = THREAD_SIZE - this_size;
+    /* Remove the frame of the tracer */
+    this_size -= frame_size;
 
-	if (this_size <= max_stack_size)
-		return;
+    if (this_size <= max_stack_size)
+        return;
 
-	/* we do not handle interrupt stacks yet */
-	if (!object_is_on_stack(stack))
-		return;
+    /* we do not handle interrupt stacks yet */
+        /* TODO: EJ after patching to 3.0.82: should we use object_starts_on_stack()? */
+    if (!object_is_on_stack(stack))
+        return;
 
-	local_irq_save(flags);
-	arch_spin_lock(&max_stack_lock);
+    local_irq_save(flags);
+    arch_spin_lock(&max_stack_lock);
 
-	/* In case another CPU set the tracer_frame on us */
-	if (unlikely(!frame_size))
-		this_size -= tracer_frame;
+    /* In case another CPU set the tracer_frame on us */
+    if (unlikely(!frame_size))
+        this_size -= tracer_frame;
 
-	/* a race could have already updated it */
-	if (this_size <= max_stack_size)
-		goto out;
+    /* a race could have already updated it */
+    if (this_size <= max_stack_size)
+        goto out;
 
-	max_stack_size = this_size;
+    max_stack_size = this_size;
 
-	max_stack_trace.nr_entries	= 0;
-	max_stack_trace.skip		= 3;
+    max_stack_trace.nr_entries  = 0;
+    max_stack_trace.skip        = 3;
 
-	save_stack_trace(&max_stack_trace);
+    save_stack_trace(&max_stack_trace);
 
-	/*
-	 * Add the passed in ip from the function tracer.
-	 * Searching for this on the stack will skip over
-	 * most of the overhead from the stack tracer itself.
-	 */
-	stack_dump_trace[0] = ip;
-	max_stack_trace.nr_entries++;
+    /*
+     * Add the passed in ip from the function tracer.
+     * Searching for this on the stack will skip over
+     * most of the overhead from the stack tracer itself.
+     */
+    stack_dump_trace[0] = ip;
+    max_stack_trace.nr_entries++;
 
-	/*
-	 * Now find where in the stack these are.
-	 */
-	i = 0;
-	start = stack;
-	top = (unsigned long *)
-		(((unsigned long)start & ~(THREAD_SIZE-1)) + THREAD_SIZE);
+    /*
+     * Now find where in the stack these are.
+     */
+    i = 0;
+    start = stack;
+    top = (unsigned long *)
+        (((unsigned long)start & ~(THREAD_SIZE-1)) + THREAD_SIZE);
 
-	/*
-	 * Loop through all the entries. One of the entries may
-	 * for some reason be missed on the stack, so we may
-	 * have to account for them. If they are all there, this
-	 * loop will only happen once. This code only takes place
-	 * on a new max, so it is far from a fast path.
-	 */
-	while (i < max_stack_trace.nr_entries) {
-		int found = 0;
+    /*
+     * Loop through all the entries. One of the entries may
+     * for some reason be missed on the stack, so we may
+     * have to account for them. If they are all there, this
+     * loop will only happen once. This code only takes place
+     * on a new max, so it is far from a fast path.
+     */
+    while (i < max_stack_trace.nr_entries) {
+        int found = 0;
 
-		stack_dump_index[i] = this_size;
-		p = start;
+        stack_dump_index[i] = this_size;
+        p = start;
 
-		for (; p < top && i < max_stack_trace.nr_entries; p++) {
-			if (*p == stack_dump_trace[i]) {
-				this_size = stack_dump_index[i++] =
-					(top - p) * sizeof(unsigned long);
-				found = 1;
-				/* Start the search from here */
-				start = p + 1;
-				/*
-				 * We do not want to show the overhead
-				 * of the stack tracer stack in the
-				 * max stack. If we haven't figured
-				 * out what that is, then figure it out
-				 * now.
-				 */
-				if (unlikely(!tracer_frame) && i == 1) {
-					tracer_frame = (p - stack) *
-						sizeof(unsigned long);
-					max_stack_size -= tracer_frame;
-				}
-			}
-		}
+        for (; p < top && i < max_stack_trace.nr_entries; p++) {
+            if (*p == stack_dump_trace[i]) {
+                this_size = stack_dump_index[i++] =
+                    (top - p) * sizeof(unsigned long);
+                found = 1;
+                /* Start the search from here */
+                start = p + 1;
+                /*
+                 * We do not want to show the overhead
+                 * of the stack tracer stack in the
+                 * max stack. If we haven't figured
+                 * out what that is, then figure it out
+                 * now.
+                 */
+                if (unlikely(!tracer_frame) && i == 1) {
+                    tracer_frame = (p - stack) *
+                        sizeof(unsigned long);
+                    max_stack_size -= tracer_frame;
+                }
+            }
+        }
 
-		if (!found)
-			i++;
-	}
+        if (!found)
+            i++;
+    }
 
  out:
-	arch_spin_unlock(&max_stack_lock);
-	local_irq_restore(flags);
+    arch_spin_unlock(&max_stack_lock);
+    local_irq_restore(flags);
 }
 
 static void

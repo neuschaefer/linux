@@ -1,0 +1,368 @@
+   /*Version   Date   Person   Responisble   Change   Description   */
+   pinmux   {
+      timestamp   =   "v,   5/6/2012   5:55:44   PM";
+      model   =   "CapriBRT_EDN000";
+      compatible   =   "Capri   12x12-pinmux";
+      reg   =   <0x35004800   268>;      /*   base   address   and   #   of   pins   */
+      data   =   <
+         0x0000002B   /*   0x3500_4800   :   ADCSYNC-->   GPEN09:   0   =   TTL   input:   0   =   pull-down   disabled:   1   =   pull-up   enabled:   0   =   unslewed   output:   1   =   Input   Disabled:   011:   8mA   */
+         0x00000003   /*   0x3500_4804   :   BAT_RM-->   BAT_RM:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000018   /*   0x3500_4808   :   BSC1_SCL-->   BSC1_SCL:   0:   RESERVED:   NA:   001   =   2.7K:   1   =   slewed   output:   0   =   Input   Enabled:   00:   Reserved   */
+         0x00000018   /*   0x3500_480C   :   BSC1_SDA-->   BSC1_SDA:   0:   RESERVED:   NA:   001   =   2.7K:   1   =   slewed   output:   0   =   Input   Enabled:   00:   Reserved   */
+         0x00000018   /*   0x3500_4810   :   BSC2_SCL-->   BSC2_SCL:   0:   RESERVED:   NA:   001   =   2.7K:   1   =   slewed   output:   0   =   Input   Enabled:   00:   Reserved   */
+         0x00000018   /*   0x3500_4814   :   BSC2_SDA-->   BSC2_SDA:   0:   RESERVED:   NA:   001   =   2.7K:   1   =   slewed   output:   0   =   Input   Enabled:   00:   Reserved   */
+         0x00000003   /*   0x3500_4818   :   CLASSGPWR-->   CLASSGPWR:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x0000004B   /*   0x3500_481C   :   CLK_CX8-->   CLK_CX8:   0   =   TTL   input:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   1   =   Input   Disabled:   011:   8mA   */
+         0x0000001B   /*   0x3500_4820   :   CLKOUT_0-->   CLKOUT_0:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   1   =   slewed   output:   1   =   Input   Disabled:   011:   8mA   */
+         0x00000203   /*   0x3500_4824   :   CLKOUT_1-->   VC_GPCLK_2:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000203   /*   0x3500_4828   :   CLKOUT_2-->   VC_GPCLK_0:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Disabled:   011:   8mA   */
+         0x00000203   /*   0x3500_482C   :   CLKOUT_3-->   VC_GPCLK_1:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Disabled:   011:   8mA   */
+         0x00000043   /*   0x3500_4830   :   CLKREQ_IN_0-->   CLKREQ_IN_0:   0   =   TTL   input:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Disabled:   011:   8mA   */
+         0x00000303   /*   0x3500_4834   :   CLKREQ_IN_1-->   GPIO_179:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000343   /*   0x3500_4838   :   CWS_SYS_REQ1-->   GPIO_183:   0   =   TTL   input:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000103   /*   0x3500_483C   :   CWS_SYS_REQ2-->   VC_CPG0:   0   =   TTL   input:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000203   /*   0x3500_4840   :   CWS_SYS_REQ3-->   VC_GPIO_6:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x0000004B   /*   0x3500_4844   :   DIGMIC1_CLK-->   DIGMIC1_CLK:   0   =   TTL   input:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   1   =   Input   Disabled:   011:   8mA   */
+         0x00000043   /*   0x3500_4848   :   DIGMIC1_DQ-->   DIGMIC1_DQ:   0   =   TTL   input:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x0000004B   /*   0x3500_484C   :   DIGMIC2_CLK-->   DIGMIC2_CLK:   0   =   TTL   input:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   1   =   Input   Disabled:   011:   8mA   */
+         0x00000043   /*   0x3500_4850   :   DIGMIC2_DQ-->   DIGMIC2_DQ:   0   =   TTL   input:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x0000004B   /*   0x3500_4854   :   GPEN13-->   GPEN13:   0   =   TTL   input:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   1   =   Input   Disabled:   011:   8mA   */
+         0x0000004B   /*   0x3500_4858   :   GPEN14-->   GPEN14:   0   =   TTL   input:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   1   =   Input   Disabled:   011:   8mA   */
+         0x0000004B   /*   0x3500_485C   :   GPEN15-->   GPEN15:   0   =   TTL   input:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   1   =   Input   Disabled:   011:   8mA   */
+         0x00000303   /*   0x3500_4860   :   GPIO00-->   GPIO_000:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000323   /*   0x3500_4864   :   GPIO01-->   GPIO_001:   0   =   TTL   input:   0   =   pull-down   disabled:   1   =   pull-up   enabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000223   /*   0x3500_4868   :   GPIO02-->   MDIO:   0   =   TTL   input:   0   =   pull-down   disabled:   1   =   pull-up   enabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000223   /*   0x3500_486C   :   GPIO03-->   MDC:   0   =   TTL   input:   0   =   pull-down   disabled:   1   =   pull-up   enabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000303   /*   0x3500_4870   :   GPIO04-->   GPIO_004:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000303   /*   0x3500_4874   :   GPIO05-->   GPIO_005:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x0000020B   /*   0x3500_4878   :   GPIO06-->   PWM_O_2:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   1   =   Input   Disabled:   011:   8mA   */
+         0x00000303   /*   0x3500_487C   :   GPIO07-->   GPIO_007:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000303   /*   0x3500_4880   :   GPIO08-->   GPIO_008:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000303   /*   0x3500_4884   :   GPIO09-->   GPIO_009:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000303   /*   0x3500_4888   :   GPIO10-->   GPIO_010:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000303   /*   0x3500_488C   :   GPIO11-->   GPIO_011:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000303   /*   0x3500_4890   :   GPIO12-->   GPIO_012:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000323   /*   0x3500_4894   :   GPIO13-->   GPIO_013:   0   =   TTL   input:   0   =   pull-down   disabled:   1   =   pull-up   enabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x000003A3   /*   0x3500_4898   :   GPIO14-->   GPIO_014:   1   =   Schmitt   Trigger   input:   0   =   pull-down   disabled:   1   =   pull-up   enabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x0000004B   /*   0x3500_489C   :   GPS_PABLANK-->   GPEN12:   0   =   TTL   input:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   1   =   Input   Disabled:   011:   8mA   */
+         0x0000004B   /*   0x3500_48A0   :   GPS_TMARK-->   GPEN10:   0   =   TTL   input:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   1   =   Input   Disabled:   011:   8mA   */
+         0x00000010   /*   0x3500_48A4   :   HDMI_SCL-->   HDMI_SCL:   0:   RESERVED:   0:   RESERVED:   0:   RESERVED:   1   =   External   Pull-up   to   +5V:   0   =   Input   Enabled:   000:   Reserved   */
+         0x00000010   /*   0x3500_48A8   :   HDMI_SDA-->   HDMI_SDA:   0:   RESERVED:   0:   RESERVED:   0:   RESERVED:   1   =   External   Pull-up   to   +5V:   0   =   Input   Enabled:   000:   Reserved   */
+         0x00000303   /*   0x3500_48AC   :   IC_DM-->   GPIO_177:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000303   /*   0x3500_48B0   :   IC_DP-->   GPIO_176:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x000000A3   /*   0x3500_48B4   :   KP_COL_IP_0-->   KP_COL_IP_0:   1   =   Schmitt   Trigger   input:   0   =   pull-down   disabled:   1   =   pull-up   enabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x000000A3   /*   0x3500_48B8   :   KP_COL_IP_1-->   KP_COL_IP_1:   1   =   Schmitt   Trigger   input:   0   =   pull-down   disabled:   1   =   pull-up   enabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x000000A3   /*   0x3500_48BC   :   KP_COL_IP_2-->   KP_COL_IP_2:   1   =   Schmitt   Trigger   input:   0   =   pull-down   disabled:   1   =   pull-up   enabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000323   /*   0x3500_48C0   :   KP_COL_IP_3-->   GPIO_064:   0   =   TTL   input:   0   =   pull-down   disabled:   1   =   pull-up   enabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x0000003B   /*   0x3500_48C4   :   KP_ROW_OP_0-->   KP_ROW_OP_0:   0   =   TTL   input:   0   =   pull-down   disabled:   1   =   pull-up   enabled:   1   =   slewed   output:   1   =   Input   Disabled:   011:   8mA   */
+         0x0000003B   /*   0x3500_48C8   :   KP_ROW_OP_1-->   KP_ROW_OP_1:   0   =   TTL   input:   0   =   pull-down   disabled:   1   =   pull-up   enabled:   1   =   slewed   output:   1   =   Input   Disabled:   011:   8mA   */
+         0x0000034B   /*   0x3500_48CC   :   KP_ROW_OP_2-->   GPIO_059:   0   =   TTL   input:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   1   =   Input   Disabled:   011:   8mA   */
+         0x0000034B   /*   0x3500_48D0   :   KP_ROW_OP_3-->   GPIO_060:   0   =   TTL   input:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   1   =   Input   Disabled:   011:   8mA   */
+         0x00000303   /*   0x3500_48D4   :   LCD_B_0-->   GPIO_169:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000303   /*   0x3500_48D8   :   LCD_B_1-->   GPIO_168:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000303   /*   0x3500_48DC   :   LCD_B_2-->   GPIO_167:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000303   /*   0x3500_48E0   :   LCD_B_3-->   GPIO_166:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000303   /*   0x3500_48E4   :   LCD_B_4-->   GPIO_165:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000303   /*   0x3500_48E8   :   LCD_B_5-->   GPIO_164:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000303   /*   0x3500_48EC   :   LCD_B_6-->   GPIO_163:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000303   /*   0x3500_48F0   :   LCD_B_7-->   GPIO_162:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000303   /*   0x3500_48F4   :   LCD_G_0-->   GPIO_161:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000303   /*   0x3500_48F8   :   LCD_G_1-->   GPIO_160:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000303   /*   0x3500_48FC   :   LCD_G_2-->   GPIO_159:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000303   /*   0x3500_4900   :   LCD_G_3-->   GPIO_158:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000303   /*   0x3500_4904   :   LCD_G_4-->   GPIO_157:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000303   /*   0x3500_4908   :   LCD_G_5-->   GPIO_156:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000303   /*   0x3500_490C   :   LCD_G_6-->   GPIO_155:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000303   /*   0x3500_4910   :   LCD_G_7-->   GPIO_154:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000303   /*   0x3500_4914   :   LCD_HSYNC-->   GPIO_170:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000303   /*   0x3500_4918   :   LCD_OE-->   GPIO_172:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000303   /*   0x3500_491C   :   LCD_PCLK-->   GPIO_173:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000303   /*   0x3500_4920   :   LCD_R_0-->   GPIO_153:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000303   /*   0x3500_4924   :   LCD_R_1-->   GPIO_152:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000303   /*   0x3500_4928   :   LCD_R_2-->   GPIO_151:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000303   /*   0x3500_492C   :   LCD_R_3-->   GPIO_150:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000303   /*   0x3500_4930   :   LCD_R_4-->   GPIO_149:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000303   /*   0x3500_4934   :   LCD_R_5-->   GPIO_148:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000303   /*   0x3500_4938   :   LCD_R_6-->   GPIO_147:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000303   /*   0x3500_493C   :   LCD_R_7-->   GPIO_146:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000303   /*   0x3500_4940   :   LCD_VSYNC-->   GPIO_171:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x0000004B   /*   0x3500_4944   :   MDMGPIO0-->   GPEN00:   0   =   TTL   input:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   1   =   Input   Disabled:   011:   8mA   */
+         0x0000004B   /*   0x3500_4948   :   MDMGPIO1-->   GPEN01:   0   =   TTL   input:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   1   =   Input   Disabled:   011:   8mA   */
+         0x0000004B   /*   0x3500_494C   :   MDMGPIO2-->   GPEN02:   0   =   TTL   input:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   1   =   Input   Disabled:   011:   8mA   */
+         0x0000004B   /*   0x3500_4950   :   MDMGPIO3-->   GPEN03:   0   =   TTL   input:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   1   =   Input   Disabled:   011:   8mA   */
+         0x0000004B   /*   0x3500_4954   :   MDMGPIO4-->   GPEN04:   0   =   TTL   input:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   1   =   Input   Disabled:   011:   8mA   */
+         0x0000004B   /*   0x3500_4958   :   MDMGPIO5-->   GPEN05:   0   =   TTL   input:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   1   =   Input   Disabled:   011:   8mA   */
+         0x0000004B   /*   0x3500_495C   :   MDMGPIO6-->   GPEN06:   0   =   TTL   input:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   1   =   Input   Disabled:   011:   8mA   */
+         0x0000004B   /*   0x3500_4960   :   MDMGPIO7-->   GPEN07:   0   =   TTL   input:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   1   =   Input   Disabled:   011:   8mA   */
+         0x0000004B   /*   0x3500_4964   :   MDMGPIO8-->   GPEN08:   0   =   TTL   input:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   1   =   Input   Disabled:   011:   8mA   */
+         0x00000343   /*   0x3500_4968   :   MPHI_DATA_0-->   GPIO_145:   0   =   TTL   input:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000343   /*   0x3500_496C   :   MPHI_DATA_1-->   GPIO_144:   0   =   TTL   input:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000343   /*   0x3500_4970   :   MPHI_DATA_2-->   GPIO_143:   0   =   TTL   input:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000343   /*   0x3500_4974   :   MPHI_DATA_3-->   GPIO_142:   0   =   TTL   input:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000303   /*   0x3500_4978   :   MPHI_DATA_4-->   GPIO_141:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000323   /*   0x3500_497C   :   MPHI_DATA_5-->   GPIO_140:   0   =   TTL   input:   0   =   pull-down   disabled:   1   =   pull-up   enabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000303   /*   0x3500_4980   :   MPHI_DATA_6-->   GPIO_139:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000323   /*   0x3500_4984   :   MPHI_DATA_7-->   GPIO_138:   0   =   TTL   input:   0   =   pull-down   disabled:   1   =   pull-up   enabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000203   /*   0x3500_4988   :   MPHI_DATA_8-->   CAM1_CAM_DATA5_CPI:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000203   /*   0x3500_498C   :   MPHI_DATA_9-->   CAM1_CAM_HSYNC_CPI:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000203   /*   0x3500_4990   :   MPHI_DATA_10-->   CAM1_CAM_CLK_CPI:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000203   /*   0x3500_4994   :   MPHI_DATA_11-->   DBI_C_SCL:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000243   /*   0x3500_4998   :   MPHI_DATA_12-->   CAM1_CAM_DATA9_CPI:   0   =   TTL   input:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000243   /*   0x3500_499C   :   MPHI_DATA_13-->   CAM1_CAM_DATA8_CPI:   0   =   TTL   input:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000243   /*   0x3500_49A0   :   MPHI_DATA_14-->   CAM1_CAM_DATA7_CPI:   0   =   TTL   input:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000243   /*   0x3500_49A4   :   MPHI_DATA_15-->   CAM1_CAM_DATA6_CPI:   0   =   TTL   input:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000243   /*   0x3500_49A8   :   MPHI_HA0-->   CAM1_CAM_DATA3_CPI:   0   =   TTL   input:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000243   /*   0x3500_49AC   :   MPHI_HAT0-->   CAM1_CAM_DATA4_CPI:   0   =   TTL   input:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x000003C3   /*   0x3500_49B0   :   MPHI_HAT1-->   GPIO_137:   1   =   Schmitt   Trigger   input:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000243   /*   0x3500_49B4   :   MPHI_HCE0_N-->   CAM1_CAM_DATA0_CPI:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000113   /*   0x3500_49B8   :   MPHI_HCE1_N-->   CIR_TX:   0   =   TTL   input:   0   =   pull-down   disabled:   1   =   pull-up   enabled:   1   =   normal   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000243   /*   0x3500_49BC   :   MPHI_HRD_N-->   CAM1_CAM_DATA2_CPI:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000243   /*   0x3500_49C0   :   MPHI_HWR_N-->   CAM1_CAM_DATA1_CPI:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000203   /*   0x3500_49C4   :   MPHI_RUN0-->   CAM1_CAM_VSYNC_CPI:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000143   /*   0x3500_49C8   :   MPHI_RUN1-->   CIR_RX:   0   =   TTL   input:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x000003A3   /*   0x3500_49CC   :   MTX_SCAN_CLK-->   GPIO_175:   1   =   Schmitt   Trigger   input:   0   =   pull-down   disabled:   1   =   pull-up   enabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000343   /*   0x3500_49D0   :   MTX_SCAN_DATA-->   GPIO_174:   0   =   TTL   input:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000123   /*   0x3500_49D4   :   NAND_AD_0-->   SDIO2_DATA_0:   0   =   TTL   input:   0   =   pull-down   disabled:   1   =   pull-up   enabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000123   /*   0x3500_49D8   :   NAND_AD_1-->   SDIO2_DATA_1:   0   =   TTL   input:   0   =   pull-down   disabled:   1   =   pull-up   enabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000123   /*   0x3500_49DC   :   NAND_AD_2-->   SDIO2_DATA_2:   0   =   TTL   input:   0   =   pull-down   disabled:   1   =   pull-up   enabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000123   /*   0x3500_49E0   :   NAND_AD_3-->   SDIO2_DATA_3:   0   =   TTL   input:   0   =   pull-down   disabled:   1   =   pull-up   enabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000123   /*   0x3500_49E4   :   NAND_AD_4-->   SDIO2_DATA_4:   0   =   TTL   input:   0   =   pull-down   disabled:   1   =   pull-up   enabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000123   /*   0x3500_49E8   :   NAND_AD_5-->   SDIO2_DATA_5:   0   =   TTL   input:   0   =   pull-down   disabled:   1   =   pull-up   enabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000123   /*   0x3500_49EC   :   NAND_AD_6-->   SDIO2_DATA_6:   0   =   TTL   input:   0   =   pull-down   disabled:   1   =   pull-up   enabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000123   /*   0x3500_49F0   :   NAND_AD_7-->   SDIO2_DATA_7:   0   =   TTL   input:   0   =   pull-down   disabled:   1   =   pull-up   enabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000103   /*   0x3500_49F4   :   NAND_ALE-->   SDIO2_CLK:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x0000035B   /*   0x3500_49F8   :   NAND_CEN_0-->   GPIO_045:   0   =   TTL   input:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   1   =   slewed   output:   1   =   Input   Disabled:   011:   8mA   */
+         0x000001A3   /*   0x3500_49FC   :   NAND_CEN_1-->   USB0PFT:   1   =   Schmitt   Trigger   input:   0   =   pull-down   disabled:   1   =   pull-up   enabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x000003C3   /*   0x3500_4A00   :   NAND_CLE-->   GPIO_048:   1   =   Schmitt   Trigger   input:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000123   /*   0x3500_4A04   :   NAND_OEN-->   SDIO2_CMD:   0   =   TTL   input:   0   =   pull-down   disabled:   1   =   pull-up   enabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x0000035B   /*   0x3500_4A08   :   NAND_RDY_0-->   GPIO_046:   0   =   TTL   input:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   1   =   slewed   output:   1   =   Input   Disabled:   011:   8mA   */
+         0x000001A3   /*   0x3500_4A0C   :   NAND_RDY_1-->   USB0PON:   1   =   Schmitt   Trigger   input:   0   =   pull-down   disabled:   1   =   pull-up   enabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x0000012B   /*   0x3500_4A10   :   NAND_WEN-->   SDIO2_RST_N:   0   =   TTL   input:   0   =   pull-down   disabled:   1   =   pull-up   enabled:   0   =   unslewed   output:   1   =   Input   Disabled:   011:   8mA   */
+         0x0000035B   /*   0x3500_4A14   :   NAND_WP-->   GPIO_047:   0   =   TTL   input:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   1   =   slewed   output:   1   =   Input   Disabled:   011:   8mA   */
+         0x00000003   /*   0x3500_4A18   :   PC1-->   PC1:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000003   /*   0x3500_4A1C   :   PC2-->   PC2:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000003   /*   0x3500_4A20   :   PMU_INT-->   PMU_INT:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000030   /*   0x3500_4A24   :   PMU_SCL-->   PMU_SCL:   0:   RESERVED:   NA:   001   =   2.7K:   1   =   slewed   output:   0   =   Input   Enabled:   00:   Reserved   */
+         0x00000030   /*   0x3500_4A28   :   PMU_SDA-->   PMU_SDA:   0:   RESERVED:   NA:   001   =   2.7K:   1   =   slewed   output:   0   =   Input   Enabled:   00:   Reserved   */
+         0x0000004B   /*   0x3500_4A2C   :   RFST2G_MTSLOTEN3G-->   RFST2G_MTSLOTEN3G:   0   =   TTL   input:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   1   =   Input   Disabled:   011:   8mA   */
+         0x00000050   /*   0x3500_4A30   :   RGMII_0_RX_CTL-->   RGMII_0_RX_CTL:   0:   RESERVED:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   1   =   amp   enable:   0   =   Input   Enabled:   000:   2mA   */
+         0x00000050   /*   0x3500_4A34   :   RGMII_0_RXC-->   RGMII_0_RXC:   0:   RESERVED:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   1   =   amp   enable:   0   =   Input   Enabled:   000:   2mA   */
+         0x00000050   /*   0x3500_4A38   :   RGMII_0_RXD_0-->   RGMII_0_RXD0:   0:   RESERVED:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   1   =   amp   enable:   0   =   Input   Enabled:   000:   2mA   */
+         0x00000050   /*   0x3500_4A3C   :   RGMII_0_RXD_1-->   RGMII_0_RXD1:   0:   RESERVED:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   1   =   amp   enable:   0   =   Input   Enabled:   000:   2mA   */
+         0x00000050   /*   0x3500_4A40   :   RGMII_0_RXD_2-->   RGMII_0_RXD2:   0:   RESERVED:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   1   =   amp   enable:   0   =   Input   Enabled:   000:   2mA   */
+         0x00000050   /*   0x3500_4A44   :   RGMII_0_RXD_3-->   RGMII_0_RXD3:   0:   RESERVED:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   1   =   amp   enable:   0   =   Input   Enabled:   000:   2mA   */
+         0x00000010   /*   0x3500_4A48   :   RGMII_0_TX_CTL-->   RGMII_0_TX_CTL:   0:   RESERVED:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   1   =   amp   enable:   0   =   Input   Enabled:   000:   2mA   */
+         0x00000010   /*   0x3500_4A4C   :   RGMII_0_TXC-->   RGMII_0_TXC:   0:   RESERVED:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   1   =   amp   enable:   0   =   Input   Enabled:   000:   2mA   */
+         0x00000010   /*   0x3500_4A50   :   RGMII_0_TXD_0-->   RGMII_0_TXD0:   0:   RESERVED:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   1   =   amp   enable:   0   =   Input   Enabled:   000:   2mA   */
+         0x00000010   /*   0x3500_4A54   :   RGMII_0_TXD_1-->   RGMII_0_TXD1:   0:   RESERVED:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   1   =   amp   enable:   0   =   Input   Enabled:   000:   2mA   */
+         0x00000010   /*   0x3500_4A58   :   RGMII_0_TXD_2-->   RGMII_0_TXD2:   0:   RESERVED:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   1   =   amp   enable:   0   =   Input   Enabled:   000:   2mA   */
+         0x00000010   /*   0x3500_4A5C   :   RGMII_0_TXD_3-->   RGMII_0_TXD3:   0:   RESERVED:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   1   =   amp   enable:   0   =   Input   Enabled:   000:   2mA   */
+         0x00000050   /*   0x3500_4A60   :   RGMII_1_RX_CTL-->   RGMII_1_RX_CTL:   0:   RESERVED:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   1   =   amp   enable:   0   =   Input   Enabled:   000:   2mA   */
+         0x00000050   /*   0x3500_4A64   :   RGMII_1_RXC-->   RGMII_1_RXC:   0:   RESERVED:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   1   =   amp   enable:   0   =   Input   Enabled:   000:   2mA   */
+         0x00000050   /*   0x3500_4A68   :   RGMII_1_RXD_0-->   RGMII_1_RXD0:   0:   RESERVED:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   1   =   amp   enable:   0   =   Input   Enabled:   000:   2mA   */
+         0x00000050   /*   0x3500_4A6C   :   RGMII_1_RXD_1-->   RGMII_1_RXD1:   0:   RESERVED:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   1   =   amp   enable:   0   =   Input   Enabled:   000:   2mA   */
+         0x00000050   /*   0x3500_4A70   :   RGMII_1_RXD_2-->   RGMII_1_RXD2:   0:   RESERVED:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   1   =   amp   enable:   0   =   Input   Enabled:   000:   2mA   */
+         0x00000050   /*   0x3500_4A74   :   RGMII_1_RXD_3-->   RGMII_1_RXD3:   0:   RESERVED:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   1   =   amp   enable:   0   =   Input   Enabled:   000:   2mA   */
+         0x00000010   /*   0x3500_4A78   :   RGMII_1_TX_CTL-->   RGMII_1_TX_CTL:   0:   RESERVED:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   1   =   amp   enable:   0   =   Input   Enabled:   000:   2mA   */
+         0x00000010   /*   0x3500_4A7C   :   RGMII_1_TXC-->   RGMII_1_TXC:   0:   RESERVED:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   1   =   amp   enable:   0   =   Input   Enabled:   000:   2mA   */
+         0x00000010   /*   0x3500_4A80   :   RGMII_1_TXD_0-->   RGMII_1_TXD0:   0:   RESERVED:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   1   =   amp   enable:   0   =   Input   Enabled:   000:   2mA   */
+         0x00000010   /*   0x3500_4A84   :   RGMII_1_TXD_1-->   RGMII_1_TXD1:   0:   RESERVED:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   1   =   amp   enable:   0   =   Input   Enabled:   000:   2mA   */
+         0x00000010   /*   0x3500_4A88   :   RGMII_1_TXD_2-->   RGMII_1_TXD2:   0:   RESERVED:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   1   =   amp   enable:   0   =   Input   Enabled:   000:   2mA   */
+         0x00000010   /*   0x3500_4A8C   :   RGMII_1_TXD_3-->   RGMII_1_TXD3:   0:   RESERVED:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   1   =   amp   enable:   0   =   Input   Enabled:   000:   2mA   */
+         0x000000D0   /*   0x3500_4A90   :   RGMII_GPIO_0-->   RGMII_GPIO_0:   1:   RESERVED:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   1   =   amp   enable:   0   =   Input   Enabled:   000:   2mA   */
+         0x000000D0   /*   0x3500_4A94   :   RGMII_GPIO_1-->   RGMII_GPIO_1:   1:   RESERVED:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   1   =   amp   enable:   0   =   Input   Enabled:   000:   2mA   */
+         0x000000D0   /*   0x3500_4A98   :   RGMII_GPIO_2-->   RGMII_GPIO_2:   1:   RESERVED:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   1   =   amp   enable:   0   =   Input   Enabled:   000:   2mA   */
+         0x000000D0   /*   0x3500_4A9C   :   RGMII_GPIO_3-->   RGMII_GPIO_3:   1:   RESERVED:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   1   =   amp   enable:   0   =   Input   Enabled:   000:   2mA   */
+         0x00000043   /*   0x3500_4AA0   :   RTXDATA2G_TXDATA3G1-->   RTXDATA2G_TXDATA3G1:   0   =   TTL   input:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000043   /*   0x3500_4AA4   :   RTXEN2G_TXDATA3G2-->   RTXEN2G_TXDATA3G2:   0   =   TTL   input:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000043   /*   0x3500_4AA8   :   RXDATA3G0-->   RXDATA3G0:   0   =   TTL   input:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000043   /*   0x3500_4AAC   :   RXDATA3G1-->   RXDATA3G1:   0   =   TTL   input:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000043   /*   0x3500_4AB0   :   RXDATA3G2-->   RXDATA3G2:   0   =   TTL   input:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000003   /*   0x3500_4AB4   :   SDIO1_CLK-->   SDIO1_CLK:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000023   /*   0x3500_4AB8   :   SDIO1_CMD-->   SDIO1_CMD:   0   =   TTL   input:   0   =   pull-down   disabled:   1   =   pull-up   enabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000023   /*   0x3500_4ABC   :   SDIO1_DATA_0-->   SDIO1_DATA_0:   0   =   TTL   input:   0   =   pull-down   disabled:   1   =   pull-up   enabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000023   /*   0x3500_4AC0   :   SDIO1_DATA_1-->   SDIO1_DATA_1:   0   =   TTL   input:   0   =   pull-down   disabled:   1   =   pull-up   enabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000023   /*   0x3500_4AC4   :   SDIO1_DATA_2-->   SDIO1_DATA_2:   0   =   TTL   input:   0   =   pull-down   disabled:   1   =   pull-up   enabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000023   /*   0x3500_4AC8   :   SDIO1_DATA_3-->   SDIO1_DATA_3:   0   =   TTL   input:   0   =   pull-down   disabled:   1   =   pull-up   enabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000003   /*   0x3500_4ACC   :   SDIO4_CLK-->   SDIO4_CLK:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000023   /*   0x3500_4AD0   :   SDIO4_CMD-->   SDIO4_CMD:   0   =   TTL   input:   0   =   pull-down   disabled:   1   =   pull-up   enabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000033   /*   0x3500_4AD4   :   SDIO4_DATA_0-->   SDIO4_DATA_0:   0   =   TTL   input:   0   =   pull-down   disabled:   1   =   pull-up   enabled:   1   =   slewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000033   /*   0x3500_4AD8   :   SDIO4_DATA_1-->   SDIO4_DATA_1:   0   =   TTL   input:   0   =   pull-down   disabled:   1   =   pull-up   enabled:   1   =   slewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000033   /*   0x3500_4ADC   :   SDIO4_DATA_2-->   SDIO4_DATA_2:   0   =   TTL   input:   0   =   pull-down   disabled:   1   =   pull-up   enabled:   1   =   slewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000033   /*   0x3500_4AE0   :   SDIO4_DATA_3-->   SDIO4_DATA_3:   0   =   TTL   input:   0   =   pull-down   disabled:   1   =   pull-up   enabled:   1   =   slewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x0000000B   /*   0x3500_4AE4   :   SIM_CLK-->   SIM_CLK:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   1   =   Input   Disabled:   011:   8mA   */
+         0x00000023   /*   0x3500_4AE8   :   SIM_DATA-->   SIM_DATA:   0   =   TTL   input:   0   =   pull-down   disabled:   1   =   pull-up   enabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x000000A3   /*   0x3500_4AEC   :   SIM_DET-->   SIM_DET:   1   =   Schmitt   Trigger   input:   0   =   pull-down   disabled:   1   =   pull-up   enabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x0000000B   /*   0x3500_4AF0   :   SIM_RESETN-->   SIM_RESETN:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   1   =   Input   Disabled:   011:   8mA   */
+         0x00000303   /*   0x3500_4AF4   :   SIM2_CLK-->   GPIO_054:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   1   =   Input   Disabled:   011:   8mA   */
+         0x00000303   /*   0x3500_4AF8   :   SIM2_DATA-->   GPIO_055:   0   =   TTL   input:   0   =   pull-down   disabled:   1   =   pull-up   enabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000303   /*   0x3500_4AFC   :   SIM2_DET-->   GPIO_056:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000303   /*   0x3500_4B00   :   SIM2_RESETN-->   GPIO_053:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x0000004B   /*   0x3500_4B04   :   SRI_C-->   SRI_C:   0   =   TTL   input:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   1   =   Input   Disabled:   011:   8mA   */
+         0x0000004B   /*   0x3500_4B08   :   SRI_D-->   SRI_D:   0   =   TTL   input:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   1   =   Input   Disabled:   011:   8mA   */
+         0x0000004B   /*   0x3500_4B0C   :   SRI_E-->   SRI_E:   0   =   TTL   input:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   1   =   Input   Disabled:   011:   8mA   */
+         0x0000034B   /*   0x3500_4B10   :   SSP_EXTCLK-->   GPIO_108:   0   =   TTL   input:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   1   =   Input   Disabled:   011:   8mA   */
+         0x00000303   /*   0x3500_4B14   :   SSP0_CLK-->   GPIO_092:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000303   /*   0x3500_4B18   :   SSP0_FS-->   GPIO_091:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000303   /*   0x3500_4B1C   :   SSP0_RXD-->   GPIO_093:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000303   /*   0x3500_4B20   :   SSP0_TXD-->   GPIO_094:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000312   /*   0x3500_4B24   :   SSP2_CLK-->   GPIO_099: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:6mA */
+         0x000003C3   /*   0x3500_4B28   :   SSP2_FS_0-->   GPIO_095:   1   =   Schmitt   Trigger   input:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000303   /*   0x3500_4B2C   :   SSP2_FS_1-->   GPIO_096:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x0000030B   /*   0x3500_4B30   :   SSP2_FS_2-->   GPIO_097:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   1   =   Input   Disabled:   011:   8mA   */
+         0x0000030B   /*   0x3500_4B34   :   SSP2_FS_3-->   GPIO_098:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   1   =   Input   Disabled:   011:   8mA   */
+         0x000003C3   /*   0x3500_4B38   :   SSP2_RXD_0-->   GPIO_100:   1   =   Schmitt   Trigger   input:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000303   /*   0x3500_4B3C   :   SSP2_RXD_1-->   GPIO_102:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000303   /*   0x3500_4B40   :   SSP2_TXD_0-->   GPIO_101:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x0000030B   /*   0x3500_4B44   :   SSP2_TXD_1-->   GPIO_103:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   1   =   Input   Disabled:   011:   8mA   */
+         0x00000103   /*   0x3500_4B48   :   SSP3_CLK-->   VC_I2S_SCK:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x0000030B   /*   0x3500_4B4C   :   SSP3_FS-->   GPIO_104:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   1   =   Input   Disabled:   011:   8mA   */
+         0x00000143   /*   0x3500_4B50   :   SSP3_RXD-->   VC_I2S_SDI:   0   =   TTL   input:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000112   /*   0x3500_4B54   :   SSP3_TXD-->   VC_I2S_SDO:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   normal   output:   0   =   Input   Enabled:   010:   6mA   */
+         0x00000103   /*   0x3500_4B58   :   SSP4_CLK-->   VC_TCK:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000103   /*   0x3500_4B5C   :   SSP4_FS-->   VC_TMS:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000103   /*   0x3500_4B60   :   SSP4_RXD-->   VC_TDI:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000103   /*   0x3500_4B64   :   SSP4_TXD-->   VC_TDO:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   1   =   Input   Disabled:   011:   8mA   */
+         0x00000103   /*   0x3500_4B68   :   SSP5_CLK-->   RTCK:   1   =   Schmitt   Trigger   input:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000103   /*   0x3500_4B6C   :   SSP5_FS-->   VC_TRSTB:   1   =   Schmitt   Trigger   input:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x000003C3   /*   0x3500_4B70   :   SSP5_RXD-->   GPIO_115:   1   =   Schmitt   Trigger   input:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x000003CB   /*   0x3500_4B74   :   SSP5_TXD-->   GPIO_116:   1   =   Schmitt   Trigger   input:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   1   =   Input   Disabled:   011:   8mA   */
+         0x00000063   /*   0x3500_4B78   :   SSP6_CLK-->   SSP6_CLK:   0   =   TTL   input:   1   =   pull-down   enabled:   1   =   pull-up   enabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000063   /*   0x3500_4B7C   :   SSP6_FS-->   SSP6_FS:   0   =   TTL   input:   1   =   pull-down   enabled:   1   =   pull-up   enabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000063   /*   0x3500_4B80   :   SSP6_RXD-->   SSP6_RXD:   0   =   TTL   input:   1   =   pull-down   enabled:   1   =   pull-up   enabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x0000006B   /*   0x3500_4B84   :   SSP6_TXD-->   SSP6_TXD:   0   =   TTL   input:   1   =   pull-down   enabled:   1   =   pull-up   enabled:   0   =   unslewed   output:   1   =   Input   Disabled:   011:   8mA   */
+         0x00000103   /*   0x3500_4B88   :   STAT_1-->   SIM_LDO_EN:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000103   /*   0x3500_4B8C   :   STAT_2-->   SIM2_LDO_EN:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x0000004B   /*   0x3500_4B90   :   SYSCLKEN-->   SYSCLKEN:   0   =   TTL   input:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   1   =   Input   Disabled:   011:   8mA   */
+         0x00000103   /*   0x3500_4B94   :   TRACECLK-->   PTI_CLK:   0:   RESERVED:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000103   /*   0x3500_4B98   :   TRACEDT00-->   PTI_DAT0:   0:   RESERVED:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000103   /*   0x3500_4B9C   :   TRACEDT01-->   PTI_DAT1:   0:   RESERVED:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000103   /*   0x3500_4BA0   :   TRACEDT02-->   PTI_DAT2:   0:   RESERVED:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000103   /*   0x3500_4BA4   :   TRACEDT03-->   PTI_DAT3:   0:   RESERVED:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000103   /*   0x3500_4BA8   :   TRACEDT04-->   PM_DEBUG3:   0:   RESERVED:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000103   /*   0x3500_4BAC   :   TRACEDT05-->   PM_DEBUG2:   0:   RESERVED:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000103   /*   0x3500_4BB0   :   TRACEDT06-->   PM_DEBUG1:   0:   RESERVED:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000103   /*   0x3500_4BB4   :   TRACEDT07-->   PM_DEBUG0:   0:   RESERVED:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000003   /*   0x3500_4BB8   :   TRACEDT08-->   TRACEDT08:   0:   RESERVED:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000003   /*   0x3500_4BBC   :   TRACEDT09-->   TRACEDT09:   0:   RESERVED:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000003   /*   0x3500_4BC0   :   TRACEDT10-->   TRACEDT10:   0:   RESERVED:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000003   /*   0x3500_4BC4   :   TRACEDT11-->   TRACEDT11:   0:   RESERVED:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000003   /*   0x3500_4BC8   :   TRACEDT12-->   TRACEDT12:   0:   RESERVED:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000003   /*   0x3500_4BCC   :   TRACEDT13-->   TRACEDT13:   0:   RESERVED:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000003   /*   0x3500_4BD0   :   TRACEDT14-->   TRACEDT14:   0:   RESERVED:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x00000103   /*   0x3500_4BD4   :   TRACEDT15-->   UARTB2_URXD:   0:   RESERVED:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x0000004B   /*   0x3500_4BD8   :   TXDATA3G0-->   TXDATA3G0:   0   =   TTL   input:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   1   =   Input   Disabled:   011:   8mA   */
+         0x0000004B   /*   0x3500_4BDC   :   TXPWRIND-->   GPEN11:   0   =   TTL   input:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   1   =   Input   Disabled:   011:   8mA   */
+         0x0000034B   /*   0x3500_4BE0   :   UARTB1_UCTS-->   PC3:   0   =   TTL   input:   0   =   pull-down   disabled:   1   =   pull-up   enabled:   0   =   unslewed   output:   1   =   Input   Disabled:   011:   8mA   */
+         0x00000243   /*   0x3500_4BE4   :   UARTB1_URTS-->   THERMAL_SHUTDOWN:   0   =   TTL   input:   1   =   pull-down   enabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x000000A3   /*   0x3500_4BE8   :   UARTB1_URXD-->   UARTB1_URXD:   1   =   Schmitt   Trigger   input:   0   =   pull-down   disabled:   1   =   pull-up   enabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x0000000B   /*   0x3500_4BEC   :   UARTB1_UTXD-->   UARTB1_UTXD:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   1   =   Input   Disabled:   011:   8mA   */
+         0x000000A3   /*   0x3500_4BF0   :   UARTB2_URXD-->   UARTB2_URXD:   1   =   Schmitt   Trigger   input:   0   =   pull-down   disabled:   1   =   pull-up   enabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x0000000B   /*   0x3500_4BF4   :   UARTB2_UTXD-->   UARTB2_UTXD:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   1   =   Input   Disabled:   011:   8mA   */
+         0x00000003   /*   0x3500_4BF8   :   UARTB3_UCTS-->   UARTB3_UCTS:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x0000000B   /*   0x3500_4BFC   :   UARTB3_URTS-->   UARTB3_URTS:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   1   =   Input   Disabled:   011:   8mA   */
+         0x00000003   /*   0x3500_4C00   :   UARTB3_URXD-->   UARTB3_URXD:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x0000000B   /*   0x3500_4C04   :   UARTB3_UTXD-->   UARTB3_UTXD:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   1   =   Input   Disabled:   011:   8mA   */
+         0x00000003   /*   0x3500_4C08   :   UARTB4_UCTS-->   UARTB4_UCTS:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x0000000B   /*   0x3500_4C0C   :   UARTB4_URTS-->   UARTB4_URTS:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   1   =   Input   Disabled:   011:   8mA   */
+         0x00000003   /*   0x3500_4C10   :   UARTB4_URXD-->   UARTB4_URXD:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   0   =   Input   Enabled:   011:   8mA   */
+         0x0000000B   /*   0x3500_4C14   :   UARTB4_UTXD-->   UARTB4_UTXD:   0   =   TTL   input:   0   =   pull-down   disabled:   0   =   pull-up   disabled:   0   =   unslewed   output:   1   =   Input   Disabled:   011:   8mA   */
+         0x00000030   /*   0x3500_4C18   :   VC_CAM1_SCL-->   VC_CAM1_SCL:   0:   RESERVED:   NA:   011   =   1.8k//2.7k:   0   =   unslewed   output:   0   =   Input   Enabled:   00:   Reserved   */
+         0x00000030   /*   0x3500_4C1C   :   VC_CAM1_SDA-->   VC_CAM1_SDA:   0:   RESERVED:   NA:   011   =   1.8k//2.7k:   0   =   unslewed   output:   0   =   Input   Enabled:   00:   Reserved   */
+         0x00000030   /*   0x3500_4C20   :   VC_CAM2_SCL-->   VC_CAM2_SCL:   0:   RESERVED:   NA:   011   =   1.8k//2.7k:   0   =   unslewed   output:   0   =   Input   Enabled:   00:   Reserved   */
+         0x00000030   /*   0x3500_4C24   :   VC_CAM2_SDA-->   VC_CAM2_SDA:   0:   RESERVED:   NA:   011   =   1.8k//2.7k:   0   =   unslewed   output:   0   =   Input   Enabled:   00:   Reserved   */
+         0x00000030   /*   0x3500_4C28   :   VC_CAM3_SCL-->   VC_CAM3_SCL:   0:   RESERVED:   NA:   011   =   1.8k//2.7k:   0   =   unslewed   output:   0   =   Input   Enabled:   00:   Reserved   */
+         0x00000030   /*   0x3500_4C2C   :   VC_CAM3_SDA-->   VC_CAM3_SDA:   0:   RESERVED:   NA:   011   =   1.8k//2.7k:   0   =   unslewed   output:   0   =   Input   Enabled:   00:   Reserved   */
+      >;
+   };
+
+   /*   gpio   node   must   be   consistent   with   pinmux   node   */
+   gpio   {
+      compatible   =   "Capri   12x12-gpio";
+      reg   =   <0x35003000   83>;      /*   base   address   and   #   of   exposed   GPIOs   */
+      data   =   <
+         0      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         1      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         4      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         5      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         7      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         8      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         9      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         10      0x00000001   /*   0:   Drive   Low   0:   Input   */
+         11      0x00000001   /*   0:   Drive   Low   0:   Input   */
+         12      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         13      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         14      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         45      0x00000000   /*   0:   Drive   Low   0:   Output   */
+         46      0x00000000   /*   0:   Drive   Low   0:   Output   */
+         47      0x00000000   /*   0:   Drive   Low   0:   Output   */
+         48      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         53      0x00000000   /*   0:   Drive   Low   0:   Output   */
+         54      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         55      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         56      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         59      0x00000000   /*   0:   Drive   Low   0:   Output   */
+         60      0x00000000   /*   0:   Drive   Low   0:   Output   */
+         64      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         91      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         92      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         93      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         94      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         95      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         96      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         97      0x00000000   /*   0:   Drive   Low   0:   Output   */
+         98      0x00000000   /*   0:   Drive   Low   0:   Output   */
+         99      0x00000000   /*   0:   Drive   Low   0:   Output   */
+         100      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         101      0x00000001   /*   0:   Drive   Low   1:   Output   */
+         102      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         103      0x00000000   /*   0:   Drive   Low   0:   Output   */
+         104      0x00000000   /*   0:   Drive   Low   0:   Output   */
+         108      0x00000000   /*   0:   Drive   Low   0:   Output   */
+         115      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         116      0x00000000   /*   0:   Drive   Low   0:   Output   */
+         137      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         138      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         139      0x00000000   /*   0:   Drive   Low   0:   Output   */
+         140      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         141      0x00000000   /*   0:   Drive   Low   0:   Output   */
+         142      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         143      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         144      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         145      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         146      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         147      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         148      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         149      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         150      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         151      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         152      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         153      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         154      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         155      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         156      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         157      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         158      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         159      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         160      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         161      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         162      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         163      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         164      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         165      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         166      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         167      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         168      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         169      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         170      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         171      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         172      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         173      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         174      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         175      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         176      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         177      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         179      0x00000001   /*   0:   Drive   Low   1:   Input   */
+         183      0x00000001   /*   0:   Drive   Low   1:   Input   */
+      >;
+   };

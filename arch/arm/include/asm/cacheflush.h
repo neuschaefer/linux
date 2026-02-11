@@ -108,7 +108,7 @@ struct cpu_cache_fns {
 	void (*dma_unmap_area)(const void *, size_t, int);
 
 	void (*dma_flush_range)(const void *, const void *);
-};
+} __no_const;
 
 /*
  * Select the calling method
@@ -156,6 +156,12 @@ extern void dmac_unmap_area(const void *, size_t, int);
 extern void dmac_flush_range(const void *, const void *);
 
 #endif
+
+static inline void dmac_flush_range_inner_outer(const void * start, 
+                                                const void * end) {
+	dmac_flush_range(start, end);
+	outer_flush_range(__pa(start), __pa(end));
+}
 
 /*
  * Copy user data from/to a page which is mapped into a different

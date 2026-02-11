@@ -1,0 +1,16 @@
+/dts-v1/;
+
+
+/ {
+  #address-cells = <1>;
+  #size-cells = <1>;
+  model = "bcm11130_ray";
+  compatible = "Broadcom,bcm11130_ray";
+  timestamp = "v0.1, 2/15/2012 12:24:00 PM";
+
+  chosen {
+  };
+
+/include/ "bcm11130_ray_hardware.dtsi"
+
+};

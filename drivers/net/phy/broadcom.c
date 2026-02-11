@@ -17,7 +17,9 @@
 #include <linux/module.h>
 #include <linux/phy.h>
 #include <linux/brcmphy.h>
+#include <linux/delay.h>
 
+#include <mach/ethHw.h>
 
 #define BRCM_PHY_MODEL(phydev) \
 	((phydev)->drv->phy_id & (phydev)->drv->phy_id_mask)
@@ -386,6 +388,7 @@ static void bcm54xx_adjust_rxrefclk(struct phy_device *phydev)
 static int bcm54xx_config_init(struct phy_device *phydev)
 {
 	int reg, err;
+	int portspeed;
 
 	reg = phy_read(phydev, MII_BCM54XX_ECR);
 	if (reg < 0)
@@ -414,6 +417,37 @@ static int bcm54xx_config_init(struct phy_device *phydev)
 	    (phydev->dev_flags & PHY_BRCM_DIS_TXCRXC_NOENRGY) ||
 	    (phydev->dev_flags & PHY_BRCM_AUTO_PWRDWN_ENABLE))
 		bcm54xx_adjust_rxrefclk(phydev);
+
+#ifdef CONFIG_MACH_CAPRI_FPGA
+    reg = phy_read(phydev, 0x9);
+    reg &= ~0x00000300;   /* Disable 1000-half/full advertisement */
+    phy_write(phydev, 0x9, reg);
+#else
+    portspeed = ethHw_portSpeed(phydev->addr);
+
+    phy_write(phydev, 0x1c, 0x0c00 );
+    reg = phy_read(phydev, 0x1c);
+
+    reg |= 0x8000; /* write enable */
+    if ( portspeed == 1000 )
+    {
+        reg &= ~0x0200; /* turn off bit 9 to disable RGMII Tx delay on ext PHY */
+    }
+    else
+    {
+        reg |= 0x0200; /* turn on bit 9 to enable RGMII Tx delay on ext PHY */
+    }
+
+    phy_write(phydev, 0x1c, reg);
+#endif
+    /* Enable out of band signaling on the external PHY */
+    phy_write(phydev, 0x18, 0x7007 );
+    reg = phy_read(phydev, 0x18);
+
+    reg |= 0x8000; /* write enable */
+    reg &= ~0x0020; /* turn off bit 5 for outband signaling */
+
+    phy_write(phydev, 0x18, reg);
 
 	bcm54xx_phydsp_config(phydev);
 
@@ -655,6 +689,43 @@ done:
 	return err;
 }
 
+static int brcm_fet_config_init_5241A(struct phy_device *phydev)
+{
+    int err;
+    uint32_t phyid_msw, phyid_lsw;
+    int retry = 0;
+
+    printk("--- Soft Reset PHY %d ---\n", phydev->addr);
+    err = phy_write(phydev, MII_BMCR, 0xB100);//BMCR_RESET);
+    if (err < 0)
+        return err;
+
+    while (1)
+    {
+        phyid_msw = phy_read(phydev, MII_PHYSID1);
+        phyid_lsw = phy_read(phydev, MII_PHYSID2);
+
+        if ((phyid_msw == 0x0143) && (phyid_lsw == 0xbc31))
+        {
+            break;
+        }
+        else
+        {
+            if (retry ++ > 30)
+            {
+                printk("#%d Read port %d PHY ID failed\n", retry, phydev->addr);
+                return -1;
+            }
+
+            mdelay( 100 );
+        }
+    }
+
+    printk("#%d Read port %d PHY ID succeeded!\n", retry, phydev->addr);
+
+    return 0;
+}
+
 static int brcm_fet_ack_interrupt(struct phy_device *phydev)
 {
 	int reg;
@@ -804,6 +875,36 @@ static struct phy_driver bcm50610m_driver = {
 	.driver		= { .owner = THIS_MODULE },
 };
 
+static struct phy_driver bcm54610_driver = {
+	.phy_id		= PHY_ID_BCM54610,
+	.phy_id_mask	= 0xfffffff0,
+	.name		= "Broadcom BCM54610",
+	.features	= PHY_GBIT_FEATURES |
+			  SUPPORTED_Pause | SUPPORTED_Asym_Pause,
+	.flags		= PHY_HAS_MAGICANEG | PHY_HAS_INTERRUPT,
+	.config_init	= bcm54xx_config_init,
+	.config_aneg	= genphy_config_aneg,
+	.read_status	= genphy_read_status,
+	.ack_interrupt	= bcm54xx_ack_interrupt,
+	.config_intr	= bcm54xx_config_intr,
+	.driver		= { .owner = THIS_MODULE },
+};
+
+static struct phy_driver bcm54612_driver = {
+	.phy_id		= PHY_ID_BCM54612,
+	.phy_id_mask	= 0xfffffff0,
+	.name		= "Broadcom BCM54612",
+	.features	= PHY_GBIT_FEATURES |
+			  SUPPORTED_Pause | SUPPORTED_Asym_Pause,
+	.flags		= PHY_HAS_MAGICANEG | PHY_HAS_INTERRUPT,
+	.config_init	= bcm54xx_config_init,
+	.config_aneg	= genphy_config_aneg,
+	.read_status	= genphy_read_status,
+	.ack_interrupt	= bcm54xx_ack_interrupt,
+	.config_intr	= bcm54xx_config_intr,
+	.driver		= { .owner = THIS_MODULE },
+};
+
 static struct phy_driver bcm57780_driver = {
 	.phy_id		= PHY_ID_BCM57780,
 	.phy_id_mask	= 0xfffffff0,
@@ -836,7 +937,7 @@ static struct phy_driver bcmac131_driver = {
 
 static struct phy_driver bcm5241_driver = {
 	.phy_id		= PHY_ID_BCM5241,
-	.phy_id_mask	= 0xfffffff0,
+	.phy_id_mask	= 0xffffffff,
 	.name		= "Broadcom BCM5241",
 	.features	= PHY_BASIC_FEATURES |
 			  SUPPORTED_Pause | SUPPORTED_Asym_Pause,
@@ -846,6 +947,21 @@ static struct phy_driver bcm5241_driver = {
 	.read_status	= genphy_read_status,
 	.ack_interrupt	= brcm_fet_ack_interrupt,
 	.config_intr	= brcm_fet_config_intr,
+	.driver		= { .owner = THIS_MODULE },
+};
+
+static struct phy_driver bcm5241A_driver = {
+	.phy_id		= PHY_ID_BCM5241A,
+	.phy_id_mask	= 0xffffffff,
+	.name		= "Broadcom BCM5241A",
+	.features	= PHY_BASIC_FEATURES |
+			  SUPPORTED_Pause | SUPPORTED_Asym_Pause,
+	.flags		= PHY_HAS_MAGICANEG,
+	.config_init	= brcm_fet_config_init_5241A,
+	.config_aneg	= genphy_config_aneg,
+	.read_status	= genphy_read_status,
+	.ack_interrupt	= NULL,
+	.config_intr	= NULL,
 	.driver		= { .owner = THIS_MODULE },
 };
 
@@ -886,8 +1002,23 @@ static int __init broadcom_init(void)
 	ret = phy_driver_register(&bcm5241_driver);
 	if (ret)
 		goto out_5241;
+	ret = phy_driver_register(&bcm5241A_driver);
+	if (ret)
+		goto out_5241A;
+	ret = phy_driver_register(&bcm54610_driver);
+	if (ret)
+		goto out_54610;
+	ret = phy_driver_register(&bcm54612_driver);
+	if (ret)
+		goto out_54612;
 	return ret;
 
+out_54612:
+	phy_driver_unregister(&bcm54610_driver);
+out_54610:
+	phy_driver_unregister(&bcm5241A_driver);
+out_5241A:
+    phy_driver_unregister(&bcm5241_driver);
 out_5241:
 	phy_driver_unregister(&bcmac131_driver);
 out_ac131:
@@ -914,6 +1045,9 @@ out_5411:
 
 static void __exit broadcom_exit(void)
 {
+	phy_driver_unregister(&bcm54612_driver);
+	phy_driver_unregister(&bcm54610_driver);
+	phy_driver_unregister(&bcm5241A_driver);
 	phy_driver_unregister(&bcm5241_driver);
 	phy_driver_unregister(&bcmac131_driver);
 	phy_driver_unregister(&bcm57780_driver);
@@ -939,9 +1073,11 @@ static struct mdio_device_id __maybe_unused broadcom_tbl[] = {
 	{ PHY_ID_BCM5482, 0xfffffff0 },
 	{ PHY_ID_BCM50610, 0xfffffff0 },
 	{ PHY_ID_BCM50610M, 0xfffffff0 },
+	{ PHY_ID_BCM54612, 0xfffffff0 },
 	{ PHY_ID_BCM57780, 0xfffffff0 },
 	{ PHY_ID_BCMAC131, 0xfffffff0 },
-	{ PHY_ID_BCM5241, 0xfffffff0 },
+	{ PHY_ID_BCM5241, 0xffffffff },
+	{ PHY_ID_BCM5241A, 0xffffffff },
 	{ }
 };
 

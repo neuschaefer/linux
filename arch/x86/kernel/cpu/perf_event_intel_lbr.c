@@ -5,6 +5,16 @@ enum {
 	LBR_FORMAT_LIP		= 0x01,
 	LBR_FORMAT_EIP		= 0x02,
 	LBR_FORMAT_EIP_FLAGS	= 0x03,
+	LBR_FORMAT_EIP_FLAGS2	= 0x04,
+	LBR_FORMAT_MAX_KNOWN    = LBR_FORMAT_EIP_FLAGS2,
+};
+
+static enum {
+	LBR_EIP_FLAGS		= 1,
+	LBR_TSX			= 2,
+} lbr_desc[LBR_FORMAT_MAX_KNOWN + 1] = {
+	[LBR_FORMAT_EIP_FLAGS]  = LBR_EIP_FLAGS,
+	[LBR_FORMAT_EIP_FLAGS2] = LBR_EIP_FLAGS | LBR_TSX,
 };
 
 /*
@@ -146,6 +156,8 @@ static void intel_pmu_lbr_read_32(struct cpu_hw_events *cpuc)
 }
 
 #define LBR_FROM_FLAG_MISPRED  (1ULL << 63)
+#define LBR_FROM_FLAG_IN_TX    (1ULL << 62)
+#define LBR_FROM_FLAG_ABORT    (1ULL << 61)
 
 /*
  * Due to lack of segmentation in Linux the effective address (offset)

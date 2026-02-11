@@ -91,6 +91,9 @@ static void __uart_start(struct tty_struct *tty)
 	struct uart_state *state = tty->driver_data;
 	struct uart_port *port = state->uart_port;
 
+	if (port->ops->wake_peer)
+		port->ops->wake_peer(port);
+
 	if (!uart_circ_empty(&state->xmit) && state->xmit.buf &&
 	    !tty->stopped && !tty->hw_stopped)
 		port->ops->start_tx(port);
@@ -1787,7 +1790,16 @@ struct baud_rates {
 };
 
 static const struct baud_rates baud_rates[] = {
+	{ 4000000, B4000000 },
+	{ 3500000, B3500000 },
+	{ 3000000, B3000000 },
+	{ 2500000, B2500000 },
+	{ 2000000, B2000000 },
+	{ 1500000, B1500000 },
+	{ 1152000, B1152000 },
+	{ 1000000, B1000000 },
 	{ 921600, B921600 },
+	{ 500000, B500000 },
 	{ 460800, B460800 },
 	{ 230400, B230400 },
 	{ 115200, B115200 },
@@ -2069,8 +2081,6 @@ uart_report_port(struct uart_driver *drv, struct uart_port *port)
 	case UPIO_MEM32:
 	case UPIO_AU:
 	case UPIO_TSI:
-	case UPIO_DWAPB:
-	case UPIO_DWAPB32:
 		snprintf(address, sizeof(address),
 			 "MMIO 0x%llx", (unsigned long long)port->mapbase);
 		break;
@@ -2491,8 +2501,6 @@ int uart_match_port(struct uart_port *port1, struct uart_port *port2)
 	case UPIO_MEM32:
 	case UPIO_AU:
 	case UPIO_TSI:
-	case UPIO_DWAPB:
-	case UPIO_DWAPB32:
 		return (port1->mapbase == port2->mapbase);
 	}
 	return 0;

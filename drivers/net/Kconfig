@@ -2540,6 +2540,13 @@ config S6GMAC
 	  To compile this driver as a module, choose M here. The module
 	  will be called s6gmac.
 
+config NET_ISLAND
+	tristate "Broadcom Island Gigabit Ethernet support"
+	depends on ARCH_ISLAND || ARCH_CAPRI
+	help
+	  This driver supports the on-chip Ethernet device on Island
+	  SoCs.
+
 source "drivers/net/stmmac/Kconfig"
 
 config PCH_GBE
@@ -3324,6 +3331,23 @@ config PPPOL2TP
 	  used by ISPs and enterprises to tunnel PPP traffic over UDP
 	  tunnels. L2TP is replacing PPTP for VPN uses.
 
+config PPPOLAC
+	tristate "PPP on L2TP Access Concentrator"
+	depends on PPP && INET
+	help
+	  L2TP (RFC 2661) is a tunneling protocol widely used in virtual private
+	  networks. This driver handles L2TP data packets between a UDP socket
+	  and a PPP channel, but only permits one session per socket. Thus it is
+	  fairly simple and suited for clients.
+
+config PPPOPNS
+	tristate "PPP on PPTP Network Server"
+	depends on PPP && INET
+	help
+	  PPTP (RFC 2637) is a tunneling protocol widely used in virtual private
+	  networks. This driver handles PPTP data packets between a RAW socket
+	  and a PPP channel. It is fairly simple and easy to use.
+
 config SLIP
 	tristate "SLIP (serial line) support"
 	---help---
@@ -3425,8 +3449,25 @@ config NETCONSOLE_DYNAMIC
 	  at runtime through a userspace interface exported using configfs.
 	  See <file:Documentation/networking/netconsole.txt> for details.
 
+config BRCM_NETCONSOLE
+        tristate "Broadcom Network console logging support (EXPERIMENTAL)"
+        depends on EXPERIMENTAL && (USB_ETH_RNDIS || USB_G_ANDROID_RNDIS)
+        ---help---
+        If you want to log kernel messages over the network, enable this.
+        See <file:Documentation/networking/netconsole.txt> for details.
+
+config BRCM_NETCONSOLE_DYNAMIC
+        bool "Broadcom Dynamic reconfiguration of logging targets (EXPERIMENTAL)"
+        depends on BRCM_NETCONSOLE && SYSFS && EXPERIMENTAL
+        #select CONFIGFS_FS
+        help
+          This option enables the ability to dynamically reconfigure target
+          parameters (interface, IP addresses, port numbers, MAC addresses)
+          at runtime through a userspace interface exported using configfs.
+          See <file:Documentation/networking/netconsole.txt> for details.
+
 config NETPOLL
-	def_bool NETCONSOLE
+	def_bool NETCONSOLE || BRCM_NETCONSOLE
 
 config NETPOLL_TRAP
 	bool "Netpoll traffic trapping"

@@ -33,6 +33,11 @@
 // #define	DEBUG			// error path messages, extra info
 // #define	VERBOSE			// more; success messages
 
+#ifdef CONFIG_ARCH_KONA
+#undef NET_IP_ALIGN
+#define NET_IP_ALIGN 0
+#endif
+
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/netdevice.h>
@@ -1079,7 +1084,7 @@ netdev_tx_t usbnet_start_xmit (struct sk_buff *skb,
 				     struct net_device *net)
 {
 	struct usbnet		*dev = netdev_priv(net);
-	int			length;
+	unsigned int		length;
 	struct urb		*urb = NULL;
 	struct skb_data		*entry;
 	struct driver_info	*info = dev->driver_info;
@@ -1326,6 +1331,15 @@ static struct device_type wwan_type = {
 	.name	= "wwan",
 };
 
+static bool usbnet_allowed = 0;
+static int __init usbnet_setup(char *s)
+{
+	if (s[0] == '1' && s[1] == 0)
+		usbnet_allowed = 1;
+	return 1;
+}
+__setup("usbnet=", usbnet_setup);
+
 int
 usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 {
@@ -1338,6 +1352,10 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 	const char			*name;
 	struct usb_driver 	*driver = to_usb_driver(udev->dev.driver);
 
+	if(!usbnet_allowed) {
+		dev_dbg(&udev->dev, "usbnet not enabled\n");
+		return -ENODEV;
+	}
 	/* usbnet already took usb runtime pm, so have to enable the feature
 	 * for usb interface, otherwise usb_autopm_get_interface may return
 	 * failure if USB_SUSPEND(RUNTIME_PM) is enabled.
@@ -1419,10 +1437,12 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 		// heuristic:  "usb%d" for links we know are two-host,
 		// else "eth%d" when there's reasonable doubt.  userspace
 		// can rename the link if it knows better.
+#if 0
 		if ((dev->driver_info->flags & FLAG_ETHER) != 0 &&
 		    ((dev->driver_info->flags & FLAG_POINTTOPOINT) == 0 ||
 		     (net->dev_addr [0] & 0x02) == 0))
 			strcpy (net->name, "eth%d");
+#endif
 		/* WLAN devices should always be named "wlan%d" */
 		if ((dev->driver_info->flags & FLAG_WLAN) != 0)
 			strcpy(net->name, "wlan%d");

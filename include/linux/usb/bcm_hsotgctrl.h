@@ -1,0 +1,33 @@
+/*****************************************************************************
+*  Copyright 2001 - 2011 Broadcom Corporation.  All rights reserved.
+*
+*  Unless you and Broadcom execute a separate written software license
+*  agreement governing use of this software, this software is licensed to you
+*  under the terms of the GNU General Public License version 2, available at
+*  http://www.gnu.org/licenses/old-license/gpl-2.0.html (the "GPL").
+*
+*  Notwithstanding the above, under no circumstances may you combine this
+*  software in any way with any other Broadcom software provided under a
+*  license other than the GPL, without Broadcom's express prior written
+*  consent.
+*
+*****************************************************************************/
+int bcm_hsotgctrl_phy_set_vbus_stat(bool on);
+int bcm_hsotgctrl_phy_set_non_driving(bool on);
+int bcm_hsotgctrl_set_phy_off(bool on);
+int bcm_hsotgctrl_phy_set_id_stat(bool floating);
+int bcm_hsotgctrl_phy_init(bool id_device);
+int bcm_hsotgctrl_phy_deinit(void);
+int bcm_hsotgctrl_en_clock(bool on);
+int bcm_hsotgctrl_bc_reset(void);
+int bcm_hsotgctrl_bc_status(unsigned long *status);
+int bcm_hsotgctrl_bc_vdp_src_off(void);
+int bcm_hsotgctrl_reset_clk_domain(void);
+int bcm_hsotgctrl_set_phy_iso(bool on);
+int bcm_hsotgctrl_set_bc_iso(bool on);
+int bcm_hsotgctrl_set_soft_ldo_pwrdn(bool on);
+int bcm_hsotgctrl_set_aldo_pdn(bool on);
+int bcm_hsotgctrl_set_phy_resetb(bool on);
+int bcm_hsotgctrl_set_phy_clk_request(bool on);
+int bcm_hsotgctrl_phy_mdio_init(void);
+int bcm_hsotgctrl_set_ldo_suspend_mask(void);

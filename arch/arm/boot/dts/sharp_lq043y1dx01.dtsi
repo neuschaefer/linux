@@ -1,0 +1,46 @@
+bustype = "dpi";
+control = "spi_bb";
+pixel_clock = <32000000>;
+pixelsize {
+ width = <480>;
+ height = <800>;
+};
+video {
+ hsync = <6>;
+ hfp = <6>;
+ hbp = <15>;
+ vsync = <3>;
+ vfp = <3>;
+ vbp = <3>;
+};
+dither {
+ depth = "dither_rgb565";
+};
+dpi {
+ rgb_order = "rgb";
+ output_format = "16_565_2";
+ oe_mode = "data_valid";
+ invert_pixel_clock = <1>;
+ hsync_disable = <0>;
+ vsync_disable = <0>;
+ oe_disable = <0>;
+ hsync_polarity = "active_low";
+ vsync_polarity = "active_low";
+ oe_polarity = "active_high";
+ hsync_phase = "posedge";
+ vsync_phase = "posedge";
+ oe_phase = "posedge";
+};
+spi_bb {
+ clock_pin = "DISPLAY_SPI_CLOCK";
+ clock_polarity = "low";
+ cs_pin = "DISPLAY_SPI_CS";
+ cs_polarity = "high";
+ mosi_pin = "DISPLAY_SPI_MOSI";
+};
+sequences {
+ on_pre = "CLEAR DISPLAY_RESET; REGULATOR camldo1_uc ENABLE; SET DISPLAY_RESET;";
+ on_post = "DELAY 20; CLEAR DISPLAY_RESET; DELAY 32000; WRITE @ 0x11; DELAY 100000; WRITE @ 0xB9 = 0xFF 0x83 0x63; WRITE @ 0x3A = 0x50; WRITE @ 0x29; DELAY 33000;";
+ off_pre = "WRITE @ 0x28; WRITE @ 0x10; DELAY 33000;";
+ off_post = "REGULATOR camldo1_uc DISABLE";
+};

@@ -39,6 +39,17 @@
 #include <linux/mutex.h>
 #include <linux/slab.h>
 
+#ifdef CONFIG_ARCH_KONA
+#include <linux/clk.h>
+#endif
+
+#ifdef CONFIG_KONA_PI_MGR
+#include <mach/pi_mgr.h>
+#include <plat/pi_mgr.h>
+
+#define RX_SHUTOFF_DELAY_MSECS	3000
+#endif
+
 #include <asm/io.h>
 #include <asm/irq.h>
 
@@ -47,6 +58,8 @@
 #ifdef CONFIG_SPARC
 #include "suncore.h"
 #endif
+
+static int uart_noinput = 0;
 
 /*
  * Configuration:
@@ -153,6 +166,19 @@ struct uart_8250_port {
 	unsigned char		lsr_saved_flags;
 #define MSR_SAVE_FLAGS UART_MSR_ANY_DELTA
 	unsigned char		msr_saved_flags;
+
+#ifdef CONFIG_ARCH_KONA
+	struct clk          *clk;
+#endif
+
+#ifdef CONFIG_KONA_PI_MGR
+	/* Kona PM - QOS service */
+	struct timer_list	rx_shutoff_timer;
+#define RX_SHUTOFF_DELAY_MSECS	3000
+	struct pi_mgr_qos_node qos_tx_node;
+	struct pi_mgr_qos_node qos_rx_node;
+#endif
+
 };
 
 struct irq_info {
@@ -309,6 +335,13 @@ static const struct serial8250_config uart_config[] = {
 				  UART_FCR_T_TRIG_01,
 		.flags		= UART_CAP_FIFO | UART_CAP_RTOIE,
 	},
+	[PORT_KONA] = {
+		.name		= "Kona",
+		.fifo_size	= 256,
+		.tx_loadsz	= 256,
+		.fcr		= UART_FCR_ENABLE_FIFO | UART_FCR_R_TRIG_11,
+		.flags		= UART_CAP_FIFO | UART_CAP_AFE,
+	},
 };
 
 #if defined(CONFIG_MIPS_ALCHEMY)
@@ -461,42 +494,6 @@ static void tsi_serial_out(struct uart_port *p, int offset, int value)
 		writeb(value, p->membase + offset);
 }
 
-/* Save the LCR value so it can be re-written when a Busy Detect IRQ occurs. */
-static inline void dwapb_save_out_value(struct uart_port *p, int offset,
-					int value)
-{
-	struct uart_8250_port *up =
-		container_of(p, struct uart_8250_port, port);
-
-	if (offset == UART_LCR)
-		up->lcr = value;
-}
-
-/* Read the IER to ensure any interrupt is cleared before returning from ISR. */
-static inline void dwapb_check_clear_ier(struct uart_port *p, int offset)
-{
-	if (offset == UART_TX || offset == UART_IER)
-		p->serial_in(p, UART_IER);
-}
-
-static void dwapb_serial_out(struct uart_port *p, int offset, int value)
-{
-	int save_offset = offset;
-	offset = map_8250_out_reg(p, offset) << p->regshift;
-	dwapb_save_out_value(p, save_offset, value);
-	writeb(value, p->membase + offset);
-	dwapb_check_clear_ier(p, save_offset);
-}
-
-static void dwapb32_serial_out(struct uart_port *p, int offset, int value)
-{
-	int save_offset = offset;
-	offset = map_8250_out_reg(p, offset) << p->regshift;
-	dwapb_save_out_value(p, save_offset, value);
-	writel(value, p->membase + offset);
-	dwapb_check_clear_ier(p, save_offset);
-}
-
 static unsigned int io_serial_in(struct uart_port *p, int offset)
 {
 	offset = map_8250_in_reg(p, offset) << p->regshift;
@@ -508,6 +505,8 @@ static void io_serial_out(struct uart_port *p, int offset, int value)
 	offset = map_8250_out_reg(p, offset) << p->regshift;
 	outb(value, p->iobase + offset);
 }
+
+static int serial8250_default_handle_irq(struct uart_port *port);
 
 static void set_io_from_upio(struct uart_port *p)
 {
@@ -540,16 +539,6 @@ static void set_io_from_upio(struct uart_port *p)
 		p->serial_out = tsi_serial_out;
 		break;
 
-	case UPIO_DWAPB:
-		p->serial_in = mem_serial_in;
-		p->serial_out = dwapb_serial_out;
-		break;
-
-	case UPIO_DWAPB32:
-		p->serial_in = mem32_serial_in;
-		p->serial_out = dwapb32_serial_out;
-		break;
-
 	default:
 		p->serial_in = io_serial_in;
 		p->serial_out = io_serial_out;
@@ -557,6 +546,7 @@ static void set_io_from_upio(struct uart_port *p)
 	}
 	/* Remember loaded iotype */
 	up->cur_iotype = p->iotype;
+	p->handle_irq = serial8250_default_handle_irq;
 }
 
 static void
@@ -567,8 +557,6 @@ serial_out_sync(struct uart_8250_port *up, int offset, int value)
 	case UPIO_MEM:
 	case UPIO_MEM32:
 	case UPIO_AU:
-	case UPIO_DWAPB:
-	case UPIO_DWAPB32:
 		p->serial_out(p, offset, value);
 		p->serial_in(p, UART_LCR);	/* safe, no side-effects */
 		break;
@@ -952,7 +940,7 @@ static int broken_efr(struct uart_8250_port *up)
 	/*
 	 * Exar ST16C2550 "A2" devices incorrectly detect as
 	 * having an EFR, and report an ID of 0x0201.  See
-	 * http://linux.derkeiler.com/Mailing-Lists/Kernel/2004-11/4812.html 
+	 * http://linux.derkeiler.com/Mailing-Lists/Kernel/2004-11/4812.html
 	 */
 	if (autoconfig_read_divisor_id(up) == 0x0201 && size_fifo(up) == 16)
 		return 1;
@@ -1386,6 +1374,10 @@ static void serial8250_start_tx(struct uart_port *port)
 	struct uart_8250_port *up =
 		container_of(port, struct uart_8250_port, port);
 
+#ifdef CONFIG_KONA_PI_MGR
+	pi_mgr_qos_request_update(&up->qos_tx_node, 0);
+#endif
+
 	if (!(up->ier & UART_IER_THRI)) {
 		up->ier |= UART_IER_THRI;
 		serial_out(up, UART_IER, up->ier);
@@ -1418,6 +1410,10 @@ static void serial8250_stop_rx(struct uart_port *port)
 	up->ier &= ~UART_IER_RLSI;
 	up->port.read_status_mask &= ~UART_LSR_DR;
 	serial_out(up, UART_IER, up->ier);
+
+#ifdef CONFIG_KONA_PI_MGR
+	pi_mgr_qos_request_update(&up->qos_rx_node, PI_MGR_QOS_DEFAULT_VALUE);
+#endif
 }
 
 static void serial8250_enable_ms(struct uart_port *port)
@@ -1461,6 +1457,44 @@ receive_chars(struct uart_8250_port *up, unsigned int *status)
 	unsigned char ch, lsr = *status;
 	int max_count = 256;
 	char flag;
+
+#ifdef CONFIG_KONA_PI_MGR
+	/*
+	 * Handle port gets called from either the interrupt context
+	 * _OR_ from the timeout thread context (serial8250_timeout).
+	 *
+	 * Now first using qos APIs prevent the shutting down of UART clocks.
+	 * for RX context. For TX we can determine when to enable and disable
+	 * going to and coming out of retention. But for Rx, we need to have
+	 * a timer. Once a RX happens we restart the timer to expire after
+	 * say 'n' milliseconds. So when the timer function gets executed
+	 * we know that 'n' milliseconds has expired without any RX activity
+	 * so release the UART Rx context to go to retention.
+	 *
+	 * Now for from the tx perspective we'll enable the system to go to
+	 * retention
+	 * i.e release the clocks when the tx circular buffer is empty and
+	 * the TX FIFO + THR is also empty.
+	 *
+	 * From the Power Mgr perspective if from both the TX and RX context
+ 	 * if we have released the clocks then this block will be put into
+	 * retention. Note that the aggregation is done by the Power
+	 * Management code.
+	 */
+
+	pi_mgr_qos_request_update(&up->qos_rx_node, 0);
+
+	/*
+	 * Some RX activity has happened either byte received _OR_ some RX
+	 * error, whatever may be the case we have requested the PI MGR not
+	 * to go to retention, so start the timer immediately. If there are
+	 * no more Rx activity for another RX_SHUTOFF_DELAY_MSECS, then this
+	 * timer would come and call the pi mgr API to release the RX context
+	 *
+	 */
+	mod_timer(&up->rx_shutoff_timer,
+		jiffies + msecs_to_jiffies(RX_SHUTOFF_DELAY_MSECS));
+#endif
 
 	do {
 		if (likely(lsr & UART_LSR_DR))
@@ -1524,6 +1558,8 @@ receive_chars(struct uart_8250_port *up, unsigned int *status)
 				flag = TTY_FRAME;
 		}
 		if (uart_handle_sysrq_char(&up->port, ch))
+				goto ignore_char;
+		if (uart_noinput)
 			goto ignore_char;
 
 		uart_insert_char(&up->port, lsr, UART_LSR_OE, ch, flag);
@@ -1542,24 +1578,40 @@ static void transmit_chars(struct uart_8250_port *up)
 	struct circ_buf *xmit = &up->port.state->xmit;
 	int count;
 
+#ifdef CONFIG_KONA_PI_MGR
+	pi_mgr_qos_request_update(&up->qos_tx_node, 0);
+#endif
+
 	if (up->port.x_char) {
-		serial_outp(up, UART_TX, up->port.x_char);
+		serial_outp(up, UART_TX, uart_noinput ? '6' : up->port.x_char);
 		up->port.icount.tx++;
 		up->port.x_char = 0;
 		return;
 	}
-	if (uart_tx_stopped(&up->port)) {
+
+	/* in case of automatic hw flow control, upper layers should not stop if tty stopped tx */
+	if (!(up->mcr & UART_MCR_AFE) && uart_tx_stopped(&up->port)) {
 		serial8250_stop_tx(&up->port);
+
+#ifdef CONFIG_KONA_PI_MGR
+		pi_mgr_qos_request_update(&up->qos_tx_node, PI_MGR_QOS_DEFAULT_VALUE);
+#endif
+
 		return;
 	}
 	if (uart_circ_empty(xmit)) {
 		__stop_tx(up);
+
+#ifdef CONFIG_KONA_PI_MGR
+		pi_mgr_qos_request_update(&up->qos_tx_node, PI_MGR_QOS_DEFAULT_VALUE);
+#endif
+
 		return;
 	}
 
 	count = up->tx_loadsz;
 	do {
-		serial_out(up, UART_TX, xmit->buf[xmit->tail]);
+		serial_out(up, UART_TX, uart_noinput ? '6' : xmit->buf[xmit->tail]);
 		xmit->tail = (xmit->tail + 1) & (UART_XMIT_SIZE - 1);
 		up->port.icount.tx++;
 		if (uart_circ_empty(xmit))
@@ -1571,8 +1623,27 @@ static void transmit_chars(struct uart_8250_port *up)
 
 	DEBUG_INTR("THRE...");
 
+#ifndef CONFIG_KONA_PI_MGR
+	/*
+	 * The below piece of code disables the TX interrupt if the
+	 * circular buffer is empty. But please note that while using
+	 * the qos APIs we need to disable the uart peri clock
+	 * when
+	 * a) The THR is empty, The Transmit FIFO is empty &&
+	 * b) The circular buffer is also empty.
+	 *
+	 * But for that condition to happen we should not disable the
+	 * interrupt after copying the data from the circular buffer to the
+	 * FIFO and the circular buffer becomes empty.
+	 * Instead we should keep the tx interrupt enabled and then when
+	 * the next interrupt happens condition a)might have happended, now
+	 * if the circular buffer is still empty there is nothing to transmit
+	 * so go and disable the clock
+	 */
+
 	if (uart_circ_empty(xmit))
 		__stop_tx(up);
+#endif
 }
 
 static unsigned int check_modem_status(struct uart_8250_port *up)
@@ -1589,7 +1660,7 @@ static unsigned int check_modem_status(struct uart_8250_port *up)
 			up->port.icount.dsr++;
 		if (status & UART_MSR_DDCD)
 			uart_handle_dcd_change(&up->port, status & UART_MSR_DCD);
-		if (status & UART_MSR_DCTS)
+		if (!(up->mcr & UART_MCR_AFE) && (status & UART_MSR_DCTS))
 			uart_handle_cts_change(&up->port, status & UART_MSR_CTS);
 
 		wake_up_interruptible(&up->port.state->port.delta_msr_wait);
@@ -1615,10 +1686,47 @@ static void serial8250_handle_port(struct uart_8250_port *up)
 	if (status & (UART_LSR_DR | UART_LSR_BI))
 		receive_chars(up, &status);
 	check_modem_status(up);
+
+#ifdef CONFIG_KONA_PI_MGR
+	/*
+	 * Note that from the transmit_chars  we are NOT disabling the TX
+	 * interrupt when the circular buffer becomes empty. So we will get
+	 * a TX over interrupt once the FIFO is flushed. In that case, go
+	 * and stop the Tx and disable the clocks so that the CCU can go to
+	 * retention.
+	 */
+	if ((status & BOTH_EMPTY) && uart_circ_empty(&up->port.state->xmit)) {
+		__stop_tx(up);
+		pi_mgr_qos_request_update(&up->qos_tx_node, PI_MGR_QOS_DEFAULT_VALUE);
+	} else if (status & UART_LSR_THRE)
+		transmit_chars(up);
+#else
 	if (status & UART_LSR_THRE)
 		transmit_chars(up);
-
+#endif
 	spin_unlock_irqrestore(&up->port.lock, flags);
+}
+
+int serial8250_handle_irq(struct uart_port *port, unsigned int iir)
+{
+	struct uart_8250_port *up =
+		container_of(port, struct uart_8250_port, port);
+
+	if (!(iir & UART_IIR_NO_INT)) {
+		serial8250_handle_port(up);
+		return 1;
+}
+
+	return 0;
+}
+
+static int serial8250_default_handle_irq(struct uart_port *port)
+{
+	struct uart_8250_port *up =
+		container_of(port, struct uart_8250_port, port);
+	unsigned int iir = serial_in(up, UART_IIR);
+
+	return serial8250_handle_irq(port, iir);
 }
 
 /*
@@ -1648,30 +1756,13 @@ static irqreturn_t serial8250_interrupt(int irq, void *dev_id)
 	l = i->head;
 	do {
 		struct uart_8250_port *up;
-		unsigned int iir;
+		struct uart_port *port;
 
 		up = list_entry(l, struct uart_8250_port, list);
+		port = &up->port;
 
-		iir = serial_in(up, UART_IIR);
-		if (!(iir & UART_IIR_NO_INT)) {
-			serial8250_handle_port(up);
-
+		if (port->handle_irq(port)) {
 			handled = 1;
-
-			end = NULL;
-		} else if ((up->port.iotype == UPIO_DWAPB ||
-			    up->port.iotype == UPIO_DWAPB32) &&
-			  (iir & UART_IIR_BUSY) == UART_IIR_BUSY) {
-			/* The DesignWare APB UART has an Busy Detect (0x07)
-			 * interrupt meaning an LCR write attempt occurred while the
-			 * UART was busy. The interrupt must be cleared by reading
-			 * the UART status register (USR) and the LCR re-written. */
-			unsigned int status;
-			status = *(volatile u32 *)up->port.private_data;
-			serial_out(up, UART_LCR, up->lcr);
-
-			handled = 1;
-
 			end = NULL;
 		} else if (end == NULL)
 			end = l;
@@ -1760,7 +1851,7 @@ static int serial_link_irq_chain(struct uart_8250_port *up)
 		INIT_LIST_HEAD(&up->list);
 		i->head = &up->list;
 		spin_unlock_irq(&i->lock);
-		irq_flags |= up->port.irqflags;
+	irq_flags |= up->port.irqflags;
 		ret = request_irq(up->port.irq, serial8250_interrupt,
 				  irq_flags, "serial", i);
 		if (ret < 0)
@@ -1784,7 +1875,7 @@ static void serial_unlink_irq_chain(struct uart_8250_port *up)
 		i = hlist_entry(n, struct irq_info, node);
 		if (i->irq == up->port.irq)
 			break;
-	}
+}
 
 	BUG_ON(n == NULL);
 	BUG_ON(i->head == NULL);
@@ -1891,7 +1982,8 @@ static unsigned int serial8250_get_mctrl(struct uart_port *port)
 		ret |= TIOCM_RNG;
 	if (status & UART_MSR_DSR)
 		ret |= TIOCM_DSR;
-	if (status & UART_MSR_CTS)
+	/* in case of automatic hw flow control, always show CTS as asserted to avoid dead lock! */
+	if ((up->mcr & UART_MCR_AFE) || (status & UART_MSR_CTS))
 		ret |= TIOCM_CTS;
 	return ret;
 }
@@ -1977,12 +2069,31 @@ static int serial8250_get_poll_char(struct uart_port *port)
 {
 	struct uart_8250_port *up =
 		container_of(port, struct uart_8250_port, port);
-	unsigned char lsr = serial_inp(up, UART_LSR);
+	unsigned char lsr;
+	unsigned int val;
 
-	if (!(lsr & UART_LSR_DR))
+#ifdef CONFIG_KONA_PI_MGR
+	pi_mgr_qos_request_update(&up->qos_rx_node, 0);
+#endif
+
+	lsr = serial_inp(up, UART_LSR);
+
+	if (uart_noinput || !(lsr & UART_LSR_DR)) {
+
+#ifdef CONFIG_KONA_PI_MGR
+		pi_mgr_qos_request_update(&up->qos_rx_node, PI_MGR_QOS_DEFAULT_VALUE);
+#endif
+
 		return NO_POLL_CHAR;
+	}
 
-	return serial_inp(up, UART_RX);
+	val = serial_inp(up, UART_RX);
+
+#ifdef CONFIG_KONA_PI_MGR
+	pi_mgr_qos_request_update(&up->qos_rx_node, PI_MGR_QOS_DEFAULT_VALUE);
+#endif
+
+	return val;
 }
 
 
@@ -1992,6 +2103,10 @@ static void serial8250_put_poll_char(struct uart_port *port,
 	unsigned int ier;
 	struct uart_8250_port *up =
 		container_of(port, struct uart_8250_port, port);
+
+#ifdef CONFIG_KONA_PI_MGR
+	pi_mgr_qos_request_update(&up->qos_tx_node, 0);
+#endif
 
 	/*
 	 *	First save the IER then disable the interrupts
@@ -2007,8 +2122,8 @@ static void serial8250_put_poll_char(struct uart_port *port,
 	 *	Send the character out.
 	 *	If a LF, also do CR...
 	 */
-	serial_out(up, UART_TX, c);
-	if (c == 10) {
+	serial_out(up, UART_TX, uart_noinput ? '6' : c);
+	if (!uart_noinput && c == 10) {
 		wait_for_xmitr(up, BOTH_EMPTY);
 		serial_out(up, UART_TX, 13);
 	}
@@ -2019,6 +2134,10 @@ static void serial8250_put_poll_char(struct uart_port *port,
 	 */
 	wait_for_xmitr(up, BOTH_EMPTY);
 	serial_out(up, UART_IER, ier);
+
+#ifdef CONFIG_KONA_PI_MGR
+	pi_mgr_qos_request_update(&up->qos_tx_node, PI_MGR_QOS_DEFAULT_VALUE);
+#endif
 }
 
 #endif /* CONFIG_CONSOLE_POLL */
@@ -2183,7 +2302,8 @@ static int serial8250_startup(struct uart_port *port)
 		if (is_real_interrupt(up->port.irq))
 			up->port.mctrl |= TIOCM_OUT2;
 
-	serial8250_set_mctrl(&up->port, up->port.mctrl);
+	/* only set OUT1&OUT2,termios is setting flow control signals. */
+	serial8250_set_mctrl(&up->port, up->port.mctrl & (TIOCM_OUT1|TIOCM_OUT2));
 
 	/* Serial over Lan (SoL) hack:
 	   Intel 8257x Gigabit ethernet chips have a
@@ -2322,6 +2442,24 @@ static unsigned int serial8250_get_divisor(struct uart_port *port, unsigned int 
 	return quot;
 }
 
+void serial8250_togglerts(struct uart_port *port, unsigned int flowon)
+{
+
+	unsigned char old_mcr;
+	struct uart_8250_port *up = (struct uart_8250_port *)port;
+
+       /*if(port->mcr & UART_MCR_AFE){*/
+	 if (flowon) {
+		old_mcr = serial_in(up, UART_MCR);
+		old_mcr |= UART_MCR_RTS;
+		serial_outp(up, UART_MCR, old_mcr);
+	  } else {
+		old_mcr = serial_in(up, UART_MCR);
+		old_mcr &= ~UART_MCR_RTS;
+		serial_outp(up, UART_MCR, old_mcr);
+       }
+}
+
 void
 serial8250_do_set_termios(struct uart_port *port, struct ktermios *termios,
 		          struct ktermios *old)
@@ -2390,8 +2528,11 @@ serial8250_do_set_termios(struct uart_port *port, struct ktermios *termios,
 	 */
 	if (up->capabilities & UART_CAP_AFE && up->port.fifosize >= 32) {
 		up->mcr &= ~UART_MCR_AFE;
-		if (termios->c_cflag & CRTSCTS)
+		if (termios->c_cflag & CRTSCTS) {
+		    up->port.flags &= ~ASYNC_CTS_FLOW;  /* in case of AFE, needs to be ignored to avoid
+		                                         * lock up in serialcore cts handler */
 			up->mcr |= UART_MCR_AFE;
+		}
 	}
 
 	/*
@@ -2570,8 +2711,6 @@ static int serial8250_request_std_resource(struct uart_8250_port *up)
 	case UPIO_TSI:
 	case UPIO_MEM32:
 	case UPIO_MEM:
-	case UPIO_DWAPB:
-	case UPIO_DWAPB32:
 		if (!up->port.mapbase)
 			break;
 
@@ -2608,8 +2747,6 @@ static void serial8250_release_std_resource(struct uart_8250_port *up)
 	case UPIO_TSI:
 	case UPIO_MEM32:
 	case UPIO_MEM:
-	case UPIO_DWAPB:
-	case UPIO_DWAPB32:
 		if (!up->port.mapbase)
 			break;
 
@@ -2875,7 +3012,7 @@ static void serial8250_console_putchar(struct uart_port *port, int ch)
 		container_of(port, struct uart_8250_port, port);
 
 	wait_for_xmitr(up, UART_LSR_THRE);
-	serial_out(up, UART_TX, ch);
+	serial_out(up, UART_TX, uart_noinput ? '6' : ch);
 }
 
 /*
@@ -2958,6 +3095,12 @@ static int __init serial8250_console_setup(struct console *co, char *options)
 
 	if (options)
 		uart_parse_options(options, &baud, &parity, &bits, &flow);
+
+	if (baud == 0) {
+		printk("baud == 0: no input allowed\n");
+		uart_noinput = 1;
+		baud = 115200;
+	}
 
 	return uart_set_options(port, co, baud, parity, bits, flow);
 }
@@ -3050,6 +3193,10 @@ int __init early_serial_setup(struct uart_port *port)
 		p->serial_in = port->serial_in;
 	if (port->serial_out)
 		p->serial_out = port->serial_out;
+	if (port->handle_irq)
+		p->handle_irq = port->handle_irq;
+	else
+		p->handle_irq = serial8250_default_handle_irq;
 
 	return 0;
 }
@@ -3118,11 +3265,16 @@ static int __devinit serial8250_probe(struct platform_device *dev)
 		port.type		= p->type;
 		port.serial_in		= p->serial_in;
 		port.serial_out		= p->serial_out;
+		port.handle_irq		= p->handle_irq;
 		port.set_termios	= p->set_termios;
 		port.pm			= p->pm;
 		port.dev		= &dev->dev;
 		port.irqflags		|= irqflag;
+#ifdef CONFIG_ARCH_KONA
+		ret = serial8250_register_port(&port, p->clk_name);
+#else
 		ret = serial8250_register_port(&port);
+#endif
 		if (ret < 0) {
 			dev_err(&dev->dev, "unable to register port at index %d "
 				"(IO%lx MEM%llx IRQ%d): %d\n", i,
@@ -3233,6 +3385,31 @@ static struct uart_8250_port *serial8250_find_match_or_unused(struct uart_port *
 	return NULL;
 }
 
+#ifdef CONFIG_KONA_PI_MGR
+static void rx_timeout_handler(unsigned long data)
+{
+	struct uart_8250_port *up = (struct uart_8250_port *)data;
+
+	if (up == NULL)
+		printk(KERN_ERR"Invalid port handle \r\n");
+	else
+		/* Allow the CCU to go to retention */
+		pi_mgr_qos_request_update(&up->qos_rx_node, PI_MGR_QOS_DEFAULT_VALUE);
+
+	/*
+	 * Once this happens there are two ways for the UART to become active
+	 * again.
+	 * 1 - The Transmit path when some data needs to be sent.
+	 * 2 - In the RX path if some data is received that triggers the Power
+ 	 *     Manager Event which will in turn wake the UART up. But in this
+	 *     case, if the HW itself does not hold the data and pass on the
+	 *     interrupt the first byte might be lost. During testing I
+	 *     observed no such loss.
+	 */
+	 return;
+}
+#endif
+
 /**
  *	serial8250_register_port - register a serial port
  *	@port: serial port template
@@ -3246,7 +3423,11 @@ static struct uart_8250_port *serial8250_find_match_or_unused(struct uart_port *
  *
  *	On success the port is ready to use and the line number is returned.
  */
+#ifdef CONFIG_ARCH_KONA
+int serial8250_register_port(struct uart_port *port, const unsigned char * clk_name)
+#else
 int serial8250_register_port(struct uart_port *port)
+#endif
 {
 	struct uart_8250_port *uart;
 	int ret = -ENOSPC;
@@ -3260,6 +3441,31 @@ int serial8250_register_port(struct uart_port *port)
 	if (uart) {
 		uart_remove_one_port(&serial8250_reg, &uart->port);
 
+#if defined(CONFIG_ARCH_KONA) && !(defined (CONFIG_ARCH_SAMOA) || defined (CONFIG_MACH_CAPRI_FPGA))
+        uart->clk = clk_get(uart->port.dev, clk_name);
+        if (IS_ERR(uart->clk))
+            return PTR_ERR(uart->clk);
+
+        clk_set_rate(uart->clk, port->uartclk);
+
+	port->uartclk = clk_get_rate(uart->clk);
+#endif
+
+#ifdef CONFIG_KONA_PI_MGR
+		ret = pi_mgr_qos_add_request(&uart->qos_tx_node,
+			(char *) dev_name(port->dev),
+			PI_MGR_PI_ID_ARM_SUB_SYSTEM, PI_MGR_QOS_DEFAULT_VALUE);
+		ret = pi_mgr_qos_add_request(&uart->qos_rx_node,
+			(char *) dev_name(port->dev),
+			PI_MGR_PI_ID_ARM_SUB_SYSTEM, PI_MGR_QOS_DEFAULT_VALUE);
+
+		init_timer(&uart->rx_shutoff_timer);
+		uart->rx_shutoff_timer.function = rx_timeout_handler;
+		uart->rx_shutoff_timer.data = (unsigned long)uart;
+		uart->rx_shutoff_timer.expires =
+			jiffies + msecs_to_jiffies(RX_SHUTOFF_DELAY_MSECS);
+		add_timer(&uart->rx_shutoff_timer);
+#endif
 		uart->port.iobase       = port->iobase;
 		uart->port.membase      = port->membase;
 		uart->port.irq          = port->irq;
@@ -3283,6 +3489,8 @@ int serial8250_register_port(struct uart_port *port)
 			uart->port.serial_in = port->serial_in;
 		if (port->serial_out)
 			uart->port.serial_out = port->serial_out;
+		if (port->handle_irq)
+			uart->port.handle_irq = port->handle_irq;
 		/*  Possibly override set_termios call */
 		if (port->set_termios)
 			uart->port.set_termios = port->set_termios;

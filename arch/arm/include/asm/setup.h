@@ -126,6 +126,14 @@ struct tag_cmdline {
 	char	cmdline[1];	/* this is the minimum size */
 };
 
+
+#define ATAG_ESN	0x54412100
+
+struct tag_esn {
+	u8 esn_mac[10];
+	u8 extra[32];
+};
+
 /* acorn RiscPC specific information */
 #define ATAG_ACORN	0x41000101
 
@@ -165,6 +173,7 @@ struct tag {
 		 * DC21285 specific
 		 */
 		struct tag_memclk	memclk;
+		struct tag_esn		esn;
 	} u;
 };
 

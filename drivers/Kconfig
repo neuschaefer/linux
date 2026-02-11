@@ -58,11 +58,15 @@ source "drivers/ptp/Kconfig"
 
 source "drivers/gpio/Kconfig"
 
+source "drivers/pwm/Kconfig"
+
 source "drivers/w1/Kconfig"
 
 source "drivers/power/Kconfig"
 
 source "drivers/hwmon/Kconfig"
+
+source "drivers/haptic/Kconfig"
 
 source "drivers/thermal/Kconfig"
 
@@ -90,11 +94,15 @@ source "drivers/uwb/Kconfig"
 
 source "drivers/mmc/Kconfig"
 
+source "drivers/mmc-poll/Kconfig"
+
 source "drivers/memstick/Kconfig"
 
 source "drivers/leds/Kconfig"
 
 source "drivers/nfc/Kconfig"
+
+source "drivers/switch/Kconfig"
 
 source "drivers/accessibility/Kconfig"
 
@@ -125,5 +133,7 @@ source "drivers/clk/Kconfig"
 source "drivers/hwspinlock/Kconfig"
 
 source "drivers/clocksource/Kconfig"
+
+source "drivers/accessory/Kconfig"
 
 endmenu

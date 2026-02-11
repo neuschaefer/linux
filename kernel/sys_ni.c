@@ -1,6 +1,7 @@
 
 #include <linux/linkage.h>
 #include <linux/errno.h>
+#include <linux/kernel.h>
 
 #include <asm/unistd.h>
 
@@ -13,6 +14,9 @@ asmlinkage long sys_ni_syscall(void);
  */
 asmlinkage long sys_ni_syscall(void)
 {
+	register int syscall_no asm ("r7");
+	printk("unimplemented syscall %d\n", syscall_no);
+
 	return -ENOSYS;
 }
 

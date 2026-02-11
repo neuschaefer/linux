@@ -1376,8 +1376,8 @@ enum tcp_seq_states {
 struct tcp_seq_afinfo {
 	char			*name;
 	sa_family_t		family;
-	struct file_operations	seq_fops;
-	struct seq_operations	seq_ops;
+	file_operations_no_const	seq_fops;
+	seq_operations_no_const	seq_ops;
 };
 
 struct tcp_iter_state {
@@ -1405,6 +1405,8 @@ extern struct sk_buff **tcp4_gro_receive(struct sk_buff **head,
 					 struct sk_buff *skb);
 extern int tcp_gro_complete(struct sk_buff *skb);
 extern int tcp4_gro_complete(struct sk_buff *skb);
+
+extern int tcp_nuke_addr(struct net *net, struct sockaddr *addr);
 
 #ifdef CONFIG_PROC_FS
 extern int tcp4_proc_init(void);

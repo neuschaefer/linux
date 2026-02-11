@@ -1,3 +1,4 @@
+ccflags-y += -O3
 lzo_compress-objs := lzo1x_compress.o
 lzo_decompress-objs := lzo1x_decompress.o
 

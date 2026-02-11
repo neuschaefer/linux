@@ -26,8 +26,11 @@ static int meminfo_proc_show(struct seq_file *m, void *v)
 	unsigned long allowed;
 	struct vmalloc_info vmi;
 	long cached;
+	long available;
 	unsigned long pages[NR_LRU_LISTS];
 	int lru;
+
+	pax_track_stack();
 
 /*
  * display in kilobytes.
@@ -48,6 +51,8 @@ static int meminfo_proc_show(struct seq_file *m, void *v)
 
 	for (lru = LRU_BASE; lru < NR_LRU_LISTS; lru++)
 		pages[lru] = global_page_state(NR_LRU_BASE + lru);
+
+	available = si_mem_available();
 
 	/*
 	 * Tagged format, for easy grepping and expansion.
@@ -104,6 +109,7 @@ static int meminfo_proc_show(struct seq_file *m, void *v)
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
 		"AnonHugePages:  %8lu kB\n"
 #endif
+		"MemAvailable:   %8lu kB\n"
 		,
 		K(i.totalram),
 		K(i.freeram),
@@ -158,12 +164,13 @@ static int meminfo_proc_show(struct seq_file *m, void *v)
 		vmi.used >> 10,
 		vmi.largest_chunk >> 10
 #ifdef CONFIG_MEMORY_FAILURE
-		,atomic_long_read(&mce_bad_pages) << (PAGE_SHIFT - 10)
+		,atomic_long_read_unchecked(&mce_bad_pages) << (PAGE_SHIFT - 10)
 #endif
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
 		,K(global_page_state(NR_ANON_TRANSPARENT_HUGEPAGES) *
 		   HPAGE_PMD_NR)
 #endif
+		,K(available)
 		);
 
 	hugetlb_report_meminfo(m);

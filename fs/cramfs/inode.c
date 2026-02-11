@@ -23,15 +23,29 @@
 #include <linux/buffer_head.h>
 #include <linux/vfs.h>
 #include <linux/mutex.h>
+#include <linux/syscalls.h>
+#include <linux/crypto.h>
+#include <linux/scatterlist.h>
 
 #include <asm/uaccess.h>
+
+extern unsigned char roothash[];
 
 static const struct super_operations cramfs_ops;
 static const struct inode_operations cramfs_dir_inode_operations;
 static const struct file_operations cramfs_directory_operations;
 static const struct address_space_operations cramfs_aops;
+static int custom_pkg_sideload = 0;
 
 static DEFINE_MUTEX(read_mutex);
+
+#define SIZEOF_AIMAGE_HEADER            256
+#define IMG_MAGIC                       0x41676d69
+#define IMG_MAGIC2                      0x43634d52
+#define IMG_TYPE_APPFS_CRAMFS           (0x0D)
+#define IMG_TYPE_AUTH_SIGNATURE         (0x16)
+#define IMG_TYPE_CRAMFS_AUTH            (0x101)
+
 
 
 /* These macros may change in future, to provide better st_ino semantics. */
@@ -91,8 +105,14 @@ static struct inode *get_cramfs_inode(struct super_block *sb,
 	}
 
 	inode->i_mode = cramfs_inode->mode;
-	inode->i_uid = cramfs_inode->uid;
-	inode->i_gid = cramfs_inode->gid;
+	if( CRAMFS_SB(sb)->flags & (MS_NODEV|MS_NOSUID)) {
+		inode->i_mode |= S_ISDIR(cramfs_inode->mode) ? (S_IRGRP | S_IXGRP) : S_IRGRP;
+	}
+	/* Unless the file is a special file, it should not writable. */
+	if (!S_ISBLK(inode->i_mode) && !S_ISCHR(inode->i_mode) && !S_ISFIFO(inode->i_mode) && !S_ISSOCK(inode->i_mode))
+		inode->i_mode &= ~S_IWUGO;
+	inode->i_uid = CRAMFS_SB(sb)->uid == 0 ? cramfs_inode->uid : CRAMFS_SB(sb)->uid;
+	inode->i_gid = CRAMFS_SB(sb)->gid == 0 ? cramfs_inode->gid : CRAMFS_SB(sb)->gid;
 
 	/* if the lower 2 bits are zero, the inode contains data */
 	if (!(inode->i_ino & 3)) {
@@ -220,6 +240,91 @@ static void *cramfs_read(struct super_block *sb, unsigned int offset, unsigned i
 	return read_buffers[buffer] + offset;
 }
 
+static int cramfs_read_and_uncompress(void* pgdata, struct super_block *sb, unsigned int offset, unsigned int len)
+{
+	struct address_space *mapping = sb->s_bdev->bd_inode->i_mapping;
+	struct page *pages[3] = {0};
+	void* srcdata[3] = {0};
+	int srclen[4] = {0};
+	int fail, total;
+	unsigned i, first_blocknr, last_blocknr, block_count, orig_offset = offset, orig_len = len;
+	unsigned long devsize;
+
+	if (!len)
+		return 0;
+	
+	first_blocknr = offset >> PAGE_CACHE_SHIFT;
+	last_blocknr = (offset + len - 1) >> PAGE_CACHE_SHIFT;
+	block_count = last_blocknr - first_blocknr + 1;
+	if (block_count > 3) {
+		printk(KERN_ERR "cramfs: compressed data too long: %d\n", len);
+		return 0;
+	}
+
+	offset &= PAGE_CACHE_SIZE - 1;
+	devsize = mapping->host->i_size >> PAGE_CACHE_SHIFT;
+	if (last_blocknr >= devsize) {
+		printk(KERN_ERR "cramfs: access past end: %lu %lu\n", orig_offset, orig_len);
+		return 0;
+	}
+
+	fail = 0;
+
+	for (i=0; i < block_count; i++) {
+		struct page *page = NULL;
+
+		page = read_mapping_page_async(mapping, i + first_blocknr, NULL);
+		/* synchronous error? */
+		if (!page || IS_ERR(page)) {
+			page = NULL;
+			fail = 1;
+		}
+		pages[i] = page;
+	}
+
+	for (i = 0; i < block_count; i++) {
+		struct page *page = pages[i];
+		if (page) {
+			wait_on_page_locked(page);
+			if (!PageUptodate(page)) {
+				/* asynchronous error */
+				page_cache_release(page);
+				pages[i] = NULL;
+				fail = 1;
+			}
+		}
+	}
+
+	if (fail) {
+		for (i = 0; i < block_count; i++) {
+			if (pages[i])
+				page_cache_release(pages[i]);
+			else
+				printk(KERN_ERR "cramfs: error reading page %lu\n", first_blocknr+i);
+		}
+		return 0;
+	}
+
+	for (i = 0; i < block_count; i++) {
+		srcdata[i] = kmap(pages[i]) + offset;
+		srclen[i] = PAGE_CACHE_SIZE - offset;
+		if (srclen[i] > len) srclen[i] = len;
+		len -= srclen[i];
+		offset = 0;
+	}
+		
+	total = cramfs_uncompress_block(pgdata, PAGE_CACHE_SIZE, srcdata, srclen);
+	if (total < 0)
+		printk(KERN_ERR "cramfs: %lu %d %d %d\n", first_blocknr, block_count, orig_offset, orig_len);
+
+	for (i = 0; i < block_count; i++) {
+		kunmap(pages[i]);
+		page_cache_release(pages[i]);
+	}
+
+	return total;
+}
+
 static void cramfs_put_super(struct super_block *sb)
 {
 	kfree(sb->s_fs_info);
@@ -314,6 +419,17 @@ static int cramfs_fill_super(struct super_block *sb, void *data, int silent)
 		goto out;
 	}
 
+	/* Did the mounter specify an overriding uid/gid for all files? */
+	if (data) {
+		const char* param = (const char*) data;
+		const char *p = strstr(param, "uid=");
+		if (p)
+			CRAMFS_SB(sb)->uid = simple_strtoul(p+4, 0, 0);
+		p = strstr(param, "gid=");
+		if (p)
+			CRAMFS_SB(sb)->gid = simple_strtoul(p+4, 0, 0);
+	}
+ 
 	/* Set it all up.. */
 	sb->s_op = &cramfs_ops;
 	root = get_cramfs_inode(sb, &super.root, 0);
@@ -511,10 +627,8 @@ static int cramfs_readpage(struct file *file, struct page * page)
 			goto err;
 		} else {
 			mutex_lock(&read_mutex);
-			bytes_filled = cramfs_uncompress_block(pgdata,
-				 PAGE_CACHE_SIZE,
-				 cramfs_read(sb, start_offset, compr_len),
-				 compr_len);
+			bytes_filled = cramfs_read_and_uncompress(pgdata,
+				 sb, start_offset, compr_len);
 			mutex_unlock(&read_mutex);
 			if (unlikely(bytes_filled < 0))
 				goto err;
@@ -569,11 +683,151 @@ static struct dentry *cramfs_mount(struct file_system_type *fs_type,
 	return mount_bdev(fs_type, flags, dev_name, data, cramfs_fill_super);
 }
 
+/* Yet another partial definition of aimage_header_t. */
+typedef struct {
+    unsigned int v1, v2, magic, magic2,
+                 re, pl, aimage_type, data_length,
+                 dl, data_start_offset; } aimage_header_t;
+
+static int aimage_field(void *vp, int user_bufs, int offset, unsigned int *p_value)
+{
+	if (user_bufs) {
+		aimage_header_t __user *up = vp;
+		unsigned char __user *ufield = ((unsigned char __user *)up) + offset;
+		if (copy_from_user(p_value, ufield, sizeof(unsigned int)))
+			return -EFAULT;
+	} else {
+		unsigned char *field = ((unsigned char *)vp) + offset;
+		*p_value = *(unsigned int*) field;
+	}
+	return 0;
+}
+
+static off_t file_read(struct file *file, void *data, int datalen, loff_t pos)
+{
+	return file->f_op->read(file, data, datalen, &pos);
+}
+
+/* Read authdata (MerkleHeader) from an open file descriptor. */
+static int cramfs_get_authdata2(struct file *file, unsigned int wtype, void *data, int datalen, void *sbuf, int sbuflen, int user_bufs)
+{
+	off_t pos;
+	unsigned int data_length;
+	unsigned int aimage_type;
+	unsigned int data_start_offset;
+	unsigned int magic, magic2;
+	int partition_offset = -1;
+	int err;
+
+	for (pos = 0; ;  pos += data_length) {
+		int nread = file_read(file, sbuf, SIZEOF_AIMAGE_HEADER, pos);
+		if (nread != SIZEOF_AIMAGE_HEADER) {
+			printk(KERN_ERR "auth read error [a] %d/%d\n", nread, SIZEOF_AIMAGE_HEADER);
+			return -EIO;
+		}
+
+		#define GET_AIMAGE_FIELD(_name) \
+			err = aimage_field(sbuf, user_bufs, offsetof(aimage_header_t, _name), &_name); \
+			if (err < 0) return err;
+
+		GET_AIMAGE_FIELD(magic);
+		GET_AIMAGE_FIELD(magic2);
+		if (magic != IMG_MAGIC || magic2 != IMG_MAGIC2) {
+			printk(KERN_ERR "invalid magic at %lx: %x %x\n", (long) pos, magic, magic2);
+			return -EINVAL;
+		}
+
+		GET_AIMAGE_FIELD(aimage_type);
+		GET_AIMAGE_FIELD(data_length);
+		GET_AIMAGE_FIELD(data_start_offset);
+		if (partition_offset == -1) {
+			/* We haven't found wtype yet. */
+			if (aimage_type == wtype) { /* Here it is. */
+				partition_offset = pos + data_start_offset;
+			}
+		} else if (aimage_type == IMG_TYPE_CRAMFS_AUTH) {
+			/* Read the Merkle header. */
+			nread = file_read(file, data, datalen, pos + data_start_offset);
+			if (nread != datalen) {
+				printk(KERN_ERR "auth read error [c] %d/%d\n", nread, datalen);
+				return -EIO;
+			}
+			break;
+		}
+	}
+	return partition_offset;
+}
+
+int cramfs_get_authdata(struct file *file, unsigned int wtype, void *data, int datalen, void *sbuf, int sbuflen)
+{
+	int user_bufs = (sbuf != NULL);
+	int sbufsize = CRAMFS_SUPER_SIZE;
+	struct hash_desc desc;
+	struct scatterlist sg;
+	unsigned char const *stored_hash;
+	unsigned char calc_hash[16];
+	unsigned digestsize;
+	void *udata;
+	int position;
+	int err;
+
+	if (!user_bufs) {
+		sbuf = kmalloc(sbufsize, GFP_KERNEL);
+		sbuflen = sbufsize;
+	}
+	if (sbuflen < sbufsize)
+		return -EINVAL;
+	position = cramfs_get_authdata2(file, wtype, data, datalen, sbuf, sbuflen, user_bufs);
+	if (!user_bufs)
+		kfree(sbuf);
+	if (position < 0)
+		return position;
+
+	desc.flags = 0;
+	desc.tfm = crypto_alloc_hash("md5", 0, CRYPTO_ALG_ASYNC);
+	if (IS_ERR(desc.tfm))
+		return PTR_ERR(desc.tfm);
+	if (!user_bufs) {
+		udata = data;
+	} else {
+		udata = kmalloc(datalen, GFP_KERNEL);
+		if (copy_from_user(udata, data, datalen)) {
+			kfree(udata);
+			return -EFAULT;
+		}
+	}
+	err = crypto_hash_init(&desc);
+	if (err < 0)
+		return err;
+	digestsize = crypto_hash_digestsize(desc.tfm);
+	BUG_ON(digestsize != sizeof(calc_hash));
+	sg_init_table(&sg, 1);
+	sg_init_one(&sg, udata, datalen);
+	crypto_hash_update(&desc, &sg, datalen);
+	crypto_hash_final(&desc, calc_hash);
+	if (user_bufs)
+		kfree(udata);
+	crypto_free_hash(desc.tfm);
+
+	if (wtype == IMG_TYPE_APPFS_CRAMFS)
+		stored_hash = &roothash[sizeof(calc_hash)];
+	else
+		stored_hash = &roothash[0];
+	if (memcmp(stored_hash, calc_hash, sizeof(calc_hash))) {
+		if ((strncmp(saved_command_line, "dev=1 ", 6) && !custom_pkg_sideload) || wtype != IMG_TYPE_APPFS_CRAMFS)
+			return -EKEYREJECTED;
+        printk("ignore roothash digest failure\n");
+    }
+	return position;
+}
+EXPORT_SYMBOL(cramfs_get_authdata);
+
 static struct file_system_type cramfs_fs_type = {
 	.owner		= THIS_MODULE,
 	.name		= "cramfs",
 	.mount		= cramfs_mount,
 	.kill_sb	= kill_block_super,
+	.get_authdata	= cramfs_get_authdata,
 	.fs_flags	= FS_REQUIRES_DEV,
 };
 
@@ -595,6 +849,13 @@ static void __exit exit_cramfs_fs(void)
 	cramfs_uncompress_exit();
 	unregister_filesystem(&cramfs_fs_type);
 }
+
+static int __init setup_custom_pkg_sideload(char *str)
+{
+	custom_pkg_sideload = (*str == '1');
+	return 1;
+}
+__setup("custom_pkg_sideload=", setup_custom_pkg_sideload);
 
 module_init(init_cramfs_fs)
 module_exit(exit_cramfs_fs)

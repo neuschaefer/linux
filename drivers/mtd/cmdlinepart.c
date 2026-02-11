@@ -165,6 +165,12 @@ static struct mtd_partition * newpart(char *s,
 		s += 2;
         }
 
+	if (strncmp(s, "enc", 3) == 0)
+	{
+		mask_flags |= MTD_UNENCRYPTED;
+		s += 3;
+	}
+
 	/* test if more partitions are following */
 	if (*s == ',')
 	{

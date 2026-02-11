@@ -71,6 +71,7 @@
 #include <linux/ctype.h>
 #include <linux/ftrace.h>
 #include <linux/slab.h>
+#include <linux/cpuacct.h>
 
 #include <asm/tlb.h>
 #include <asm/irq_regs.h>
@@ -82,6 +83,10 @@
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/sched.h>
+
+#ifdef CONFIG_BCM_KNLLOG_IRQ
+#include <linux/broadcom/knllog.h>
+#endif
 
 /*
  * Convert user-nice values [ -20 ... 0 ... 19 ]
@@ -2217,7 +2222,7 @@ void set_task_cpu(struct task_struct *p, unsigned int new_cpu)
 
 	if (task_cpu(p) != new_cpu) {
 		p->se.nr_migrations++;
-		perf_sw_event(PERF_COUNT_SW_CPU_MIGRATIONS, 1, 1, NULL, 0);
+		perf_sw_event(PERF_COUNT_SW_CPU_MIGRATIONS, 1, NULL, 0);
 	}
 
 	__set_task_cpu(p, new_cpu);
@@ -2836,19 +2841,23 @@ void sched_fork(struct task_struct *p)
 	p->state = TASK_RUNNING;
 
 	/*
+	 * Make sure we do not leak PI boosting priority to the child.
+	 */
+	p->prio = current->normal_prio;
+
+	/*
 	 * Revert to default priority/policy on fork if requested.
 	 */
 	if (unlikely(p->sched_reset_on_fork)) {
-		if (p->policy == SCHED_FIFO || p->policy == SCHED_RR) {
+		if (task_has_rt_policy(p)) {
 			p->policy = SCHED_NORMAL;
-			p->normal_prio = p->static_prio;
-		}
-
-		if (PRIO_TO_NICE(p->static_prio) < 0) {
 			p->static_prio = NICE_TO_PRIO(0);
-			p->normal_prio = p->static_prio;
-			set_load_weight(p);
-		}
+			p->rt_priority = 0;
+		} else if (PRIO_TO_NICE(p->static_prio) < 0)
+			p->static_prio = NICE_TO_PRIO(0);
+
+		p->prio = p->normal_prio = p->static_prio;
+		set_load_weight(p);
 
 		/*
 		 * We don't need the reset flag anymore after the fork. It has
@@ -2856,11 +2865,6 @@ void sched_fork(struct task_struct *p)
 		 */
 		p->sched_reset_on_fork = 0;
 	}
-
-	/*
-	 * Make sure we do not leak PI boosting priority to the child.
-	 */
-	p->prio = current->normal_prio;
 
 	if (!rt_prio(p->prio))
 		p->sched_class = &fair_sched_class;
@@ -3053,7 +3057,7 @@ static void finish_task_switch(struct rq *rq, struct task_struct *prev)
 #ifdef __ARCH_WANT_INTERRUPTS_ON_CTXSW
 	local_irq_disable();
 #endif /* __ARCH_WANT_INTERRUPTS_ON_CTXSW */
-	perf_event_task_sched_in(current);
+	perf_event_task_sched_in(prev, current);
 #ifdef __ARCH_WANT_INTERRUPTS_ON_CTXSW
 	local_irq_enable();
 #endif /* __ARCH_WANT_INTERRUPTS_ON_CTXSW */
@@ -4226,6 +4230,8 @@ static void __sched __schedule(void)
 	struct rq *rq;
 	int cpu;
 
+	pax_track_stack();
+
 need_resched:
 	preempt_disable();
 	cpu = smp_processor_id();
@@ -4273,6 +4279,12 @@ need_resched:
 	next = pick_next_task(rq);
 	clear_tsk_need_resched(prev);
 	rq->skip_clock_update = 0;
+
+#ifdef CONFIG_BCM_KNLLOG_IRQ
+	if (gKnllogIrqSchedEnable & KNLLOG_THREAD) KNLLOG("%d (%x)-> %d (%x)\n",
+			(int)prev->pid, *(int *)(prev->comm),
+			(int)next->pid, *(int *)(next->comm));
+#endif
 
 	if (likely(prev != next)) {
 		rq->nr_switches++;
@@ -4919,6 +4931,8 @@ int can_nice(const struct task_struct *p, const int nice)
 	/* convert nice value [19,-20] to rlimit style value [1,40] */
 	int nice_rlim = 20 - nice;
 
+	gr_learn_resource(p, RLIMIT_NICE, nice_rlim, 1);
+
 	return (nice_rlim <= task_rlimit(p, RLIMIT_NICE) ||
 		capable(CAP_SYS_NICE));
 }
@@ -4952,7 +4966,8 @@ SYSCALL_DEFINE1(nice, int, increment)
 	if (nice > 19)
 		nice = 19;
 
-	if (increment < 0 && !can_nice(current, nice))
+	if (increment < 0 && (!can_nice(current, nice) ||
+			      gr_handle_chroot_nice()))
 		return -EPERM;
 
 	retval = security_task_setnice(current, nice);
@@ -5096,6 +5111,7 @@ recheck:
 			unsigned long rlim_rtprio =
 					task_rlimit(p, RLIMIT_RTPRIO);
 
+			 gr_learn_resource(p, RLIMIT_RTPRIO, param->sched_priority, 1);
 			/* can't set/change the rt policy */
 			if (policy != p->policy && !rlim_rtprio)
 				return -EPERM;
@@ -5236,6 +5252,8 @@ int sched_setscheduler_nocheck(struct task_struct *p, int policy,
 {
 	return __sched_setscheduler(p, policy, param, false);
 }
+
+EXPORT_SYMBOL(sched_setscheduler_nocheck);
 
 static int
 do_sched_setscheduler(pid_t pid, int policy, struct sched_param __user *param)
@@ -5813,12 +5831,12 @@ void sched_show_task(struct task_struct *p)
 	printk(KERN_INFO "%-15.15s %c", p->comm,
 		state < sizeof(stat_nam) - 1 ? stat_nam[state] : '?');
 #if BITS_PER_LONG == 32
-	if (state == TASK_RUNNING)
+	if (current == p)
 		printk(KERN_CONT " running  ");
 	else
 		printk(KERN_CONT " %08lx ", thread_saved_pc(p));
 #else
-	if (state == TASK_RUNNING)
+	if (current == p)
 		printk(KERN_CONT "  running task    ");
 	else
 		printk(KERN_CONT " %016lx ", thread_saved_pc(p));
@@ -5830,6 +5848,8 @@ void sched_show_task(struct task_struct *p)
 		task_pid_nr(p), task_pid_nr(p->real_parent),
 		(unsigned long)task_thread_info(p)->flags);
 
+	if (p->mm)
+		printk(KERN_CONT "vmt: %lu, frss: %lu, arss: %lu\n", p->mm->total_vm, get_mm_counter(p->mm, MM_FILEPAGES), get_mm_counter(p->mm, MM_ANONPAGES));
 	show_stack(p, NULL);
 }
 
@@ -7952,7 +7972,7 @@ static void init_rt_rq(struct rt_rq *rt_rq, struct rq *rq)
 #ifdef CONFIG_SMP
 	rt_rq->rt_nr_migratory = 0;
 	rt_rq->overloaded = 0;
-	plist_head_init_raw(&rt_rq->pushable_tasks, &rq->lock);
+	plist_head_init(&rt_rq->pushable_tasks);
 #endif
 
 	rt_rq->rt_time = 0;
@@ -8157,7 +8177,7 @@ void __init sched_init(void)
 #endif
 
 #ifdef CONFIG_RT_MUTEXES
-	plist_head_init_raw(&init_task.pi_waiters, &init_task.pi_lock);
+	plist_head_init(&init_task.pi_waiters);
 #endif
 
 	/*
@@ -8208,13 +8228,24 @@ static inline int preempt_count_equals(int preempt_offset)
 	return (nested == preempt_offset);
 }
 
+static int __might_sleep_init_called;
+int __init __might_sleep_init(void)
+{
+	__might_sleep_init_called = 1;
+	return 0;
+}
+early_initcall(__might_sleep_init);
+
 void __might_sleep(const char *file, int line, int preempt_offset)
 {
 #ifdef in_atomic
 	static unsigned long prev_jiffy;	/* ratelimiting */
 
 	if ((preempt_count_equals(preempt_offset) && !irqs_disabled()) ||
-	    system_state != SYSTEM_RUNNING || oops_in_progress)
+	    oops_in_progress)
+		return;
+	if (system_state != SYSTEM_RUNNING &&
+	    (!__might_sleep_init_called || system_state != SYSTEM_BOOTING))
 		return;
 	if (time_before(jiffies, prev_jiffy + HZ) && prev_jiffy)
 		return;
@@ -8965,6 +8996,20 @@ cpu_cgroup_destroy(struct cgroup_subsys *ss, struct cgroup *cgrp)
 }
 
 static int
+cpu_cgroup_allow_attach(struct cgroup *cgrp, struct task_struct *tsk)
+{
+	const struct cred *cred = current_cred(), *tcred;
+
+	tcred = __task_cred(tsk);
+
+	if ((current != tsk) && !capable(CAP_SYS_NICE) &&
+	    cred->euid != tcred->uid && cred->euid != tcred->suid)
+		return -EACCES;
+
+	return 0;
+}
+
+static int
 cpu_cgroup_can_attach_task(struct cgroup *cgrp, struct task_struct *tsk)
 {
 #ifdef CONFIG_RT_GROUP_SCHED
@@ -9069,6 +9114,7 @@ struct cgroup_subsys cpu_cgroup_subsys = {
 	.name		= "cpu",
 	.create		= cpu_cgroup_create,
 	.destroy	= cpu_cgroup_destroy,
+	.allow_attach	= cpu_cgroup_allow_attach,
 	.can_attach_task = cpu_cgroup_can_attach_task,
 	.attach_task	= cpu_cgroup_attach_task,
 	.exit		= cpu_cgroup_exit,
@@ -9095,7 +9141,29 @@ struct cpuacct {
 	u64 __percpu *cpuusage;
 	struct percpu_counter cpustat[CPUACCT_STAT_NSTATS];
 	struct cpuacct *parent;
+	struct cpuacct_charge_calls *cpufreq_fn;
+	void *cpuacct_data;
 };
+
+static struct cpuacct *cpuacct_root;
+
+/* Default calls for cpufreq accounting */
+static struct cpuacct_charge_calls *cpuacct_cpufreq;
+int cpuacct_register_cpufreq(struct cpuacct_charge_calls *fn)
+{
+	cpuacct_cpufreq = fn;
+
+	/*
+	 * Root node is created before platform can register callbacks,
+	 * initalize here.
+	 */
+	if (cpuacct_root && fn) {
+		cpuacct_root->cpufreq_fn = fn;
+		if (fn->init)
+			fn->init(&cpuacct_root->cpuacct_data);
+	}
+	return 0;
+}
 
 struct cgroup_subsys cpuacct_subsys;
 
@@ -9131,8 +9199,16 @@ static struct cgroup_subsys_state *cpuacct_create(
 		if (percpu_counter_init(&ca->cpustat[i], 0))
 			goto out_free_counters;
 
+	ca->cpufreq_fn = cpuacct_cpufreq;
+
+	/* If available, have platform code initalize cpu frequency table */
+	if (ca->cpufreq_fn && ca->cpufreq_fn->init)
+		ca->cpufreq_fn->init(&ca->cpuacct_data);
+
 	if (cgrp->parent)
 		ca->parent = cgroup_ca(cgrp->parent);
+	else
+		cpuacct_root = ca;
 
 	return &ca->css;
 
@@ -9260,6 +9336,32 @@ static int cpuacct_stats_show(struct cgroup *cgrp, struct cftype *cft,
 	return 0;
 }
 
+static int cpuacct_cpufreq_show(struct cgroup *cgrp, struct cftype *cft,
+		struct cgroup_map_cb *cb)
+{
+	struct cpuacct *ca = cgroup_ca(cgrp);
+	if (ca->cpufreq_fn && ca->cpufreq_fn->cpufreq_show)
+		ca->cpufreq_fn->cpufreq_show(ca->cpuacct_data, cb);
+
+	return 0;
+}
+
+/* return total cpu power usage (milliWatt second) of a group */
+static u64 cpuacct_powerusage_read(struct cgroup *cgrp, struct cftype *cft)
+{
+	int i;
+	struct cpuacct *ca = cgroup_ca(cgrp);
+	u64 totalpower = 0;
+
+	if (ca->cpufreq_fn && ca->cpufreq_fn->power_usage)
+		for_each_present_cpu(i) {
+			totalpower += ca->cpufreq_fn->power_usage(
+					ca->cpuacct_data);
+		}
+
+	return totalpower;
+}
+
 static struct cftype files[] = {
 	{
 		.name = "usage",
@@ -9273,6 +9375,14 @@ static struct cftype files[] = {
 	{
 		.name = "stat",
 		.read_map = cpuacct_stats_show,
+	},
+	{
+		.name =  "cpufreq",
+		.read_map = cpuacct_cpufreq_show,
+	},
+	{
+		.name = "power",
+		.read_u64 = cpuacct_powerusage_read
 	},
 };
 
@@ -9303,6 +9413,10 @@ static void cpuacct_charge(struct task_struct *tsk, u64 cputime)
 	for (; ca; ca = ca->parent) {
 		u64 *cpuusage = per_cpu_ptr(ca->cpuusage, cpu);
 		*cpuusage += cputime;
+
+		/* Call back into platform code to account for CPU speeds */
+		if (ca->cpufreq_fn && ca->cpufreq_fn->charge)
+			ca->cpufreq_fn->charge(ca->cpuacct_data, cputime, cpu);
 	}
 
 	rcu_read_unlock();

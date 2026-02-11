@@ -1,0 +1,6 @@
+   videocore {
+      /include/ "CapriStone_EDN000_vc_pins.dtsi"
+      display@main {
+         /include/ "sharp_lq043y1dx01.dtsi"
+      };
+   };

@@ -116,6 +116,10 @@ obj-$(CONFIG_X86_CHECK_BIOS_CORRUPTION) += check.o
 obj-$(CONFIG_SWIOTLB)			+= pci-swiotlb.o
 obj-$(CONFIG_OF)			+= devicetree.o
 
+obj-$(CONFIG_PERF_EVENTS)		+= perf_regs.o
+
+obj-$(CONFIG_PERF_EVENTS)		+= perf_regs.o
+
 ###
 # 64 bit specific files
 ifeq ($(CONFIG_X86_64),y)

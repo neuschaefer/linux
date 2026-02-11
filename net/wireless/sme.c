@@ -727,8 +727,14 @@ void cfg80211_disconnected(struct net_device *dev, u16 reason,
 	struct cfg80211_event *ev;
 	unsigned long flags;
 
-	CFG80211_DEV_WARN_ON(wdev->sme_state != CFG80211_SME_CONNECTED);
 
+/*
+ * The bcmdhd will be disconnected by the time it gets here so this warning
+ * isn't important.. it just adds latency dumping the message to the console.
+*/
+#if !defined(CONFIG_ARCH_CAPRI)
+	CFG80211_DEV_WARN_ON(wdev->sme_state != CFG80211_SME_CONNECTED);
+#endif
 	ev = kzalloc(sizeof(*ev) + ie_len, gfp);
 	if (!ev)
 		return;

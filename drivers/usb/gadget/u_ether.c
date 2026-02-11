@@ -20,6 +20,18 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+/*******************************************************************************************
+Copyright 2010 Broadcom Corporation.  All rights reserved.
+
+Unless you and Broadcom execute a separate written software license agreement governing use 
+of this software, this software is licensed to you under the terms of the GNU General Public 
+License version 2, available at http://www.gnu.org/copyleft/gpl.html (the "GPL"). 
+
+Notwithstanding the above, under no circumstances may you combine this software in any way 
+with any other Broadcom software provided under a license other than the GPL, without 
+Broadcom's express prior written consent.
+*******************************************************************************************/
+
 /* #define VERBOSE_DEBUG */
 
 #include <linux/kernel.h>
@@ -28,6 +40,7 @@
 #include <linux/ctype.h>
 #include <linux/etherdevice.h>
 #include <linux/ethtool.h>
+#include <linux/brcm_console.h>
 
 #include "u_ether.h"
 
@@ -81,10 +94,36 @@ struct eth_dev {
 
 	unsigned long		todo;
 #define	WORK_RX_MEMORY		0
+#define	WORK_BRCM_NETCONSOLE_ON		1
+#define	WORK_BRCM_NETCONSOLE_OFF	2
 
 	bool			zlp;
 	u8			host_mac[ETH_ALEN];
 };
+
+#ifdef CONFIG_BRCM_NETCONSOLE
+#define MAX_RETRY_NO	1000
+
+static DEFINE_MUTEX(cleanup_netpoll_mutex);
+
+void cleanup_netpoll_lock(void)
+{
+	mutex_lock(&cleanup_netpoll_mutex);
+}
+
+void cleanup_netpoll_unlock(void)
+{
+	mutex_unlock(&cleanup_netpoll_mutex);
+}
+
+int cleanup_netpoll_is_locked(void)
+{
+	return mutex_is_locked(&cleanup_netpoll_mutex);
+}
+
+extern void brcm_current_netcon_status(unsigned char status);
+extern unsigned char brcm_get_netcon_status(void);
+#endif
 
 /*-------------------------------------------------------------------------*/
 
@@ -259,6 +298,7 @@ rx_submit(struct eth_dev *dev, struct usb_request *req, gfp_t gfp_flags)
 	req->length = size;
 	req->complete = rx_complete;
 	req->context = skb;
+	req->dma = 0;
 
 	retval = usb_ep_queue(out, req, gfp_flags);
 	if (retval == -ENOMEM)
@@ -456,10 +496,28 @@ static void eth_work(struct work_struct *work)
 		if (netif_running(dev->net))
 			rx_fill(dev, GFP_KERNEL);
 	}
-
+#ifdef CONFIG_BRCM_NETCONSOLE
+	else if (test_and_clear_bit(WORK_BRCM_NETCONSOLE_ON, &dev->todo)) {
+				cleanup_netpoll_lock();
+				brcm_current_netcon_status(USB_RNDIS_ON);
+	}
+	else if (test_and_clear_bit(WORK_BRCM_NETCONSOLE_OFF, &dev->todo)) {
+				brcm_current_netcon_status(USB_RNDIS_OFF);
+				cleanup_netpoll_unlock();
+	}
+#endif
+	
 	if (dev->todo)
 		DBG(dev, "work done, flags = 0x%lx\n", dev->todo);
 }
+
+
+#ifdef CONFIG_NET_POLL_CONTROLLER
+static void eth_poll_controller(struct net_device *dev)
+{
+  return; //do not thing....
+}
+#endif
 
 static void tx_complete(struct usb_ep *ep, struct usb_request *req)
 {
@@ -565,18 +623,20 @@ static netdev_tx_t eth_start_xmit(struct sk_buff *skb,
 	 * or the hardware can't use skb buffers.
 	 * or there's not enough space for extra headers we need
 	 */
-	if (dev->wrap) {
-		unsigned long	flags;
+	if (skb->netpoll_signature != SKB_NETPOLL_SIGNATURE) {
+		if (dev->wrap) {
+			unsigned long	flags;
 
-		spin_lock_irqsave(&dev->lock, flags);
-		if (dev->port_usb)
-			skb = dev->wrap(dev->port_usb, skb);
-		spin_unlock_irqrestore(&dev->lock, flags);
-		if (!skb)
-			goto drop;
-
-		length = skb->len;
+			spin_lock_irqsave(&dev->lock, flags);
+			if (dev->port_usb)
+				skb = dev->wrap(dev->port_usb, skb);
+			spin_unlock_irqrestore(&dev->lock, flags);
+			if (!skb)
+				goto drop;
+		}
 	}
+    length = skb->len;
+
 	req->buf = skb->data;
 	req->context = skb;
 	req->complete = tx_complete;
@@ -604,6 +664,7 @@ static netdev_tx_t eth_start_xmit(struct sk_buff *skb,
 			? ((atomic_read(&dev->tx_qlen) % qmult) != 0)
 			: 0;
 
+	req->dma = 0;
 	retval = usb_ep_queue(in, req, GFP_ATOMIC);
 	switch (retval) {
 	default:
@@ -639,6 +700,10 @@ static void eth_start(struct eth_dev *dev, gfp_t gfp_flags)
 	/* and open the tx floodgates */
 	atomic_set(&dev->tx_qlen, 0);
 	netif_wake_queue(dev->net);
+
+#ifdef CONFIG_BRCM_NETCONSOLE
+	defer_kevent(dev, WORK_BRCM_NETCONSOLE_ON);
+#endif
 }
 
 static int eth_open(struct net_device *net)
@@ -714,6 +779,7 @@ static char *host_addr;
 module_param(host_addr, charp, S_IRUGO);
 MODULE_PARM_DESC(host_addr, "Host Ethernet Address");
 
+#if 0 // See gether_setup
 static int get_ether_addr(const char *str, u8 *dev_addr)
 {
 	if (str) {
@@ -734,6 +800,7 @@ static int get_ether_addr(const char *str, u8 *dev_addr)
 	random_ether_addr(dev_addr);
 	return 1;
 }
+#endif
 
 static struct eth_dev *the_dev;
 
@@ -744,6 +811,9 @@ static const struct net_device_ops eth_netdev_ops = {
 	.ndo_change_mtu		= ueth_change_mtu,
 	.ndo_set_mac_address 	= eth_mac_addr,
 	.ndo_validate_addr	= eth_validate_addr,
+#ifdef CONFIG_NET_POLL_CONTROLLER
+	.ndo_poll_controller = eth_poll_controller,
+#endif
 };
 
 static struct device_type gadget_type = {
@@ -764,6 +834,26 @@ static struct device_type gadget_type = {
  * Returns negative errno, or zero on success
  */
 int gether_setup(struct usb_gadget *g, u8 ethaddr[ETH_ALEN])
+{
+	return gether_setup_name(g, ethaddr, "usb");
+}
+
+/**
+ * gether_setup_name - initialize one ethernet-over-usb link
+ * @g: gadget to associated with these links
+ * @ethaddr: NULL, or a buffer in which the ethernet address of the
+ *	host side of the link is recorded
+ * @netname: name for network device (for example, "usb")
+ * Context: may sleep
+ *
+ * This sets up the single network link that may be exported by a
+ * gadget driver using this framework.  The link layer addresses are
+ * set up using module parameters.
+ *
+ * Returns negative errno, or zero on success
+ */
+int gether_setup_name(struct usb_gadget *g, u8 ethaddr[ETH_ALEN],
+		const char *netname)
 {
 	struct eth_dev		*dev;
 	struct net_device	*net;
@@ -787,15 +877,33 @@ int gether_setup(struct usb_gadget *g, u8 ethaddr[ETH_ALEN])
 
 	/* network device setup */
 	dev->net = net;
-	strcpy(net->name, "usb%d");
+	snprintf(net->name, sizeof(net->name), "%s%%d", netname);
 
+#if 0 //We use the fixed host MAC address for USB logging.
 	if (get_ether_addr(dev_addr, net->dev_addr))
 		dev_warn(&g->dev,
 			"using random %s ethernet address\n", "self");
 	if (get_ether_addr(host_addr, dev->host_mac))
 		dev_warn(&g->dev,
 			"using random %s ethernet address\n", "host");
-
+#else
+	dev_warn(&g->dev,
+			"using fixed %s ethernet address\n", "self");
+	net->dev_addr [0] = 0x22;
+	net->dev_addr [1] = 0x33;
+	net->dev_addr [2] = 0x44;
+	net->dev_addr [3] = 0x55;
+	net->dev_addr [4] = 0x66;
+	net->dev_addr [5] = 0x77;
+	dev_warn(&g->dev,
+			"using fixed %s ethernet address\n", "host");
+	dev->host_mac [0] = 0xaa;
+	dev->host_mac [1] = 0xbb;
+	dev->host_mac [2] = 0xcc;
+	dev->host_mac [3] = 0xdd;
+	dev->host_mac [4] = 0xee;
+	dev->host_mac [5] = 0xff;
+#endif
 	if (ethaddr)
 		memcpy(ethaddr, dev->host_mac, ETH_ALEN);
 
@@ -835,16 +943,33 @@ int gether_setup(struct usb_gadget *g, u8 ethaddr[ETH_ALEN])
  */
 void gether_cleanup(void)
 {
+#ifdef CONFIG_BRCM_NETCONSOLE
+	unsigned short retry = 0;
+#endif
+	pr_info("%s\n", __func__);
+
 	if (!the_dev)
 		return;
+
+#ifdef CONFIG_BRCM_NETCONSOLE
+	/* Check if the netpoll has been released or not... */
+	do {
+		msleep(10);
+		if (retry++ == MAX_RETRY_NO) {
+			pr_err("failed to release netpoll...\n");
+			cleanup_netpoll_unlock();
+			break;
+		}
+	} while (cleanup_netpoll_is_locked());
+#endif
 
 	unregister_netdev(the_dev->net);
 	flush_work_sync(&the_dev->work);
 	free_netdev(the_dev->net);
 
 	the_dev = NULL;
-}
 
+}
 
 /**
  * gether_connect - notify network layer that USB link is active
@@ -866,6 +991,8 @@ struct net_device *gether_connect(struct gether *link)
 {
 	struct eth_dev		*dev = the_dev;
 	int			result = 0;
+
+	pr_info("%s\n", __func__);
 
 	if (!dev)
 		return ERR_PTR(-EINVAL);
@@ -910,8 +1037,9 @@ struct net_device *gether_connect(struct gether *link)
 		spin_unlock(&dev->lock);
 
 		netif_carrier_on(dev->net);
-		if (netif_running(dev->net))
+		if (netif_running(dev->net)){
 			eth_start(dev, GFP_ATOMIC);
+		} 
 
 	/* on error, disable any endpoints  */
 	} else {
@@ -943,11 +1071,15 @@ void gether_disconnect(struct gether *link)
 	struct eth_dev		*dev = link->ioport;
 	struct usb_request	*req;
 
-	WARN_ON(!dev);
 	if (!dev)
 		return;
 
 	DBG(dev, "%s\n", __func__);
+	pr_info("%s\n", __func__);
+
+#ifdef CONFIG_BRCM_NETCONSOLE
+	defer_kevent(dev, WORK_BRCM_NETCONSOLE_OFF);
+#endif
 
 	netif_stop_queue(dev->net);
 	netif_carrier_off(dev->net);

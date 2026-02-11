@@ -12,6 +12,7 @@
 #
 
 MKIMAGE         := $(srctree)/scripts/mkuboot.sh
+MKDTB           := $(srctree)/scripts/mkdtb.sh
 
 ifneq ($(MACHINE),)
 include $(srctree)/$(MACHINE)/Makefile.boot
@@ -27,7 +28,19 @@ INITRD_PHYS := $(initrd_phys-y)
 
 export ZRELADDR INITRD_PHYS PARAMS_PHYS
 
-targets := Image zImage xipImage bootpImage uImage
+targets := Image zImage xipImage bootpImage uImage dt-blob
+
+$(obj)/dt-blob: FORCE
+ifeq ($(CONFIG_KONA_ATAG_DT),y)
+	$(CONFIG_SHELL) $(MKDTB) $(srctree)/arch/arm/boot/dts/$(CONFIG_KONA_ATAG_DT_DTS_FILE).dts \
+				$(objtree)/arch/arm/boot/dt-blob
+	@echo '  dt-blob is ready.'
+else
+ifneq ($(wildcard $(objtree)/arch/arm/boot/dt-blob),)
+	rm -f $(objtree)/arch/arm/boot/dt-blob
+endif
+	@echo '  dt-blob is not needed.'
+endif
 
 ifeq ($(CONFIG_XIP_KERNEL),y)
 
@@ -58,6 +71,16 @@ $(obj)/zImage:	$(obj)/compressed/vmlinux FORCE
 	@echo '  Kernel: $@ is ready'
 
 endif
+
+targets += $(dtb-y)
+
+# Rule to build device tree blobs
+$(obj)/%.dtb: $(src)/dts/%.dts FORCE
+	$(call if_changed_dep,dtc)
+
+$(obj)/dtbs: $(addprefix $(obj)/, $(dtb-y))
+
+clean-files := *.dtb
 
 quiet_cmd_uimage = UIMAGE  $@
       cmd_uimage = $(CONFIG_SHELL) $(MKIMAGE) -A arm -O linux -T kernel \

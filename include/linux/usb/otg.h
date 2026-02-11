@@ -111,6 +111,18 @@ struct otg_transceiver {
 	/* start or continue HNP role switch */
 	int	(*start_hnp)(struct otg_transceiver *otg);
 
+	/* Control pullup */
+	int	(*pullup_on)(struct otg_transceiver *otg, bool on);
+
+	/* set_delayed_adp */
+	int	(*set_delayed_adp)(struct otg_transceiver *otg);
+
+	/* set SRP required after Vbus goes off */
+	int	(*set_srp_reqd)(struct otg_transceiver *otg);
+
+	/* Set OTG enable/disable in transceiver */
+	int	(*set_otg_enable)(struct otg_transceiver *otg, bool enable);
+
 };
 
 

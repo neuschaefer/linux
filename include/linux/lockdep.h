@@ -185,7 +185,13 @@ struct lock_chain {
 	u64				chain_key;
 };
 
+#ifdef CONFIG_ARCH_CAPRI
+/* lockdep can't be used in Android capri due to big size of kernel */
+#define MAX_LOCKDEP_KEYS_BITS		12
+#else
 #define MAX_LOCKDEP_KEYS_BITS		13
+#endif
+
 /*
  * Subtract one because we offset hlock->class_idx by 1 in order
  * to make 0 mean no class. This avoids overflowing the class_idx

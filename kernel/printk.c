@@ -41,8 +41,13 @@
 #include <linux/cpu.h>
 #include <linux/notifier.h>
 #include <linux/rculist.h>
+#include <trace/stm.h>
 
 #include <asm/uaccess.h>
+#include <asm/cacheflush.h>
+
+void (* BrcmLogString)(const char *inLogString,
+				unsigned short inSender) = 0;
 
 /*
  * Architectures can override it:
@@ -52,6 +57,10 @@ void asmlinkage __attribute__((weak)) early_printk(const char *fmt, ...)
 }
 
 #define __LOG_BUF_LEN	(1 << CONFIG_LOG_BUF_SHIFT)
+
+#ifdef        CONFIG_DEBUG_LL
+extern void printascii(char *);
+#endif
 
 /* printk's without a loglevel use this.. */
 #define DEFAULT_MESSAGE_LOGLEVEL CONFIG_DEFAULT_MESSAGE_LOGLEVEL
@@ -112,6 +121,10 @@ static DEFINE_SPINLOCK(logbuf_lock);
 static unsigned log_start;	/* Index into log_buf: next char to be read by syslog() */
 static unsigned con_start;	/* Index into log_buf: next char to be sent to consoles */
 static unsigned log_end;	/* Index into log_buf: most-recently-written-char + 1 */
+#if 1 /* ifdef CONFIG_LASTRING */
+static unsigned long last_log_end __attribute__ ((section (".bss_noinit")));
+#endif
+
 
 /*
  * If exclusive_console is non-NULL then only this console is to be printed to.
@@ -144,9 +157,10 @@ static int console_may_schedule;
 
 #ifdef CONFIG_PRINTK
 
-static char __log_buf[__LOG_BUF_LEN];
-static char *log_buf = __log_buf;
-static int log_buf_len = __LOG_BUF_LEN;
+static char __log_buf[__LOG_BUF_LEN] __attribute__ ((section (".bss_noinit")));
+static char __last_log_buf[__LOG_BUF_LEN];
+char *log_buf = __log_buf;
+int log_buf_len = __LOG_BUF_LEN;
 static unsigned logged_chars; /* Number of chars produced since last read+clear operation */
 static int saved_console_loglevel = -1;
 
@@ -290,6 +304,53 @@ static inline void boot_delay_msec(void)
 }
 #endif
 
+/*
+ * Return the number of unread characters in the log buffer.
+ */
+static int log_buf_get_len(void)
+{
+	return logged_chars;
+}
+
+/*
+ * Clears the ring-buffer
+ */
+void log_buf_clear(void)
+{
+	logged_chars = 0;
+}
+
+/*
+ * Copy a range of characters from the log buffer.
+ */
+int log_buf_copy(char *dest, int idx, int len)
+{
+	int ret, max;
+	bool took_lock = false;
+
+	if (!oops_in_progress) {
+		spin_lock_irq(&logbuf_lock);
+		took_lock = true;
+	}
+
+	max = log_buf_get_len();
+	if (idx < 0 || idx >= max) {
+		ret = -1;
+	} else {
+		if (len > max - idx)
+			len = max - idx;
+		ret = len;
+		idx += (log_end - max);
+		while (len-- > 0)
+			dest[len] = LOG_BUF(idx + len);
+	}
+
+	if (took_lock)
+		spin_unlock_irq(&logbuf_lock);
+
+	return ret;
+}
+
 #ifdef CONFIG_SECURITY_DMESG_RESTRICT
 int dmesg_restrict = 1;
 #else
@@ -312,6 +373,11 @@ static int check_syslog_permissions(int type, bool from_file)
 	 */
 	if (from_file && type != SYSLOG_ACTION_OPEN)
 		return 0;
+
+#ifdef CONFIG_GRKERNSEC_DMESG
+	if (grsec_enable_dmesg && !capable(CAP_SYSLOG) && !capable_nolog(CAP_SYS_ADMIN))
+		return -EPERM;
+#endif
 
 	if (syslog_action_restricted(type)) {
 		if (capable(CAP_SYSLOG))
@@ -706,9 +772,9 @@ static void zap_locks(void)
 }
 
 #if defined(CONFIG_PRINTK_TIME)
-static int printk_time = 1;
+/*static*/ int printk_time = 1;
 #else
-static int printk_time = 0;
+/*static*/ int printk_time = 0;
 #endif
 module_param_named(time, printk_time, bool, S_IRUGO | S_IWUSR);
 
@@ -836,6 +902,72 @@ static inline void printk_delay(void)
 	}
 }
 
+//#ifdef CONFIG_BRCM_UNIFIED_LOGGING
+/* Unified logging */
+
+int bcmlog_mtt_on;
+unsigned short bcmlog_log_ulogging_id;
+
+/* ------------------------------------------------------------ */
+int brcm_retrive_early_printk(void)
+{
+	/* int printed_len = length; */
+	unsigned long flags;
+	int this_cpu;
+	/* char *p = data; */
+
+	preempt_disable();
+	/* This stops the holder of brcm_console_sem just where we want him */
+	raw_local_irq_save(flags);
+	this_cpu = smp_processor_id();
+
+	/*
+	 * Ouch, printk recursed into itself!
+	 */
+	if (unlikely(printk_cpu == this_cpu)) {
+		/*
+		 * If a crash is occurring during printk() on this CPU,
+		 * then try to get the crash message out but make sure
+		 * we can't deadlock. Otherwise just return to avoid the
+		 * recursion and return - but flag the recursion so that
+		 * it can be printed at the next appropriate moment:
+		 */
+		if (!oops_in_progress) {
+			recursion_bug = 1;
+			goto end_restore_irqs;
+		}
+		zap_locks();
+	}
+
+	lockdep_off();
+	spin_lock(&logbuf_lock);
+	printk_cpu = this_cpu;
+
+	if (bcmlog_log_ulogging_id > 0 && BrcmLogString)
+		BrcmLogString(log_buf, bcmlog_log_ulogging_id);
+
+	/*
+	 * Try to acquire and then immediately release the
+	 * brcm_console semaphore. The release will do all the
+	 * actual magic (print out buffers, wake up klogd,
+	 * etc).
+	 *
+	 * The acquire_brcm_console_semaphore_for_printk() function
+	 * will release 'logbuf_lock' regardless of whether it
+	 * actually gets the semaphore or not.
+	 */
+	if (console_trylock_for_printk(this_cpu))
+		console_unlock();
+
+	lockdep_on();
+
+end_restore_irqs:
+	raw_local_irq_restore(flags);
+
+	preempt_enable();
+	return 0;
+}//#endif
+
 asmlinkage int vprintk(const char *fmt, va_list args)
 {
 	int printed_len = 0;
@@ -885,8 +1017,12 @@ asmlinkage int vprintk(const char *fmt, va_list args)
 	printed_len += vscnprintf(printk_buf + printed_len,
 				  sizeof(printk_buf) - printed_len, fmt, args);
 
-	p = printk_buf;
+#ifdef	CONFIG_DEBUG_LL
+	printascii(printk_buf);
+#endif
 
+	p = printk_buf;
+	
 	/* Read log level and handle special printk prefix */
 	plen = log_prefix(p, &current_log_level, &special);
 	if (plen) {
@@ -906,6 +1042,10 @@ asmlinkage int vprintk(const char *fmt, va_list args)
 		}
 	}
 
+//#ifdef CONFIG_BRCM_UNIFIED_LOGGING
+if (bcmlog_mtt_on == 1 && bcmlog_log_ulogging_id > 0 && BrcmLogString)
+	BrcmLogString(printk_buf, bcmlog_log_ulogging_id);
+//#endif
 	/*
 	 * Copy the output into log_buf. If the caller didn't provide
 	 * the appropriate log prefix, we insert them here
@@ -974,6 +1114,20 @@ out_restore_irqs:
 	raw_local_irq_restore(flags);
 
 	preempt_enable();
+#if 1 /* ifdef CONFIG_LASTRING */
+	if (log_buf == __log_buf && dmac_flush_range) {
+		unsigned log_end1 = log_end;
+		char *start = &LOG_BUF(log_end1 - printed_len), *end = &LOG_BUF(log_end1);
+		if (start < end)
+			dmac_flush_range_inner_outer(start, end);
+		else if (end < start) {
+			dmac_flush_range_inner_outer(start, log_buf + __LOG_BUF_LEN);
+			dmac_flush_range_inner_outer(&LOG_BUF(0), end);
+		}
+		last_log_end = log_end1;
+		dmac_flush_range_inner_outer(&last_log_end, ((unsigned char*) &last_log_end) + sizeof(last_log_end));
+	}
+#endif
 	return printed_len;
 }
 EXPORT_SYMBOL(printk);
@@ -1159,7 +1313,6 @@ static int __cpuinit console_cpu_notify(struct notifier_block *self,
 	switch (action) {
 	case CPU_ONLINE:
 	case CPU_DEAD:
-	case CPU_DYING:
 	case CPU_DOWN_FAILED:
 	case CPU_UP_CANCELED:
 		console_lock();
@@ -1186,6 +1339,7 @@ void console_lock(void)
 	console_may_schedule = 1;
 }
 EXPORT_SYMBOL(console_lock);
+EXPORT_SYMBOL(BrcmLogString);
 
 /**
  * console_trylock - try to lock the console system for exclusive use.
@@ -1646,6 +1800,35 @@ bool printk_timed_ratelimit(unsigned long *caller_jiffies,
 	return false;
 }
 EXPORT_SYMBOL(printk_timed_ratelimit);
+
+void printk_init(void)
+{
+#if 1 /* ifdef CONFIG_LASTRING */
+	unsigned first = log_buf + __LOG_BUF_LEN - &LOG_BUF(last_log_end);
+	unsigned second = &LOG_BUF(last_log_end) - &LOG_BUF(0);
+	memcpy(__last_log_buf, &LOG_BUF(last_log_end), first);
+	if (second) memcpy(__last_log_buf + first, __log_buf, second);
+
+	/* Zero out the log buffer so that we don't get whatever might
+	* have been lying around in memory. */    
+	memset(__log_buf, 0, __LOG_BUF_LEN);
+#endif
+}
+
+#if 1 /* ifdef CONFIG_LASTRING */
+ssize_t read_lastring(struct file *file, char __user *buf,
+                size_t count, loff_t *ppos)
+{
+	if (*ppos >= __LOG_BUF_LEN)
+		return 0;
+	if (count + *ppos > __LOG_BUF_LEN)
+		count = __LOG_BUF_LEN - *ppos;
+	if (copy_to_user(buf, __last_log_buf + *ppos, count))
+		return -EFAULT;
+	*ppos += count;
+	return count;
+}
+#endif
 
 static DEFINE_SPINLOCK(dump_list_lock);
 static LIST_HEAD(dump_list);

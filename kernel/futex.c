@@ -54,6 +54,7 @@
 #include <linux/mount.h>
 #include <linux/pagemap.h>
 #include <linux/syscalls.h>
+#include <linux/ptrace.h>
 #include <linux/signal.h>
 #include <linux/module.h>
 #include <linux/magic.h>
@@ -238,6 +239,11 @@ get_futex_key(u32 __user *uaddr, int fshared, union futex_key *key, int rw)
 	struct mm_struct *mm = current->mm;
 	struct page *page, *page_head;
 	int err, ro = 0;
+
+#ifdef CONFIG_PAX_SEGMEXEC
+	if ((mm->pax_flags & MF_PAX_SEGMEXEC) && address >= SEGMEXEC_TASK_SIZE)
+		return -EFAULT;
+#endif
 
 	/*
 	 * The futex address must be "naturally" aligned.
@@ -1895,6 +1901,8 @@ static int futex_wait(u32 __user *uaddr, unsigned int flags, u32 val,
 	struct futex_q q = futex_q_init;
 	int ret;
 
+	pax_track_stack();
+
 	if (!bitset)
 		return -EINVAL;
 	q.bitset = bitset;
@@ -2293,6 +2301,8 @@ static int futex_wait_requeue_pi(u32 __user *uaddr, unsigned int flags,
 
 	if (uaddr == uaddr2)
 		return -EINVAL;
+
+	pax_track_stack();
 
 	if (!bitset)
 		return -EINVAL;
@@ -2743,6 +2753,7 @@ static int __init futex_init(void)
 {
 	u32 curval;
 	int i;
+	mm_segment_t oldfs;
 
 	/*
 	 * This will fail and we want it. Some arch implementations do
@@ -2754,11 +2765,14 @@ static int __init futex_init(void)
 	 * implementation, the non-functional ones will return
 	 * -ENOSYS.
 	 */
+	oldfs = get_fs();
+	set_fs(USER_DS);
 	if (cmpxchg_futex_value_locked(&curval, NULL, 0, 0) == -EFAULT)
 		futex_cmpxchg_enabled = 1;
+	set_fs(oldfs);
 
 	for (i = 0; i < ARRAY_SIZE(futex_queues); i++) {
-		plist_head_init(&futex_queues[i].chain, &futex_queues[i].lock);
+		plist_head_init(&futex_queues[i].chain);
 		spin_lock_init(&futex_queues[i].lock);
 	}
 

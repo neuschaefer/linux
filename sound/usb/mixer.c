@@ -890,6 +890,18 @@ static int get_min_max_with_quirks(struct usb_mixer_elem_info *cval,
 		 * reacting.  They don't return errors but simply clip
 		 * to the lower aligned value.
 		 */
+
+		/* Roku: the following code sometimes changed the volume resolution from
+ 		 * 128 to 256 on Laredo because the read() of the current mixer value 
+ 		 * was bogus, so skip it...
+ 		 * (An explanation about the code sequence above: Laredo doesn't give
+ 		 * an error to the attempts to SET_RES to lower values, but the GET_RES
+ 		 * value never changes from 128, so that's what we end up with. 128 = .5 dB)
+                 */
+	        if (cval->mixer->chip->usb_id == USB_ID(0x1d5a, 0xc0b3)) {
+			printk(KERN_INFO "Keeping Laredo vres at %d\n", cval->res);
+		}
+		else
 		if (cval->min + cval->res < cval->max) {
 			int last_valid_res = cval->res;
 			int saved, test, check;

@@ -1,0 +1,351 @@
+videocore {
+       /include/"capriray-vcmem-light.dtsi"
+	pins {
+
+		pin_config {
+
+			pin@default {
+				polarity = "active_high";
+				startup_state = "inactive";
+				function = "smi";
+			};
+
+			pin@p0 {
+				function = "dpi";
+			};
+
+			pin@p1 {
+				function = "dpi";
+			};
+
+			pin@p2 {
+				function = "dpi";
+			};
+
+			pin@p3 {
+				function = "dpi";
+			};
+
+			pin@p4 {
+				function = "dpi";
+			};
+
+			pin@p5 {
+				function = "dpi";
+			};
+
+			pin@p6 {
+				function = "dpi";
+			};
+
+			pin@p7 {
+				function = "dpi";
+			};
+
+			pin@p8 {
+				function = "dpi";
+			};
+
+			pin@p9 {
+				function = "dpi";
+			};
+
+			pin@p10 {
+				function = "dpi";
+			};
+
+			pin@p11 {
+				function = "dpi";
+			};
+
+			pin@p12 {
+				function = "dpi";
+			};
+
+			pin@p13 {
+				function = "dpi";
+			};
+
+			pin@p14 {
+				function = "dpi";
+			};
+
+			pin@p15 {
+				function = "dpi";
+			};
+
+			pin@p16 {
+				function = "dpi";
+			};
+
+			pin@p17 {
+				function = "dpi";
+			};
+
+			pin@p18 {
+				function = "dpi";
+			};
+
+			pin@p19 {
+				function = "dpi";
+			};
+
+			pin@p20 {
+				function = "dpi";
+			};
+
+			pin@p21 {
+				function = "dpi";
+			};
+
+			pin@p22 {
+				function = "dpi";
+			};
+
+			pin@p23 {
+				function = "dpi";
+			};
+
+			pin@p24 {
+				function = "dpi";
+			};
+
+			pin@p25 {
+				function = "dpi";
+			};
+
+			pin@p26 {
+				function = "dpi";
+			};
+
+			pin@p27 {
+				function = "dpi";
+			};
+
+			pin@p28 {
+			};
+
+			pin@p29 {
+			};
+
+			pin@p30 {
+			};
+
+			pin@p31 {
+			};
+
+			pin@p32 {
+			};
+
+			pin@p33 {
+			};
+
+			pin@p34 {
+			};
+
+			pin@p35 {
+			};
+
+			pin@p36 {
+			};
+
+			pin@p37 {
+			};
+
+			pin@p38 {
+			};
+
+			pin@p39 {
+			};
+
+			pin@p40 {
+			};
+
+			pin@p41 {
+			};
+
+			pin@p42 {
+			};
+
+			pin@p43 {
+			};
+
+			pin@p44 {
+			};
+
+			pin@p45 {
+			};
+
+			pin@p46 {
+			};
+
+			pin@p47 {
+			};
+
+			pin@p48 {
+			};
+
+			pin@p49 {
+			};
+
+			pin@p50 {
+			};
+
+			pin@p51 {
+			};
+
+			pin@p52 {
+			};
+
+			pin@p53 {
+			};
+
+			pin@p54 {
+				function = "spi";
+			};
+
+			pin@p55 {
+				function = "spi";
+			};
+
+			pin@p56 {
+				function = "spi";
+			};
+
+			pin@p57 {
+				function = "spi";
+			};
+
+			pin@p58 {
+				function = "spi";
+			};
+
+			pin@p59 {
+				function = "pcm";
+			};
+
+			pin@p60 {
+				function = "pcm";
+			};
+
+			pin@p61 {
+				function = "pcm";
+			};
+
+			pin@p62 {
+				function = "pcm";
+			};
+
+			pin@p63 {
+				function = "i2c0";
+			};
+
+			pin@p64 {
+				function = "i2c0";
+			};
+
+			pin@p65 {
+				function = "i2c1";
+			};
+
+			pin@p66 {
+				function = "i2c1";
+			};
+
+			pin@p67 {
+				startup_state = "active";
+				function = "pwm";
+			};
+
+			pin@p68 {
+				startup_state = "active";
+				function = "pwm";
+			};
+
+			pin@p69 {
+				function = "uart0";
+			};
+
+			pin@p70 {
+				function = "uart0";
+			};
+
+			pin@p71 {
+				function = "gp_clk";
+			};
+
+			pin@p72 {
+				function = "gp_clk";
+			};
+
+			pin@p73 {
+				function = "output";
+			};
+
+			pin@p74 {
+				function = "output";
+			};
+
+			pin@p75 {
+				function = "output";
+			};
+
+			pin@p76 {
+				function = "output";
+			};
+
+			pin@p77 {
+				function = "output";
+			};
+
+			pin@p78 {
+				function = "gp_clk";
+			};
+
+			pin@p79 {
+				function = "output";
+			};
+
+			pin@p80 {
+				startup_state = "active";
+				function = "output";
+			};
+
+			pin@p81 {
+				function = "output";
+			};
+
+			pin@p82 {
+				function = "output";
+			};
+
+			pin@p83 {
+				function = "input";
+			};
+
+			pin@p84 {
+				function = "output";
+			};
+
+			pin@p85 {
+				function = "output";
+			};
+
+			pin@p86 {
+				function = "output";
+			};
+
+			pin@p87 {
+				function = "output";
+			};
+		};
+
+		kona_pin_config {
+		};
+
+		pin_defines {
+
+		};
+	};
+
+};

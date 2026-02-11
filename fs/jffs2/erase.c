@@ -74,7 +74,7 @@ static void jffs2_erase_block(struct jffs2_sb_info *c,
 	((struct erase_priv_struct *)instr->priv)->jeb = jeb;
 	((struct erase_priv_struct *)instr->priv)->c = c;
 
-	ret = c->mtd->erase(c->mtd, instr);
+	ret = TIMED_CALL(c->mtd, c->mtd->erase(c->mtd, instr), erase, &instr->len);
 	if (!ret)
 		return;
 
@@ -381,7 +381,7 @@ static int jffs2_block_check_erase(struct jffs2_sb_info *c, struct jffs2_erasebl
 
 		*bad_offset = ofs;
 
-		ret = c->mtd->read(c->mtd, ofs, readlen, &retlen, ebuf);
+		ret = TIMED_CALL(c->mtd, c->mtd->read(c->mtd, ofs, readlen, &retlen, ebuf, 0), read, &retlen);
 		if (ret) {
 			printk(KERN_WARNING "Read of newly-erased block at 0x%08x failed: %d. Putting on bad_list\n", ofs, ret);
 			ret = -EIO;
@@ -439,7 +439,8 @@ static void jffs2_mark_erased_block(struct jffs2_sb_info *c, struct jffs2_eraseb
 		struct jffs2_unknown_node marker = {
 			.magic =	cpu_to_je16(JFFS2_MAGIC_BITMASK),
 			.nodetype =	cpu_to_je16(JFFS2_NODETYPE_CLEANMARKER),
-			.totlen =	cpu_to_je32(c->cleanmarker_size)
+			.totlen =	cpu_to_je32(c->cleanmarker_size),
+			.hdr_crc =	cpu_to_je32(0)
 		};
 
 		jffs2_prealloc_raw_node_refs(c, jeb, 1);

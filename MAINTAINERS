@@ -599,7 +599,6 @@ M:	Will Deacon <will.deacon@arm.com>
 S:	Maintained
 F:	arch/arm/kernel/perf_event*
 F:	arch/arm/oprofile/common.c
-F:	arch/arm/kernel/pmu.c
 F:	arch/arm/include/asm/pmu.h
 F:	arch/arm/kernel/hw_breakpoint.c
 F:	arch/arm/include/asm/hw_breakpoint.h
@@ -5110,6 +5109,14 @@ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/mchehab/linux-2.6.git
 S:	Maintained
 F:	Documentation/video4linux/README.pvrusb2
 F:	drivers/media/video/pvrusb2/
+
+PWM DEVICE API
+M:	Bill Gatliff <bgat@billgatliff.com>
+L:	linux-embedded@vger.kernel.org
+T:	git git://git.billgatliff.com/pwm.git
+S:	Maintained
+F:	Documentation/pwm.txt
+F:	drivers/pwm/
 
 PXA2xx/PXA3xx SUPPORT
 M:	Eric Miao <eric.y.miao@gmail.com>

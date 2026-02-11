@@ -55,8 +55,9 @@
 #define PTRACE_O_TRACEEXEC	0x00000010
 #define PTRACE_O_TRACEVFORKDONE	0x00000020
 #define PTRACE_O_TRACEEXIT	0x00000040
+#define PTRACE_O_EXITKILL	0x00100000
 
-#define PTRACE_O_MASK		0x0000007f
+#define PTRACE_O_MASK	(0x0000007f | PTRACE_O_EXITKILL)
 
 /* Wait extended result codes for the above trace options.  */
 #define PTRACE_EVENT_FORK	1
@@ -87,6 +88,7 @@
 #define PT_TRACE_EXEC	0x00000080
 #define PT_TRACE_VFORK_DONE	0x00000100
 #define PT_TRACE_EXIT	0x00000200
+#define PT_EXITKILL 0x00000400
 
 #define PT_TRACE_MASK	0x000003f4
 
@@ -115,10 +117,10 @@ extern void __ptrace_unlink(struct task_struct *child);
 extern void exit_ptrace(struct task_struct *tracer);
 #define PTRACE_MODE_READ   1
 #define PTRACE_MODE_ATTACH 2
-/* Returns 0 on success, -errno on denial. */
-extern int __ptrace_may_access(struct task_struct *task, unsigned int mode);
 /* Returns true on success, false on denial. */
 extern bool ptrace_may_access(struct task_struct *task, unsigned int mode);
+/* Returns true on success, false on denial. */
+extern bool ptrace_may_access_log(struct task_struct *task, unsigned int mode);
 
 static inline int ptrace_reparented(struct task_struct *child)
 {

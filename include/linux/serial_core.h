@@ -46,7 +46,8 @@
 #define PORT_AR7	18	/* Texas Instruments AR7 internal UART */
 #define PORT_U6_16550A	19	/* ST-Ericsson U6xxx internal UART */
 #define PORT_TEGRA	20	/* NVIDIA Tegra internal UART */
-#define PORT_MAX_8250	20	/* max port ID */
+#define PORT_KONA	21	/* Broadcom Kona SoC internal UART */
+#define PORT_MAX_8250	21	/* max port ID */
 
 /*
  * ARM specific type numbers.  These are not currently guaranteed
@@ -206,6 +207,9 @@
 /* Xilinx PSS UART */
 #define PORT_XUARTPS	98
 
+/* Broadcom Virtual UART */
+#define PORT_BCMVUART	93
+
 #ifdef __KERNEL__
 
 #include <linux/compiler.h>
@@ -245,6 +249,7 @@ struct uart_ops {
 	void		(*pm)(struct uart_port *, unsigned int state,
 			      unsigned int oldstate);
 	int		(*set_wake)(struct uart_port *, unsigned int state);
+	void		(*wake_peer)(struct uart_port *);
 
 	/*
 	 * Return a string describing the type of the port
@@ -300,6 +305,7 @@ struct uart_port {
 	void			(*set_termios)(struct uart_port *,
 				               struct ktermios *new,
 				               struct ktermios *old);
+	int			(*handle_irq)(struct uart_port *);
 	void			(*pm)(struct uart_port *, unsigned int state,
 				      unsigned int old);
 	unsigned int		irq;			/* irq number */
@@ -317,9 +323,7 @@ struct uart_port {
 #define UPIO_MEM32		(3)
 #define UPIO_AU			(4)			/* Au1x00 type IO */
 #define UPIO_TSI		(5)			/* Tsi108/109 type IO */
-#define UPIO_DWAPB		(6)			/* DesignWare APB UART */
-#define UPIO_RM9000		(7)			/* RM9000 type IO */
-#define UPIO_DWAPB32		(8)			/* DesignWare APB UART (32 bit accesses) */
+#define UPIO_RM9000		(6)			/* RM9000 type IO */
 
 	unsigned int		read_status_mask;	/* driver specific */
 	unsigned int		ignore_status_mask;	/* driver specific */

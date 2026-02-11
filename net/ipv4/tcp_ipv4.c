@@ -83,10 +83,15 @@
 #include <linux/crypto.h>
 #include <linux/scatterlist.h>
 
+#define CONFIG_TCP_COUNT 1 // FIXME: move to config?
+
 int sysctl_tcp_tw_reuse __read_mostly;
 int sysctl_tcp_low_latency __read_mostly;
 EXPORT_SYMBOL(sysctl_tcp_low_latency);
 
+#ifdef CONFIG_GRKERNSEC_BLACKHOLE
+extern int grsec_enable_blackhole;
+#endif
 
 #ifdef CONFIG_TCP_MD5SIG
 static struct tcp_md5sig_key *tcp_v4_md5_do_lookup(struct sock *sk,
@@ -1620,6 +1625,9 @@ int tcp_v4_do_rcv(struct sock *sk, struct sk_buff *skb)
 	return 0;
 
 reset:
+#ifdef CONFIG_GRKERNSEC_BLACKHOLE
+	if (!grsec_enable_blackhole)
+#endif
 	tcp_v4_send_reset(rsk, skb);
 discard:
 	kfree_skb(skb);
@@ -1635,6 +1643,10 @@ csum_err:
 	goto discard;
 }
 EXPORT_SYMBOL(tcp_v4_do_rcv);
+
+#ifdef CONFIG_TCP_COUNT
+static unsigned long long tcp_count;
+#endif
 
 /*
  *	From tcp_input.c
@@ -1681,13 +1693,28 @@ int tcp_v4_rcv(struct sk_buff *skb)
 	TCP_SKB_CB(skb)->flags	 = iph->tos;
 	TCP_SKB_CB(skb)->sacked	 = 0;
 
-	sk = __inet_lookup_skb(&tcp_hashinfo, skb, th->source, th->dest);
-	if (!sk)
-		goto no_tcp_socket;
+#ifdef CONFIG_TCP_COUNT
+	/* don't count traffic destined for internal interfaces 
+	   (127.0.0.1), and don't count traffic from port 2049 (NFS) */
+	if (ntohs(th->source) != 2049 && 
+	    (iph->daddr & 0xff) != 127)
+		tcp_count += iph->ihl*4 + skb->len;
+#endif
 
+	sk = __inet_lookup_skb(&tcp_hashinfo, skb, th->source, th->dest);
+	if (!sk) {
+#ifdef CONFIG_GRKERNSEC_BLACKHOLE
+		ret = 1;
+#endif
+		goto no_tcp_socket;
+	}
 process:
-	if (sk->sk_state == TCP_TIME_WAIT)
+	if (sk->sk_state == TCP_TIME_WAIT) {
+#ifdef CONFIG_GRKERNSEC_BLACKHOLE
+		ret = 2;
+#endif
 		goto do_time_wait;
+	}
 
 	if (unlikely(iph->ttl < inet_sk(sk)->min_ttl)) {
 		NET_INC_STATS_BH(net, LINUX_MIB_TCPMINTTLDROP);
@@ -1737,6 +1764,10 @@ no_tcp_socket:
 bad_packet:
 		TCP_INC_STATS_BH(net, TCP_MIB_INERRS);
 	} else {
+#ifdef CONFIG_GRKERNSEC_BLACKHOLE
+		if (!grsec_enable_blackhole || (ret == 1 &&
+		    (skb->dev->flags & IFF_LOOPBACK)))
+#endif
 		tcp_v4_send_reset(NULL, skb);
 	}
 
@@ -2351,6 +2382,28 @@ static int tcp_seq_open(struct inode *inode, struct file *file)
 	return 0;
 }
 
+#ifdef CONFIG_TCP_COUNT
+
+static int tcpcount_proc_show(struct seq_file *m, void *v)
+{
+	seq_printf(m, "%llu\n", tcp_count);
+	return 0;
+}
+
+static int tcpcount_proc_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, tcpcount_proc_show, NULL);
+}
+
+static const struct file_operations tcpcount_proc_fops = {
+    .open       = tcpcount_proc_open,
+    .read       = seq_read,
+    .llseek     = seq_lseek,
+    .release    = single_release,
+};
+
+#endif
+
 int tcp_proc_register(struct net *net, struct tcp_seq_afinfo *afinfo)
 {
 	int rc = 0;
@@ -2368,7 +2421,7 @@ int tcp_proc_register(struct net *net, struct tcp_seq_afinfo *afinfo)
 	p = proc_create_data(afinfo->name, S_IRUGO, net->proc_net,
 			     &afinfo->seq_fops, afinfo);
 	if (!p)
-		rc = -ENOMEM;
+		return -ENOMEM;
 	return rc;
 }
 EXPORT_SYMBOL(tcp_proc_register);
@@ -2401,7 +2454,11 @@ static void get_openreq4(struct sock *sk, struct request_sock *req,
 		0,  /* non standard timer */
 		0, /* open_requests have no inode */
 		atomic_read(&sk->sk_refcnt),
+#ifdef CONFIG_GRKERNSEC_HIDESYM
+		NULL,
+#else
 		req,
+#endif
 		len);
 }
 
@@ -2451,7 +2508,12 @@ static void get_tcp4_sock(struct sock *sk, struct seq_file *f, int i, int *len)
 		sock_i_uid(sk),
 		icsk->icsk_probes_out,
 		sock_i_ino(sk),
-		atomic_read(&sk->sk_refcnt), sk,
+		atomic_read(&sk->sk_refcnt),
+#ifdef CONFIG_GRKERNSEC_HIDESYM
+		NULL,
+#else
+		sk,
+#endif
 		jiffies_to_clock_t(icsk->icsk_rto),
 		jiffies_to_clock_t(icsk->icsk_ack.ato),
 		(icsk->icsk_ack.quick << 1) | icsk->icsk_ack.pingpong,
@@ -2479,7 +2541,13 @@ static void get_timewait4_sock(struct inet_timewait_sock *tw,
 		" %02X %08X:%08X %02X:%08lX %08X %5d %8d %d %d %pK%n",
 		i, src, srcp, dest, destp, tw->tw_substate, 0, 0,
 		3, jiffies_to_clock_t(ttd), 0, 0, 0, 0,
-		atomic_read(&tw->tw_refcnt), tw, len);
+		atomic_read(&tw->tw_refcnt),
+#ifdef CONFIG_GRKERNSEC_HIDESYM
+		NULL,
+#else
+		tw,
+#endif
+		len);
 }
 
 #define TMPSZ 150
@@ -2528,6 +2596,9 @@ static struct tcp_seq_afinfo tcp4_seq_afinfo = {
 
 static int __net_init tcp4_proc_init_net(struct net *net)
 {
+#ifdef CONFIG_TCP_COUNT
+	(void) proc_create("tcp_count", 0, net->proc_net, &tcpcount_proc_fops);
+#endif
 	return tcp_proc_register(net, &tcp4_seq_afinfo);
 }
 

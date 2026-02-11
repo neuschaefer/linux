@@ -23,6 +23,7 @@
 #include <asm/memory.h>
 #include <mach/vmalloc.h>
 #include <asm/pgtable-hwdef.h>
+#include <asm/tlbflush.h>
 
 /*
  * Just any arbitrary offset to the start of the vmalloc VM area: the
@@ -475,9 +476,6 @@ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 		remap_pfn_range(vma, from, pfn, size, prot)
 
 #define pgtable_cache_init() do { } while (0)
-
-void identity_mapping_add(pgd_t *, unsigned long, unsigned long);
-void identity_mapping_del(pgd_t *, unsigned long, unsigned long);
 
 #endif /* !__ASSEMBLY__ */
 

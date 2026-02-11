@@ -1,0 +1,28 @@
+bustype = "lvds";
+pixel_clock = <74112720>;
+pixelsize {
+ width = <1280>;
+ height = <800>;
+};
+video {
+ hsync = <39>;
+ hfp = <59>;
+ hbp = <96>;
+ vsync = <10>;
+ vfp = <5>;
+ vbp = <23>;
+};
+dither {
+ depth = "dither_rgb666";
+};
+lvds {
+ mode = "openldi_18_single_unbal";
+ vpol = "positive";
+ hpol = "positive";
+};
+sequences {
+ on_pre = "SET DISPLAY_POWER; DELAY 15000; SET DISPLAY_RESET; DELAY 15000;";
+ on_post = "SET DISPLAY_BL_PWR; DELAY 15000; SET DISPLAY_BL_EN;";
+ off_pre = "CLEAR DISPLAY_BL_EN; DELAY 15000; CLEAR DISPLAY_BL_PWR;";
+ off_post = "CLEAR DISPLAY_RESET; DELAY 15000; CLEAR DISPLAY_POWER;";
+};

@@ -577,6 +577,8 @@ static struct buffer_head *inode_getblk(struct inode *inode, sector_t block,
 	int lastblock = 0;
 	bool isBeyondEOF;
 
+	pax_track_stack();
+
 	prev_epos.offset = udf_file_entry_alloc_offset(inode);
 	prev_epos.block = iinfo->i_location;
 	prev_epos.bh = NULL;

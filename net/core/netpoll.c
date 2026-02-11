@@ -9,6 +9,18 @@
  * Copyright (C) 2002  Red Hat, Inc.
  */
 
+/*******************************************************************************************
+Copyright 2010 Broadcom Corporation.  All rights reserved.
+
+Unless you and Broadcom execute a separate written software license agreement governing use
+of this software, this software is licensed to you under the terms of the GNU General Public
+License version 2, available at http://www.gnu.org/copyleft/gpl.html (the "GPL").
+
+Notwithstanding the above, under no circumstances may you combine this software in any way
+with any other Broadcom software provided under a license other than the GPL, without
+Broadcom's express prior written consent.
+*******************************************************************************************/
+
 #include <linux/moduleparam.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
@@ -27,14 +39,22 @@
 #include <net/udp.h>
 #include <asm/unaligned.h>
 #include <trace/events/napi.h>
+#ifdef CONFIG_BRCM_NETCONSOLE
+#include "../../drivers/usb/gadget/u_ether.h"
+#include "../../drivers/usb/gadget/rndis.h"
+#endif
 
 /*
  * We maintain a small pool of fully-sized skbs, to make sure the
  * message gets out even in extreme OOM situations.
  */
-
+#ifdef CONFIG_BRCM_NETCONSOLE
+#define MAX_UDP_CHUNK 1400
+#else
 #define MAX_UDP_CHUNK 1460
-#define MAX_SKBS 32
+#endif
+#define MAX_SKBS 128
+#define MAX_QUEUE_DEPTH (MAX_SKBS / 2)
 
 static struct sk_buff_head skb_pool;
 
@@ -44,15 +64,25 @@ static atomic_t trapped;
 #define NETPOLL_RX_ENABLED  1
 #define NETPOLL_RX_DROP     2
 
+#ifdef CONFIG_BRCM_NETCONSOLE
+#define MAX_SKB_SIZE \
+		(MAX_UDP_CHUNK + sizeof(struct udphdr) + \
+				sizeof(struct iphdr) + sizeof(struct ethhdr) + \
+				sizeof (struct rndis_packet_msg_type))
+#else
 #define MAX_SKB_SIZE \
 		(MAX_UDP_CHUNK + sizeof(struct udphdr) + \
 				sizeof(struct iphdr) + sizeof(struct ethhdr))
+#endif
 
 static void zap_completion_queue(void);
 static void arp_reply(struct sk_buff *skb);
 
 static unsigned int carrier_timeout = 4;
 module_param(carrier_timeout, uint, 0644);
+
+static DEFINE_SPINLOCK(txq_lock);
+static struct workqueue_struct *brcm_tx_work_q;
 
 static void queue_process(struct work_struct *work)
 {
@@ -61,12 +91,13 @@ static void queue_process(struct work_struct *work)
 	struct sk_buff *skb;
 	unsigned long flags;
 
+	spin_lock(&txq_lock);
 	while ((skb = skb_dequeue(&npinfo->txq))) {
 		struct net_device *dev = skb->dev;
 		const struct net_device_ops *ops = dev->netdev_ops;
 		struct netdev_queue *txq;
 
-		if (!netif_device_present(dev) || !netif_running(dev)) {
+		if (!netif_device_present(dev) || !netif_running(dev) || !netif_carrier_ok(dev)) {
 			__kfree_skb(skb);
 			continue;
 		}
@@ -80,13 +111,15 @@ static void queue_process(struct work_struct *work)
 			skb_queue_head(&npinfo->txq, skb);
 			__netif_tx_unlock(txq);
 			local_irq_restore(flags);
-
-			schedule_delayed_work(&npinfo->tx_work, HZ/10);
+			spin_unlock(&txq_lock);
+			queue_delayed_work(brcm_tx_work_q,
+				&npinfo->tx_work, 0);
 			return;
 		}
 		__netif_tx_unlock(txq);
 		local_irq_restore(flags);
 	}
+	spin_unlock(&txq_lock);
 }
 
 static __sum16 checksum_udp(struct sk_buff *skb, struct udphdr *uh,
@@ -208,25 +241,81 @@ void netpoll_poll_dev(struct net_device *dev)
 
 	zap_completion_queue();
 }
-EXPORT_SYMBOL(netpoll_poll_dev);
 
 void netpoll_poll(struct netpoll *np)
 {
 	netpoll_poll_dev(np->dev);
 }
-EXPORT_SYMBOL(netpoll_poll);
 
-static void refill_skbs(void)
+/**
+ * static void __refill_skbs(struct sk_buff *skb) - put the skb buf back to queue to reuse
+ *
+ */
+static void __refill_skbs(struct sk_buff *skb)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&skb_pool.lock, flags);
+
+		if (skb)
+			__skb_queue_tail(&skb_pool, skb);
+		else printk("Can not refill the skb buffer....\n");
+		/* printk("@%d",skb_pool.qlen); */
+	spin_unlock_irqrestore(&skb_pool.lock, flags);
+}
+
+/**
+ * unsigned char netpoll_free_skbs(struct sk_buff *skb) - Obtain the available buffer
+ *
+ * @return the number bytes of free memory buffer
+ */
+
+int netpoll_free_memory(void)
+{
+	unsigned char free_skbs;
+	unsigned long flags;
+
+	spin_lock_irqsave(&skb_pool.lock, flags);
+	free_skbs = skb_queue_len(&skb_pool);
+	spin_unlock_irqrestore(&skb_pool.lock, flags);
+	return free_skbs<<10;
+}
+
+/**
+ * void netpoll_recycle_skbs(struct sk_buff *skb) - recycle the skb buf for the logging to avoid to run out of memory
+ *
+ */
+
+void netpoll_recycle_skbs(struct sk_buff *skb)
+{
+	__refill_skbs(skb);
+}
+
+/**
+ * unsigned short netpoll_skb_size(void) - the whole skb size which includes the memory buffer for the logging data.
+ *
+ */
+unsigned short netpoll_skb_size(void)
+{
+	return 	MAX_SKB_SIZE;
+}
+
+/**
+ * static void reserve_skbs_list(void) - reserve the skb buf list with allocated memory buffer for the logging data at beginning.
+ *
+ */
+static void reserve_skbs_list(void)
 {
 	struct sk_buff *skb;
 	unsigned long flags;
+
+	printk("reserve_skbs_list \n");
 
 	spin_lock_irqsave(&skb_pool.lock, flags);
 	while (skb_pool.qlen < MAX_SKBS) {
 		skb = alloc_skb(MAX_SKB_SIZE, GFP_ATOMIC);
 		if (!skb)
 			break;
-
 		__skb_queue_tail(&skb_pool, skb);
 	}
 	spin_unlock_irqrestore(&skb_pool.lock, flags);
@@ -266,18 +355,16 @@ static struct sk_buff *find_skb(struct netpoll *np, int len, int reserve)
 	struct sk_buff *skb;
 
 	zap_completion_queue();
-	refill_skbs();
 repeat:
 
-	skb = alloc_skb(len, GFP_ATOMIC);
-	if (!skb)
-		skb = skb_dequeue(&skb_pool);
-
+	skb = skb_dequeue(&skb_pool);
+	/* printk("!%d",skb_pool.qlen); */
 	if (!skb) {
 		if (++count < 10) {
 			netpoll_poll(np);
 			goto repeat;
 		}
+		printk("find_skb: out of memory..................\n");
 		return NULL;
 	}
 
@@ -306,7 +393,7 @@ void netpoll_send_skb_on_dev(struct netpoll *np, struct sk_buff *skb,
 	/* It is up to the caller to keep npinfo alive. */
 	struct netpoll_info *npinfo = np->dev->npinfo;
 
-	if (!npinfo || !netif_running(dev) || !netif_device_present(dev)) {
+	if (!npinfo || !netif_running(dev) || !netif_device_present(dev) || !netif_carrier_ok(dev)) {
 		__kfree_skb(skb);
 		return;
 	}
@@ -315,6 +402,11 @@ void netpoll_send_skb_on_dev(struct netpoll *np, struct sk_buff *skb,
 	if (skb_queue_len(&npinfo->txq) == 0 && !netpoll_owner_active(dev)) {
 		struct netdev_queue *txq;
 		unsigned long flags;
+
+		if (spin_is_locked(&txq_lock)) {
+			skb_queue_tail(&npinfo->txq, skb);
+			return;
+		}
 
 		txq = netdev_get_tx_queue(dev, skb_get_queue_mapping(skb));
 
@@ -350,7 +442,8 @@ void netpoll_send_skb_on_dev(struct netpoll *np, struct sk_buff *skb,
 
 	if (status != NETDEV_TX_OK) {
 		skb_queue_tail(&npinfo->txq, skb);
-		schedule_delayed_work(&npinfo->tx_work,0);
+		if (!spin_is_locked(&txq_lock))
+			queue_delayed_work(brcm_tx_work_q, &npinfo->tx_work, 0);
 	}
 }
 EXPORT_SYMBOL(netpoll_send_skb_on_dev);
@@ -362,10 +455,22 @@ void netpoll_send_udp(struct netpoll *np, const char *msg, int len)
 	struct udphdr *udph;
 	struct iphdr *iph;
 	struct ethhdr *eth;
+	static unsigned short iph_id = 0x1234;
+	struct net_device *dev = np->dev;
+	struct netpoll_info *npinfo = np->dev->npinfo;
+	struct rndis_packet_msg_type *rndis_header;
 
+	if (!npinfo || !netif_running(dev) || !netif_device_present(dev) || !netif_carrier_ok(dev))
+		return;
+
+	iph_id++;
 	udp_len = len + sizeof(*udph);
 	ip_len = udp_len + sizeof(*iph);
-	total_len = ip_len + LL_RESERVED_SPACE(np->dev);
+	total_len = ip_len + LL_RESERVED_SPACE(np->dev)
+#ifdef CONFIG_BRCM_NETCONSOLE
+		+ sizeof (struct rndis_packet_msg_type) /* reserved for the RNDIS header */
+#endif
+	;
 
 	skb = find_skb(np, total_len + np->dev->needed_tailroom,
 		       total_len - len);
@@ -411,12 +516,20 @@ void netpoll_send_udp(struct netpoll *np, const char *msg, int len)
 	skb->protocol = eth->h_proto = htons(ETH_P_IP);
 	memcpy(eth->h_source, np->dev->dev_addr, ETH_ALEN);
 	memcpy(eth->h_dest, np->remote_mac, ETH_ALEN);
-
+	/* Add RNDIS header here so we do not need to deal with on the ethernet driver */
+#ifdef CONFIG_BRCM_NETCONSOLE
+	rndis_header = (void *) skb_push (skb, sizeof *rndis_header);
+	memset (rndis_header, 0, sizeof *rndis_header);
+	rndis_header->MessageType = __constant_cpu_to_le32(REMOTE_NDIS_PACKET_MSG);
+	rndis_header->MessageLength = cpu_to_le32(skb->len);
+	rndis_header->DataOffset = __constant_cpu_to_le32 (36);
+	rndis_header->DataLength = cpu_to_le32(skb->len - sizeof *rndis_header);
+#endif
+	skb->netpoll_signature = SKB_NETPOLL_SIGNATURE;
 	skb->dev = np->dev;
 
 	netpoll_send_skb(np, skb);
 }
-EXPORT_SYMBOL(netpoll_send_udp);
 
 static void arp_reply(struct sk_buff *skb)
 {
@@ -643,7 +756,6 @@ void netpoll_print_options(struct netpoll *np)
 	printk(KERN_INFO "%s: remote ethernet address %pM\n",
 	                 np->name, np->remote_mac);
 }
-EXPORT_SYMBOL(netpoll_print_options);
 
 int netpoll_parse_options(struct netpoll *np, char *opt)
 {
@@ -712,7 +824,6 @@ int netpoll_parse_options(struct netpoll *np, char *opt)
 	       np->name, cur);
 	return -1;
 }
-EXPORT_SYMBOL(netpoll_parse_options);
 
 int __netpoll_setup(struct netpoll *np)
 {
@@ -721,6 +832,7 @@ int __netpoll_setup(struct netpoll *np)
 	const struct net_device_ops *ops;
 	unsigned long flags;
 	int err;
+
 
 	if ((ndev->priv_flags & IFF_DISABLE_NETPOLL) ||
 	    !ndev->netdev_ops->ndo_poll_controller) {
@@ -744,6 +856,10 @@ int __netpoll_setup(struct netpoll *np)
 		skb_queue_head_init(&npinfo->arp_tx);
 		skb_queue_head_init(&npinfo->txq);
 		INIT_DELAYED_WORK(&npinfo->tx_work, queue_process);
+		brcm_tx_work_q = create_workqueue("netpoll-txq");
+
+		if (brcm_tx_work_q == NULL)
+			pr_err("brcm_tx_work_q is failed to be created!");
 
 		atomic_set(&npinfo->refcnt, 1);
 
@@ -800,6 +916,7 @@ int netpoll_setup(struct netpoll *np)
 		goto put;
 	}
 
+#if 0 /* for Android CTS test */
 	if (!netif_running(ndev)) {
 		unsigned long atmost, atleast;
 
@@ -840,6 +957,7 @@ int netpoll_setup(struct netpoll *np)
 			msleep(4000);
 		}
 	}
+#endif
 
 	if (!np->local_ip) {
 		rcu_read_lock();
@@ -860,9 +978,6 @@ int netpoll_setup(struct netpoll *np)
 
 	np->dev = ndev;
 
-	/* fill up the skb queue */
-	refill_skbs();
-
 	rtnl_lock();
 	err = __netpoll_setup(np);
 	rtnl_unlock();
@@ -876,11 +991,12 @@ put:
 	dev_put(ndev);
 	return err;
 }
-EXPORT_SYMBOL(netpoll_setup);
 
 static int __init netpoll_init(void)
 {
 	skb_queue_head_init(&skb_pool);
+	/* preallocate skb buffers */
+	reserve_skbs_list();
 	return 0;
 }
 core_initcall(netpoll_init);
@@ -913,13 +1029,14 @@ void __netpoll_cleanup(struct netpoll *np)
 
 		/* avoid racing with NAPI reading npinfo */
 		synchronize_rcu_bh();
-
 		skb_queue_purge(&npinfo->arp_tx);
 		skb_queue_purge(&npinfo->txq);
 		cancel_delayed_work_sync(&npinfo->tx_work);
-
+		flush_workqueue(brcm_tx_work_q);
+		destroy_workqueue(brcm_tx_work_q);
 		/* clean after last, unfinished work */
 		__skb_queue_purge(&npinfo->txq);
+
 		kfree(npinfo);
 	}
 }
@@ -930,6 +1047,8 @@ void netpoll_cleanup(struct netpoll *np)
 	if (!np->dev)
 		return;
 
+	pr_info("%s\n", __func__);
+
 	rtnl_lock();
 	__netpoll_cleanup(np);
 	rtnl_unlock();
@@ -937,13 +1056,11 @@ void netpoll_cleanup(struct netpoll *np)
 	dev_put(np->dev);
 	np->dev = NULL;
 }
-EXPORT_SYMBOL(netpoll_cleanup);
 
 int netpoll_trap(void)
 {
 	return atomic_read(&trapped);
 }
-EXPORT_SYMBOL(netpoll_trap);
 
 void netpoll_set_trap(int trap)
 {
@@ -953,3 +1070,12 @@ void netpoll_set_trap(int trap)
 		atomic_dec(&trapped);
 }
 EXPORT_SYMBOL(netpoll_set_trap);
+EXPORT_SYMBOL(netpoll_trap);
+EXPORT_SYMBOL(netpoll_print_options);
+EXPORT_SYMBOL(netpoll_parse_options);
+EXPORT_SYMBOL(netpoll_setup);
+EXPORT_SYMBOL(netpoll_cleanup);
+EXPORT_SYMBOL(netpoll_send_udp);
+EXPORT_SYMBOL(netpoll_free_memory);
+EXPORT_SYMBOL(netpoll_poll_dev);
+EXPORT_SYMBOL(netpoll_poll);

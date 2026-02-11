@@ -204,6 +204,15 @@ config MTD_BLOCK_RO
 	  You do not need this option for use with the DiskOnChip devices. For
 	  those, enable NFTL support (CONFIG_NFTL) instead.
 
+config MTD_BLOCK_ROBBS
+	tristate "Readonly block device access to MTD devices with bad block skipping"
+	depends on MTD_BLOCK_RO!=y && BLOCK
+	select MTD_BLKDEVS
+	help
+	  This provides a simple "bad block skipping" (ie readonly) NAND Flash
+	  Translation Layer, which allows bad block unaware readonly filesystems
+	  (such as cramfs) to run from NAND MTD devices.
+
 config FTL
 	tristate "FTL (Flash Translation Layer) support"
 	depends on BLOCK
@@ -331,5 +340,7 @@ source "drivers/mtd/onenand/Kconfig"
 source "drivers/mtd/lpddr/Kconfig"
 
 source "drivers/mtd/ubi/Kconfig"
+
+source "drivers/mtd/bcmnand/Kconfig"
 
 endif # MTD

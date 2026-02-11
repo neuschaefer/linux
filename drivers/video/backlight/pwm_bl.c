@@ -17,9 +17,10 @@
 #include <linux/fb.h>
 #include <linux/backlight.h>
 #include <linux/err.h>
-#include <linux/pwm.h>
+#include <linux/pwm/pwm.h>
 #include <linux/pwm_backlight.h>
 #include <linux/slab.h>
+#include <linux/gpio.h>
 
 struct pwm_bl_data {
 	struct pwm_device	*pwm;
@@ -29,6 +30,8 @@ struct pwm_bl_data {
 	int			(*notify)(struct device *,
 					  int brightness);
 	int			(*check_fb)(struct device *, struct fb_info *);
+	int 			pwm_started;
+	unsigned int            gpio;
 };
 
 static int pwm_backlight_update_status(struct backlight_device *bl)
@@ -46,14 +49,25 @@ static int pwm_backlight_update_status(struct backlight_device *bl)
 	if (pb->notify)
 		brightness = pb->notify(pb->dev, brightness);
 
+	pwm_set_period_ns(pb->pwm, pb->period);
 	if (brightness == 0) {
-		pwm_config(pb->pwm, 0, pb->period);
-		pwm_disable(pb->pwm);
+		pwm_set_duty_ns(pb->pwm, 0);
+		if(pb->pwm_started != 0){ 
+			pwm_stop(pb->pwm);
+			pb->pwm_started = 0;
+		}
 	} else {
-		brightness = pb->lth_brightness +
-			(brightness * (pb->period - pb->lth_brightness) / max);
-		pwm_config(pb->pwm, brightness, pb->period);
-		pwm_enable(pb->pwm);
+		pwm_set_duty_ns(pb->pwm, brightness * pb->period / max);
+		if(pb->pwm_started == 0){
+			pwm_start(pb->pwm);
+			pb->pwm_started = 1;
+		}
+	}
+	if (pb->gpio >= 0) {
+		if (brightness == 0)
+			gpio_set_value(pb->gpio, 0);
+		else
+			gpio_set_value(pb->gpio, 1);
 	}
 	return 0;
 }
@@ -110,13 +124,24 @@ static int pwm_backlight_probe(struct platform_device *pdev)
 		(data->pwm_period_ns / data->max_brightness);
 	pb->dev = &pdev->dev;
 
-	pb->pwm = pwm_request(data->pwm_id, "backlight");
+	pb->pwm = pwm_request(data->pwm_name, "backlight");
 	if (IS_ERR(pb->pwm)) {
 		dev_err(&pdev->dev, "unable to request PWM for backlight\n");
 		ret = PTR_ERR(pb->pwm);
 		goto err_pwm;
 	} else
 		dev_dbg(&pdev->dev, "got pwm for backlight\n");
+
+	if (data->enable_gpio >= 0) {
+		ret = gpio_request_one(data->enable_gpio,
+				       GPIOF_OUT_INIT_HIGH, "Backlight Enable");
+		pb->gpio = data->enable_gpio;
+		printk(KERN_INFO "%s() Backlight GPIO requested: %d, status: %d\n",
+		       __FUNCTION__, data->enable_gpio, ret);
+		if (ret) {
+			return ret;
+		}
+	}
 
 	memset(&props, 0, sizeof(struct backlight_properties));
 	props.type = BACKLIGHT_RAW;
@@ -130,13 +155,21 @@ static int pwm_backlight_probe(struct platform_device *pdev)
 	}
 
 	bl->props.brightness = data->dft_brightness;
+	pwm_set_polarity(pb->pwm, data->polarity);
 	backlight_update_status(bl);
+
+	if (data->enable_gpio >= 0) {
+		if (bl->props.brightness == 0)
+			gpio_set_value(data->enable_gpio, 0);
+		else
+			gpio_set_value(data->enable_gpio, 1);
+	}
 
 	platform_set_drvdata(pdev, bl);
 	return 0;
 
 err_bl:
-	pwm_free(pb->pwm);
+	pwm_release(pb->pwm);
 err_pwm:
 	kfree(pb);
 err_alloc:
@@ -152,40 +185,15 @@ static int pwm_backlight_remove(struct platform_device *pdev)
 	struct pwm_bl_data *pb = dev_get_drvdata(&bl->dev);
 
 	backlight_device_unregister(bl);
-	pwm_config(pb->pwm, 0, pb->period);
-	pwm_disable(pb->pwm);
-	pwm_free(pb->pwm);
+	pwm_set_duty_ns(pb->pwm, 0);
+	pwm_stop(pb->pwm);
+	pwm_release(pb->pwm);
+
 	kfree(pb);
 	if (data->exit)
 		data->exit(&pdev->dev);
 	return 0;
 }
-
-#ifdef CONFIG_PM
-static int pwm_backlight_suspend(struct platform_device *pdev,
-				 pm_message_t state)
-{
-	struct backlight_device *bl = platform_get_drvdata(pdev);
-	struct pwm_bl_data *pb = dev_get_drvdata(&bl->dev);
-
-	if (pb->notify)
-		pb->notify(pb->dev, 0);
-	pwm_config(pb->pwm, 0, pb->period);
-	pwm_disable(pb->pwm);
-	return 0;
-}
-
-static int pwm_backlight_resume(struct platform_device *pdev)
-{
-	struct backlight_device *bl = platform_get_drvdata(pdev);
-
-	backlight_update_status(bl);
-	return 0;
-}
-#else
-#define pwm_backlight_suspend	NULL
-#define pwm_backlight_resume	NULL
-#endif
 
 static struct platform_driver pwm_backlight_driver = {
 	.driver		= {
@@ -194,8 +202,6 @@ static struct platform_driver pwm_backlight_driver = {
 	},
 	.probe		= pwm_backlight_probe,
 	.remove		= pwm_backlight_remove,
-	.suspend	= pwm_backlight_suspend,
-	.resume		= pwm_backlight_resume,
 };
 
 static int __init pwm_backlight_init(void)

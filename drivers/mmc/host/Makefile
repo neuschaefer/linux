@@ -10,6 +10,9 @@ obj-$(CONFIG_MMC_MXS)		+= mxs-mmc.o
 obj-$(CONFIG_MMC_SDHCI)		+= sdhci.o
 obj-$(CONFIG_MMC_SDHCI_PCI)	+= sdhci-pci.o
 obj-$(CONFIG_MMC_SDHCI_PXA)	+= sdhci-pxa.o
+obj-$(CONFIG_MMC_SDHCI_PLTFM_KONA)	+= sdhci-pltfm-kona.o
+obj-$(CONFIG_MMC_KONA_SDIO_WIFI)    += sdio-wifi.o
+obj-$(CONFIG_MMC_SDHCI_PLTFM)	+= sdhci-pltfm.o
 obj-$(CONFIG_MMC_SDHCI_S3C)	+= sdhci-s3c.o
 obj-$(CONFIG_MMC_SDHCI_SPEAR)	+= sdhci-spear.o
 obj-$(CONFIG_MMC_WBSD)		+= wbsd.o
@@ -59,3 +62,19 @@ sdhci-of-$(CONFIG_MMC_SDHCI_OF_HLWD)	+= sdhci-of-hlwd.o
 ifeq ($(CONFIG_CB710_DEBUG),y)
 	CFLAGS-cb710-mmc	+= -DDEBUG
 endif
+
+subdir-ccflags-$(CONFIG_MACH_CAPRI_BASE) += -Iarch/arm/mach-capri/hw_cfg/BASE
+subdir-ccflags-$(CONFIG_MACH_CAPRI_FPGA) += -Iarch/arm/mach-capri/hw_cfg/CAPRI_FPGA \
+						-Iarch/arm/mach-capri/hw_cfg/BASE
+subdir-ccflags-$(CONFIG_MACH_CAPRI_STONE) += -Iarch/arm/mach-capri/hw_cfg/CAPRI_STONE \
+						-Iarch/arm/mach-capri/hw_cfg/BASE
+subdir-ccflags-$(CONFIG_MACH_CAPRI_RAY) += -Iarch/arm/mach-capri/hw_cfg/CAPRI_RAY \
+						-Iarch/arm/mach-capri/hw_cfg/BASE
+subdir-ccflags-$(CONFIG_MACH_CAPRI_RAY_NAND) += -Iarch/arm/mach-capri/hw_cfg/CAPRI_RAY_NAND \
+                                                -Iarch/arm/mach-capri/hw_cfg/BASE
+subdir-ccflags-$(CONFIG_MACH_CAPRI_TABLET) += -Iarch/arm/mach-capri/hw_cfg/CAPRI_TABLET \
+			-Iarch/arm/mach-capri/hw_cfg/BASE
+subdir-ccflags-$(CONFIG_MACH_CAPRI_SS) += -Iarch/arm/mach-capri/hw_cfg/CAPRI_SS \
+			-Iarch/arm/mach-capri/hw_cfg/BASE
+subdir-ccflags-$(CONFIG_MACH_CAPRI_M500) += -Iarch/arm/mach-capri/hw_cfg/CAPRI_M500 \
+			-Iarch/arm/mach-capri/hw_cfg/BASE

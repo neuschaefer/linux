@@ -217,7 +217,7 @@ static __kprobes void FETCH_FUNC_NAME(memory, string)(struct pt_regs *regs,
 	long ret;
 	int maxlen = get_rloc_len(*(u32 *)dest);
 	u8 *dst = get_rloc_data(dest);
-	u8 *src = addr;
+	const u8 __user *src = (const u8 __force_user *)addr;
 	mm_segment_t old_fs = get_fs();
 	if (!maxlen)
 		return;
@@ -229,7 +229,7 @@ static __kprobes void FETCH_FUNC_NAME(memory, string)(struct pt_regs *regs,
 	pagefault_disable();
 	do
 		ret = __copy_from_user_inatomic(dst++, src++, 1);
-	while (dst[-1] && ret == 0 && src - (u8 *)addr < maxlen);
+	while (dst[-1] && ret == 0 && src - (const u8 __force_user *)addr < maxlen);
 	dst[-1] = '\0';
 	pagefault_enable();
 	set_fs(old_fs);
@@ -238,7 +238,7 @@ static __kprobes void FETCH_FUNC_NAME(memory, string)(struct pt_regs *regs,
 		((u8 *)get_rloc_data(dest))[0] = '\0';
 		*(u32 *)dest = make_data_rloc(0, get_rloc_offs(*(u32 *)dest));
 	} else
-		*(u32 *)dest = make_data_rloc(src - (u8 *)addr,
+		*(u32 *)dest = make_data_rloc(src - (const u8 __force_user *)addr,
 					      get_rloc_offs(*(u32 *)dest));
 }
 /* Return the length of string -- including null terminal byte */
@@ -252,7 +252,7 @@ static __kprobes void FETCH_FUNC_NAME(memory, string_size)(struct pt_regs *regs,
 	set_fs(KERNEL_DS);
 	pagefault_disable();
 	do {
-		ret = __copy_from_user_inatomic(&c, (u8 *)addr + len, 1);
+		ret = __copy_from_user_inatomic(&c, (const u8 __force_user *)addr + len, 1);
 		len++;
 	} while (c && ret == 0 && len < MAX_STRING_SIZE);
 	pagefault_enable();
@@ -1680,7 +1680,8 @@ static __kprobes void kprobe_perf_func(struct kprobe *kp,
 	store_trace_args(sizeof(*entry), tp, regs, (u8 *)&entry[1], dsize);
 
 	head = this_cpu_ptr(call->perf_events);
-	perf_trace_buf_submit(entry, size, rctx, entry->ip, 1, regs, head);
+	perf_trace_buf_submit(entry, size, rctx,
+					entry->ip, 1, regs, head, NULL);
 }
 
 /* Kretprobe profile handler */
@@ -1711,7 +1712,8 @@ static __kprobes void kretprobe_perf_func(struct kretprobe_instance *ri,
 	store_trace_args(sizeof(*entry), tp, regs, (u8 *)&entry[1], dsize);
 
 	head = this_cpu_ptr(call->perf_events);
-	perf_trace_buf_submit(entry, size, rctx, entry->ret_ip, 1, regs, head);
+	perf_trace_buf_submit(entry, size, rctx,
+					entry->ret_ip, 1, regs, head, NULL);
 }
 
 static int probe_perf_enable(struct ftrace_event_call *call)
@@ -1742,7 +1744,8 @@ static void probe_perf_disable(struct ftrace_event_call *call)
 #endif	/* CONFIG_PERF_EVENTS */
 
 static __kprobes
-int kprobe_register(struct ftrace_event_call *event, enum trace_reg type)
+int kprobe_register(struct ftrace_event_call *event,
+		    enum trace_reg type, void *data)
 {
 	switch (type) {
 	case TRACE_REG_REGISTER:
@@ -1756,6 +1759,9 @@ int kprobe_register(struct ftrace_event_call *event, enum trace_reg type)
 		return probe_perf_enable(event);
 	case TRACE_REG_PERF_UNREGISTER:
 		probe_perf_disable(event);
+		return 0;
+	case TRACE_REG_PERF_OPEN:
+	case TRACE_REG_PERF_CLOSE:
 		return 0;
 #endif
 	}

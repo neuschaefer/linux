@@ -1,0 +1,16 @@
+/dts-v1/;
+
+
+/ {
+  #address-cells = <1>;
+  #size-cells = <1>;
+  model = "bcm281xx_tablet";
+  compatible = "Broadcom,bcm281xx_tablet";
+  timestamp = "v0.1, 2/15/2012 12:24:00 PM";
+
+  chosen {
+  };
+
+/include/ "bcm281xx_tablet_hardware.dtsi"
+
+};

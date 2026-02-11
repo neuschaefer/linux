@@ -1,0 +1,318 @@
+  pinmux {
+      compatible = "Broadcom,bcm11130_ray_nand-pinmux";
+      reg = <0x35004800 268>;     /* base address and # of pins */
+      data = <
+        0x00000013   /* 0x35004800 : ADCSYNC-->GPEN09: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:8mA */
+        0x00000023   /* 0x35004804 : BAT_RM-->BAT_RM: hys_en:0 pull_dn:0 pull_up:1 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000070   /* 0x35004808 : BSC1_SCL-->BSC1_SCL: hys_en:0 pull_dn:1 pull_up:1 slew:1 input_dis:0 drv_sth:2mA */
+        0x00000070   /* 0x3500480c : BSC1_SDA-->BSC1_SDA: hys_en:0 pull_dn:1 pull_up:1 slew:1 input_dis:0 drv_sth:2mA */
+        0x00000070   /* 0x35004810 : BSC2_SCL-->BSC2_SCL: hys_en:0 pull_dn:1 pull_up:1 slew:1 input_dis:0 drv_sth:2mA */
+        0x00000070   /* 0x35004814 : BSC2_SDA-->BSC2_SDA: hys_en:0 pull_dn:1 pull_up:1 slew:1 input_dis:0 drv_sth:2mA */
+        0x00000113   /* 0x35004818 : CLASSGPWR-->PC3: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:8mA */
+        0x00000013   /* 0x3500481c : CLK_CX8-->CLK_CX8: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:8mA */
+        0x00000003   /* 0x35004820 : CLKOUT_0-->CLKOUT_0: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000203   /* 0x35004824 : CLKOUT_1-->VC_GPCLK_2: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000203   /* 0x35004828 : CLKOUT_2-->VC_GPCLK_0: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000203   /* 0x3500482c : CLKOUT_3-->VC_GPCLK_1: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x000000c3   /* 0x35004830 : CLKREQ_IN_0-->CLKREQ_IN_0: hys_en:1 pull_dn:1 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000113   /* 0x35004834 : CLKREQ_IN_1-->PWM_O_0: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:8mA */
+        0x000003c3   /* 0x35004838 : CWS_SYS_REQ1-->GPIO_183: hys_en:1 pull_dn:1 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000103   /* 0x3500483c : CWS_SYS_REQ2-->VC_CPG0: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000203   /* 0x35004840 : CWS_SYS_REQ3-->VC_GPIO_6: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000013   /* 0x35004844 : DIGMIC1_CLK-->DIGMIC1_CLK: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:8mA */
+        0x000000c3   /* 0x35004848 : DIGMIC1_DQ-->DIGMIC1_DQ: hys_en:1 pull_dn:1 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000013   /* 0x3500484c : DIGMIC2_CLK-->DIGMIC2_CLK: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:8mA */
+        0x000000c3   /* 0x35004850 : DIGMIC2_DQ-->DIGMIC2_DQ: hys_en:1 pull_dn:1 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000013   /* 0x35004854 : GPEN13-->GPEN13: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:8mA */
+        0x00000013   /* 0x35004858 : GPEN14-->GPEN14: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:8mA */
+        0x00000013   /* 0x3500485c : GPEN15-->GPEN15: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:8mA */
+        0x00000303   /* 0x35004860 : GPIO00-->GPIO_000: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000303   /* 0x35004864 : GPIO01-->GPIO_001: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000223   /* 0x35004868 : GPIO02-->MDIO: hys_en:0 pull_dn:0 pull_up:1 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000223   /* 0x3500486c : GPIO03-->MDC: hys_en:0 pull_dn:0 pull_up:1 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000303   /* 0x35004870 : GPIO04-->GPIO_004: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000303   /* 0x35004874 : GPIO05-->GPIO_005: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000203   /* 0x35004878 : GPIO06-->PWM_O_2: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000303   /* 0x3500487c : GPIO07-->GPIO_007: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000303   /* 0x35004880 : GPIO08-->GPIO_008: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000303   /* 0x35004884 : GPIO09-->GPIO_009: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000303   /* 0x35004888 : GPIO10-->GPIO_010: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000303   /* 0x3500488c : GPIO11-->GPIO_011: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000383   /* 0x35004890 : GPIO12-->GPIO_012: hys_en:1 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x000003c3   /* 0x35004894 : GPIO13-->GPIO_013: hys_en:1 pull_dn:1 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x000003b3   /* 0x35004898 : GPIO14-->GPIO_014: hys_en:1 pull_dn:0 pull_up:1 slew:1 input_dis:0 drv_sth:8mA */
+        0x00000013   /* 0x3500489c : GPS_PABLANK-->GPEN12: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:8mA */
+        0x00000013   /* 0x350048a0 : GPS_TMARK-->GPEN10: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:8mA */
+        0x00000000   /* 0x350048a4 : HDMI_SCL-->HDMI_SCL: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:2mA */
+        0x00000000   /* 0x350048a8 : HDMI_SDA-->HDMI_SDA: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:2mA */
+        0x00000303   /* 0x350048ac : IC_DM-->GPIO_177: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000303   /* 0x350048b0 : IC_DP-->GPIO_176: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x000000a3   /* 0x350048b4 : KP_COL_IP_0-->KP_COL_IP_0: hys_en:1 pull_dn:0 pull_up:1 slew:0 input_dis:0 drv_sth:8mA */
+        0x000000a3   /* 0x350048b8 : KP_COL_IP_1-->KP_COL_IP_1: hys_en:1 pull_dn:0 pull_up:1 slew:0 input_dis:0 drv_sth:8mA */
+        0x000000a3   /* 0x350048bc : KP_COL_IP_2-->KP_COL_IP_2: hys_en:1 pull_dn:0 pull_up:1 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000303   /* 0x350048c0 : KP_COL_IP_3-->GPIO_064: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000012   /* 0x350048c4 : KP_ROW_OP_0-->KP_ROW_OP_0: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:6mA */
+        0x00000012   /* 0x350048c8 : KP_ROW_OP_1-->KP_ROW_OP_1: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:6mA */
+        0x00000312   /* 0x350048cc : KP_ROW_OP_2-->GPIO_059: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:6mA */
+        0x00000312   /* 0x350048d0 : KP_ROW_OP_3-->GPIO_060: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:6mA */
+        0x00000003   /* 0x350048d4 : LCD_B_0-->LCD_B_0: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000003   /* 0x350048d8 : LCD_B_1-->LCD_B_1: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000003   /* 0x350048dc : LCD_B_2-->LCD_B_2: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000003   /* 0x350048e0 : LCD_B_3-->LCD_B_3: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000003   /* 0x350048e4 : LCD_B_4-->LCD_B_4: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000003   /* 0x350048e8 : LCD_B_5-->LCD_B_5: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000003   /* 0x350048ec : LCD_B_6-->LCD_B_6: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000003   /* 0x350048f0 : LCD_B_7-->LCD_B_7: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000003   /* 0x350048f4 : LCD_G_0-->LCD_G_0: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000003   /* 0x350048f8 : LCD_G_1-->LCD_G_1: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000003   /* 0x350048fc : LCD_G_2-->LCD_G_2: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000003   /* 0x35004900 : LCD_G_3-->LCD_G_3: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000003   /* 0x35004904 : LCD_G_4-->LCD_G_4: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000003   /* 0x35004908 : LCD_G_5-->LCD_G_5: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000003   /* 0x3500490c : LCD_G_6-->LCD_G_6: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000003   /* 0x35004910 : LCD_G_7-->LCD_G_7: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000003   /* 0x35004914 : LCD_HSYNC-->LCD_HSYNC: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000003   /* 0x35004918 : LCD_OE-->LCD_OE: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000003   /* 0x3500491c : LCD_PCLK-->LCD_PCLK: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000003   /* 0x35004920 : LCD_R_0-->LCD_R_0: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000003   /* 0x35004924 : LCD_R_1-->LCD_R_1: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000003   /* 0x35004928 : LCD_R_2-->LCD_R_2: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000003   /* 0x3500492c : LCD_R_3-->LCD_R_3: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000003   /* 0x35004930 : LCD_R_4-->LCD_R_4: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000003   /* 0x35004934 : LCD_R_5-->LCD_R_5: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000003   /* 0x35004938 : LCD_R_6-->LCD_R_6: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000003   /* 0x3500493c : LCD_R_7-->LCD_R_7: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000003   /* 0x35004940 : LCD_VSYNC-->LCD_VSYNC: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000013   /* 0x35004944 : MDMGPIO0-->GPEN00: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:8mA */
+        0x00000013   /* 0x35004948 : MDMGPIO1-->GPEN01: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:8mA */
+        0x00000013   /* 0x3500494c : MDMGPIO2-->GPEN02: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:8mA */
+        0x00000013   /* 0x35004950 : MDMGPIO3-->GPEN03: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:8mA */
+        0x00000013   /* 0x35004954 : MDMGPIO4-->GPEN04: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:8mA */
+        0x00000013   /* 0x35004958 : MDMGPIO5-->GPEN05: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:8mA */
+        0x00000013   /* 0x3500495c : MDMGPIO6-->GPEN06: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:8mA */
+        0x00000013   /* 0x35004960 : MDMGPIO7-->GPEN07: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:8mA */
+        0x00000013   /* 0x35004964 : MDMGPIO8-->GPEN08: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:8mA */
+        0x00000303   /* 0x35004968 : MPHI_DATA_0-->GPIO_145: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000303   /* 0x3500496c : MPHI_DATA_1-->GPIO_144: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000303   /* 0x35004970 : MPHI_DATA_2-->GPIO_143: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000303   /* 0x35004974 : MPHI_DATA_3-->GPIO_142: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000312   /* 0x35004978 : MPHI_DATA_4-->GPIO_141: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:6mA */
+        0x000003c3   /* 0x3500497c : MPHI_DATA_5-->GPIO_140: hys_en:1 pull_dn:1 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000312   /* 0x35004980 : MPHI_DATA_6-->GPIO_139: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:6mA */
+        0x00000303   /* 0x35004984 : MPHI_DATA_7-->GPIO_138: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x000002c3   /* 0x35004988 : MPHI_DATA_8-->CAM1_CAM_DATA5_CPI: hys_en:1 pull_dn:1 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x000002c3   /* 0x3500498c : MPHI_DATA_9-->CAM1_CAM_HSYNC_CPI: hys_en:1 pull_dn:1 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x000002c3   /* 0x35004990 : MPHI_DATA_10-->CAM1_CAM_CLK_CPI: hys_en:1 pull_dn:1 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000203   /* 0x35004994 : MPHI_DATA_11-->DBI_C_SCL: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x000002c3   /* 0x35004998 : MPHI_DATA_12-->CAM1_CAM_DATA9_CPI: hys_en:1 pull_dn:1 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x000002c3   /* 0x3500499c : MPHI_DATA_13-->CAM1_CAM_DATA8_CPI: hys_en:1 pull_dn:1 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x000002c3   /* 0x350049a0 : MPHI_DATA_14-->CAM1_CAM_DATA7_CPI: hys_en:1 pull_dn:1 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x000002c3   /* 0x350049a4 : MPHI_DATA_15-->CAM1_CAM_DATA6_CPI: hys_en:1 pull_dn:1 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x000002c3   /* 0x350049a8 : MPHI_HA0-->CAM1_CAM_DATA3_CPI: hys_en:1 pull_dn:1 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x000002c3   /* 0x350049ac : MPHI_HAT0-->CAM1_CAM_DATA4_CPI: hys_en:1 pull_dn:1 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x000003b3   /* 0x350049b0 : MPHI_HAT1-->GPIO_137: hys_en:1 pull_dn:0 pull_up:1 slew:1 input_dis:0 drv_sth:8mA */
+        0x000002c3   /* 0x350049b4 : MPHI_HCE0_N-->CAM1_CAM_DATA0_CPI: hys_en:1 pull_dn:1 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000113   /* 0x350049b8 : MPHI_HCE1_N-->CIR_TX: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:8mA */
+        0x000002c3   /* 0x350049bc : MPHI_HRD_N-->CAM1_CAM_DATA2_CPI: hys_en:1 pull_dn:1 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x000002c3   /* 0x350049c0 : MPHI_HWR_N-->CAM1_CAM_DATA1_CPI: hys_en:1 pull_dn:1 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x000002c3   /* 0x350049c4 : MPHI_RUN0-->CAM1_CAM_VSYNC_CPI: hys_en:1 pull_dn:1 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x000001c3   /* 0x350049c8 : MPHI_RUN1-->CIR_RX: hys_en:1 pull_dn:1 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x000003c3   /* 0x350049cc : MTX_SCAN_CLK-->GPIO_175: hys_en:1 pull_dn:1 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000312   /* 0x350049d0 : MTX_SCAN_DATA-->GPIO_174: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:6mA */
+        0x00000003   /* 0x350049d4 : NAND_AD_0-->NAND_AD_0: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000003   /* 0x350049d8 : NAND_AD_1-->NAND_AD_1: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000003   /* 0x350049dc : NAND_AD_2-->NAND_AD_2: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000003   /* 0x350049e0 : NAND_AD_3-->NAND_AD_3: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000003   /* 0x350049e4 : NAND_AD_4-->NAND_AD_4: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000003   /* 0x350049e8 : NAND_AD_5-->NAND_AD_5: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000003   /* 0x350049ec : NAND_AD_6-->NAND_AD_6: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000003   /* 0x350049f0 : NAND_AD_7-->NAND_AD_7: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000003   /* 0x350049f4 : NAND_ALE-->NAND_ALE: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000003   /* 0x350049f8 : NAND_CEN_0-->NAND_CEN_0: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x000001a3   /* 0x350049fc : NAND_CEN_1-->USB0PFT: hys_en:1 pull_dn:0 pull_up:1 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000003   /* 0x35004a00 : NAND_CLE-->NAND_CLE: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000003   /* 0x35004a04 : NAND_OEN-->NAND_OEN: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000003   /* 0x35004a08 : NAND_RDY_0-->NAND_RDY_0: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000112   /* 0x35004a0c : NAND_RDY_1-->USB0PON: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:6mA */
+        0x00000003   /* 0x35004a10 : NAND_WEN-->NAND_WEN: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000003   /* 0x35004a14 : NAND_WP-->NAND_WP: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000013   /* 0x35004a18 : PC1-->PC1: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:8mA */
+        0x00000013   /* 0x35004a1c : PC2-->PC2: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:8mA */
+        0x000000a3   /* 0x35004a20 : PMU_INT-->PMU_INT: hys_en:1 pull_dn:0 pull_up:1 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000020   /* 0x35004a24 : PMU_SCL-->PMU_SCL: hys_en:0 pull_dn:0 pull_up:1 slew:0 input_dis:0 drv_sth:2mA */
+        0x00000020   /* 0x35004a28 : PMU_SDA-->PMU_SDA: hys_en:0 pull_dn:0 pull_up:1 slew:0 input_dis:0 drv_sth:2mA */
+        0x00000013   /* 0x35004a2c : RFST2G_MTSLOTEN3G-->RFST2G_MTSLOTEN3G: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:8mA */
+        0x00000050   /* 0x35004a30 : RGMII_0_RX_CTL-->RGMII_0_RX_CTL: hys_en:0 pull_dn:1 pull_up:0 slew:1 input_dis:0 drv_sth:2mA */
+        0x00000050   /* 0x35004a34 : RGMII_0_RXC-->RGMII_0_RXC: hys_en:0 pull_dn:1 pull_up:0 slew:1 input_dis:0 drv_sth:2mA */
+        0x00000050   /* 0x35004a38 : RGMII_0_RXD_0-->RGMII_0_RXD0: hys_en:0 pull_dn:1 pull_up:0 slew:1 input_dis:0 drv_sth:2mA */
+        0x00000050   /* 0x35004a3c : RGMII_0_RXD_1-->RGMII_0_RXD1: hys_en:0 pull_dn:1 pull_up:0 slew:1 input_dis:0 drv_sth:2mA */
+        0x00000050   /* 0x35004a40 : RGMII_0_RXD_2-->RGMII_0_RXD2: hys_en:0 pull_dn:1 pull_up:0 slew:1 input_dis:0 drv_sth:2mA */
+        0x00000050   /* 0x35004a44 : RGMII_0_RXD_3-->RGMII_0_RXD3: hys_en:0 pull_dn:1 pull_up:0 slew:1 input_dis:0 drv_sth:2mA */
+        0x00000010   /* 0x35004a48 : RGMII_0_TX_CTL-->RGMII_0_TX_CTL: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:2mA */
+        0x00000010   /* 0x35004a4c : RGMII_0_TXC-->RGMII_0_TXC: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:2mA */
+        0x00000010   /* 0x35004a50 : RGMII_0_TXD_0-->RGMII_0_TXD0: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:2mA */
+        0x00000010   /* 0x35004a54 : RGMII_0_TXD_1-->RGMII_0_TXD1: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:2mA */
+        0x00000010   /* 0x35004a58 : RGMII_0_TXD_2-->RGMII_0_TXD2: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:2mA */
+        0x00000010   /* 0x35004a5c : RGMII_0_TXD_3-->RGMII_0_TXD3: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:2mA */
+        0x00000050   /* 0x35004a60 : RGMII_1_RX_CTL-->RGMII_1_RX_CTL: hys_en:0 pull_dn:1 pull_up:0 slew:1 input_dis:0 drv_sth:2mA */
+        0x00000050   /* 0x35004a64 : RGMII_1_RXC-->RGMII_1_RXC: hys_en:0 pull_dn:1 pull_up:0 slew:1 input_dis:0 drv_sth:2mA */
+        0x00000050   /* 0x35004a68 : RGMII_1_RXD_0-->RGMII_1_RXD0: hys_en:0 pull_dn:1 pull_up:0 slew:1 input_dis:0 drv_sth:2mA */
+        0x00000050   /* 0x35004a6c : RGMII_1_RXD_1-->RGMII_1_RXD1: hys_en:0 pull_dn:1 pull_up:0 slew:1 input_dis:0 drv_sth:2mA */
+        0x00000050   /* 0x35004a70 : RGMII_1_RXD_2-->RGMII_1_RXD2: hys_en:0 pull_dn:1 pull_up:0 slew:1 input_dis:0 drv_sth:2mA */
+        0x00000050   /* 0x35004a74 : RGMII_1_RXD_3-->RGMII_1_RXD3: hys_en:0 pull_dn:1 pull_up:0 slew:1 input_dis:0 drv_sth:2mA */
+        0x00000010   /* 0x35004a78 : RGMII_1_TX_CTL-->RGMII_1_TX_CTL: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:2mA */
+        0x00000010   /* 0x35004a7c : RGMII_1_TXC-->RGMII_1_TXC: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:2mA */
+        0x00000010   /* 0x35004a80 : RGMII_1_TXD_0-->RGMII_1_TXD0: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:2mA */
+        0x00000010   /* 0x35004a84 : RGMII_1_TXD_1-->RGMII_1_TXD1: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:2mA */
+        0x00000010   /* 0x35004a88 : RGMII_1_TXD_2-->RGMII_1_TXD2: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:2mA */
+        0x00000010   /* 0x35004a8c : RGMII_1_TXD_3-->RGMII_1_TXD3: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:2mA */
+        0x00000000   /* 0x35004a90 : RGMII_GPIO_0-->RGMII_GPIO_0: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:2mA */
+        0x00000000   /* 0x35004a94 : RGMII_GPIO_1-->RGMII_GPIO_1: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:2mA */
+        0x00000000   /* 0x35004a98 : RGMII_GPIO_2-->RGMII_GPIO_2: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:2mA */
+        0x00000000   /* 0x35004a9c : RGMII_GPIO_3-->RGMII_GPIO_3: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:2mA */
+        0x00000013   /* 0x35004aa0 : RTXDATA2G_TXDATA3G1-->RTXDATA2G_TXDATA3G1: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:8mA */
+        0x00000013   /* 0x35004aa4 : RTXEN2G_TXDATA3G2-->RTXEN2G_TXDATA3G2: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:8mA */
+        0x00000043   /* 0x35004aa8 : RXDATA3G0-->RXDATA3G0: hys_en:0 pull_dn:1 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000043   /* 0x35004aac : RXDATA3G1-->RXDATA3G1: hys_en:0 pull_dn:1 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000043   /* 0x35004ab0 : RXDATA3G2-->RXDATA3G2: hys_en:0 pull_dn:1 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000003   /* 0x35004ab4 : SDIO1_CLK-->SDIO1_CLK: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000023   /* 0x35004ab8 : SDIO1_CMD-->SDIO1_CMD: hys_en:0 pull_dn:0 pull_up:1 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000023   /* 0x35004abc : SDIO1_DATA_0-->SDIO1_DATA_0: hys_en:0 pull_dn:0 pull_up:1 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000023   /* 0x35004ac0 : SDIO1_DATA_1-->SDIO1_DATA_1: hys_en:0 pull_dn:0 pull_up:1 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000023   /* 0x35004ac4 : SDIO1_DATA_2-->SDIO1_DATA_2: hys_en:0 pull_dn:0 pull_up:1 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000023   /* 0x35004ac8 : SDIO1_DATA_3-->SDIO1_DATA_3: hys_en:0 pull_dn:0 pull_up:1 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000005   /* 0x35004acc : SDIO4_CLK-->SDIO4_CLK: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:12mA */
+        0x00000025   /* 0x35004ad0 : SDIO4_CMD-->SDIO4_CMD: hys_en:0 pull_dn:0 pull_up:1 slew:0 input_dis:0 drv_sth:12mA */
+        0x00000025   /* 0x35004ad4 : SDIO4_DATA_0-->SDIO4_DATA_0: hys_en:0 pull_dn:0 pull_up:1 slew:0 input_dis:0 drv_sth:12mA */
+        0x00000025   /* 0x35004ad8 : SDIO4_DATA_1-->SDIO4_DATA_1: hys_en:0 pull_dn:0 pull_up:1 slew:0 input_dis:0 drv_sth:12mA */
+        0x00000025   /* 0x35004adc : SDIO4_DATA_2-->SDIO4_DATA_2: hys_en:0 pull_dn:0 pull_up:1 slew:0 input_dis:0 drv_sth:12mA */
+        0x00000025   /* 0x35004ae0 : SDIO4_DATA_3-->SDIO4_DATA_3: hys_en:0 pull_dn:0 pull_up:1 slew:0 input_dis:0 drv_sth:12mA */
+        0x00000003   /* 0x35004ae4 : SIM_CLK-->SIM_CLK: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000003   /* 0x35004ae8 : SIM_DATA-->SIM_DATA: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000003   /* 0x35004aec : SIM_DET-->SIM_DET: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000003   /* 0x35004af0 : SIM_RESETN-->SIM_RESETN: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000303   /* 0x35004af4 : SIM2_CLK-->GPIO_054: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000303   /* 0x35004af8 : SIM2_DATA-->GPIO_055: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000303   /* 0x35004afc : SIM2_DET-->GPIO_056: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000303   /* 0x35004b00 : SIM2_RESETN-->GPIO_053: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000013   /* 0x35004b04 : SRI_C-->SRI_C: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:8mA */
+        0x00000013   /* 0x35004b08 : SRI_D-->SRI_D: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:8mA */
+        0x00000013   /* 0x35004b0c : SRI_E-->SRI_E: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:8mA */
+        0x00000112   /* 0x35004b10 : SSP_EXTCLK-->VC_CPG1: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:6mA */
+        0x00000303   /* 0x35004b14 : SSP0_CLK-->GPIO_092: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000303   /* 0x35004b18 : SSP0_FS-->GPIO_091: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000303   /* 0x35004b1c : SSP0_RXD-->GPIO_093: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000303   /* 0x35004b20 : SSP0_TXD-->GPIO_094: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000303   /* 0x35004b24 : SSP2_CLK-->GPIO_099: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000352   /* 0x35004b28 : SSP2_FS_0-->GPIO_095: hys_en:0 pull_dn:1 pull_up:0 slew:1 input_dis:0 drv_sth:6mA */
+        0x000003c3   /* 0x35004b2c : SSP2_FS_1-->GPIO_096: hys_en:1 pull_dn:1 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000312   /* 0x35004b30 : SSP2_FS_2-->GPIO_097: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:6mA */
+        0x00000312   /* 0x35004b34 : SSP2_FS_3-->GPIO_098: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:6mA */
+        0x00000303   /* 0x35004b38 : SSP2_RXD_0-->GPIO_100: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x000003c3   /* 0x35004b3c : SSP2_RXD_1-->GPIO_102: hys_en:1 pull_dn:1 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000303   /* 0x35004b40 : SSP2_TXD_0-->GPIO_101: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000312   /* 0x35004b44 : SSP2_TXD_1-->GPIO_103: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:6mA */
+        0x00000103   /* 0x35004b48 : SSP3_CLK-->VC_I2S_SCK: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000112   /* 0x35004b4c : SSP3_FS-->VC_I2S_WSIO: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:6mA */
+        0x00000143   /* 0x35004b50 : SSP3_RXD-->VC_I2S_SDI: hys_en:0 pull_dn:1 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000112   /* 0x35004b54 : SSP3_TXD-->VC_I2S_SDO: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:6mA */
+        0x00000103   /* 0x35004b58 : SSP4_CLK-->VC_TCK: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000103   /* 0x35004b5c : SSP4_FS-->VC_TMS: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000103   /* 0x35004b60 : SSP4_RXD-->VC_TDI: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000103   /* 0x35004b64 : SSP4_TXD-->VC_TDO: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000103   /* 0x35004b68 : SSP5_CLK-->RTCK: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000103   /* 0x35004b6c : SSP5_FS-->VC_TRSTB: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000043   /* 0x35004b70 : SSP5_RXD-->SSP5_RXD: hys_en:0 pull_dn:1 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000013   /* 0x35004b74 : SSP5_TXD-->SSP5_TXD: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:8mA */
+        0x00000013   /* 0x35004b78 : SSP6_CLK-->SSP6_CLK: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:8mA */
+        0x00000013   /* 0x35004b7c : SSP6_FS-->SSP6_FS: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:8mA */
+        0x00000043   /* 0x35004b80 : SSP6_RXD-->SSP6_RXD: hys_en:0 pull_dn:1 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000013   /* 0x35004b84 : SSP6_TXD-->SSP6_TXD: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:8mA */
+        0x00000112   /* 0x35004b88 : STAT_1-->SIM_LDO_EN: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:6mA */
+        0x00000112   /* 0x35004b8c : STAT_2-->SIM2_LDO_EN: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:6mA */
+        0x00000013   /* 0x35004b90 : SYSCLKEN-->SYSCLKEN: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:8mA */
+        0x00000003   /* 0x35004b94 : TRACECLK-->TRACECLK: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000003   /* 0x35004b98 : TRACEDT00-->TRACEDT00: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000003   /* 0x35004b9c : TRACEDT01-->TRACEDT01: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000003   /* 0x35004ba0 : TRACEDT02-->TRACEDT02: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000003   /* 0x35004ba4 : TRACEDT03-->TRACEDT03: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000003   /* 0x35004ba8 : TRACEDT04-->TRACEDT04: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000003   /* 0x35004bac : TRACEDT05-->TRACEDT05: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000003   /* 0x35004bb0 : TRACEDT06-->TRACEDT06: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000003   /* 0x35004bb4 : TRACEDT07-->TRACEDT07: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000003   /* 0x35004bb8 : TRACEDT08-->TRACEDT08: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000003   /* 0x35004bbc : TRACEDT09-->TRACEDT09: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000003   /* 0x35004bc0 : TRACEDT10-->TRACEDT10: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000003   /* 0x35004bc4 : TRACEDT11-->TRACEDT11: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000003   /* 0x35004bc8 : TRACEDT12-->TRACEDT12: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000003   /* 0x35004bcc : TRACEDT13-->TRACEDT13: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000003   /* 0x35004bd0 : TRACEDT14-->TRACEDT14: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000003   /* 0x35004bd4 : TRACEDT15-->TRACEDT15: hys_en:0 pull_dn:0 pull_up:0 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000013   /* 0x35004bd8 : TXDATA3G0-->TXDATA3G0: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:8mA */
+        0x00000013   /* 0x35004bdc : TXPWRIND-->GPEN11: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:8mA */
+        0x00000312   /* 0x35004be0 : UARTB1_UCTS-->PC3: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:6mA */
+        0x00000212   /* 0x35004be4 : UARTB1_URTS-->THERMAL_SHUTDOWN: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:6mA */
+        0x000000a3   /* 0x35004be8 : UARTB1_URXD-->UARTB1_URXD: hys_en:1 pull_dn:0 pull_up:1 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000013   /* 0x35004bec : UARTB1_UTXD-->UARTB1_UTXD: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:8mA */
+        0x000000a3   /* 0x35004bf0 : UARTB2_URXD-->UARTB2_URXD: hys_en:1 pull_dn:0 pull_up:1 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000013   /* 0x35004bf4 : UARTB2_UTXD-->UARTB2_UTXD: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:8mA */
+        0x000000a3   /* 0x35004bf8 : UARTB3_UCTS-->UARTB3_UCTS: hys_en:1 pull_dn:0 pull_up:1 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000012   /* 0x35004bfc : UARTB3_URTS-->UARTB3_URTS: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:6mA */
+        0x000000a3   /* 0x35004c00 : UARTB3_URXD-->UARTB3_URXD: hys_en:1 pull_dn:0 pull_up:1 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000013   /* 0x35004c04 : UARTB3_UTXD-->UARTB3_UTXD: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:8mA */
+        0x000000a3   /* 0x35004c08 : UARTB4_UCTS-->UARTB4_UCTS: hys_en:1 pull_dn:0 pull_up:1 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000012   /* 0x35004c0c : UARTB4_URTS-->UARTB4_URTS: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:6mA */
+        0x000000a3   /* 0x35004c10 : UARTB4_URXD-->UARTB4_URXD: hys_en:1 pull_dn:0 pull_up:1 slew:0 input_dis:0 drv_sth:8mA */
+        0x00000013   /* 0x35004c14 : UARTB4_UTXD-->UARTB4_UTXD: hys_en:0 pull_dn:0 pull_up:0 slew:1 input_dis:0 drv_sth:8mA */
+        0x00000020   /* 0x35004c18 : VC_CAM1_SCL-->VC_CAM1_SCL: hys_en:0 pull_dn:0 pull_up:1 slew:0 input_dis:0 drv_sth:2mA */
+        0x00000020   /* 0x35004c1c : VC_CAM1_SDA-->VC_CAM1_SDA: hys_en:0 pull_dn:0 pull_up:1 slew:0 input_dis:0 drv_sth:2mA */
+        0x00000020   /* 0x35004c20 : VC_CAM2_SCL-->VC_CAM2_SCL: hys_en:0 pull_dn:0 pull_up:1 slew:0 input_dis:0 drv_sth:2mA */
+        0x00000020   /* 0x35004c24 : VC_CAM2_SDA-->VC_CAM2_SDA: hys_en:0 pull_dn:0 pull_up:1 slew:0 input_dis:0 drv_sth:2mA */
+        0x00000020   /* 0x35004c28 : VC_CAM3_SCL-->VC_CAM3_SCL: hys_en:0 pull_dn:0 pull_up:1 slew:0 input_dis:0 drv_sth:2mA */
+        0x00000020   /* 0x35004c2c : VC_CAM3_SDA-->VC_CAM3_SDA: hys_en:0 pull_dn:0 pull_up:1 slew:0 input_dis:0 drv_sth:2mA */
+          >;
+  };
+
+  /* gpio node must be consistent with pinmux node */
+  /* Pins 4,5,7,8,9,10,11,91,92,94,100,176 are owned by the videocore and are not in this table */
+  /* Later the videocore dtsi file will specify these pins properly */
+  gpio {
+      compatible = "Broadcom,bcm11130_ray_nand-gpio";
+      reg = <0x35003000 34>;      /* base address and # of exposed GPIOs */
+      data = <
+            183    0x00000001 /* 1: Input */
+              0    0x00000001 /* 1: Input */
+              1    0x00000001 /* 1: Input */
+             12    0x00000001 /* 1: Input */
+             13    0x00000001 /* 1: Input */
+             14    0x00000001 /* 1: Input */
+            177    0x00000001 /* 1: Input */
+             64    0x00000001 /* 1: Input */
+             59    0x00000001 /* 1: Input */
+             60    0x00000001 /* 1: Input */
+            145    0x00000001 /* 1: Input */
+            144    0x00000001 /* 1: Input */
+            143    0x00000001 /* 1: Input */
+            142    0x00000001 /* 1: Input */
+            141    0x00000001 /* 1: Input */
+            140    0x00000001 /* 1: Input */
+            139    0x00000001 /* 1: Input */
+            138    0x00000001 /* 1: Input */
+            137    0x00000001 /* 1: Input */
+            175    0x00000001 /* 1: Input */
+            174    0x00000001 /* 1: Input */
+             54    0x00000001 /* 1: Input */
+             55    0x00000000 /* 0: Initial_level   0: Output */
+             56    0x00000001 /* 1: Input */
+             53    0x00000000 /* 0: Initial_level   0: Output */
+             93    0x00000001 /* 1: Input */
+             99    0x00000001 /* 1: Input */
+             95    0x00000001 /* 1: Input */
+             96    0x00000001 /* 1: Input */
+             97    0x00000001 /* 1: Input */
+             98    0x00000001 /* 1: Input */
+            102    0x00000001 /* 1: Input */
+            101    0x00000001 /* 1: Input */
+            103    0x00000001 /* 1: Input */
+          >;
+  };

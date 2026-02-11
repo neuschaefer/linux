@@ -12,16 +12,24 @@
 #include <linux/device.h>
 #include <linux/init.h>
 #include <linux/fs.h>
+#include <linux/fdtable.h>
 #include <linux/initrd.h>
 #include <linux/async.h>
 #include <linux/fs_struct.h>
 #include <linux/slab.h>
+#include <linux/crypto.h>
 
 #include <linux/nfs_fs.h>
 #include <linux/nfs_fs_sb.h>
 #include <linux/nfs_mount.h>
 
+#include <linux/device-mapper.h>
+#include <linux/dm-ioctl.h>
+#include <linux/dm-auth.h>
+
 #include "do_mounts.h"
+
+#define IMG_TYPE_INITFS_CRAMFS          (0x0A)
 
 int __initdata rd_doload;	/* 1 = load RAM disk, 0 = don't load */
 
@@ -29,6 +37,8 @@ int root_mountflags = MS_RDONLY | MS_SILENT;
 static char * __initdata root_device_name;
 static char __initdata saved_root_name[64];
 static int __initdata root_wait;
+unsigned char roothash[32];
+extern unsigned int dm_major;
 
 dev_t ROOT_DEV;
 
@@ -57,6 +67,30 @@ static int __init readwrite(char *str)
 
 __setup("ro", readonly);
 __setup("rw", readwrite);
+
+static int __init hexstr_to_bin(char *hex, unsigned char *bin, int binlen)
+{
+	int i;
+
+	for (i = 0; i < binlen; i++) {
+		char hi = hex[2*i];
+		char lo = hex[2*i+1];
+		if (!isxdigit(hi) || !isxdigit(lo)) {
+			printk(KERN_ERR "invalid hex char in roothash %s\n", roothash);
+			return -EINVAL;
+		}
+		bin[i] = (hex_to_bin(hi) << 4) | hex_to_bin(lo);
+	}
+	return 0;
+}
+
+static int __init setup_roothash(char *str)
+{
+	hexstr_to_bin(str, roothash, sizeof(roothash));
+	return 1;
+}
+__setup("roothash=", setup_roothash);
+
 
 #ifdef CONFIG_BLOCK
 /**
@@ -262,6 +296,13 @@ static void __init get_fs_names(char *page)
 {
 	char *s = page;
 
+#if 1 // ROKU
+	// Always try squashfs first.
+	strcpy(page, "squashfs");
+	page += strlen(page)+1;
+	s = page;
+#endif
+
 	if (root_fs_names) {
 		strcpy(page, root_fs_names);
 		while (*s++) {
@@ -285,13 +326,151 @@ static void __init get_fs_names(char *page)
 	*s = '\0';
 }
 
+struct dm_params { /* parameters for DM_ ioctls */
+	struct dm_ioctl ioc;
+	struct dm_target_spec target;
+	char params[128];
+};
+static char *dm_ctl_name = "/dev/authroot_ctl";
+static int mapper_minor = 250;
+
+/* Initialize a dm_params struct. */
+static void __init dm_params_init(struct dm_params* dm)
+{
+	memset(dm, 0, sizeof(*dm));
+	dm->ioc.version[0] = DM_VERSION_MAJOR ;
+	dm->ioc.version[1] = DM_VERSION_MINOR;
+	dm->ioc.version[2] = DM_VERSION_PATCHLEVEL;
+	dm->ioc.data_start = sizeof(dm->ioc);
+	dm->ioc.data_size = sizeof(dm->ioc);
+	dm->ioc.flags = DM_PERSISTENT_DEV_FLAG;
+	strcpy(dm->ioc.name, "auth_root");
+	dm->ioc.dev = new_encode_dev(MKDEV(MD_MAJOR, mapper_minor));
+}
+
+/* Delete the mapper device created by authenticate_root. */
+static void __init unauthenticate_root(void)
+{
+	int ctl;
+	struct dm_params dm;
+	int err;
+	dm_params_init(&dm);
+	ctl = sys_open((const char __user __force *) dm_ctl_name, O_RDWR, 0);
+	BUG_ON(ctl < 0);
+	err = sys_ioctl(ctl, DM_DEV_REMOVE, (unsigned long) &dm);
+	sys_close(ctl);
+}
+
+/* Set up an authentication device-mapper on top of the specified device.
+ * Return the name of the new device in new_name.
+ */
+static int __init authenticate_root(char *name, char *fs, char *new_name, int new_name_len)
+{
+	int root;
+	int ctl;
+	int dev;
+	struct file_system_type *fstype;
+	struct file *file;
+	struct MerkleHeader mheader;
+	struct dm_params dm;
+	int err;
+
+
+	/* Read MerkleHeader from filesystem. */
+	fstype = get_fs_type(fs);
+	if (!fstype->get_authdata) {
+		printk(KERN_INFO "%s filesystem does not support authentication\n", fs);
+		return -EINVAL;
+	}
+	dev = sys_open(name, O_RDONLY, 0);
+	if (dev < 0) {
+		printk(KERN_ERR "cannot open %s: error %d\n", name, dev);
+		return dev;
+	}
+	spin_lock(&current->files->file_lock);
+	file = files_fdtable(current->files)->fd[dev];
+	spin_unlock(&current->files->file_lock);
+	err = fstype->get_authdata(file, IMG_TYPE_INITFS_CRAMFS, &mheader, sizeof(mheader), NULL, 0);
+	sys_close(dev);
+	if (err < 0) {
+		printk(KERN_INFO "cannot get authentication data from %s\n", name);
+		return err;
+	}
+
+	/* Create a control node to access device-mapper. */
+	sys_mknod(dm_ctl_name, S_IFCHR|0600,
+		new_encode_dev(MKDEV(MISC_MAJOR, MAPPER_CTRL_MINOR)));
+	ctl = sys_open((const char __user __force *) dm_ctl_name, O_RDWR, 0);
+	BUG_ON(ctl < 0);
+
+	/* Create dm-auth device mapper on top of root device. */
+	dm_params_init(&dm);
+	err = sys_ioctl(ctl, DM_DEV_CREATE, (unsigned long) &dm);
+	if (err < 0) {
+		sys_close(ctl);
+		printk(KERN_ERR "DM_DEV_CREATE failed: %d\n", err);
+		return err;
+	}
+	dm.ioc.data_size = sizeof(dm);
+	dm.ioc.target_count = 1;
+	dm.target.length = to_sector(mheader.mh_udata_size);
+	strcpy(dm.target.target_type, "auth");
+	snprintf(dm.params, sizeof(dm.params), "%s 0", name);
+	err = sys_ioctl(ctl, DM_TABLE_LOAD, (unsigned long) &dm);
+	if (err < 0) {
+		sys_close(ctl);
+		printk(KERN_ERR "DM_TABLE_LOAD failed: %d\n", err);
+		unauthenticate_root();
+		return err;
+	}
+	err = sys_ioctl(ctl, DM_DEV_SUSPEND, (unsigned long) &dm);
+	sys_close(ctl);
+
+	/* Now create a node to access the mapped root. */
+	strncpy(new_name, "/dev/auth_root", new_name_len);
+	sys_mknod(new_name, S_IFBLK|0777,
+		new_encode_dev(MKDEV(dm_major, mapper_minor)));
+
+	/* Initialize the mapper with the MerkleHeader we got earlier. */
+	root = sys_open(new_name, O_RDWR, 0);
+	if (root < 0) {
+		printk(KERN_ERR "cannot open new root %s\n", new_name);
+		unauthenticate_root();
+		return root;
+	}
+	err = sys_ioctl(root, DMAUTH_IOCTL_SET_MERKLE_STICKY, (unsigned long) &mheader);
+	sys_close(root);
+	if (err < 0) {
+		unauthenticate_root();
+		return err;
+	}
+	return 0;
+}
+
 static int __init do_mount_root(char *name, char *fs, int flags, void *data)
 {
-	int err = sys_mount(name, "/root", fs, flags, data);
-	if (err)
-		return err;
+	int err;
+	char root_name[128];
+	
+	if (strcmp(fs, "nfs") != 0) {
+		printk(KERN_INFO "booting authenticated root %s using %s\n", name, fs);
+		err = authenticate_root(name, fs, root_name, sizeof(root_name));
+		if (err < 0) {
+			if (err != -EINVAL) printk(KERN_ERR "authenticate error %d\n", err);
+			return err;
+		}
+		name = root_name;
+	} else {
+		printk(KERN_INFO "booting unauthenticated root %s using %s\n", name, fs);
+	}
 
-	sys_chdir((const char __user __force *)"/root");
+	err = sys_mount((char __force_user *)name, (char __force_user *)"/root", (char __force_user *)fs, flags, (void __force_user *)data);
+	if (err) {
+		unauthenticate_root();
+		return err;
+	}
+
+	sys_chdir((const char __force_user*)"/root");
 	ROOT_DEV = current->fs->pwd.mnt->mnt_sb->s_dev;
 	printk(KERN_INFO
 	       "VFS: Mounted root (%s filesystem)%s on device %u:%u.\n",
@@ -410,18 +589,18 @@ void __init change_floppy(char *fmt, ...)
 	va_start(args, fmt);
 	vsprintf(buf, fmt, args);
 	va_end(args);
-	fd = sys_open("/dev/root", O_RDWR | O_NDELAY, 0);
+	fd = sys_open((char __user *)"/dev/root", O_RDWR | O_NDELAY, 0);
 	if (fd >= 0) {
 		sys_ioctl(fd, FDEJECT, 0);
 		sys_close(fd);
 	}
 	printk(KERN_NOTICE "VFS: Insert %s and press ENTER\n", buf);
-	fd = sys_open("/dev/console", O_RDWR, 0);
+	fd = sys_open((__force const char __user *)"/dev/console", O_RDWR, 0);
 	if (fd >= 0) {
 		sys_ioctl(fd, TCGETS, (long)&termios);
 		termios.c_lflag &= ~ICANON;
 		sys_ioctl(fd, TCSETSF, (long)&termios);
-		sys_read(fd, &c, 1);
+		sys_read(fd, (char __user *)&c, 1);
 		termios.c_lflag |= ICANON;
 		sys_ioctl(fd, TCSETSF, (long)&termios);
 		sys_close(fd);
@@ -515,6 +694,6 @@ void __init prepare_namespace(void)
 	mount_root();
 out:
 	devtmpfs_mount("dev");
-	sys_mount(".", "/", NULL, MS_MOVE, NULL);
-	sys_chroot((const char __user __force *)".");
+	sys_mount((char __force_user *)".", (char __force_user *)"/", NULL, MS_MOVE, NULL);
+	sys_chroot((const char __force_user *)".");
 }

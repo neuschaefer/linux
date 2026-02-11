@@ -39,8 +39,18 @@
 
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/partitions.h>
+#include <linux/sysfs.h> 
+#include <linux/kobject.h> 
 
 #include "mtdcore.h"
+
+static int in_value;
+static struct kobject *kobj_ref;
+static ssize_t sysfs_perfstats_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf);
+static ssize_t sysfs_perfstats_store(struct kobject *kobj,
+							struct kobj_attribute *attr,const char *buf, size_t count);
+struct kobj_attribute perfstats_attr = __ATTR(flash, 0666, sysfs_perfstats_show, sysfs_perfstats_store);
+
 /*
  * backing device capabilities for non-mappable devices (such as NAND flash)
  * - permits private mappings, copies are taken of the data
@@ -651,7 +661,7 @@ void __put_mtd_device(struct mtd_info *mtd)
  */
 
 int default_mtd_writev(struct mtd_info *mtd, const struct kvec *vecs,
-		       unsigned long count, loff_t to, size_t *retlen)
+		       unsigned long count, loff_t to, size_t *retlen, int encrypted)
 {
 	unsigned long i;
 	size_t totlen = 0, thislen;
@@ -663,7 +673,7 @@ int default_mtd_writev(struct mtd_info *mtd, const struct kvec *vecs,
 		for (i=0; i<count; i++) {
 			if (!vecs[i].iov_len)
 				continue;
-			ret = mtd->write(mtd, to, vecs[i].iov_len, &thislen, vecs[i].iov_base);
+			ret = TIMED_CALL(mtd, mtd->write(mtd, to, vecs[i].iov_len, &thislen, vecs[i].iov_base, encrypted), write, &thislen);
 			totlen += thislen;
 			if (ret || thislen != vecs[i].iov_len)
 				break;
@@ -768,6 +778,51 @@ static const struct file_operations mtd_proc_ops = {
 };
 #endif /* CONFIG_PROC_FS */
 
+/* Support for /sys/kernel/perfstats */
+static ssize_t sysfs_perfstats_show(struct kobject *kobj, 
+				struct kobj_attribute *attr, char *buf)
+{
+	struct mtd_info *mtd;
+	int count = 0;
+
+	mutex_lock(&mtd_table_mutex);
+	mtd_for_each_device(mtd) {
+		count += sprintf(buf + count, "mtd%d %u %u %u %u %u %u %u %u %u %u %u %u\n",
+			mtd->index, 
+			mtd->perf_stats.cumulative_mean_write, mtd->perf_stats.cumulative_num_write,
+			mtd->perf_stats.cumulative_mean_read, mtd->perf_stats.cumulative_num_read,
+			mtd->perf_stats.cumulative_mean_erase, mtd->perf_stats.cumulative_num_erase,
+			mtd->perf_stats.mean_write, mtd->perf_stats.num_write,
+			mtd->perf_stats.mean_read, mtd->perf_stats.num_read,
+			mtd->perf_stats.mean_erase, mtd->perf_stats.num_erase);		
+	}
+	mutex_unlock(&mtd_table_mutex);
+
+	return count;
+}
+ 
+static ssize_t sysfs_perfstats_store(struct kobject *kobj, 
+				struct kobj_attribute *attr,const char *buf, size_t count)
+{
+	struct mtd_info *mtd;
+	int ret;
+
+	ret = kstrtoint(buf, 10, &in_value);
+	if (ret < 0)
+		return ret;
+
+	if (!in_value) {
+		mutex_lock(&mtd_table_mutex);
+		mtd_for_each_device(mtd) {
+			mtd->perf_stats.mean_write = mtd->perf_stats.num_write =
+			mtd->perf_stats.mean_read = mtd->perf_stats.num_read =
+			mtd->perf_stats.mean_erase = mtd->perf_stats.num_erase = 0;
+		}
+		mutex_unlock(&mtd_table_mutex);
+	}
+	return count;
+}
+
 /*====================================================================*/
 /* Init code */
 
@@ -808,8 +863,21 @@ static int __init init_mtd(void)
 #ifdef CONFIG_PROC_FS
 	proc_mtd = proc_create("mtd", 0, NULL, &mtd_proc_ops);
 #endif /* CONFIG_PROC_FS */
+
+	/*Creating a directory in /sys/kernel/ */
+	kobj_ref = kobject_create_and_add("perfstats",kernel_kobj);
+
+	/*Creating sysfs file for perfstat*/
+	if(sysfs_create_file(kobj_ref,&perfstats_attr.attr)){
+		pr_err("Cannot create sysfs file......\n");
+		goto out_sysfs;
+	}
+
 	return 0;
 
+out_sysfs:
+	kobject_put(kobj_ref); 
+	sysfs_remove_file(kernel_kobj, &perfstats_attr.attr);
 err_bdi3:
 	bdi_destroy(&mtd_bdi_ro_mappable);
 err_bdi2:
@@ -823,6 +891,8 @@ err_reg:
 
 static void __exit cleanup_mtd(void)
 {
+	kobject_put(kobj_ref); 
+	sysfs_remove_file(kernel_kobj, &perfstats_attr.attr);
 #ifdef CONFIG_PROC_FS
 	if (proc_mtd)
 		remove_proc_entry( "mtd", NULL);

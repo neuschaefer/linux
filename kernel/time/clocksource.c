@@ -838,6 +838,27 @@ sysfs_show_available_clocksources(struct sys_device *dev,
 	return count;
 }
 
+/**
+ * get_clocksource - get a clocksource by its name
+ * @name:	Name of the clocksource to get
+ *
+ * Get a clocksource by its name
+ */
+struct clocksource *get_clocksource(const char *name)
+{
+	struct clocksource *src = NULL;
+
+	mutex_lock(&clocksource_mutex);
+	list_for_each_entry(src, &clocksource_list, list) {
+		if (strcmp(src->name, name) == 0)
+			break;
+	}
+	mutex_unlock(&clocksource_mutex);
+
+	return src;
+}
+EXPORT_SYMBOL(get_clocksource);
+
 /*
  * Sysfs setup bits:
  */

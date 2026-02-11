@@ -25,6 +25,7 @@
 #include <linux/namei.h>
 #include <linux/log2.h>
 #include <linux/kmemleak.h>
+#include <linux/dm-auth.h>
 #include <asm/uaccess.h>
 #include "internal.h"
 
@@ -672,7 +673,7 @@ static bool bd_may_claim(struct block_device *bdev, struct block_device *whole,
 	else if (bdev->bd_contains == bdev)
 		return true;  	 /* is a whole device which isn't held */
 
-	else if (whole->bd_holder == bd_may_claim)
+	else if (whole->bd_holder == (void *)bd_may_claim)
 		return true; 	 /* is a partition of a device that is being partitioned */
 	else if (whole->bd_holder != NULL)
 		return false;	 /* is a partition of a held device */
@@ -1526,6 +1527,21 @@ static long block_ioctl(struct file *file, unsigned cmd, unsigned long arg)
 	else
 		mode &= ~FMODE_NDELAY;
 
+	if (cmd == BLKGETAUTHDATA) {
+		struct AuthData __user *uauth = (struct AuthData __user *) arg;
+		struct AuthDataHeader ah;
+		struct file_system_type *fstype;
+		if (copy_from_user(&ah, &uauth->ad_header, sizeof(struct AuthDataHeader)))
+			return -EFAULT;
+		fstype = get_fs_type(ah.ah_filesystem);
+		if (fstype == NULL)
+			return -EINVAL;
+		if (fstype->get_authdata == NULL)
+			return -EINVAL;
+		return fstype->get_authdata(file, ah.ah_wtype,
+			&uauth->ad_mheader, sizeof(uauth->ad_mheader),
+			&uauth->ad_scratch, sizeof(uauth->ad_scratch));
+	}
 	return blkdev_ioctl(bdev, mode, cmd, arg);
 }
 

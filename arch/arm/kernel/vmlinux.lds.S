@@ -21,7 +21,8 @@
 #define ARM_CPU_KEEP(x)
 #endif
 
-#if defined(CONFIG_SMP_ON_UP) && !defined(CONFIG_DEBUG_SPINLOCK)
+#if (defined(CONFIG_SMP_ON_UP) && !defined(CONFIG_DEBUG_SPINLOCK)) || \
+	defined(CONFIG_GENERIC_BUG)
 #define ARM_EXIT_KEEP(x)	x
 #else
 #define ARM_EXIT_KEEP(x)
@@ -263,6 +264,13 @@ SECTIONS
 	NOTES
 
 	BSS_SECTION(0, 0, 0)
+
+	. = ALIGN(PAGE_SIZE);
+	.bss_noinit : {
+		*(.bss_noinit)
+	}
+	
+	. = ALIGN(PAGE_SIZE);
 	_end = .;
 
 	STABS_DEBUG

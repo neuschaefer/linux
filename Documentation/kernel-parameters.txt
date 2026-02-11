@@ -482,12 +482,21 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 			Also note the kernel might malfunction if you disable
 			some critical bits.
 
+	cma=nn[MG]	[ARM,KNL]
+			Sets the size of kernel global memory area for contiguous
+			memory allocations. For more information, see
+			include/linux/dma-contiguous.h
+
 	cmo_free_hint=	[PPC] Format: { yes | no }
 			Specify whether pages are marked as being inactive
 			when they are freed.  This is used in CMO environments
 			to determine OS memory pressure for page stealing by
 			a hypervisor.
 			Default: yes
+
+	coherent_pool=nn[KMG]	[ARM,KNL]
+			Sets the size of memory pool for coherent, atomic dma
+			allocations if Contiguous Memory Allocator (CMA) is used.
 
 	code_bytes	[X86] How many bytes of object code to print
 			in an oops report.
@@ -1892,6 +1901,13 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 			Halt all CPUs after the first oops has been printed for
 			the specified number of seconds.  This is to be used if
 			your oopses keep scrolling off the screen.
+
+	pax_nouderef	[X86] disables UDEREF.  Most likely needed under certain
+			virtualization environments that don't cope well with the
+			expand down segment used by UDEREF on X86-32 or the frequent
+			page table updates on X86-64.
+
+	pax_softmode=	0/1 to disable/enable PaX softmode on boot already.
 
 	pcbit=		[HW,ISDN]
 

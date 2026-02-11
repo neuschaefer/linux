@@ -1,0 +1,17 @@
+/dts-v1/;
+
+
+/ {
+  #address-cells = <1>;
+  #size-cells = <1>;
+  model = "bcm11130_roku_austin";
+  compatible = "Broadcom,bcm11130_roku_austin";
+  timestamp = "v0.1, 2/15/2012 12:24:00 PM";
+
+  chosen {
+  };
+
+/include/ "bcm11130_roku_austin_hardware.dtsi"
+/include/ "CapriRayMPS_Roku_Austin_VC.dtsi"
+
+};

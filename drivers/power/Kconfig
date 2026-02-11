@@ -235,4 +235,85 @@ config CHARGER_GPIO
 	  This driver can be build as a module. If so, the module will be
 	  called gpio-charger.
 
+config BATTERY_BCM59055
+	tristate "BCM59055 Battery support"
+	depends on MFD_BCM_PMU590XX
+	help
+	  A battery driver for PMU59055.
+
+config BCM_CMP_BATTERY_MULTI
+        tristate "CMP Multi Battery and Power Supply Driver"
+        default n
+        depends on POWER_SUPPLY
+        help
+          CMP driver for multiple platforms for supplying power supply information
+          to Power Supply system.
+
+config BCM_CMP_BATTERY_BQ24616
+        tristate "CMP BQ24616 Battery and Power Supply Driver"
+        default n
+        depends on POWER_SUPPLY
+        help
+          CMP driver based on BQ24616 for supplying battery and power supply
+          information to Power Supply system.
+
+config MONITOR_ADC121C021_I2C
+        tristate "ADC121C021 Battery Monitor"
+        depends on I2C
+        help
+         Say Y here if you want to support a ADC121C021 battery monitor.
+         If unsure, say N.
+
+config MONITOR_BQ27541_I2C
+        tristate "BQ27541 Battery Monitor"
+        depends on I2C
+        help
+         Say Y here if you want to support BQ27541 battery monitor.
+
+config POWER_BCMPMU
+	bool "BCMPMU battery driver"
+	depends on MFD_BCMPMU
+	default n
+	help
+	 Say Y to include support of battery driver for BCM PMUs.
+
+config CHARGER_BCMPMU
+	bool "BCMPMU charger driver"
+	depends on MFD_BCMPMU
+	default n
+	help
+	 Say Y to include support of charger driver for BCM PMUs.
+
+config CHARGER_BCMPMU_EXT
+	bool "BCMPMU external charger driver"
+	depends on MFD_BCMPMU
+	default n
+	help
+	 Say Y to include support of external charger driver for BCM PMUs.
+
+config BCMPMU_EM
+	tristate "BCMPMU charging and gauging driver"
+	depends on MFD_BCMPMU
+	default n
+	help
+	 Say Y to include kernel charging and gauging module for BCM PMUs.
+
+config CHARGER_BCMPMU_SPA
+	bool "BCMPMU support SPA charging module"
+	depends on MFD_BCMPMU
+	default n
+	help
+	 Say Y to support
+	 SPA charging module
+	 for BRCM
+	 PMUs.
+
+config BCM_FAKE_BATTERY_DRIVER
+     tristate "Dummy Battery and Power Supply Driver"
+     default n
+     depends on POWER_SUPPLY
+     ---help---
+     Dummy driver for supplying fake battery and power supply information to
+     Power Supply system.
+
 endif # POWER_SUPPLY

@@ -5,7 +5,11 @@
 #define __ASMARM_CACHE_H
 
 #define L1_CACHE_SHIFT		CONFIG_ARM_L1_CACHE_SHIFT
+#ifdef __ASSEMBLY__
 #define L1_CACHE_BYTES		(1 << L1_CACHE_SHIFT)
+#else
+#define L1_CACHE_BYTES		(1UL << L1_CACHE_SHIFT)
+#endif
 
 /*
  * Memory returned by kmalloc() may be used for DMA, so we must make

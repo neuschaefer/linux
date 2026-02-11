@@ -55,7 +55,9 @@ jump_label_sort_entries(struct jump_entry *start, struct jump_entry *stop)
 
 	size = (((unsigned long)stop - (unsigned long)start)
 					/ sizeof(struct jump_entry));
+	pax_open_kernel();
 	sort(start, size, sizeof(struct jump_entry), jump_label_cmp, NULL);
+	pax_close_kernel();
 }
 
 static void jump_label_update(struct jump_label_key *key, int enable);
@@ -72,13 +74,44 @@ void jump_label_inc(struct jump_label_key *key)
 	jump_label_unlock();
 }
 
-void jump_label_dec(struct jump_label_key *key)
+static void __jump_label_dec(struct jump_label_key *key,
+		unsigned long rate_limit, struct delayed_work *work)
 {
 	if (!atomic_dec_and_mutex_lock(&key->enabled, &jump_label_mutex))
 		return;
 
-	jump_label_update(key, JUMP_LABEL_DISABLE);
+	if (rate_limit) {
+		atomic_inc(&key->enabled);
+		schedule_delayed_work(work, rate_limit);
+	} else
+		jump_label_update(key, JUMP_LABEL_DISABLE);
+
 	jump_label_unlock();
+}
+
+static void jump_label_update_timeout(struct work_struct *work)
+{
+	struct jump_label_key_deferred *key =
+		container_of(work, struct jump_label_key_deferred, work.work);
+	__jump_label_dec(&key->key, 0, NULL);
+}
+
+void jump_label_dec(struct jump_label_key *key)
+{
+	__jump_label_dec(key, 0, NULL);
+}
+
+void jump_label_dec_deferred(struct jump_label_key_deferred *key)
+{
+	__jump_label_dec(&key->key, key->timeout, &key->work);
+}
+
+
+void jump_label_rate_limit(struct jump_label_key_deferred *key,
+		unsigned long rl)
+{
+	key->timeout = rl;
+	INIT_DELAYED_WORK(&key->work, jump_label_update_timeout);
 }
 
 static int addr_conflict(struct jump_entry *entry, void *start, void *end)
@@ -122,14 +155,7 @@ static void __jump_label_update(struct jump_label_key *key,
 	}
 }
 
-/*
- * Not all archs need this.
- */
-void __weak arch_jump_label_text_poke_early(jump_label_t addr)
-{
-}
-
-static __init int jump_label_init(void)
+void __init jump_label_init(void)
 {
 	struct jump_entry *iter_start = __start___jump_table;
 	struct jump_entry *iter_stop = __stop___jump_table;
@@ -152,10 +178,7 @@ static __init int jump_label_init(void)
 #endif
 	}
 	jump_label_unlock();
-
-	return 0;
 }
-early_initcall(jump_label_init);
 
 #ifdef CONFIG_MODULES
 
@@ -298,10 +321,12 @@ static void jump_label_invalidate_module_init(struct module *mod)
 	struct jump_entry *iter_stop = iter_start + mod->num_jump_entries;
 	struct jump_entry *iter;
 
+	pax_open_kernel();
 	for (iter = iter_start; iter < iter_stop; iter++) {
 		if (within_module_init(iter->code, mod))
 			iter->code = 0;
 	}
+	pax_close_kernel();
 }
 
 static int

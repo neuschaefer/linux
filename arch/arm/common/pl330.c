@@ -144,9 +144,15 @@
 
 #define	PART		0x330
 #define DESIGNER	0x41
-#define REVISION	0x0
 #define INTEG_CFG	0x0
 #define PERIPH_ID_VAL	((PART << 0) | (DESIGNER << 12))
+#define PERIPH_ID_MASK	(0x000FFFFF)
+
+#define PERIPH_REV_SHIFT	20
+#define PERIPH_REV_MASK		0xF
+#define PERIPH_REV_R0P0		0
+#define PERIPH_REV_R1P0		1
+#define PERIPH_REV_R1P1		2
 
 #define PCELL_ID_VAL	0xb105f00d
 
@@ -219,7 +225,8 @@
  * For typical scenario, at 1word/burst, 10MB and 20MB xfers per req
  * should be enough for P<->M and M<->M respectively.
  */
-#define MCODE_BUFF_PER_REQ	256
+/*#define MCODE_BUFF_PER_REQ	256*/
+#define MCODE_BUFF_PER_REQ		512
 
 /*
  * Mark a _pl330_req as free.
@@ -367,9 +374,14 @@ static inline bool is_manager(struct pl330_thread *thrd)
 /* If manager of the thread is in Non-Secure mode */
 static inline bool _manager_ns(struct pl330_thread *thrd)
 {
+/* BRCM: No manager thread, security based on APB interface */
+#ifdef CONFIG_DMAC_KONA_PL330_SECURE_MODE
 	struct pl330_dmac *pl330 = thrd->dmac;
 
 	return (pl330->pinfo->pcfg.mode & DMAC_MODE_NS) ? true : false;
+#else
+	return true;
+#endif
 }
 
 static inline u32 get_id(struct pl330_info *pi, u32 off)
@@ -383,6 +395,12 @@ static inline u32 get_id(struct pl330_info *pi, u32 off)
 	id |= (readb(regs + off + 0xc) << 24);
 
 	return id;
+}
+
+/* Return PL330 revision ID info */
+static inline u32 get_revision_id(u32 periph_id)
+{
+	return ((periph_id >> PERIPH_REV_SHIFT) & PERIPH_REV_MASK);
 }
 
 static inline u32 _emit_ADDH(unsigned dry_run, u8 buf[],
@@ -780,6 +798,8 @@ static inline void _execute_DBGINSN(struct pl330_thread *thrd,
 
 static inline u32 _state(struct pl330_thread *thrd)
 {
+/* BRCM: Cant determine the state machine in open mode!!!*/
+#ifdef CONFIG_DMAC_KONA_PL330_SECURE_MODE
 	void __iomem *regs = thrd->dmac->pinfo->base;
 	u32 val;
 
@@ -834,12 +854,16 @@ static inline u32 _state(struct pl330_thread *thrd)
 	default:
 		return PL330_STATE_INVALID;
 	}
+#else
+	return PL330_STATE_STOPPED;
+#endif
 }
 
 /* If the request 'req' of thread 'thrd' is currently active */
 static inline bool _req_active(struct pl330_thread *thrd,
 		struct _pl330_req *req)
 {
+#ifdef CONFIG_DMAC_KONA_PL330_SECURE_MODE
 	void __iomem *regs = thrd->dmac->pinfo->base;
 	u32 buf = req->mc_bus, pc = readl(regs + CPC(thrd->id));
 
@@ -847,6 +871,9 @@ static inline bool _req_active(struct pl330_thread *thrd,
 		return false;
 
 	return (pc >= buf && pc <= buf + req->mc_len) ? true : false;
+#else
+	return true;
+#endif
 }
 
 /* Returns 0 if the thread is inactive, ID of active req + 1 otherwise */
@@ -863,7 +890,9 @@ static inline unsigned _thrd_active(struct pl330_thread *thrd)
 
 static void _stop(struct pl330_thread *thrd)
 {
+#ifdef CONFIG_DMAC_KONA_PL330_SECURE_MODE
 	void __iomem *regs = thrd->dmac->pinfo->base;
+#endif
 	u8 insn[6] = {0, 0, 0, 0, 0, 0};
 
 	if (_state(thrd) == PL330_STATE_FAULT_COMPLETING)
@@ -878,7 +907,10 @@ static void _stop(struct pl330_thread *thrd)
 	_emit_KILL(0, insn);
 
 	/* Stop generating interrupts for SEV */
+	 /* BRCM: non-secure mode, INTEN is set once in ABI */
+#ifdef CONFIG_DMAC_KONA_PL330_SECURE_MODE
 	writel(readl(regs + INTEN) & ~(1 << thrd->ev), regs + INTEN);
+#endif
 
 	_execute_DBGINSN(thrd, insn, is_manager(thrd));
 }
@@ -886,7 +918,9 @@ static void _stop(struct pl330_thread *thrd)
 /* Start doing req 'idx' of thread 'thrd' */
 static bool _trigger(struct pl330_thread *thrd)
 {
+#ifdef CONFIG_DMAC_KONA_PL330_SECURE_MODE
 	void __iomem *regs = thrd->dmac->pinfo->base;
+#endif
 	struct _pl330_req *req;
 	struct pl330_req *r;
 	struct _arg_GO go;
@@ -912,10 +946,14 @@ static bool _trigger(struct pl330_thread *thrd)
 
 	if (r->cfg)
 		ns = r->cfg->nonsecure ? 1 : 0;
+#ifdef CONFIG_DMAC_KONA_PL330_SECURE_MODE
 	else if (readl(regs + CS(thrd->id)) & CS_CNS)
 		ns = 1;
 	else
 		ns = 0;
+#else
+		ns = 1;
+#endif
 
 	/* See 'Abort Sources' point-4 at Page 2-25 */
 	if (_manager_ns(thrd) && !ns)
@@ -928,7 +966,10 @@ static bool _trigger(struct pl330_thread *thrd)
 	_emit_GO(0, insn, &go);
 
 	/* Set to generate interrupts for SEV */
+	 /* BRCM: non-secure mode, INTEN is set once in ABI */
+#ifdef CONFIG_DMAC_KONA_PL330_SECURE_MODE
 	writel(readl(regs + INTEN) | (1 << thrd->ev), regs + INTEN);
+#endif
 
 	/* Only manager can execute GO */
 	_execute_DBGINSN(thrd, insn, true);
@@ -973,14 +1014,25 @@ static inline int _ldst_memtomem(unsigned dry_run, u8 buf[],
 		const struct _xfer_spec *pxs, int cyc)
 {
 	int off = 0;
+	struct pl330_config *pcfg = pxs->r->cfg->pcfg;
 
-	while (cyc--) {
-		off += _emit_LD(dry_run, &buf[off], ALWAYS);
-		off += _emit_RMB(dry_run, &buf[off]);
-		off += _emit_ST(dry_run, &buf[off], ALWAYS);
-		off += _emit_WMB(dry_run, &buf[off]);
+	/*
+	 * PL330 rev r0p0 needs needs memory barrier instructions
+	 * This workaround is not nedded for DMAC rev >= r1p0
+	 */
+	if (get_revision_id(pcfg->periph_id) >= PERIPH_REV_R1P0) {
+		while (cyc--) {
+			off += _emit_LD(dry_run, &buf[off], ALWAYS);
+			off += _emit_ST(dry_run, &buf[off], ALWAYS);
+		}
+	} else {
+		while (cyc--) {
+			off += _emit_LD(dry_run, &buf[off], ALWAYS);
+			off += _emit_RMB(dry_run, &buf[off]);
+			off += _emit_ST(dry_run, &buf[off], ALWAYS);
+			off += _emit_WMB(dry_run, &buf[off]);
+		}
 	}
-
 	return off;
 }
 
@@ -988,10 +1040,22 @@ static inline int _ldst_devtomem(unsigned dry_run, u8 buf[],
 		const struct _xfer_spec *pxs, int cyc)
 {
 	int off = 0;
+	enum pl330_cond c = SINGLE;
+	struct pl330_config *pcfg = pxs->r->cfg->pcfg;
 
+	if (pxs->r->cfg->brst_size)
+		c = BURST;
+
+	/*
+	 * PL330 rev r0p0 needs needs memory barrier instructions(ERRATA 716336)
+	 * This workaround is not nedded for DMAC rev >= r1p0
+	 */
 	while (cyc--) {
-		off += _emit_WFP(dry_run, &buf[off], SINGLE, pxs->r->peri);
-		off += _emit_LDP(dry_run, &buf[off], SINGLE, pxs->r->peri);
+		off += _emit_WFP(dry_run, &buf[off], c, pxs->r->peri);
+		off += _emit_LDP(dry_run, &buf[off], c, pxs->r->peri);
+		if (get_revision_id(pcfg->periph_id) < PERIPH_REV_R1P0) {
+			off += _emit_RMB(dry_run, &buf[off]);
+		}
 		off += _emit_ST(dry_run, &buf[off], ALWAYS);
 		off += _emit_FLUSHP(dry_run, &buf[off], pxs->r->peri);
 	}
@@ -1003,11 +1067,23 @@ static inline int _ldst_memtodev(unsigned dry_run, u8 buf[],
 		const struct _xfer_spec *pxs, int cyc)
 {
 	int off = 0;
+	enum pl330_cond c = SINGLE;
+	struct pl330_config *pcfg = pxs->r->cfg->pcfg;
 
+	if (pxs->r->cfg->brst_size)
+		c = BURST;
+
+	/*
+	 * PL330 rev r0p0 needs needs memory barrier instructions(ERRATA 716336)
+	 * This workaround is not nedded for DMAC rev >= r1p0
+	 */
 	while (cyc--) {
-		off += _emit_WFP(dry_run, &buf[off], SINGLE, pxs->r->peri);
+		off += _emit_WFP(dry_run, &buf[off], c, pxs->r->peri);
 		off += _emit_LD(dry_run, &buf[off], ALWAYS);
-		off += _emit_STP(dry_run, &buf[off], SINGLE, pxs->r->peri);
+		if (get_revision_id(pcfg->periph_id) < PERIPH_REV_R1P0) {
+			off += _emit_RMB(dry_run, &buf[off]);
+		}
+		off += _emit_STP(dry_run, &buf[off], c, pxs->r->peri);
 		off += _emit_FLUSHP(dry_run, &buf[off], pxs->r->peri);
 	}
 
@@ -1281,6 +1357,8 @@ int pl330_submit_req(void *ch_id, struct pl330_req *r)
 		goto xfer_exit;
 	}
 
+	r->cfg->pcfg = &pi->pcfg;
+
 	/* Prefer Secure Channel */
 	if (!_manager_ns(thrd))
 		r->cfg->nonsecure = 0;
@@ -1436,6 +1514,8 @@ int pl330_update(const struct pl330_info *pi)
 	}
 
 	/* Check which event happened i.e, thread notified */
+	/*BRCM: ES reg is Secure APB only*/
+#ifdef CONFIG_DMAC_KONA_PL330_SECURE_MODE
 	val = readl(regs + ES);
 	if (pi->pcfg.num_events < 32
 			&& val & ~((1 << pi->pcfg.num_events) - 1)) {
@@ -1444,17 +1524,26 @@ int pl330_update(const struct pl330_info *pi)
 		ret = 1;
 		goto updt_exit;
 	}
+#else
+	/* Read INTSTATUS to check channel interrupts */
+	val = readl(regs + INTSTATUS);
+#endif
 
 	for (ev = 0; ev < pi->pcfg.num_events; ev++) {
 		if (val & (1 << ev)) { /* Event occurred */
 			struct pl330_thread *thrd;
-			u32 inten = readl(regs + INTEN);
 			int active;
+#ifdef CONFIG_DMAC_KONA_PL330_SECURE_MODE
+			u32 inten = readl(regs + INTEN);
 
 			/* Clear the event */
 			if (inten & (1 << ev))
 				writel(1 << ev, regs + INTCLR);
-
+#else
+			/* clear the inetrrupt */
+			writel(1 << ev, regs + INTCLR);
+#endif
+ 
 			ret = 1;
 
 			id = pl330->events[ev];
@@ -1490,7 +1579,9 @@ int pl330_update(const struct pl330_info *pi)
 		spin_lock_irqsave(&pl330->lock, flags);
 	}
 
+#ifdef CONFIG_DMAC_KONA_PL330_SECURE_MODE
 updt_exit:
+#endif
 	spin_unlock_irqrestore(&pl330->lock, flags);
 
 	if (pl330->dmac_tbd.reset_dmac
@@ -1858,21 +1949,38 @@ int pl330_add(struct pl330_info *pi)
 	regs = pi->base;
 
 	/* Check if we can handle this DMAC */
-	if ((get_id(pi, PERIPH_ID) & 0xfffff) != PERIPH_ID_VAL
-	   || get_id(pi, PCELL_ID) != PCELL_ID_VAL) {
+	if (((get_id(pi, PERIPH_ID) & PERIPH_ID_MASK) != PERIPH_ID_VAL)
+	    || (get_id(pi, PCELL_ID) != PCELL_ID_VAL)) {
 		dev_err(pi->dev, "PERIPH_ID 0x%x, PCELL_ID 0x%x !\n",
-			get_id(pi, PERIPH_ID), get_id(pi, PCELL_ID));
+			get_id(pi, PERIPH_ID) & PERIPH_ID_MASK, get_id(pi, PCELL_ID));
 		return -EINVAL;
 	}
 
 	/* Read the configuration of the DMAC */
 	read_dmac_config(pi);
 
+	/* Print PL330 revision */
+	if (get_revision_id(pi->pcfg.periph_id) == PERIPH_REV_R0P0)
+		dev_info(pi->dev, "PL330 DMAC Revision ID = 0x%04x, Revision r0p0\n",
+			get_revision_id(pi->pcfg.periph_id));
+	else if (get_revision_id(pi->pcfg.periph_id) == PERIPH_REV_R1P0)
+		dev_info(pi->dev, "PL330 DMAC Revision ID = 0x%04x, Revision r1p0\n",
+			get_revision_id(pi->pcfg.periph_id));
+	else if (get_revision_id(pi->pcfg.periph_id) == PERIPH_REV_R1P1)
+		dev_info(pi->dev, "PL330 DMAC Revision ID = 0x%04x, Revision r1p1\n",
+			get_revision_id(pi->pcfg.periph_id));
+	else
+		dev_info(pi->dev, "PL330 DMAC Revision ID = 0x%04x\n",
+			 get_revision_id(pi->pcfg.periph_id));
+
 	if (pi->pcfg.num_events == 0) {
 		dev_err(pi->dev, "%s:%d Can't work without events!\n",
 			__func__, __LINE__);
 		return -EINVAL;
 	}
+
+	/*clear interrupt status to avoid any spurious interrupts during bootup*/
+	writel(0xFFFFFFFF, regs + INTCLR);
 
 	pl330 = kzalloc(sizeof(*pl330), GFP_KERNEL);
 	if (!pl330) {

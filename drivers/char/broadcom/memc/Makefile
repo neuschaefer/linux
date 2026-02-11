@@ -1,0 +1,20 @@
+EXTRA_CFLAGS := -Werror
+
+ifeq ($(srctree),)
+
+#
+# We weren't called from the linux make environment, redirect
+#
+
+all:
+	$(MAKE) -C ../../../../drivers/char/broadcom/memc
+
+.PHONY: all
+
+else
+
+obj-$(CONFIG_BCM_MEMC) += \
+	memc.o \
+	cmd_memc.o
+
+endif

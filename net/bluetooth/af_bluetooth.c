@@ -40,6 +40,15 @@
 
 #include <net/bluetooth/bluetooth.h>
 
+#ifdef CONFIG_ANDROID_PARANOID_NETWORK
+#include <linux/android_aid.h>
+#endif
+
+#ifndef CONFIG_BT_SOCK_DEBUG
+#undef  BT_DBG
+#define BT_DBG(D...)
+#endif
+
 #define VERSION "2.16"
 
 /* Bluetooth sockets */
@@ -71,19 +80,16 @@ static const char *const bt_slock_key_strings[BT_MAX_PROTO] = {
 	"slock-AF_BLUETOOTH-BTPROTO_AVDTP",
 };
 
-static inline void bt_sock_reclassify_lock(struct socket *sock, int proto)
+void bt_sock_reclassify_lock(struct sock *sk, int proto)
 {
-	struct sock *sk = sock->sk;
-
-	if (!sk)
-		return;
-
+	BUG_ON(!sk);
 	BUG_ON(sock_owned_by_user(sk));
 
 	sock_lock_init_class_and_name(sk,
 			bt_slock_key_strings[proto], &bt_slock_key[proto],
 				bt_key_strings[proto], &bt_lock_key[proto]);
 }
+EXPORT_SYMBOL(bt_sock_reclassify_lock);
 
 int bt_sock_register(int proto, const struct net_proto_family *ops)
 {
@@ -125,10 +131,39 @@ int bt_sock_unregister(int proto)
 }
 EXPORT_SYMBOL(bt_sock_unregister);
 
+#ifdef CONFIG_ANDROID_PARANOID_NETWORK
+static inline int current_has_bt_admin(void)
+{
+	return (!current_euid() || in_egroup_p(AID_NET_BT_ADMIN));
+}
+
+static inline int current_has_bt(void)
+{
+	return (current_has_bt_admin() || in_egroup_p(AID_NET_BT));
+}
+# else
+static inline int current_has_bt_admin(void)
+{
+	return 1;
+}
+
+static inline int current_has_bt(void)
+{
+	return 1;
+}
+#endif
+
 static int bt_sock_create(struct net *net, struct socket *sock, int proto,
 			  int kern)
 {
 	int err;
+
+	if (proto == BTPROTO_RFCOMM || proto == BTPROTO_SCO ||
+			proto == BTPROTO_L2CAP) {
+		if (!current_has_bt())
+			return -EPERM;
+	} else if (!current_has_bt_admin())
+		return -EPERM;
 
 	if (net != &init_net)
 		return -EAFNOSUPPORT;
@@ -145,7 +180,8 @@ static int bt_sock_create(struct net *net, struct socket *sock, int proto,
 
 	if (bt_proto[proto] && try_module_get(bt_proto[proto]->owner)) {
 		err = bt_proto[proto]->create(net, sock, proto, kern);
-		bt_sock_reclassify_lock(sock, proto);
+		if (!err)
+			bt_sock_reclassify_lock(sock->sk, proto);
 		module_put(bt_proto[proto]->owner);
 	}
 
@@ -494,9 +530,8 @@ int bt_sock_wait_state(struct sock *sk, int state, unsigned long timeo)
 	BT_DBG("sk %p", sk);
 
 	add_wait_queue(sk_sleep(sk), &wait);
+	set_current_state(TASK_INTERRUPTIBLE);
 	while (sk->sk_state != state) {
-		set_current_state(TASK_INTERRUPTIBLE);
-
 		if (!timeo) {
 			err = -EINPROGRESS;
 			break;
@@ -510,12 +545,13 @@ int bt_sock_wait_state(struct sock *sk, int state, unsigned long timeo)
 		release_sock(sk);
 		timeo = schedule_timeout(timeo);
 		lock_sock(sk);
+		set_current_state(TASK_INTERRUPTIBLE);
 
 		err = sock_error(sk);
 		if (err)
 			break;
 	}
-	set_current_state(TASK_RUNNING);
+	__set_current_state(TASK_RUNNING);
 	remove_wait_queue(sk_sleep(sk), &wait);
 	return err;
 }

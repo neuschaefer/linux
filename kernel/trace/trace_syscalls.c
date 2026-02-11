@@ -16,9 +16,9 @@ static DECLARE_BITMAP(enabled_enter_syscalls, NR_syscalls);
 static DECLARE_BITMAP(enabled_exit_syscalls, NR_syscalls);
 
 static int syscall_enter_register(struct ftrace_event_call *event,
-				 enum trace_reg type);
+				 enum trace_reg type, void *data);
 static int syscall_exit_register(struct ftrace_event_call *event,
-				 enum trace_reg type);
+				 enum trace_reg type, void *data);
 
 static int syscall_enter_define_fields(struct ftrace_event_call *call);
 static int syscall_exit_define_fields(struct ftrace_event_call *call);
@@ -531,7 +531,7 @@ static void perf_syscall_enter(void *ignore, struct pt_regs *regs, long id)
 			       (unsigned long *)&rec->args);
 
 	head = this_cpu_ptr(sys_data->enter_event->perf_events);
-	perf_trace_buf_submit(rec, size, rctx, 0, 1, regs, head);
+	perf_trace_buf_submit(rec, size, rctx, 0, 1, regs, head, NULL);
 }
 
 int perf_sysenter_enable(struct ftrace_event_call *call)
@@ -607,7 +607,7 @@ static void perf_syscall_exit(void *ignore, struct pt_regs *regs, long ret)
 	rec->ret = syscall_get_return_value(current, regs);
 
 	head = this_cpu_ptr(sys_data->exit_event->perf_events);
-	perf_trace_buf_submit(rec, size, rctx, 0, 1, regs, head);
+	perf_trace_buf_submit(rec, size, rctx, 0, 1, regs, head, NULL);
 }
 
 int perf_sysexit_enable(struct ftrace_event_call *call)
@@ -648,7 +648,7 @@ void perf_sysexit_disable(struct ftrace_event_call *call)
 #endif /* CONFIG_PERF_EVENTS */
 
 static int syscall_enter_register(struct ftrace_event_call *event,
-				 enum trace_reg type)
+				 enum trace_reg type, void *data)
 {
 	switch (type) {
 	case TRACE_REG_REGISTER:
@@ -663,13 +663,16 @@ static int syscall_enter_register(struct ftrace_event_call *event,
 	case TRACE_REG_PERF_UNREGISTER:
 		perf_sysenter_disable(event);
 		return 0;
+	case TRACE_REG_PERF_OPEN:
+	case TRACE_REG_PERF_CLOSE:
+		return 0;
 #endif
 	}
 	return 0;
 }
 
 static int syscall_exit_register(struct ftrace_event_call *event,
-				 enum trace_reg type)
+				 enum trace_reg type, void *data)
 {
 	switch (type) {
 	case TRACE_REG_REGISTER:
@@ -683,6 +686,9 @@ static int syscall_exit_register(struct ftrace_event_call *event,
 		return perf_sysexit_enable(event);
 	case TRACE_REG_PERF_UNREGISTER:
 		perf_sysexit_disable(event);
+		return 0;
+	case TRACE_REG_PERF_OPEN:
+	case TRACE_REG_PERF_CLOSE:
 		return 0;
 #endif
 	}

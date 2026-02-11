@@ -15,7 +15,7 @@ ifeq ($(CONFIG_CPU_ENDIAN_BE8),y)
 LDFLAGS_vmlinux	+= --be8
 endif
 
-OBJCOPYFLAGS	:=-O binary -R .comment -S
+OBJCOPYFLAGS	:=-O binary -R .comment -S --remove-section=.bss_noinit
 GZFLAGS		:=-9
 #KBUILD_CFLAGS	+=-pipe
 # Explicitly specifiy 32-bit ARM ISA since toolchain default can be -mthumb:
@@ -113,9 +113,24 @@ endif
 endif
 
 # Need -Uarm for gcc < 3.x
-KBUILD_CFLAGS	+=$(CFLAGS_ABI) $(CFLAGS_THUMB2) $(arch-y) $(tune-y) $(call cc-option,-mshort-load-bytes,$(call cc-option,-malignment-traps,)) -msoft-float -Uarm
-KBUILD_AFLAGS	+=$(CFLAGS_ABI) $(AFLAGS_THUMB2) $(arch-y) $(tune-y) -include asm/unified.h -msoft-float
+KBUILD_CFLAGS	+=$(CFLAGS_ABI) $(CFLAGS_THUMB2) $(arch-y) $(tune-y) $(call cc-option,-mshort-load-bytes,$(call cc-option,-malignment-traps,)) -Uarm
+KBUILD_AFLAGS	+=$(CFLAGS_ABI) $(AFLAGS_THUMB2) $(arch-y) $(tune-y) -include asm/unified.h
 
+ifeq ($(CONFIG_VFP),y)
+ifeq ($(CONFIG_VFPv3),y)
+# v3 vfp
+KBUILD_CFLAGS	+=-mfpu=vfp3 -mfloat-abi=softfp
+KBUILD_AFLAGS	+=-mfpu=vfp3 -mfloat-abi=softfp 
+else
+#non-v3 vfp
+KBUILD_CFLAGS	+=-mfloat-abi=softfp
+KBUILD_AFLAGS	+=-mfloat-abi=softfp
+endif
+else
+#no vfp
+KBUILD_CFLAGS	+=-mfloat-abi=soft
+KBUILD_AFLAGS	+=-mfloat-abi=soft
+endif
 CHECKFLAGS	+= -D__arm__
 
 #Default value
@@ -133,6 +148,7 @@ endif
 # by CONFIG_* macro name.
 machine-$(CONFIG_ARCH_AT91)		:= at91
 machine-$(CONFIG_ARCH_BCMRING)		:= bcmring
+machine-$(CONFIG_ARCH_CAPRI)		:= capri
 machine-$(CONFIG_ARCH_CLPS711X)		:= clps711x
 machine-$(CONFIG_ARCH_CNS3XXX)		:= cns3xxx
 machine-$(CONFIG_ARCH_DAVINCI)		:= davinci
@@ -145,6 +161,7 @@ machine-$(CONFIG_ARCH_INTEGRATOR)	:= integrator
 machine-$(CONFIG_ARCH_IOP13XX)		:= iop13xx
 machine-$(CONFIG_ARCH_IOP32X)		:= iop32x
 machine-$(CONFIG_ARCH_IOP33X)		:= iop33x
+machine-$(CONFIG_ARCH_ISLAND)           := island
 machine-$(CONFIG_ARCH_IXP2000)		:= ixp2000
 machine-$(CONFIG_ARCH_IXP23XX)		:= ixp23xx
 machine-$(CONFIG_ARCH_IXP4XX)		:= ixp4xx
@@ -171,6 +188,7 @@ machine-$(CONFIG_ARCH_ORION5X)		:= orion5x
 machine-$(CONFIG_ARCH_PNX4008)		:= pnx4008
 machine-$(CONFIG_ARCH_PXA)		:= pxa
 machine-$(CONFIG_ARCH_REALVIEW)		:= realview
+machine-$(CONFIG_ARCH_RHEA)             := rhea
 machine-$(CONFIG_ARCH_RPC)		:= rpc
 machine-$(CONFIG_ARCH_S3C2410)		:= s3c2410 s3c2400 s3c2412 s3c2416 s3c2440 s3c2443
 machine-$(CONFIG_ARCH_S3C24A0)		:= s3c24a0
@@ -199,6 +217,7 @@ machine-$(CONFIG_MACH_SPEAR600)		:= spear6xx
 
 # Platform directory name.  This list is sorted alphanumerically
 # by CONFIG_* macro name.
+plat-$(CONFIG_ARCH_KONA)	:= kona
 plat-$(CONFIG_ARCH_MXC)		:= mxc
 plat-$(CONFIG_ARCH_OMAP)	:= omap
 plat-$(CONFIG_ARCH_S3C64XX)	:= samsung
@@ -252,6 +271,7 @@ core-$(CONFIG_VFP)		+= arch/arm/vfp/
 
 # If we have a machine-specific directory, then include it in the build.
 core-y				+= arch/arm/kernel/ arch/arm/mm/ arch/arm/common/
+core-y				+= arch/arm/crypto/
 core-y				+= $(machdirs) $(platdirs)
 
 drivers-$(CONFIG_OPROFILE)      += arch/arm/oprofile/
@@ -271,19 +291,38 @@ boot := arch/arm/boot
 
 archprepare:
 	$(Q)$(MAKE) $(build)=arch/arm/tools include/generated/mach-types.h
+ifeq ($(CONFIG_ARCH_RHEA_B0),y)
+	$(Q)echo "Creating rdb link for Rhea B0"; \
+	ln -fsn $(srctree)/arch/arm/mach-rhea/include/mach/rdb_B0 $(srctree)/arch/arm/mach-rhea/include/mach/rdb
+endif
+ifeq ($(CONFIG_ARCH_RHEA_A0),y)
+	$(Q)echo "Creating rdb link for Rhea A0"; \
+	ln -fsn $(srctree)/arch/arm/mach-rhea/include/mach/rdb_A0 $(srctree)/arch/arm/mach-rhea/include/mach/rdb
+endif
+
 
 # Convert bzImage to zImage
 bzImage: zImage
 
-zImage Image xipImage bootpImage uImage: vmlinux
+zImage Image xipImage bootpImage uImage dt-blob: vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $(boot)/$@
 
 zinstall uinstall install: vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $@
 
+%.dtb:
+	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $(boot)/$@
+
+dtbs:
+	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $(boot)/$@
+
 # We use MRPROPER_FILES and CLEAN_FILES now
 archclean:
 	$(Q)$(MAKE) $(clean)=$(boot)
+	$(Q)echo "Removing rdb link for Rhea"; \
+	if test -e $(srctree)/arch/arm/mach-rhea/include/mach/rdb; then \
+		rm $(srctree)/arch/arm/mach-rhea/include/mach/rdb; \
+	fi;
 
 # My testing targets (bypasses dependencies)
 bp:;	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $(boot)/bootpImage
@@ -297,6 +336,7 @@ define archhelp
   echo  '  uImage        - U-Boot wrapped zImage'
   echo  '  bootpImage    - Combined zImage and initial RAM disk' 
   echo  '                  (supply initrd image via make variable INITRD=<path>)'
+  echo  '  dtbs          - Build device tree blobs for enabled boards'
   echo  '  install       - Install uncompressed kernel'
   echo  '  zinstall      - Install compressed kernel'
   echo  '  uinstall      - Install U-Boot wrapped compressed kernel'

@@ -23,6 +23,7 @@
 #include <linux/mutex.h>
 #include <linux/async.h>
 #include <linux/pm_runtime.h>
+#include <linux/major.h>
 
 #include "base.h"
 #include "power/power.h"
@@ -169,6 +170,27 @@ static int dev_uevent_filter(struct kset *kset, struct kobject *kobj)
 
 	if (ktype == &device_ktype) {
 		struct device *dev = to_dev(kobj);
+#if 1 /* don't do expensive mdev notifications for loop and dm devices */
+		extern unsigned int dm_major;
+		int major = MAJOR(dev->devt);
+		if (major == LOOP_MAJOR || major == dm_major)
+			/* Loopback or device-mapper device. */
+			return 0;
+	      {
+		char const *kobj_name = kobject_name(kobj);
+		char loop_major_str[8];
+		char dm_major_str[8];
+		snprintf(loop_major_str, sizeof(loop_major_str), "%d:", LOOP_MAJOR);
+		snprintf(dm_major_str, sizeof(dm_major_str), "%d:", dm_major);
+		if (kobj_name != NULL &&
+		  (!memcmp(kobj_name, loop_major_str, strlen(loop_major_str)) ||
+		  !memcmp(kobj_name, dm_major_str, strlen(dm_major_str)) ||
+		  !memcmp(kobj_name, "0:", 2)))    /* also device mapper? */
+			/* Loopback or device-mapper subdevice. */
+			return 0;
+	      }
+#endif
+
 		if (dev->bus)
 			return 1;
 		if (dev->class)

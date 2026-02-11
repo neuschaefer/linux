@@ -137,6 +137,32 @@ config USB_EHCI_FSL
 	---help---
 	  Variation of ARC USB block used in some Freescale chips.
 
+config USB_BCM_ISLAND
+	tristate "Support for Broadcom Island USB host"
+	depends on ARCH_ISLAND
+	---help---
+	  Enables support for Broadcom Island USB host low-level functions.
+
+config USB_BCM_CAPRI
+	tristate "Support for Broadcom Capri USB host"
+	depends on ARCH_CAPRI
+	---help---
+	  Enables support for Broadcom Capri USB host low-level functions.
+
+config USB_BCM_CAPRI_HSIC
+	tristate "Support for Broadcom Capri USB HSIC host"
+	depends on ARCH_CAPRI
+	---help---
+	  Enables support for Broadcom Capri USB HSIC host low-level functions.
+
+config USB_EHCI_BCM
+        bool "Support for Broadcom on-chip EHCI USB controller"
+        depends on USB_EHCI_HCD && (ARCH_ISLAND || ARCH_CAPRI)
+        select USB_EHCI_ROOT_HUB_TT
+        ---help---
+          Enables EHCI support for USB host controller on some Broadcom
+	  SOCs.
+
 config USB_EHCI_MXC
 	bool "Support for Freescale on-chip EHCI USB controller"
 	depends on USB_EHCI_HCD && ARCH_MXC
@@ -378,6 +404,13 @@ config USB_CNS3XXX_OHCI
 	  Enable support for the CNS3XXX SOC's on-chip OHCI controller.
 	  It is needed for low-speed USB 1.0 device support.
 
+config USB_OHCI_BCM
+        bool "Support for Broadcom on-chip OHCI USB controller"
+        depends on USB_OHCI_HCD && (ARCH_ISLAND || ARCH_CAPRI)
+        ---help---
+          Enables OHCI support for USB host controller on some Broadcom
+          SOCs.
+
 config USB_OHCI_BIG_ENDIAN_DESC
 	bool
 	depends on USB_OHCI_HCD
@@ -543,15 +576,6 @@ config USB_HWA_HCD
 	  To compile this driver a module, choose M here: the module
 	  will be called "hwa-hc".
 
-config USB_IMX21_HCD
-       tristate "iMX21 HCD support"
-       depends on USB && ARM && MACH_MX21
-       help
-         This driver enables support for the on-chip USB host in the
-         iMX21 processor.
-
-         To compile this driver as a module, choose M here: the
-         module will be called "imx21-hcd".
 
 config USB_OCTEON_EHCI
 	bool "Octeon on-chip EHCI support"
@@ -578,3 +602,23 @@ config USB_OCTEON_OHCI
 config USB_OCTEON2_COMMON
 	bool
 	default y if USB_OCTEON_EHCI || USB_OCTEON_OHCI
+
+config USB_DWCOTG
+	tristate "Synopsis DWC host support"
+	depends on USB
+	help
+	  The Synopsis DWC controller is a dual-role
+	  host/peripheral/OTG ("On The Go") USB controllers.
+
+	  Enable this option to support this IP in host controller mode.
+	  If unsure, say N.
+
+	  To compile this driver as a module, choose M here: the
+	  modules built will be called dwc_otg and dwc_common_port.
+
+config DWCOTG_ROOT
+	string "Path to DWC OTG modules source directory"
+	default "../../../../hardware/broadcom/bcm2835/kernel/DWC_otg/"
+	depends on USB_DWCOTG
+	help
+        This is required to tell the kernel where to build DWC OTG driver from

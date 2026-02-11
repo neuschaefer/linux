@@ -22,6 +22,10 @@
 #include "mmc_ops.h"
 #include "sd_ops.h"
 
+#ifdef CONFIG_MMC_BCM_SD
+#include "../host/sdhci.h"
+#endif
+
 static const unsigned int tran_exp[] = {
 	10000,		100000,		1000000,	10000000,
 	0,		0,		0,		0
@@ -259,9 +263,14 @@ static int mmc_read_ext_csd(struct mmc_card *card, u8 *ext_csd)
 	}
 
 	card->ext_csd.rev = ext_csd[EXT_CSD_REV];
+#ifdef CONFIG_MMC_BCM_SD
 	if (card->ext_csd.rev > 5) {
-		printk(KERN_ERR "%s: unrecognised EXT_CSD revision %d\n",
-			mmc_hostname(card->host), card->ext_csd.rev);
+#else
+	if (card->ext_csd.rev > 3) {
+#endif
+		printk(KERN_ERR "%s: unrecognised EXT_CSD structure "
+			"version %d\n", mmc_hostname(card->host),
+			card->ext_csd.rev);
 		err = -EINVAL;
 		goto out;
 	}
@@ -579,8 +588,20 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 		err = mmc_send_cid(host, cid);
 	else
 		err = mmc_all_send_cid(host, cid);
+#if 0 /* Original code before adding temporary workaround for broken MMC parts */
 	if (err)
 		goto err;
+#else
+	if (err){
+		if (err == -ETIMEDOUT || err == -EILSEQ) {
+			pr_debug("%s: Ignoring error %d for mmc_all_send_cid\n",
+				__func__, err);
+			err = 0;
+		} else {
+			goto err;
+		}
+	}
+#endif
 
 	if (oldcard) {
 		if (memcmp(cid, oldcard->raw_cid, sizeof(cid)) != 0) {
@@ -711,6 +732,9 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 	 * Activate high speed (if supported)
 	 */
 	if ((card->ext_csd.hs_max_dtr != 0) &&
+#ifdef CONFIG_MMC_BCM_SD
+        (host->f_max > SDHCI_HOST_MAX_CLK_LS_MODE) &&
+#endif
 		(host->caps & MMC_CAP_MMC_HIGHSPEED)) {
 		err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
 				 EXT_CSD_HS_TIMING, 1, 0);

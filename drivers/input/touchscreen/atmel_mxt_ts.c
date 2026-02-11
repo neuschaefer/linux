@@ -20,6 +20,13 @@
 #include <linux/input/mt.h>
 #include <linux/interrupt.h>
 #include <linux/slab.h>
+#include <linux/io.h>
+#include <asm/gpio.h>
+#ifdef CONFIG_HAS_EARLYSUSPEND
+#include <linux/earlysuspend.h>
+#endif
+
+
 
 /* Version */
 #define MXT_VER_20		20
@@ -251,7 +258,16 @@ struct mxt_data {
 	unsigned int irq;
 	unsigned int max_x;
 	unsigned int max_y;
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	struct early_suspend suspend_desc;
+#endif
+
 };
+
+#ifdef CONFIG_HAS_EARLYSUSPEND
+static void mxt_early_suspend(struct early_suspend *h);
+static void mxt_late_resume(struct early_suspend *h);
+#endif /* CONFIG_HAS_EARLYSUSPEND */
 
 static bool mxt_object_readable(unsigned int type)
 {
@@ -438,13 +454,11 @@ mxt_get_object(struct mxt_data *data, u8 type)
 {
 	struct mxt_object *object;
 	int i;
-
 	for (i = 0; i < data->info.object_num; i++) {
 		object = data->object_table + i;
 		if (object->type == type)
 			return object;
 	}
-
 	dev_err(&data->client->dev, "Invalid object type\n");
 	return NULL;
 }
@@ -589,6 +603,7 @@ static irqreturn_t mxt_interrupt(int irq, void *dev_id)
 	u8 max_reportid;
 	u8 min_reportid;
 
+	/*printk(KERN_ERR"mxt_interrupt: irq = %d\n", irq);*/
 	do {
 		if (mxt_read_message(data, &message)) {
 			dev_err(dev, "Failed to read message\n");
@@ -819,16 +834,21 @@ static int mxt_initialize(struct mxt_data *data)
 	mxt_handle_pdata(data);
 
 	/* Backup to memory */
-	mxt_write_object(data, MXT_GEN_COMMAND,
+	error = mxt_write_object(data, MXT_GEN_COMMAND,
 			MXT_COMMAND_BACKUPNV,
 			MXT_BACKUP_VALUE);
 	msleep(MXT_BACKUP_TIME);
-
+	if(error) {
+		printk(KERN_ERR"write obj MXT_COMMAND_BACKUPNV failed\n");
+	}
 	/* Soft reset */
-	mxt_write_object(data, MXT_GEN_COMMAND,
+	error = mxt_write_object(data, MXT_GEN_COMMAND,
 			MXT_COMMAND_RESET, 1);
 	msleep(MXT_RESET_TIME);
 
+	if(error) {
+		printk(KERN_ERR"write obj MXT_COMMAND_RESET failed\n");
+	}
 	/* Update matrix size at info struct */
 	error = mxt_read_reg(client, MXT_MATRIX_X_SIZE, &val);
 	if (error)
@@ -849,7 +869,6 @@ static int mxt_initialize(struct mxt_data *data)
 			"Matrix X Size: %d Matrix Y Size: %d Object Num: %d\n",
 			info->matrix_xsize, info->matrix_ysize,
 			info->object_num);
-
 	return 0;
 }
 
@@ -1053,6 +1072,27 @@ static void mxt_input_close(struct input_dev *dev)
 	mxt_stop(data);
 }
 
+#define MXT224_INT_GPIO_PIN      2 /* skip expander chip */
+
+static int mxt224_platform_init_hw(void)
+{
+	int rc;
+	rc = gpio_request(MXT224_INT_GPIO_PIN, "ts_mxt224");
+	if (rc < 0)
+	{
+		printk(KERN_ERR "unable to request GPIO pin %d\n", MXT224_INT_GPIO_PIN);
+		return rc;
+	}
+	gpio_direction_input(MXT224_INT_GPIO_PIN);
+
+	return 0;
+}
+
+static void mxt224_platform_exit_hw(void)
+{
+	gpio_free(MXT224_INT_GPIO_PIN);
+}
+
 static int __devinit mxt_probe(struct i2c_client *client,
 		const struct i2c_device_id *id)
 {
@@ -1060,9 +1100,22 @@ static int __devinit mxt_probe(struct i2c_client *client,
 	struct mxt_data *data;
 	struct input_dev *input_dev;
 	int error;
+	unsigned int vir, gpio, offset;
 
 	if (!pdata)
 		return -EINVAL;
+	/*turn LDO on */
+	vir = (unsigned int)ioremap(0x35003000, 4096);
+	gpio=129;
+	offset = 0x100+gpio*4;
+	writel(1<<1, vir + 0x50);
+	/*printk(KERN_ERR"GPOR%d=0x%x\n", gpio/32, readl(vir+(gpio/32)*4));*/
+	/*turn on mux */
+	gpio=14;
+	offset = 0x100+gpio*4;
+	writel(0, vir+offset);
+	writel(1<<14, vir + 0x40);
+	
 
 	data = kzalloc(sizeof(struct mxt_data), GFP_KERNEL);
 	input_dev = input_allocate_device();
@@ -1086,8 +1139,9 @@ static int __devinit mxt_probe(struct i2c_client *client,
 	mxt_calc_resolution(data);
 
 	__set_bit(EV_ABS, input_dev->evbit);
-	__set_bit(EV_KEY, input_dev->evbit);
-	__set_bit(BTN_TOUCH, input_dev->keybit);
+	__set_bit(EV_SYN, input_dev->evbit);
+	//__set_bit(EV_KEY, input_dev->evbit);
+	//__set_bit(BTN_TOUCH, input_dev->keybit);
 
 	/* For single touch */
 	input_set_abs_params(input_dev, ABS_X,
@@ -1103,7 +1157,7 @@ static int __devinit mxt_probe(struct i2c_client *client,
 			     0, data->max_x, 0, 0);
 	input_set_abs_params(input_dev, ABS_MT_POSITION_Y,
 			     0, data->max_y, 0, 0);
-
+	__set_bit(INPUT_PROP_DIRECT,(volatile long unsigned int *) &input_dev->propbit);
 	input_set_drvdata(input_dev, data);
 	i2c_set_clientdata(client, data);
 
@@ -1111,8 +1165,12 @@ static int __devinit mxt_probe(struct i2c_client *client,
 	if (error)
 		goto err_free_object;
 
+	
+	/*Config GPIO for interrupt */
+	mxt224_platform_init_hw();
 	error = request_threaded_irq(client->irq, NULL, mxt_interrupt,
-			pdata->irqflags, client->dev.driver->name, data);
+			IRQF_TRIGGER_FALLING, client->dev.driver->name, data);
+	
 	if (error) {
 		dev_err(&client->dev, "Failed to register interrupt\n");
 		goto err_free_object;
@@ -1129,6 +1187,13 @@ static int __devinit mxt_probe(struct i2c_client *client,
 	error = sysfs_create_group(&client->dev.kobj, &mxt_attr_group);
 	if (error)
 		goto err_unregister_device;
+	
+#ifdef CONFIG_HAS_EARLYSUSPEND
+			data->suspend_desc.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN,
+			data->suspend_desc.suspend = mxt_early_suspend,
+			data->suspend_desc.resume = mxt_late_resume,
+			register_early_suspend(&data->suspend_desc);
+#endif /* CONFIG_HAS_EARLYSUSPEND */
 
 	return 0;
 
@@ -1158,11 +1223,11 @@ static int __devexit mxt_remove(struct i2c_client *client)
 	return 0;
 }
 
-#ifdef CONFIG_PM
-static int mxt_suspend(struct device *dev)
+#if defined(CONFIG_PM) || defined(CONFIG_HAS_EARLYSUSPEND)
+static int mxt_suspend(struct mxt_data *data)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct mxt_data *data = i2c_get_clientdata(client);
+	/*struct i2c_client *client = to_i2c_client(dev);*/
+	/*struct mxt_data *data = i2c_get_clientdata(client);*/
 	struct input_dev *input_dev = data->input_dev;
 
 	mutex_lock(&input_dev->mutex);
@@ -1175,10 +1240,10 @@ static int mxt_suspend(struct device *dev)
 	return 0;
 }
 
-static int mxt_resume(struct device *dev)
+static int mxt_resume(struct mxt_data *data)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct mxt_data *data = i2c_get_clientdata(client);
+	/*struct i2c_client *client = to_i2c_client(dev);*/
+	/*struct mxt_data *data = i2c_get_clientdata(client);*/
 	struct input_dev *input_dev = data->input_dev;
 
 	/* Soft reset */
@@ -1197,11 +1262,38 @@ static int mxt_resume(struct device *dev)
 	return 0;
 }
 
+/*
 static const struct dev_pm_ops mxt_pm_ops = {
 	.suspend	= mxt_suspend,
 	.resume		= mxt_resume,
 };
+*/
+
+#else
+#define mxt_suspend	NULL
+#define mxt_resume	NULL
 #endif
+
+
+#ifdef CONFIG_HAS_EARLYSUSPEND
+static void mxt_early_suspend(struct early_suspend *h)
+{
+	struct mxt_data *data = container_of(h, struct mxt_data, suspend_desc);
+	/*pm_message_t mesg = { .event = PM_EVENT_SUSPEND, };*/
+	printk(KERN_INFO"mxt_early_suspend++\n");
+	mxt_suspend(data);
+}
+
+static void mxt_late_resume(struct early_suspend *h)
+{
+	struct mxt_data *data = container_of(h, struct mxt_data, suspend_desc);
+	printk(KERN_INFO"mxt_late_resume++\n");
+	mxt_resume(data);
+}
+
+
+#endif /* CONFIG_HAS_EARLYSUSPEND */
+
 
 static const struct i2c_device_id mxt_id[] = {
 	{ "qt602240_ts", 0 },
@@ -1215,7 +1307,7 @@ static struct i2c_driver mxt_driver = {
 	.driver = {
 		.name	= "atmel_mxt_ts",
 		.owner	= THIS_MODULE,
-#ifdef CONFIG_PM
+#ifndef CONFIG_HAS_EARLYSUSPEND
 		.pm	= &mxt_pm_ops,
 #endif
 	},

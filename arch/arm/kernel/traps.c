@@ -21,6 +21,7 @@
 #include <linux/kdebug.h>
 #include <linux/module.h>
 #include <linux/kexec.h>
+#include <linux/bug.h>
 #include <linux/delay.h>
 #include <linux/init.h>
 #include <linux/sched.h>
@@ -34,6 +35,17 @@
 #include <asm/tls.h>
 
 #include "signal.h"
+
+#ifdef CONFIG_BCM_KNLLOG_SUPPORT
+#include <linux/broadcom/knllog.h>
+
+static int __init logstart(void)
+{
+	knllog_init();
+	return 0;
+}
+subsys_initcall(logstart);
+#endif
 
 static const char *handler[]= { "prefetch abort", "data abort", "address exception", "interrupt" };
 
@@ -55,7 +67,7 @@ static void dump_mem(const char *, const char *, unsigned long, unsigned long);
 void dump_backtrace_entry(unsigned long where, unsigned long from, unsigned long frame)
 {
 #ifdef CONFIG_KALLSYMS
-	printk("[<%08lx>] (%pS) from [<%08lx>] (%pS)\n", where, (void *)where, from, (void *)from);
+	printk("%pS\n", (void *)where);
 #else
 	printk("Function entered at [<%08lx>] from [<%08lx>]\n", where, from);
 #endif
@@ -226,10 +238,12 @@ void show_stack(struct task_struct *tsk, unsigned long *sp)
 #define S_SMP ""
 #endif
 
+int die_counter;
+EXPORT_SYMBOL(die_counter);
+
 static int __die(const char *str, int err, struct thread_info *thread, struct pt_regs *regs)
 {
 	struct task_struct *tsk = thread->task;
-	static int die_counter;
 	int ret;
 
 	printk(KERN_EMERG "Internal error: %s: %x [#%d]" S_PREEMPT S_SMP "\n",
@@ -257,6 +271,28 @@ static int __die(const char *str, int err, struct thread_info *thread, struct pt
 
 static DEFINE_SPINLOCK(die_lock);
 
+#if 1 /* ifdef CONFIG_KSTACK */
+
+static char die_stack[THREAD_SIZE + sizeof(struct pt_regs)] __attribute__ ((section (".bss_noinit")));
+
+ssize_t read_kstack(struct file *file, char __user *buf,
+                size_t count, loff_t *ppos)
+{
+	if (*ppos >= sizeof(die_stack))
+		return 0;
+	if (count + *ppos > sizeof(die_stack))
+		count = sizeof(die_stack) - *ppos;
+	if (copy_to_user(buf, die_stack + *ppos, count))
+		return -EFAULT;
+	*ppos += count;
+	return count;
+}
+
+#endif
+
+
+extern void gr_handle_kernel_exploit(void);
+
 /*
  * This function is protected against re-entrancy.
  */
@@ -264,12 +300,29 @@ void die(const char *str, struct pt_regs *regs, int err)
 {
 	struct thread_info *thread = current_thread_info();
 	int ret;
+	enum bug_trap_type bug_type = BUG_TRAP_TYPE_NONE;
 
 	oops_enter();
 
 	spin_lock_irq(&die_lock);
 	console_verbose();
+#ifdef CONFIG_KSTACK
+	if (die_counter == 0) {
+		memcpy(die_stack, current_thread_info(), THREAD_SIZE);
+		memcpy(die_stack + THREAD_SIZE, regs, sizeof(*regs));
+		//if (_dma_cache_wback) dma_cache_wback((unsigned long)die_stack, sizeof(die_stack));
+	}
+	if (die_counter > 2) while (1) ; // that's enough
+#endif
 	bust_spinlocks(1);
+#ifdef CONFIG_BCM_KNLLOG_SUPPORT
+	local_irq_disable();
+	knllog_dump();
+#endif
+	if (!user_mode(regs))
+		bug_type = report_bug(regs->ARM_pc, regs);
+	if (bug_type != BUG_TRAP_TYPE_NONE)
+		str = "Oops - BUG";
 	ret = __die(str, err, thread, regs);
 
 	if (regs && kexec_should_crash(thread->task))
@@ -280,10 +333,21 @@ void die(const char *str, struct pt_regs *regs, int err)
 	spin_unlock_irq(&die_lock);
 	oops_exit();
 
-	if (in_interrupt())
+	if (in_interrupt()) {
+#ifdef CONFIG_BCM_CPDUMP_INIRQ
+		/* CP crash APIs uses some function calls which should
+		 * be done in process context. So we manually clear
+		 * soft IRQs. This is for Broadcom use only */
+		current_thread_info()->preempt_count =
+			current_thread_info()->preempt_count & 0xFFFF00FF;
+#endif
 		panic("Fatal exception in interrupt");
+	}
 	if (panic_on_oops)
 		panic("Fatal exception");
+
+	gr_handle_kernel_exploit();
+
 	if (ret != NOTIFY_STOP)
 		do_exit(SIGSEGV);
 }
@@ -300,6 +364,24 @@ void arm_notify_die(const char *str, struct pt_regs *regs,
 		die(str, regs, err);
 	}
 }
+
+#ifdef CONFIG_GENERIC_BUG
+
+int is_valid_bugaddr(unsigned long pc)
+{
+#ifdef CONFIG_THUMB2_KERNEL
+	unsigned short bkpt;
+#else
+	unsigned long bkpt;
+#endif
+
+	if (probe_kernel_address((unsigned *)pc, bkpt))
+		return 0;
+
+	return bkpt == BUG_INSTR_VALUE;
+}
+
+#endif
 
 static LIST_HEAD(undef_hook);
 static DEFINE_SPINLOCK(undef_lock);
@@ -692,16 +774,6 @@ baddataabort(int code, unsigned long instr, struct pt_regs *regs)
 
 	arm_notify_die("unknown data abort code", regs, &info, instr, 0);
 }
-
-void __attribute__((noreturn)) __bug(const char *file, int line)
-{
-	printk(KERN_CRIT"kernel BUG at %s:%d!\n", file, line);
-	*(int *)0 = 0;
-
-	/* Avoid "noreturn function does return" */
-	for (;;);
-}
-EXPORT_SYMBOL(__bug);
 
 void __readwrite_bug(const char *fn)
 {

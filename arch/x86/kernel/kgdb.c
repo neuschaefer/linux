@@ -126,11 +126,11 @@ char *dbg_get_reg(int regno, void *mem, struct pt_regs *regs)
 #ifdef CONFIG_X86_32
 	switch (regno) {
 	case GDB_SS:
-		if (!user_mode_vm(regs))
+		if (!user_mode(regs))
 			*(unsigned long *)mem = __KERNEL_DS;
 		break;
 	case GDB_SP:
-		if (!user_mode_vm(regs))
+		if (!user_mode(regs))
 			*(unsigned long *)mem = kernel_stack_pointer(regs);
 		break;
 	case GDB_GS:
@@ -475,12 +475,12 @@ int kgdb_arch_handle_exception(int e_vector, int signo, int err_code,
 	case 'k':
 		/* clear the trace bit */
 		linux_regs->flags &= ~X86_EFLAGS_TF;
-		atomic_set(&kgdb_cpu_doing_single_step, -1);
+		atomic_set_unchecked(&kgdb_cpu_doing_single_step, -1);
 
 		/* set the trace bit if we're stepping */
 		if (remcomInBuffer[0] == 's') {
 			linux_regs->flags |= X86_EFLAGS_TF;
-			atomic_set(&kgdb_cpu_doing_single_step,
+			atomic_set_unchecked(&kgdb_cpu_doing_single_step,
 				   raw_smp_processor_id());
 		}
 
@@ -536,7 +536,7 @@ static int __kgdb_notify(struct die_args *args, unsigned long cmd)
 		return NOTIFY_DONE;
 
 	case DIE_DEBUG:
-		if (atomic_read(&kgdb_cpu_doing_single_step) != -1) {
+		if (atomic_read_unchecked(&kgdb_cpu_doing_single_step) != -1) {
 			if (user_mode(regs))
 				return single_step_cont(regs, args);
 			break;
@@ -610,7 +610,7 @@ int kgdb_arch_init(void)
 	return register_die_notifier(&kgdb_notifier);
 }
 
-static void kgdb_hw_overflow_handler(struct perf_event *event, int nmi,
+static void kgdb_hw_overflow_handler(struct perf_event *event,
 		struct perf_sample_data *data, struct pt_regs *regs)
 {
 	struct task_struct *tsk = current;
@@ -640,7 +640,7 @@ void kgdb_arch_late(void)
 	for (i = 0; i < HBP_NUM; i++) {
 		if (breakinfo[i].pev)
 			continue;
-		breakinfo[i].pev = register_wide_hw_breakpoint(&attr, NULL);
+		breakinfo[i].pev = register_wide_hw_breakpoint(&attr, NULL, NULL);
 		if (IS_ERR((void * __force)breakinfo[i].pev)) {
 			printk(KERN_ERR "kgdb: Could not allocate hw"
 			       "breakpoints\nDisabling the kernel debugger\n");

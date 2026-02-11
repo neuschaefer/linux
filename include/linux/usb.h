@@ -321,6 +321,12 @@ struct usb_bus {
 	u8 otg_port;			/* 0, or number of OTG/HNP port */
 	unsigned is_b_host:1;		/* true during some HNP roleswitches */
 	unsigned b_hnp_enable:1;	/* OTG: did A-Host enable HNP? */
+	unsigned hnp_support:1; 	/* OTG: HNP is supported on OTG port */
+#ifdef CONFIG_USB_OTG
+	bool otg_vbus_off; /* OTG: A-host must turn off Vbus within 5 seconds if B-device disconnects */
+	struct delayed_work hnp_polling; /* OTG: HNP polling work */
+	struct delayed_work maint_conf_session_for_td; /* OTG: Maintain configured session n test device */
+#endif
 	unsigned sg_tablesize;		/* 0 or largest number of sg list entries */
 
 	int devnum_next;		/* Next open device number in
@@ -1453,7 +1459,16 @@ extern int usb_driver_set_configuration(struct usb_device *udev, int config);
  * USB identifies 5 second timeouts, maybe more in a few cases, and a few
  * slow devices (like some MGE Ellipse UPSes) actually push that limit.
  */
+#ifdef CONFIG_USB_OTG
+/* REVISIT: In case device went away after bus reset,
+ * get descriptor request would fail. In this case, we need
+ * to detect this sooner and take corrective action. Change
+ * this 5 seconds timout to 500ms for now as a temp workaround
+ */
+#define USB_CTRL_GET_TIMEOUT	500
+#else
 #define USB_CTRL_GET_TIMEOUT	5000
+#endif
 #define USB_CTRL_SET_TIMEOUT	5000
 
 

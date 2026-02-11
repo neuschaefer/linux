@@ -58,6 +58,10 @@ struct mtd_oob_buf64 {
 #define MTD_BIT_WRITEABLE	0x800	/* Single bits can be flipped */
 #define MTD_NO_ERASE		0x1000	/* No erase necessary */
 #define MTD_POWERUP_LOCK	0x2000	/* Always locked after reset */
+#define MTD_ENCRYPTED		0x4000  /* Encrypted data */
+#define MTD_UNENCRYPTED		0x8000  /* Unencrypted data (used only in mask_flags) */
+ 
+#define MTD_PER_PART_FLAGS	(MTD_ENCRYPTED)
 
 // Some common devices / combinations of capabilities
 #define MTD_CAP_ROM		0
@@ -174,6 +178,40 @@ struct mtd_ecc_stats {
 	__u32 failed;
 	__u32 badblocks;
 	__u32 bbtblocks;
+};
+
+/* Get performance statistics about read/write and erase cycles */
+#define PERFGETSTATS		1
+
+/**
+ * struct mtd_perf_stats - performance stats
+ *
+ * @cumulative_mean_write: cumulative running average of write time per bytes (nanosecs)
+ * @cumulative_num_write:  cumulative number of writes
+ * @cumulative_mean_read:  cumulative running average of read time per bytes (nanosecs)
+ * @cumulative_num_read:	cumulative number of reads
+ * @cumulative_mean_erase: cumulative running average of erase time per bytes (nanosecs)
+ * @cumulative_num_erase:  cumulative number of erases
+ * @mean_write: running average of write time per bytes (nanosecs) since last PERFGETSTATS
+ * @num_write:  number of writes since last PERFGETSTATS
+ * @mean_read:  running average of read time per bytes (nanosecs) since last PERFGETSTATS
+ * @num_read:	number of reads since last PERFGETSTATS
+ * @mean_erase: running average of erase time per bytes (nanosecs) since last PERFGETSTATS
+ * @num_erase:  number of erases since last PERFGETSTATS
+ */
+struct mtd_perf_stats {
+	__u32 cumulative_mean_write;
+	__u32 cumulative_num_write;
+	__u32 cumulative_mean_read;
+	__u32 cumulative_num_read;
+	__u32 cumulative_mean_erase;
+	__u32 cumulative_num_erase;
+	__u32 mean_write;
+	__u32 num_write;
+	__u32 mean_read;
+	__u32 num_read;
+	__u32 mean_erase;
+	__u32 num_erase;
 };
 
 /*

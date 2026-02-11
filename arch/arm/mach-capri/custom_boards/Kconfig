@@ -1,0 +1,15 @@
+menu	"Custom Capri SoC based Machine types"
+	depends on MACH_CAPRI_CUSTOM_BOARDS_SUPPORT
+
+choice
+        prompt "Capri SoC based custom board type"
+
+config MACH_CAPRI_ROKU_AUSTIN
+	bool "Support Roku Austin board"
+	help
+	   Support for the Roku Austin board.
+
+
+endchoice
+
+endmenu

@@ -425,6 +425,7 @@ int add_mtd_blktrans_dev(struct mtd_blktrans_dev *new)
 		goto error3;
 
 	new->rq->queuedata = new;
+	new->rq->backing_dev_info.ra_pages = 0;
 	blk_queue_logical_block_size(new->rq, tr->blksize);
 
 	if (tr->discard) {

@@ -98,6 +98,18 @@ config TOUCHSCREEN_ATMEL_MXT
 	  To compile this driver as a module, choose M here: the
 	  module will be called atmel_mxt_ts.
 
+config TOUCHSCREEN_ATMEL_MXT224
+	tristate "Atmel mXT224 I2C Touchscreen"
+	depends on I2C
+	help
+	  Say Y here if you have Atmel mXT series I2C touchscreen,
+	  such as AT42QT602240/ATMXT224, connected to your system.
+
+	  If unsure, say N.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called mxt224.
+
 config TOUCHSCREEN_BITSY
 	tristate "Compaq iPAQ H3600 (Bitsy) touchscreen"
 	depends on SA1100_BITSY
@@ -110,6 +122,16 @@ config TOUCHSCREEN_BITSY
 	  To compile this driver as a module, choose M here: the
 	  module will be called h3600_ts_input.
 
+config TOUCHSCREEN_BCM915500
+	tristate "Broadcom 15500 touchscreen interface"
+	depends on I2C
+	help
+	  Say Y here if you want to support a capactive touchscreen interface using
+	  the BCM915500 controller.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called bcm15500.
+     
 config TOUCHSCREEN_BU21013
 	tristate "BU21013 based touch panel controllers"
 	depends on I2C
@@ -363,6 +385,27 @@ config TOUCHSCREEN_PENMOUNT
 	  To compile this driver as a module, choose M here: the
 	  module will be called penmount.
 
+config TOUCHSCREEN_QT602240
+	tristate "QT602240 I2C Touchscreen"
+	depends on I2C
+	help
+	  Say Y here if you have the AT42QT602240/ATMXT224 I2C touchscreen
+	  connected to your system.
+
+	  If unsure, say N.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called qt602240_ts.
+
+config QT602240_BRCM_FIX
+	bool "T602240 I2C Touchscreen with BRCM RheaRay Board"
+	depends on TOUCHSCREEN_QT602240=y
+	help
+	  Say Y if you have the AT42QT602240/ATMXT224 I2C touchscreen
+	  connected to Broadcom RheaRay board
+
+	  If unsure, say N.
+
 config TOUCHSCREEN_MIGOR
 	tristate "Renesas MIGO-R touchscreen"
 	depends on SH_MIGOR && I2C
@@ -382,6 +425,12 @@ config TOUCHSCREEN_TNETV107X
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called tnetv107x-ts.
+
+config TOUCHSCREEN_SYNAPTICS_I2C_RMI
+	tristate "Synaptics i2c touchscreen"
+	depends on I2C
+	help
+	  This enables support for Synaptics RMI over I2C based touchscreens.
 
 config TOUCHSCREEN_TOUCHRIGHT
 	tristate "Touchright serial touchscreen"
@@ -673,6 +722,18 @@ config TOUCHSCREEN_TSC2007
 	  To compile this driver as a module, choose M here: the
 	  module will be called tsc2007.
 
+config TOUCHSCREEN_TANGO
+   tristate "TANGO Capacitive Touchscreen"
+   depends on I2C
+   help
+     Say Y here if you have a Tango based touchscreen. If unsure, say N.
+
+config TOUCHSCREEN_GT818
+   tristate "Goodix Capacitive Touchscreen"
+   depends on I2C
+   help
+     Say Y here if you have a Tango based touchscreen. If unsure, say N.
+
 config TOUCHSCREEN_W90X900
 	tristate "W90P910 touchscreen driver"
 	depends on HAVE_CLK
@@ -726,4 +787,32 @@ config TOUCHSCREEN_TPS6507X
 	  To compile this driver as a module, choose M here: the
 	  module will be called tps6507x_ts.
 
+config TOUCHSCREEN_EGALAX_I2C
+        tristate "eGalax Capacitive Touchscreen"
+        depends on I2C
+        help
+	  Say Y here if you have the EETI eGalax capacitive touchscreen.
+
+	  If unsure, say N.
+
+	  To compile this driver as a module, choose M here: the
+          module will be called egalax_i2c_ts.
+
+config CP_TS_SOFTKEY
+   bool "Compal Softkey Support"
+   depends on TOUCHSCREEN_EGALAX_I2C
+   default n
+   help
+     Say Y if you want Compal touch panel softkey support.
+     If unsure, say N.
+
+config TOUCHSCREEN_SCALE
+   bool "Compal touchscreen scaling Support"
+   depends on TOUCHSCREEN_EGALAX_I2C
+   default n
+   help
+     Say Y if you want Compal touch panel scaling support.
+     Give it a try, it's quite cool!
+     If unsure, say N.
+     
 endif

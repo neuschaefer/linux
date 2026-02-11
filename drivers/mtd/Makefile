@@ -17,6 +17,7 @@ obj-$(CONFIG_MTD_CHAR)		+= mtdchar.o
 obj-$(CONFIG_MTD_BLKDEVS)	+= mtd_blkdevs.o
 obj-$(CONFIG_MTD_BLOCK)		+= mtdblock.o
 obj-$(CONFIG_MTD_BLOCK_RO)	+= mtdblock_ro.o
+obj-$(CONFIG_MTD_BLOCK_ROBBS)   += mtdblock_robbs.o
 obj-$(CONFIG_FTL)		+= ftl.o
 obj-$(CONFIG_NFTL)		+= nftl.o
 obj-$(CONFIG_INFTL)		+= inftl.o
@@ -29,6 +30,6 @@ obj-$(CONFIG_MTD_SWAP)		+= mtdswap.o
 nftl-objs		:= nftlcore.o nftlmount.o
 inftl-objs		:= inftlcore.o inftlmount.o
 
-obj-y		+= chips/ lpddr/ maps/ devices/ nand/ onenand/ tests/
+obj-y		+= chips/ lpddr/ maps/ devices/ nand/ onenand/ tests/ bcmnand/
 
 obj-$(CONFIG_MTD_UBI)		+= ubi/

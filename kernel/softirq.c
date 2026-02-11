@@ -29,6 +29,11 @@
 #include <trace/events/irq.h>
 
 #include <asm/irq.h>
+
+#ifdef CONFIG_BCM_KNLLOG_IRQ
+#include <linux/broadcom/knllog.h>
+#endif
+
 /*
    - No shared variables, all the data are CPU local.
    - If a softirq needs serialization, let it serialize itself
@@ -56,7 +61,7 @@ static struct softirq_action softirq_vec[NR_SOFTIRQS] __cacheline_aligned_in_smp
 
 DEFINE_PER_CPU(struct task_struct *, ksoftirqd);
 
-char *softirq_to_name[NR_SOFTIRQS] = {
+const char * const softirq_to_name[NR_SOFTIRQS] = {
 	"HI", "TIMER", "NET_TX", "NET_RX", "BLOCK", "BLOCK_IOPOLL",
 	"TASKLET", "SCHED", "HRTIMER", "RCU"
 };
@@ -235,7 +240,7 @@ restart:
 			kstat_incr_softirqs_this_cpu(vec_nr);
 
 			trace_softirq_entry(vec_nr);
-			h->action(h);
+			h->action();
 			trace_softirq_exit(vec_nr);
 			if (unlikely(prev_count != preempt_count())) {
 				printk(KERN_ERR "huh, entered softirq %u %s %p"
@@ -385,9 +390,11 @@ void raise_softirq(unsigned int nr)
 	local_irq_restore(flags);
 }
 
-void open_softirq(int nr, void (*action)(struct softirq_action *))
+void open_softirq(int nr, void (*action)(void))
 {
-	softirq_vec[nr].action = action;
+	pax_open_kernel();
+	*(void **)&softirq_vec[nr].action = action;
+	pax_close_kernel();
 }
 
 /*
@@ -441,7 +448,7 @@ void __tasklet_hi_schedule_first(struct tasklet_struct *t)
 
 EXPORT_SYMBOL(__tasklet_hi_schedule_first);
 
-static void tasklet_action(struct softirq_action *a)
+static void tasklet_action(void)
 {
 	struct tasklet_struct *list;
 
@@ -460,7 +467,15 @@ static void tasklet_action(struct softirq_action *a)
 			if (!atomic_read(&t->count)) {
 				if (!test_and_clear_bit(TASKLET_STATE_SCHED, &t->state))
 					BUG();
+#ifdef CONFIG_BCM_KNLLOG_IRQ
+				if (gKnllogIrqSchedEnable & KNLLOG_TASKLET)
+					KNLLOG("in  0x%x 0x%x 0x%x 0x%x\n", (int)t->func, (int)t->data, t->count, t->state);
+#endif
 				t->func(t->data);
+#ifdef CONFIG_BCM_KNLLOG_IRQ
+				if (gKnllogIrqSchedEnable & KNLLOG_TASKLET)
+					KNLLOG("out 0x%x 0x%x 0x%x 0x%x\n", (int)t->func, (int)t->data, t->count, t->state);
+#endif
 				tasklet_unlock(t);
 				continue;
 			}
@@ -476,7 +491,7 @@ static void tasklet_action(struct softirq_action *a)
 	}
 }
 
-static void tasklet_hi_action(struct softirq_action *a)
+static void tasklet_hi_action(void)
 {
 	struct tasklet_struct *list;
 
@@ -495,7 +510,15 @@ static void tasklet_hi_action(struct softirq_action *a)
 			if (!atomic_read(&t->count)) {
 				if (!test_and_clear_bit(TASKLET_STATE_SCHED, &t->state))
 					BUG();
+#ifdef CONFIG_BCM_KNLLOG_IRQ
+				if (gKnllogIrqSchedEnable & KNLLOG_TASKLET)
+					KNLLOG("in  0x%x 0x%x 0x%x 0x%x\n", (int)t->func, (int)t->data, t->count, t->state);
+#endif
 				t->func(t->data);
+#ifdef CONFIG_BCM_KNLLOG_IRQ
+				if (gKnllogIrqSchedEnable & KNLLOG_TASKLET)
+					KNLLOG("out 0x%x 0x%x 0x%x 0x%x\n", (int)t->func, (int)t->data, t->count, t->state);
+#endif
 				tasklet_unlock(t);
 				continue;
 			}

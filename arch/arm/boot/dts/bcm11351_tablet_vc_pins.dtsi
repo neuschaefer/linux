@@ -1,0 +1,297 @@
+      pins {
+         pin_config {
+            pin@default {
+               polarity = "active_high";
+               startup_state = "inactive";
+               function = "smi";
+            }; // pin
+            pin@p0 {
+               function = "dpi";
+            }; // pin
+            pin@p1 {
+               function = "dpi";
+            }; // pin
+            pin@p2 {
+               function = "dpi";
+            }; // pin
+            pin@p3 {
+               function = "dpi";
+            }; // pin
+            pin@p4 {
+               function = "dpi";
+            }; // pin
+            pin@p5 {
+               function = "dpi";
+            }; // pin
+            pin@p6 {
+               function = "dpi";
+            }; // pin
+            pin@p7 {
+               function = "dpi";
+            }; // pin
+            pin@p8 {
+               function = "dpi";
+            }; // pin
+            pin@p9 {
+               function = "dpi";
+            }; // pin
+            pin@p10 {
+               function = "dpi";
+            }; // pin
+            pin@p11 {
+               function = "dpi";
+            }; // pin
+            pin@p12 {
+               function = "dpi";
+            }; // pin
+            pin@p13 {
+               function = "dpi";
+            }; // pin
+            pin@p14 {
+               function = "dpi";
+            }; // pin
+            pin@p15 {
+               function = "dpi";
+            }; // pin
+            pin@p16 {
+               function = "dpi";
+            }; // pin
+            pin@p17 {
+               function = "dpi";
+            }; // pin
+            pin@p18 {
+               function = "dpi";
+            }; // pin
+            pin@p19 {
+               function = "dpi";
+            }; // pin
+            pin@p20 {
+               function = "dpi";
+            }; // pin
+            pin@p21 {
+               function = "dpi";
+            }; // pin
+            pin@p22 {
+               function = "dpi";
+            }; // pin
+            pin@p23 {
+               function = "dpi";
+            }; // pin
+            pin@p24 {
+               function = "dpi";
+            }; // pin
+            pin@p25 {
+               function = "dpi";
+            }; // pin
+            pin@p26 {
+               function = "dpi";
+            }; // pin
+            pin@p27 {
+               function = "dpi";
+            }; // pin
+            pin@p28 {}; 
+            pin@p29 {}; 
+            pin@p30 {}; 
+            pin@p31 {}; 
+            pin@p32 {}; 
+            pin@p33 {}; 
+            pin@p34 {}; 
+            pin@p35 {}; 
+            pin@p36 {}; 
+            pin@p37 {}; 
+            pin@p38 {}; 
+            pin@p39 {}; 
+            pin@p40 {}; 
+            pin@p41 {}; 
+            pin@p42 {}; 
+            pin@p43 {}; 
+            pin@p44 {}; 
+            pin@p45 {}; 
+            pin@p46 {}; 
+            pin@p47 {}; 
+            pin@p48 {}; 
+            pin@p49 {}; 
+            pin@p50 {}; 
+            pin@p51 {}; 
+            pin@p52 {}; 
+            pin@p53 {}; 
+            pin@p54 {
+               function = "spi";
+            }; // pin
+            pin@p55 {
+               function = "spi";
+            }; // pin
+            pin@p56 {
+               function = "spi";
+            }; // pin
+            pin@p57 {
+               function = "spi";
+            }; // pin
+            pin@p58 {
+               function = "spi";
+            }; // pin
+            pin@p59 {
+               function = "pcm";
+            }; // pin
+            pin@p60 {
+               function = "pcm";
+            }; // pin
+            pin@p61 {
+               function = "pcm";
+            }; // pin
+            pin@p62 {
+               function = "pcm";
+            }; // pin
+            pin@p63 {
+               function = "i2c0";
+            }; // pin
+            pin@p64 {
+               function = "i2c0";
+            }; // pin
+            pin@p65 {
+               function = "i2c1";
+            }; // pin
+            pin@p66 {
+               function = "i2c1";
+            }; // pin
+            pin@p67 {
+               startup_state = "active";
+               function = "pwm";
+            }; // pin
+            pin@p68 {
+               startup_state = "active";
+               function = "pwm";
+            }; // pin
+            pin@p69 {
+               function = "uart0";
+            }; // pin
+            pin@p70 {
+               function = "uart0";
+            }; // pin
+            pin@p71 {
+               function = "gp_clk";
+            }; // pin
+            pin@p72 {
+               function = "gp_clk";
+            }; // pin
+            pin@p73 {
+               function = "output";
+            }; // pin
+            pin@p74 {
+               function = "output";
+            }; // pin
+            pin@p75 {
+               function = "output";
+            }; // pin
+            pin@p76 {
+               function = "output";
+            }; // pin
+            pin@p77 {
+               function = "output";
+            }; // pin
+            pin@p78 {
+               function = "output";
+            }; // pin
+            pin@p79 {
+               function = "input";
+            }; // pin
+            pin@p80 {
+               startup_state = "active";
+               function = "output";
+            }; // pin
+            pin@p81 {
+               function = "output";
+            }; // pin
+            pin@p82 {
+               function = "output";
+            }; // pin
+            pin@p83 {
+               function = "output";
+            }; // pin
+            pin@p84 {
+               function = "output";
+            }; // pin
+            pin@p85 {
+               function = "output";
+            }; // pin
+            pin@p86 {
+               function = "output";
+            }; // pin
+            pin@p87 {
+               function = "output";
+            }; // pin
+         }; // pin_config
+         kona_pin_config {
+            kona_pin@kona_default {
+               polarity = "active_high";
+               startup_state = "inactive";
+            }; // kona_pin
+            kona_pin@k4 {}; 
+            kona_pin@k5 {}; 
+            kona_pin@k100 {}; 
+            kona_pin@k7 {}; 
+            kona_pin@k9 {}; 
+            kona_pin@k176 {}; 
+            kona_pin@k10 {}; 
+            kona_pin@k104 {}; 
+            kona_pin@k108 {}; 
+            kona_pin@k8 {}; 
+            kona_pin@k11 {}; 
+         }; // kona_pin_config
+         pin_defines {
+            pin_define@DISPLAY_POWER {
+               type = "offcore";
+               number = <4>;
+            }; // pin_define
+            pin_define@DISPLAY_RESET {
+               type = "offcore";
+               number = <5>;
+            }; // pin_define
+            pin_define@DISPLAY_BL_PWR {
+               type = "offcore";
+               number = <100>;
+            }; // pin_define
+            pin_define@DISPLAY_BL_EN {
+               type = "offcore";
+               number = <7>;
+            }; // pin_define
+            pin_define@CAMERA_0_SHUTDOWN {
+               type = "offcore";
+               number = <9>;
+            }; // pin_define
+            pin_define@CAMERA_0_AF_ENABLE {
+               type = "absent";
+            }; // pin_define
+            pin_define@CAMERA_0_POWER_ENABLE {
+               type = "offcore";
+               number = <176>;
+            }; // pin_define
+            pin_define@CAMERA_1_SHUTDOWN {
+               type = "offcore";
+               number = <10>;
+            }; // pin_define
+            pin_define@CAMERA_1_AF_ENABLE {
+               type = "absent";
+            }; // pin_define
+            pin_define@CAMERA_1_POWER_ENABLE {
+               type = "offcore";
+               number = <176>;
+            }; // pin_define
+            pin_define@LQ043Y1DX01_RESET {
+               type = "internal";
+               number = <10>;
+            }; // pin_define
+            pin_define@HDMI_CONTROL_ATTACHED_PIN {
+               type = "internal";
+               number = <79>;
+            }; // pin_define
+            pin_define@ADP1653_ENABLE {
+               type = "offcore";
+               number = <104>;
+            }; // pin_define
+            pin_define@ADP1653_STROBE {
+               type = "offcore";
+               number = <108>;
+            }; // pin_define
+         }; // pin_defines
+      }; // pins

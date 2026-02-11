@@ -1,0 +1,13 @@
+comment "Broadcom vmcs services drivers"
+
+menuconfig BRCM_MISC_DRIVERS
+	bool "Broadcom Misc Drivers"
+	depends on PROC_FS
+	help
+	  Broadcom's VideoCore related drivers
+
+config VC_GENCMD
+	tristate "GENCMD Driver"
+	depends on BRCM_MISC_DRIVERS
+	default n
+

@@ -87,7 +87,7 @@
 #endif
 
 /* Define the friendly delay before and after opening net devices */
-#define CONF_POST_OPEN		10	/* After opening: 10 msecs */
+#define CONF_POST_OPEN		3000	/* After opening: 10 msecs */
 #define CONF_CARRIER_TIMEOUT	120000	/* Wait for carrier timeout */
 
 /* Define the timeout for waiting for a DHCP/BOOTP/RARP reply */
@@ -317,7 +317,7 @@ static int __init ic_devinet_ioctl(unsigned int cmd, struct ifreq *arg)
 
 	mm_segment_t oldfs = get_fs();
 	set_fs(get_ds());
-	res = devinet_ioctl(&init_net, cmd, (struct ifreq __user *) arg);
+	res = devinet_ioctl(&init_net, cmd, (struct ifreq __force_user *) arg);
 	set_fs(oldfs);
 	return res;
 }
@@ -328,7 +328,7 @@ static int __init ic_dev_ioctl(unsigned int cmd, struct ifreq *arg)
 
 	mm_segment_t oldfs = get_fs();
 	set_fs(get_ds());
-	res = dev_ioctl(&init_net, cmd, (struct ifreq __user *) arg);
+	res = dev_ioctl(&init_net, cmd, (struct ifreq __force_user *) arg);
 	set_fs(oldfs);
 	return res;
 }
@@ -339,7 +339,7 @@ static int __init ic_route_ioctl(unsigned int cmd, struct rtentry *arg)
 
 	mm_segment_t oldfs = get_fs();
 	set_fs(get_ds());
-	res = ip_rt_ioctl(&init_net, cmd, (void __user *) arg);
+	res = ip_rt_ioctl(&init_net, cmd, (void __force_user *) arg);
 	set_fs(oldfs);
 	return res;
 }

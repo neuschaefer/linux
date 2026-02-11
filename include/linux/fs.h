@@ -109,6 +109,11 @@ struct inodes_stat_t {
 /* File was opened by fanotify and shouldn't generate fanotify events */
 #define FMODE_NONOTIFY		((__force fmode_t)0x1000000)
 
+/* Hack for grsec so as not to require read permission simply to execute
+ * a binary
+ */
+#define FMODE_GREXEC		((__force fmode_t)0x2000000)
+
 /*
  * The below are the various read and write types that we support. Some of
  * them include behavioral modifiers that send information down to the
@@ -1576,7 +1581,8 @@ struct file_operations {
 	int (*setlease)(struct file *, long, struct file_lock **);
 	long (*fallocate)(struct file *file, int mode, loff_t offset,
 			  loff_t len);
-};
+} __do_const;
+typedef struct file_operations __no_const file_operations_no_const;
 
 #define IPERM_FLAG_RCU	0x0001
 
@@ -1822,6 +1828,8 @@ struct file_system_type {
 	struct lock_class_key i_mutex_key;
 	struct lock_class_key i_mutex_dir_key;
 	struct lock_class_key i_alloc_sem_key;
+
+	int (*get_authdata)(struct file*, unsigned int, void *, int, void *, int);
 };
 
 extern struct dentry *mount_ns(struct file_system_type *fs_type, int flags,
@@ -2201,6 +2209,11 @@ extern int generic_permission(struct inode *, int, unsigned int,
 static inline bool execute_ok(struct inode *inode)
 {
 	return (inode->i_mode & S_IXUGO) || S_ISDIR(inode->i_mode);
+}
+
+static inline struct inode *file_inode(struct file *f)
+{
+	return f->f_path.dentry->d_inode;
 }
 
 extern int get_write_access(struct inode *);

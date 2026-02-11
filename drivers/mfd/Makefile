@@ -95,3 +95,6 @@ obj-$(CONFIG_MFD_PM8921_CORE) 	+= pm8921-core.o
 obj-$(CONFIG_MFD_PM8XXX_IRQ) 	+= pm8xxx-irq.o
 obj-$(CONFIG_MFD_TPS65910)	+= tps65910.o tps65910-irq.o
 obj-$(CONFIG_TPS65911_COMPARATOR)	+= tps65911-comparator.o
+obj-$(CONFIG_MFD_BCM_PMU590XX)  += bcm590xx-i2c.o bcm590xx-core.o bcm590xx-usb.o
+obj-$(CONFIG_MFD_BCMPMU)	+= bcmpmu-i2c.o bcmpmu-core.o bcmpmu-irq.o bcmpmu-accy.o
+obj-$(CONFIG_MFD_BCM59056)	+= bcmpmu-bcm59056-map.o

@@ -109,7 +109,7 @@ __mmap_switched_data:
 	.long	__data_loc			@ r4
 	.long	_sdata				@ r5
 	.long	__bss_start			@ r6
-	.long	_end				@ r7
+	.long	__bss_stop			@ r7
 	.long	processor_id			@ r4
 	.long	__machine_arch_type		@ r5
 	.long	__atags_pointer			@ r6

@@ -231,6 +231,10 @@ poll_again:
 		return buffer;
 	if (key != 9)
 		tab = 0;
+
+	/* Console driver returns 4 same bytes and breaks the following switch */
+	key &= 0xFF;
+
 	switch (key) {
 	case 8: /* backspace */
 		if (cp > buffer) {

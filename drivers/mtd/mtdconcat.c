@@ -66,7 +66,7 @@ struct mtd_concat {
 
 static int
 concat_read(struct mtd_info *mtd, loff_t from, size_t len,
-	    size_t * retlen, u_char * buf)
+	    size_t * retlen, u_char * buf, int encrypted)
 {
 	struct mtd_concat *concat = CONCAT(mtd);
 	int ret = 0, err;
@@ -91,7 +91,7 @@ concat_read(struct mtd_info *mtd, loff_t from, size_t len,
 			/* Entire transaction goes into this subdev */
 			size = len;
 
-		err = subdev->read(subdev, from, size, &retsize, buf);
+		err = subdev->read(subdev, from, size, &retsize, buf, 0);
 
 		/* Save information about bitflips! */
 		if (unlikely(err)) {
@@ -120,7 +120,7 @@ concat_read(struct mtd_info *mtd, loff_t from, size_t len,
 
 static int
 concat_write(struct mtd_info *mtd, loff_t to, size_t len,
-	     size_t * retlen, const u_char * buf)
+	     size_t * retlen, const u_char * buf, int encrypted)
 {
 	struct mtd_concat *concat = CONCAT(mtd);
 	int err = -EINVAL;
@@ -148,7 +148,7 @@ concat_write(struct mtd_info *mtd, loff_t to, size_t len,
 		if (!(subdev->flags & MTD_WRITEABLE))
 			err = -EROFS;
 		else
-			err = subdev->write(subdev, to, size, &retsize, buf);
+			err = subdev->write(subdev, to, size, &retsize, buf, 0);
 
 		if (err)
 			break;
@@ -167,7 +167,7 @@ concat_write(struct mtd_info *mtd, loff_t to, size_t len,
 
 static int
 concat_writev(struct mtd_info *mtd, const struct kvec *vecs,
-		unsigned long count, loff_t to, size_t * retlen)
+		unsigned long count, loff_t to, size_t * retlen, int encrypted)
 {
 	struct mtd_concat *concat = CONCAT(mtd);
 	struct kvec *vecs_copy;
@@ -228,7 +228,7 @@ concat_writev(struct mtd_info *mtd, const struct kvec *vecs,
 			err = -EROFS;
 		else
 			err = subdev->writev(subdev, &vecs_copy[entry_low],
-				entry_high - entry_low + 1, to, &retsize);
+				entry_high - entry_low + 1, to, &retsize, 0);
 
 		vecs_copy[entry_high].iov_len = old_iov_len - size;
 		vecs_copy[entry_high].iov_base += size;
@@ -253,7 +253,7 @@ concat_writev(struct mtd_info *mtd, const struct kvec *vecs,
 }
 
 static int
-concat_read_oob(struct mtd_info *mtd, loff_t from, struct mtd_oob_ops *ops)
+concat_read_oob(struct mtd_info *mtd, loff_t from, struct mtd_oob_ops *ops, int encrypted)
 {
 	struct mtd_concat *concat = CONCAT(mtd);
 	struct mtd_oob_ops devops = *ops;
@@ -273,7 +273,7 @@ concat_read_oob(struct mtd_info *mtd, loff_t from, struct mtd_oob_ops *ops)
 		if (from + devops.len > subdev->size)
 			devops.len = subdev->size - from;
 
-		err = subdev->read_oob(subdev, from, &devops);
+		err = subdev->read_oob(subdev, from, &devops, 0);
 		ops->retlen += devops.retlen;
 		ops->oobretlen += devops.oobretlen;
 
@@ -310,7 +310,7 @@ concat_read_oob(struct mtd_info *mtd, loff_t from, struct mtd_oob_ops *ops)
 }
 
 static int
-concat_write_oob(struct mtd_info *mtd, loff_t to, struct mtd_oob_ops *ops)
+concat_write_oob(struct mtd_info *mtd, loff_t to, struct mtd_oob_ops *ops, int encrypted)
 {
 	struct mtd_concat *concat = CONCAT(mtd);
 	struct mtd_oob_ops devops = *ops;
@@ -333,7 +333,7 @@ concat_write_oob(struct mtd_info *mtd, loff_t to, struct mtd_oob_ops *ops)
 		if (to + devops.len > subdev->size)
 			devops.len = subdev->size - to;
 
-		err = subdev->write_oob(subdev, to, &devops);
+		err = subdev->write_oob(subdev, to, &devops, 0);
 		ops->retlen += devops.oobretlen;
 		if (err)
 			return err;
@@ -379,7 +379,7 @@ static int concat_dev_erase(struct mtd_info *mtd, struct erase_info *erase)
 	 * FIXME: Allow INTERRUPTIBLE. Which means
 	 * not having the wait_queue head on the stack.
 	 */
-	err = mtd->erase(mtd, erase);
+	err = TIMED_CALL(mtd, mtd->erase(mtd, erase), erase, &erase->len);
 	if (!err) {
 		set_current_state(TASK_UNINTERRUPTIBLE);
 		add_wait_queue(&waitq, &wait);

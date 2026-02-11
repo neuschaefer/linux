@@ -346,6 +346,7 @@ struct i2c_algorithm {
 	/* To determine what the adapter supports */
 	u32 (*functionality) (struct i2c_adapter *);
 };
+typedef struct i2c_algorithm __no_const i2c_algorithm_no_const;
 
 /*
  * i2c_adapter is the structure used to identify a physical i2c bus along
@@ -409,7 +410,8 @@ void i2c_unlock_adapter(struct i2c_adapter *);
 /* i2c adapter classes (bitmask) */
 #define I2C_CLASS_HWMON		(1<<0)	/* lm_sensors, ... */
 #define I2C_CLASS_DDC		(1<<3)	/* DDC bus on graphics adapters */
-#define I2C_CLASS_SPD		(1<<7)	/* Memory modules */
+#define I2C_CLASS_SPD		(1<<7)	/* SPD EEPROMs and similar */
+#define I2C_CLASS_TOUCHSCREEN	(1<<8)	/* Capacitive touchscreen */
 
 /* Internal numbers to terminate lists */
 #define I2C_CLIENT_END		0xfffeU

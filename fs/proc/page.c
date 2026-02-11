@@ -11,6 +11,7 @@
 #include <linux/kernel-page-flags.h>
 #include <asm/uaccess.h>
 #include "internal.h"
+#include <linux/grinternal.h>
 
 #define KPMSIZE sizeof(u64)
 #define KPMMASK (KPMSIZE - 1)
@@ -61,7 +62,20 @@ static ssize_t kpagecount_read(struct file *file, char __user *buf,
 	return ret;
 }
 
+#ifdef CONFIG_GRKERNSEC_ROKU_ENABLE_PROC_PAGE_MONITOR
+static int pagemap_open(struct inode *inode, struct file *file)
+{
+	if (roku_grsec_disable_proc_page_monitor)
+	    return -EPERM;
+	else
+	    return 0;
+}
+#endif
+
 static const struct file_operations proc_kpagecount_operations = {
+#ifdef CONFIG_GRKERNSEC_ROKU_ENABLE_PROC_PAGE_MONITOR
+	.open	= pagemap_open,
+#endif
 	.llseek = mem_lseek,
 	.read = kpagecount_read,
 };
@@ -199,6 +213,9 @@ static ssize_t kpageflags_read(struct file *file, char __user *buf,
 }
 
 static const struct file_operations proc_kpageflags_operations = {
+#ifdef CONFIG_GRKERNSEC_ROKU_ENABLE_PROC_PAGE_MONITOR
+	.open	= pagemap_open,
+#endif
 	.llseek = mem_lseek,
 	.read = kpageflags_read,
 };

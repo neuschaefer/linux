@@ -1414,7 +1414,7 @@ void hrtimer_peek_ahead_timers(void)
 	local_irq_restore(flags);
 }
 
-static void run_hrtimer_softirq(struct softirq_action *h)
+static void run_hrtimer_softirq(void)
 {
 	struct hrtimer_cpu_base *cpu_base = &__get_cpu_var(hrtimer_bases);
 
@@ -1624,6 +1624,7 @@ out:
 	destroy_hrtimer_on_stack(&t.timer);
 	return ret;
 }
+EXPORT_SYMBOL_GPL(hrtimer_nanosleep);
 
 SYSCALL_DEFINE2(nanosleep, struct timespec __user *, rqtp,
 		struct timespec __user *, rmtp)

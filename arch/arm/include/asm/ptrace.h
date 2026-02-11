@@ -190,6 +190,12 @@ static inline int valid_user_regs(struct pt_regs *regs)
 
 #define instruction_pointer(regs)	(regs)->ARM_pc
 
+#ifdef CONFIG_THUMB2_KERNEL
+#define frame_pointer(regs) (regs)->ARM_r7
+#else
+#define frame_pointer(regs) (regs)->ARM_fp
+#endif
+
 #ifdef CONFIG_SMP
 extern unsigned long profile_pc(struct pt_regs *regs);
 #else
@@ -231,6 +237,11 @@ static inline unsigned long regs_get_register(struct pt_regs *regs,
 
 /* Valid only for Kernel mode traps. */
 static inline unsigned long kernel_stack_pointer(struct pt_regs *regs)
+{
+	return regs->ARM_sp;
+}
+
+static inline unsigned long user_stack_pointer(struct pt_regs *regs)
 {
 	return regs->ARM_sp;
 }

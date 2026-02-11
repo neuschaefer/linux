@@ -18,6 +18,7 @@
 #include <linux/raw.h>
 #include <linux/tty.h>
 #include <linux/capability.h>
+#include <linux/security.h>
 #include <linux/ptrace.h>
 #include <linux/device.h>
 #include <linux/highmem.h>
@@ -32,6 +33,15 @@
 
 #ifdef CONFIG_IA64
 # include <linux/efi.h>
+#endif
+
+#if 1 /* CONFIG_LTCORE */
+#include <linux/coredump.h>
+#include <linux/zlib.h>
+#endif
+
+#if defined(CONFIG_GRKERNSEC) && !defined(CONFIG_GRKERNSEC_NO_RBAC)
+extern struct file_operations grsec_fops;
 #endif
 
 static inline unsigned long size_inside_page(unsigned long start,
@@ -56,6 +66,7 @@ static inline int valid_mmap_phys_addr_range(unsigned long pfn, size_t size)
 }
 #endif
 
+#if defined(CONFIG_DEVMEM) || defined(CONFIG_DEVKMEM)
 #ifdef CONFIG_STRICT_DEVMEM
 static inline int range_is_allowed(unsigned long pfn, unsigned long size)
 {
@@ -65,9 +76,13 @@ static inline int range_is_allowed(unsigned long pfn, unsigned long size)
 
 	while (cursor < to) {
 		if (!devmem_is_allowed(pfn)) {
+#ifdef CONFIG_GRKERNSEC_KMEM
+			gr_handle_mem_readwrite(from, to);
+#else
 			printk(KERN_INFO
 		"Program %s tried to access /dev/mem between %Lx->%Lx.\n",
 				current->comm, from, to);
+#endif
 			return 0;
 		}
 		cursor += PAGE_SIZE;
@@ -75,13 +90,20 @@ static inline int range_is_allowed(unsigned long pfn, unsigned long size)
 	}
 	return 1;
 }
+#elif defined(CONFIG_GRKERNSEC_KMEM)
+static inline int range_is_allowed(unsigned long pfn, unsigned long size)
+{
+	return 0;
+}
 #else
 static inline int range_is_allowed(unsigned long pfn, unsigned long size)
 {
 	return 1;
 }
 #endif
+#endif
 
+#ifdef CONFIG_DEVMEM
 void __weak unxlate_dev_mem_ptr(unsigned long phys, void *addr)
 {
 }
@@ -117,6 +139,7 @@ static ssize_t read_mem(struct file *file, char __user *buf,
 
 	while (count > 0) {
 		unsigned long remaining;
+		char *temp;
 
 		sz = size_inside_page(p, count);
 
@@ -132,7 +155,23 @@ static ssize_t read_mem(struct file *file, char __user *buf,
 		if (!ptr)
 			return -EFAULT;
 
-		remaining = copy_to_user(buf, ptr, sz);
+#ifdef CONFIG_PAX_USERCOPY
+		temp = kmalloc(sz, GFP_KERNEL);
+		if (!temp) {
+			unxlate_dev_mem_ptr(p, ptr);
+			return -ENOMEM;
+		}
+		memcpy(temp, ptr, sz);
+#else
+		temp = ptr;
+#endif
+
+		remaining = copy_to_user(buf, temp, sz);
+
+#ifdef CONFIG_PAX_USERCOPY
+		kfree(temp);
+#endif
+
 		unxlate_dev_mem_ptr(p, ptr);
 		if (remaining)
 			return -EFAULT;
@@ -208,6 +247,9 @@ static ssize_t write_mem(struct file *file, const char __user *buf,
 	*ppos += written;
 	return written;
 }
+#endif	/* CONFIG_DEVMEM */
+
+#if defined(CONFIG_DEVMEM) || defined(CONFIG_DEVKMEM)
 
 int __weak phys_mem_access_prot_allowed(struct file *file,
 	unsigned long pfn, unsigned long size, pgprot_t *vma_prot)
@@ -296,7 +338,7 @@ static const struct vm_operations_struct mmap_mem_ops = {
 #endif
 };
 
-static int mmap_mem(struct file *file, struct vm_area_struct *vma)
+static int mmap_mem_nogrsec(struct file *file, struct vm_area_struct *vma)
 {
 	size_t size = vma->vm_end - vma->vm_start;
 
@@ -305,9 +347,6 @@ static int mmap_mem(struct file *file, struct vm_area_struct *vma)
 
 	if (!private_mapping_ok(vma))
 		return -ENOSYS;
-
-	if (!range_is_allowed(vma->vm_pgoff, size))
-		return -EPERM;
 
 	if (!phys_mem_access_prot_allowed(file, vma->vm_pgoff, size,
 						&vma->vm_page_prot))
@@ -329,6 +368,14 @@ static int mmap_mem(struct file *file, struct vm_area_struct *vma)
 	}
 	return 0;
 }
+static int mmap_mem(struct file *file, struct vm_area_struct *vma)
+{
+	if (!range_is_allowed(vma->vm_pgoff, vma->vm_end - vma->vm_start))
+		return -EPERM;
+
+	return mmap_mem_nogrsec(file, vma);
+}
+#endif	/* CONFIG_DEVMEM */
 
 #ifdef CONFIG_DEVKMEM
 static int mmap_kmem(struct file *file, struct vm_area_struct *vma)
@@ -350,6 +397,44 @@ static int mmap_kmem(struct file *file, struct vm_area_struct *vma)
 
 	vma->vm_pgoff = pfn;
 	return mmap_mem(file, vma);
+}
+#endif
+
+#if 1 // ifdef CONFIG_RCLOG
+#define RCLOG_BUF_SIZE  (64*1024)
+static unsigned char rclog_buf[RCLOG_BUF_SIZE]
+	__attribute__ ((section (".bss_noinit"), aligned (PAGE_SIZE)));
+
+static int mmap_rclog(struct file * file, struct vm_area_struct * vma)
+{
+	vma->vm_pgoff = __pa(&rclog_buf) >> PAGE_SHIFT;
+	return mmap_mem_nogrsec(file, vma);
+}
+
+static loff_t llseek_rclog(struct file * file, loff_t offset, int orig)
+{
+	mutex_lock(&file->f_path.dentry->d_inode->i_mutex);
+	switch (orig) {
+	case 0: break;
+	case 1: offset += file->f_pos; break;
+	case 2: offset += RCLOG_BUF_SIZE; break;
+	default: break;
+	}
+	mutex_unlock(&file->f_path.dentry->d_inode->i_mutex);
+	file->f_pos = offset;
+	return file->f_pos;
+}
+
+ssize_t read_rclog(struct file *file, char __user *buf, size_t count, loff_t *ppos)
+{
+	if (*ppos >= RCLOG_BUF_SIZE)
+		return 0;
+	if (count + *ppos > RCLOG_BUF_SIZE)
+		count = RCLOG_BUF_SIZE - *ppos;
+	if (copy_to_user(buf, rclog_buf + *ppos, count))
+		return -EFAULT;
+	*ppos += count;
+	return count;
 }
 #endif
 
@@ -387,6 +472,21 @@ static ssize_t read_oldmem(struct file *file, char __user *buf,
 }
 #endif
 
+#if 1 /* ifdef CONFIG_LTCORE */
+extern ssize_t read_ltcore(struct file *file, char __user *buf,
+                size_t count, loff_t *ppos);
+#endif
+
+#if 1 /* ifdef CONFIG_LASTRING */
+extern ssize_t read_lastring(struct file *file, char __user *buf,
+                size_t count, loff_t *ppos);
+#endif
+
+#if 1 /* ifdef CONFIG_KSTACK */
+extern ssize_t read_kstack(struct file *file, char __user *buf,
+                size_t count, loff_t *ppos);
+#endif
+
 #ifdef CONFIG_DEVKMEM
 /*
  * This function reads the *virtual* memory as seen by the kernel.
@@ -395,9 +495,8 @@ static ssize_t read_kmem(struct file *file, char __user *buf,
 			 size_t count, loff_t *ppos)
 {
 	unsigned long p = *ppos;
-	ssize_t low_count, read, sz;
+	ssize_t low_count, read, sz, err = 0;
 	char * kbuf; /* k-addr because vread() takes vmlist_lock rwlock */
-	int err = 0;
 
 	read = 0;
 	if (p < (unsigned long) high_memory) {
@@ -419,6 +518,8 @@ static ssize_t read_kmem(struct file *file, char __user *buf,
 		}
 #endif
 		while (low_count > 0) {
+			char *temp;
+
 			sz = size_inside_page(p, low_count);
 
 			/*
@@ -428,7 +529,22 @@ static ssize_t read_kmem(struct file *file, char __user *buf,
 			 */
 			kbuf = xlate_dev_kmem_ptr((char *)p);
 
-			if (copy_to_user(buf, kbuf, sz))
+#ifdef CONFIG_PAX_USERCOPY
+			temp = kmalloc(sz, GFP_KERNEL);
+			if (!temp)
+				return -ENOMEM;
+			memcpy(temp, kbuf, sz);
+#else
+			temp = kbuf;
+#endif
+
+			err = copy_to_user(buf, temp, sz);
+
+#ifdef CONFIG_PAX_USERCOPY
+			kfree(temp);
+#endif
+
+			if (err)
 				return -EFAULT;
 			buf += sz;
 			p += sz;
@@ -693,6 +809,8 @@ static loff_t null_lseek(struct file *file, loff_t offset, int orig)
 	return file->f_pos = 0;
 }
 
+#if defined(CONFIG_DEVMEM) || defined(CONFIG_DEVKMEM) || defined(CONFIG_DEVPORT)
+
 /*
  * The memory devices use the full 32/64 bits of the offset, and so we cannot
  * check against negative addresses: they are ok. The return value is weird,
@@ -726,9 +844,103 @@ static loff_t memory_lseek(struct file *file, loff_t offset, int orig)
 	return ret;
 }
 
+#endif
+
+#if defined(CONFIG_DEVMEM) || defined(CONFIG_DEVKMEM) || defined(CONFIG_DEVPORT)
 static int open_port(struct inode * inode, struct file * filp)
 {
 	return capable(CAP_SYS_RAWIO) ? 0 : -EPERM;
+}
+static int open_ltcore(struct inode * inode, struct file * filp)
+{
+#ifdef LTCORE_USE_ZLIB
+	z_streamp zstr = 0;
+	printk("open_ltcore: %d\n", ltcore_dump_cnt);
+
+	zstr = kmalloc(sizeof(*zstr), GFP_KERNEL);
+	if (zstr == 0)
+	{
+		pr_err("%s: Can't allocate memory for inflate zstr\n", __func__);
+		goto out_of_mem;
+	}
+	zstr->workspace = kmalloc(zlib_inflate_workspacesize(), GFP_KERNEL);
+	if (zstr->workspace == 0)
+	{
+		pr_err("%s: Can't allocate memory for inflate workspace\n", __func__);
+		goto out_of_mem;
+	}
+
+	zstr->next_in = ltcore_dump_file;
+	zstr->avail_in = ltcore_dump_cnt;
+	if (zlib_inflateInit(zstr) != Z_OK)
+	{
+		pr_err("%s: Can't initialize inflate\n", __func__);
+		goto out_of_mem;
+	}
+	filp->private_data = zstr;
+#endif
+
+	return 0;
+
+#ifdef LTCORE_USE_ZLIB
+out_of_mem:
+	if (zstr && zstr->workspace)
+		kfree(zstr->workspace);
+	if (zstr)
+		kfree(zstr);
+	return -ENOMEM;
+#endif
+}
+
+static int release_ltcore(struct inode * inode, struct file * filp)
+{
+#ifdef LTCORE_USE_ZLIB
+	if (filp->private_data)
+	{
+		z_streamp zstr = (z_streamp)filp->private_data;
+		zlib_inflateEnd(zstr);
+		kfree(zstr->workspace);
+		kfree(zstr);
+		filp->private_data = 0;
+	}
+#endif
+
+	return 0;
+}
+static int open_ltother(struct inode * inode, struct file * filp)
+{
+	return 0;
+}
+#endif
+
+static char hsm_flag __attribute__ ((section (".bss_noinit")));
+
+static ssize_t read_hsm(struct file *file, char __user *buf, size_t count, loff_t *ppos)
+{
+    size_t fsize = sizeof(hsm_flag);
+    if (*ppos >= fsize || count != fsize)
+        return -EINVAL;
+    if (put_user(hsm_flag, buf))
+        return -EFAULT;
+    // Alawys set postion to 0, the caller doesn't need seek before read  
+    *ppos = 0;
+    return fsize;
+}
+
+static ssize_t write_hsm(struct file *file, const char __user *buf,
+              size_t count, loff_t *ppos)
+{
+    size_t fsize = sizeof(hsm_flag);
+    if (*ppos >= fsize || count != fsize)
+        return -EINVAL;
+    // Read to flag so that hsm_flag is not overwritten when the call fails
+    char flag;
+    if (get_user(flag, buf))
+        return -EFAULT;
+    hsm_flag = flag;
+    // Alawys set postion to 0, the caller doesn't need seek before write  
+    *ppos = 0;
+    return fsize;
 }
 
 #define zero_lseek	null_lseek
@@ -738,7 +950,12 @@ static int open_port(struct inode * inode, struct file * filp)
 #define open_mem	open_port
 #define open_kmem	open_mem
 #define open_oldmem	open_mem
+#define open_lastring	open_ltother
+#define open_kstack	open_ltother
+#define open_rclog	open_ltother
+#define open_hsm	open_ltother
 
+#ifdef CONFIG_DEVMEM
 static const struct file_operations mem_fops = {
 	.llseek		= memory_lseek,
 	.read		= read_mem,
@@ -747,6 +964,8 @@ static const struct file_operations mem_fops = {
 	.open		= open_mem,
 	.get_unmapped_area = get_unmapped_area_mem,
 };
+#endif
+
 
 #ifdef CONFIG_DEVKMEM
 static const struct file_operations kmem_fops = {
@@ -806,6 +1025,43 @@ static const struct file_operations oldmem_fops = {
 };
 #endif
 
+#if 1 /* ifdef CONFIG_LTCORE */
+static const struct file_operations ltcore_fops = {
+	.read   = read_ltcore,
+	.open   = open_ltcore,
+	.release = release_ltcore,
+};
+#endif
+
+#if 1 /* ifdef CONFIG_LASTRING */
+static const struct file_operations lastring_fops = {
+	.read   = read_lastring,
+	.open   = open_lastring,
+};
+#endif
+
+#if 1 /* ifdef CONFIG_RCLOG */
+ static const struct file_operations rclog_fops = {
+	.llseek = llseek_rclog,
+	.read   = read_rclog,
+	.mmap   = mmap_rclog,
+	.open   = open_rclog,
+};
+#endif
+
+#if 1 /* ifdef CONFIG_KSTACK */
+static const struct file_operations kstack_fops = {
+	.read   = read_kstack,
+	.open   = open_kstack,
+};
+#endif
+
+static const struct file_operations hsm_fops = {
+	.open   = open_hsm,
+	.read   = read_hsm,
+	.write  = write_hsm,
+};
+
 static ssize_t kmsg_writev(struct kiocb *iocb, const struct iovec *iv,
 			   unsigned long count, loff_t pos)
 {
@@ -850,7 +1106,9 @@ static const struct memdev {
 	const struct file_operations *fops;
 	struct backing_dev_info *dev_info;
 } devlist[] = {
+#ifdef CONFIG_DEVMEM
 	 [1] = { "mem", 0, &mem_fops, &directly_mappable_cdev_bdi },
+#endif
 #ifdef CONFIG_DEVKMEM
 	 [2] = { "kmem", 0, &kmem_fops, &directly_mappable_cdev_bdi },
 #endif
@@ -866,6 +1124,22 @@ static const struct memdev {
 #ifdef CONFIG_CRASH_DUMP
 	[12] = { "oldmem", 0, &oldmem_fops, NULL },
 #endif
+#if 1 /* ifdef CONFIG_LTCORE */
+	[13] = { "ltcore", 0666, &ltcore_fops, NULL },
+#endif
+#if 1 /* ifdef CONFIG_LASTRING */
+	[14] = { "lastring", 0666, &lastring_fops, NULL },
+#endif
+#if 1 /* ifdef CONFIG_KSTACK */
+	[15] = { "kstack", 0666, &kstack_fops, NULL },
+#endif
+#if 1 // ifdef CONFIG_RCLOG
+	[16] = { "rclog", 0666, &rclog_fops, NULL },
+#endif
+#if defined(CONFIG_GRKERNSEC) && !defined(CONFIG_GRKERNSEC_NO_RBAC)
+	[17] = { "grsec",S_IRUSR | S_IWUGO, &grsec_fops, NULL },
+#endif
+	[18] = { "hsm", 0666, &hsm_fops, NULL },
 };
 
 static int memory_open(struct inode *inode, struct file *filp)

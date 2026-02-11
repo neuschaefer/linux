@@ -1,0 +1,55 @@
+/*****************************************************************************
+*  Copyright 2001 - 2012 Broadcom Corporation.  All rights reserved.
+*
+*  Unless you and Broadcom execute a separate written software license
+*  agreement governing use of this software, this software is licensed to you
+*  under the terms of the GNU General Public License version 2, available at
+*  http://www.gnu.org/licenses/old-license/gpl-2.0.html (the "GPL").
+*
+*  Notwithstanding the above, under no circumstances may you combine this
+*  software in any way with any other Broadcom software provided under a
+*  license other than the GPL, without Broadcom's express prior written
+*  consent.
+*
+*****************************************************************************/
+
+/****************************************************************************/
+/**
+*  @file    chal_otp.c
+*
+*  @brief   Low level OTP driver routines
+*
+*  @note
+*****************************************************************************/
+
+/* ---- Include Files ---------------------------------------------------- */
+
+#include <chal/chal_otp.h>
+
+/* ---- External Function Prototypes ------------------------------------- */
+/* ---- External Variable Declarations ----------------------------------- */
+/* ---- Public Variables ------------------------------------------------- */
+/* ---- Private Constants and Types -------------------------------------- */
+/* ---- Private Function Prototypes -------------------------------------- */
+/* ---- Private Variables ------------------------------------------------ */
+
+/* ==== Public Functions ================================================= */
+
+/****************************************************************************
+* See chal_otp.h for API documentation.
+****************************************************************************/
+
+#include <chal/chal_otp.h>
+
+int chal_otp_init(CHAL_OTP_HANDLE_t* handle, uint32_t otpBar)
+{
+    if (!handle)
+    {
+	return -1;
+    }
+
+    handle->bar = otpBar;
+    handle->otp_status_code = 0;
+
+    return 0;
+}

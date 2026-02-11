@@ -591,35 +591,6 @@ ohci_hub_descriptor (
 
 /*-------------------------------------------------------------------------*/
 
-#ifdef	CONFIG_USB_OTG
-
-static int ohci_start_port_reset (struct usb_hcd *hcd, unsigned port)
-{
-	struct ohci_hcd	*ohci = hcd_to_ohci (hcd);
-	u32			status;
-
-	if (!port)
-		return -EINVAL;
-	port--;
-
-	/* start port reset before HNP protocol times out */
-	status = ohci_readl(ohci, &ohci->regs->roothub.portstatus [port]);
-	if (!(status & RH_PS_CCS))
-		return -ENODEV;
-
-	/* khubd will finish the reset later */
-	ohci_writel(ohci, RH_PS_PRS, &ohci->regs->roothub.portstatus [port]);
-	return 0;
-}
-
-#else
-
-#define	ohci_start_port_reset		NULL
-
-#endif
-
-/*-------------------------------------------------------------------------*/
-
 
 /* See usb 7.1.7.5:  root hubs must issue at least 50 msec reset signaling,
  * not necessarily continuous ... to guard against resume signaling.

@@ -31,7 +31,7 @@
 #include <linux/percpu_counter.h>
 #include <linux/swap.h>
 
-static struct vfsmount *shm_mnt;
+struct vfsmount *shm_mnt;
 
 #ifdef CONFIG_SHMEM
 /*
@@ -1101,6 +1101,8 @@ static int shmem_writepage(struct page *page, struct writeback_control *wbc)
 		goto unlock;
 	}
 	entry = shmem_swp_entry(info, index, NULL);
+	if (!entry)
+		goto unlock;
 	if (entry->val) {
 		/*
 		 * The more uptodate page coming down from a stacked
@@ -1171,6 +1173,8 @@ static struct page *shmem_swapin(swp_entry_t entry, gfp_t gfp,
 	struct vm_area_struct pvma;
 	struct page *page;
 
+	pax_track_stack()
+
 	/* Create a pseudo vma that just contains the policy */
 	pvma.vm_start = 0;
 	pvma.vm_pgoff = idx;
@@ -1182,7 +1186,7 @@ static struct page *shmem_swapin(swp_entry_t entry, gfp_t gfp,
 	/* Drop reference taken by mpol_shared_policy_lookup() */
 	mpol_cond_put(pvma.vm_policy);
 
-	return page;
+	return page
 }
 
 static struct page *shmem_alloc_page(gfp_t gfp,
@@ -2580,8 +2584,7 @@ int shmem_fill_super(struct super_block *sb, void *data, int silent)
 	int err = -ENOMEM;
 
 	/* Round up to L1_CACHE_BYTES to resist false sharing */
-	sbinfo = kzalloc(max((int)sizeof(struct shmem_sb_info),
-				L1_CACHE_BYTES), GFP_KERNEL);
+	sbinfo = kzalloc(max(sizeof(struct shmem_sb_info), L1_CACHE_BYTES), GFP_KERNEL);
 	if (!sbinfo)
 		return -ENOMEM;
 
@@ -3027,6 +3030,15 @@ put_memory:
 }
 EXPORT_SYMBOL_GPL(shmem_file_setup);
 
+void shmem_set_file(struct vm_area_struct *vma, struct file *file)
+{
+	if (vma->vm_file)
+		fput(vma->vm_file);
+	vma->vm_file = file;
+	vma->vm_ops = &shmem_vm_ops;
+	vma->vm_flags |= VM_CAN_NONLINEAR;
+}
+
 /**
  * shmem_zero_setup - setup a shared anonymous mapping
  * @vma: the vma to be mmapped is prepared by do_mmap_pgoff
@@ -3040,11 +3052,7 @@ int shmem_zero_setup(struct vm_area_struct *vma)
 	if (IS_ERR(file))
 		return PTR_ERR(file);
 
-	if (vma->vm_file)
-		fput(vma->vm_file);
-	vma->vm_file = file;
-	vma->vm_ops = &shmem_vm_ops;
-	vma->vm_flags |= VM_CAN_NONLINEAR;
+	shmem_set_file(vma, file);
 	return 0;
 }
 

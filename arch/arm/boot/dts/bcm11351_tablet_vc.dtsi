@@ -1,0 +1,6 @@
+   videocore {
+      /include/ "bcm11351_tablet_vc_pins.dtsi"
+      display@main {
+         /include/ "truly_tft1280800_lvds.dtsi"
+      };
+   };

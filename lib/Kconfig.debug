@@ -667,8 +667,9 @@ config DEBUG_LOCKING_API_SELFTESTS
 	  mutexes and rwsems.
 
 config STACKTRACE
-	bool
+	bool "Stacktrace"
 	depends on STACKTRACE_SUPPORT
+	default y
 
 config DEBUG_STACK_USAGE
 	bool "Stack utilization instrumentation"
@@ -706,7 +707,6 @@ config DEBUG_BUGVERBOSE
 
 config DEBUG_INFO
 	bool "Compile the kernel with debug info"
-	depends on DEBUG_KERNEL
 	help
           If you say Y here the resulting kernel image will include
 	  debugging info resulting in a larger kernel image.
@@ -1088,6 +1088,7 @@ config LATENCYTOP
 	depends on DEBUG_KERNEL
 	depends on STACKTRACE_SUPPORT
 	depends on PROC_FS
+	depends on !GRKERNSEC_HIDESYM
 	select FRAME_POINTER if !MIPS && !PPC && !S390 && !MICROBLAZE
 	select KALLSYMS
 	select KALLSYMS_ALL
@@ -1252,6 +1253,28 @@ config ASYNC_RAID6_TEST
 	  engine if one is available.
 
 	  If unsure, say N.
+
+config SDHCI_THROUGHPUT
+	bool "Enable sdhci throughput data dump over debugfs"
+	depends on DEBUG_FS
+	help
+		The interface is loacted at DEBUGFS/sdhci-throughput
+		A file is created inside the sdhci-throughput directory,
+		for each mmc interface. Wirte 1 to these files, to enable the
+		throuhput dump. Write 0 to disable them. The message dumped is
+		of the following format:
+
+		[access type]:[device] [time t2 sec],[time t2 usec],[time t1
+                   sec],[time t1 usec],[block size],[no of blocks],[access rate in bytes/sec]
+
+		eg: W:(mmc0) 946685911,510155,946685911,475456,512,1024,15109599
+
+		The above line can be interpreted as "A write of 1024 blocks,
+		each of size 512 bytes to mmc0, has taken ((946685911-946685910)*10^6 +
+		(510155-475456)) usecs i.e at a rate of 15109599 bytes/sec."
+
+		The speed dumped in bytes/sec need not be always accurate because of
+		the mismatch in resolution of timestamping and the speed of DMA access.
 
 source "samples/Kconfig"
 

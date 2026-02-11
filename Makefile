@@ -245,8 +245,9 @@ CONFIG_SHELL := $(shell if [ -x "$$BASH" ]; then echo $$BASH; \
 
 HOSTCC       = gcc
 HOSTCXX      = g++
-HOSTCFLAGS   = -Wall -Wmissing-prototypes -Wstrict-prototypes -O2 -fomit-frame-pointer
-HOSTCXXFLAGS = -O2
+HOSTCFLAGS   = -Wall -Wmissing-prototypes -Wstrict-prototypes -Wno-unused-parameter -Wno-missing-field-initializers -O2 -fomit-frame-pointer -fno-delete-null-pointer-checks
+HOSTCFLAGS  += $(call cc-option, -Wno-empty-body)
+HOSTCXXFLAGS = -O2 -fno-delete-null-pointer-checks
 
 # Decide whether to build built-in, modular, or both.
 # Normally, just do built-in.
@@ -358,6 +359,7 @@ CFLAGS_GCOV	= -fprofile-arcs -ftest-coverage
 # Use LINUXINCLUDE when you must reference the include/ directory.
 # Needed to be compatible with the O= option
 LINUXINCLUDE    := -I$(srctree)/arch/$(hdr-arch)/include \
+		   -I$(srctree)/arch/$(hdr-arch)/include/uapi \
                    -Iarch/$(hdr-arch)/include/generated -Iinclude \
                    $(if $(KBUILD_SRC), -I$(srctree)/include) \
                    -include include/generated/autoconf.h
@@ -365,10 +367,12 @@ LINUXINCLUDE    := -I$(srctree)/arch/$(hdr-arch)/include \
 KBUILD_CPPFLAGS := -D__KERNEL__
 
 KBUILD_CFLAGS   := -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
+		   -Wno-unused-parameter -Wno-missing-field-initializers \
 		   -fno-strict-aliasing -fno-common \
 		   -Werror-implicit-function-declaration \
 		   -Wno-format-security \
 		   -fno-delete-null-pointer-checks
+KBUILD_CFLAGS   += $(call cc-option, -Wno-empty-body)
 KBUILD_AFLAGS_KERNEL :=
 KBUILD_CFLAGS_KERNEL :=
 KBUILD_AFLAGS   := -D__ASSEMBLY__
@@ -392,6 +396,7 @@ export KBUILD_AFLAGS AFLAGS_KERNEL AFLAGS_MODULE
 export KBUILD_AFLAGS_MODULE KBUILD_CFLAGS_MODULE KBUILD_LDFLAGS_MODULE
 export KBUILD_AFLAGS_KERNEL KBUILD_CFLAGS_KERNEL
 export KBUILD_ARFLAGS
+export BRCM_MODULES_DIR
 
 # When compiling out-of-tree modules, put MODVERDIR in the module
 # tree rather than in the kernel tree. The kernel tree might
@@ -407,8 +412,8 @@ export RCS_TAR_IGNORE := --exclude SCCS --exclude BitKeeper --exclude .svn --exc
 # Rules shared between *config targets and build targets
 
 # Basic helpers built in scripts/
-PHONY += scripts_basic
-scripts_basic:
+PHONY += scripts_basic gcc-plugins
+scripts_basic: gcc-plugins
 	$(Q)$(MAKE) $(build)=scripts/basic
 	$(Q)rm -f .tmp_quiet_recordmcount
 
@@ -564,6 +569,41 @@ else
 KBUILD_CFLAGS	+= -O2
 endif
 
+ifeq ($(shell $(CONFIG_SHELL) $(srctree)/scripts/gcc-plugin.sh "$(HOSTCC)" "$(CC)"), y)
+CONSTIFY_PLUGIN := -DCONSTIFY_PLUGIN
+ifdef CONFIG_PAX_MEMORY_STACKLEAK
+STACKLEAK_PLUGIN := -fplugin=$(objtree)/tools/gcc/stackleak_plugin.so -fplugin-arg-stackleak_plugin-track-lowest-sp=100
+endif
+ifdef CONFIG_KALLOCSTAT_PLUGIN
+KALLOCSTAT_PLUGIN := -fplugin=$(objtree)/tools/gcc/kallocstat_plugin.so
+endif
+ifdef CONFIG_PAX_KERNEXEC_PLUGIN
+KERNEXEC_PLUGIN := -fplugin=$(objtree)/tools/gcc/kernexec_plugin.so
+endif
+ifdef CONFIG_CHECKER_PLUGIN
+ifeq ($(call cc-ifversion, -ge, 0406, y), y)
+CHECKER_PLUGIN := -fplugin=$(objtree)/tools/gcc/checker_plugin.so -DCHECKER_PLUGIN
+endif
+endif
+GCC_PLUGINS := $(CONSTIFY_PLUGIN) $(STACKLEAK_PLUGIN) $(KALLOCSTAT_PLUGIN) $(KERNEXEC_PLUGIN) $(CHECKER_PLUGIN)
+export CONSTIFY_PLUGIN STACKLEAK_PLUGIN KERNEXEC_PLUGIN CHECKER_PLUGIN
+gcc-plugins-build:
+# 	Kernel build as it is configured currently can't build constify_plugin with standard 
+# 	command $(Q)$(MAKE) $(build)=tools/gcc, and that's why we use special command below.
+	@(cd tools/gcc &&\
+		$(HOSTCC) -export-dynamic -shared -m32 -fPIC -DSONAME=\"constify_plugin.so\" -o constify_plugin.so -fPIC -I$(CROSSTOOLS_PLUGIN_INC) constify_plugin.c \
+	)
+#	$(Q)$(MAKE) $(build)=tools/gcc
+else
+gcc-plugins-build:
+ifeq ($(call cc-ifversion, -ge, 0405, y), y)
+	$(error Your gcc installation does not support plugins.  If the necessary headers for plugin support are missing, they should be installed.  On Debian, apt-get install gcc-<ver>-plugin-dev.))
+else
+	$(Q)echo "warning, your gcc version does not support plugins, you should upgrade it to gcc 4.5 at least"
+endif
+	$(Q)echo "PAX_MEMORY_STACKLEAK and constification will be less secure"
+endif
+
 include $(srctree)/arch/$(SRCARCH)/Makefile
 
 ifneq ($(CONFIG_FRAME_WARN),0)
@@ -708,7 +748,7 @@ export mod_strip_cmd
 
 
 ifeq ($(KBUILD_EXTMOD),)
-core-y		+= kernel/ mm/ fs/ ipc/ security/ crypto/ block/
+core-y		+= kernel/ mm/ fs/ ipc/ security/ crypto/ block/ grsecurity/
 
 vmlinux-dirs	:= $(patsubst %/,%,$(filter %/, $(init-y) $(init-m) \
 		     $(core-y) $(core-m) $(drivers-y) $(drivers-m) \
@@ -932,6 +972,7 @@ vmlinux.o: $(modpost-init) $(vmlinux-main) FORCE
 
 # The actual objects are generated when descending, 
 # make sure no implicit rule kicks in
+$(sort $(vmlinux-init) $(vmlinux-main)) $(vmlinux-lds): KBUILD_CFLAGS += $(GCC_PLUGINS)
 $(sort $(vmlinux-init) $(vmlinux-main)) $(vmlinux-lds): $(vmlinux-dirs) ;
 
 # Handle descending into subdirectories listed in $(vmlinux-dirs)
@@ -941,7 +982,7 @@ $(sort $(vmlinux-init) $(vmlinux-main)) $(vmlinux-lds): $(vmlinux-dirs) ;
 # Error messages still appears in the original language
 
 PHONY += $(vmlinux-dirs)
-$(vmlinux-dirs): prepare scripts
+$(vmlinux-dirs): gcc-plugins prepare scripts
 	$(Q)$(MAKE) $(build)=$@
 
 # Store (new) KERNELRELASE string in include/config/kernel.release
@@ -986,6 +1027,7 @@ prepare0: archprepare FORCE
 	$(Q)$(MAKE) $(build)=. missing-syscalls
 
 # All the preparing..
+prepare: KBUILD_CFLAGS := $(filter-out $(GCC_PLUGINS),$(KBUILD_CFLAGS))
 prepare: prepare0
 
 # Generate some files
@@ -1087,6 +1129,7 @@ all: modules
 #	using awk while concatenating to the final file.
 
 PHONY += modules
+modules: KBUILD_CFLAGS += $(GCC_PLUGINS)
 modules: $(vmlinux-dirs) $(if $(KBUILD_BUILTIN),vmlinux) modules.builtin
 	$(Q)$(AWK) '!x[$$0]++' $(vmlinux-dirs:%=$(objtree)/%/modules.order) > $(objtree)/modules.order
 	@$(kecho) '  Building modules, stage 2.';
@@ -1102,7 +1145,7 @@ modules.builtin: $(vmlinux-dirs:%=%/modules.builtin)
 
 # Target to prepare building external modules
 PHONY += modules_prepare
-modules_prepare: prepare scripts
+modules_prepare: gcc-plugins prepare scripts
 
 # Target to install modules
 PHONY += modules_install
@@ -1174,7 +1217,15 @@ PHONY += $(clean-dirs) clean archclean
 $(clean-dirs):
 	$(Q)$(MAKE) $(clean)=$(patsubst _clean_%,%,$@)
 
-clean: archclean
+clean: archclean $(clean-dirs)
+	$(call cmd,rmdirs)
+	$(call cmd,rmfiles)
+	@find . $(RCS_FIND_IGNORE) \
+		\( -name '*.[oas]' -o -name '*.ko' -o -name '.*.cmd' \
+		-o -name '.*.d' -o -name '.*.tmp' -o -name '*.mod.c' \
+		-o -name '*.symtypes' -o -name 'modules.order' \
+		-o -name modules.builtin -o -name '.tmp_*.o.*' \
+		-o -name '*.gcno' \) -type f -print | xargs rm -f
 
 # mrproper - Delete all generated files, including .config
 #
@@ -1198,7 +1249,7 @@ distclean: mrproper
 	@find $(srctree) $(RCS_FIND_IGNORE) \
 		\( -name '*.orig' -o -name '*.rej' -o -name '*~' \
 		-o -name '*.bak' -o -name '#*#' -o -name '.*.orig' \
-		-o -name '.*.rej' -o -size 0 \
+		-o -name '.*.rej' -o -name '*.so' -o -size 0 \
 		-o -name '*%' -o -name '.*.cmd' -o -name 'core' \) \
 		-type f -print | xargs rm -f
 
@@ -1359,6 +1410,7 @@ PHONY += $(module-dirs) modules
 $(module-dirs): crmodverdir $(objtree)/Module.symvers
 	$(Q)$(MAKE) $(build)=$(patsubst _module_%,%,$@)
 
+modules: KBUILD_CFLAGS += $(GCC_PLUGINS)
 modules: $(module-dirs)
 	@$(kecho) '  Building modules, stage 2.';
 	$(Q)$(MAKE) -f $(srctree)/scripts/Makefile.modpost
@@ -1485,17 +1537,19 @@ else
         target-dir = $(if $(KBUILD_EXTMOD),$(dir $<),$(dir $@))
 endif
 
-%.s: %.c prepare scripts FORCE
+%.s: KBUILD_CFLAGS += $(GCC_PLUGINS)
+%.s: %.c gcc-plugins prepare scripts FORCE
 	$(Q)$(MAKE) $(build)=$(build-dir) $(target-dir)$(notdir $@)
 %.i: %.c prepare scripts FORCE
 	$(Q)$(MAKE) $(build)=$(build-dir) $(target-dir)$(notdir $@)
-%.o: %.c prepare scripts FORCE
+%.o: KBUILD_CFLAGS += $(GCC_PLUGINS)
+%.o: %.c gcc-plugins prepare scripts FORCE
 	$(Q)$(MAKE) $(build)=$(build-dir) $(target-dir)$(notdir $@)
 %.lst: %.c prepare scripts FORCE
 	$(Q)$(MAKE) $(build)=$(build-dir) $(target-dir)$(notdir $@)
-%.s: %.S prepare scripts FORCE
+%.s: %.S gcc-plugins prepare scripts FORCE
 	$(Q)$(MAKE) $(build)=$(build-dir) $(target-dir)$(notdir $@)
-%.o: %.S prepare scripts FORCE
+%.o: %.S gcc-plugins prepare scripts FORCE
 	$(Q)$(MAKE) $(build)=$(build-dir) $(target-dir)$(notdir $@)
 %.symtypes: %.c prepare scripts FORCE
 	$(Q)$(MAKE) $(build)=$(build-dir) $(target-dir)$(notdir $@)
@@ -1505,11 +1559,13 @@ endif
 	$(cmd_crmodverdir)
 	$(Q)$(MAKE) KBUILD_MODULES=$(if $(CONFIG_MODULES),1) \
 	$(build)=$(build-dir)
-%/: prepare scripts FORCE
+%/: KBUILD_CFLAGS += $(GCC_PLUGINS)
+%/: gcc-plugins prepare scripts FORCE
 	$(cmd_crmodverdir)
 	$(Q)$(MAKE) KBUILD_MODULES=$(if $(CONFIG_MODULES),1) \
 	$(build)=$(build-dir)
-%.ko: prepare scripts FORCE
+%.ko: KBUILD_CFLAGS += $(GCC_PLUGINS)
+%.ko: gcc-plugins prepare scripts FORCE
 	$(cmd_crmodverdir)
 	$(Q)$(MAKE) KBUILD_MODULES=$(if $(CONFIG_MODULES),1)   \
 	$(build)=$(build-dir) $(@:.ko=.o)

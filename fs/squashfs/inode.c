@@ -58,13 +58,22 @@ static int squashfs_new_inode(struct super_block *sb, struct inode *inode,
 {
 	int err;
 
-	err = squashfs_get_id(sb, le16_to_cpu(sqsh_ino->uid), &inode->i_uid);
-	if (err)
-		return err;
+	struct squashfs_sb_info *msblk = sb->s_fs_info;
+	if (msblk->uid)
+		inode->i_uid = msblk->uid;
+	else {
+		err = squashfs_get_id(sb, le16_to_cpu(sqsh_ino->uid), &inode->i_uid);
+		if (err)
+			return err;
+	}
 
-	err = squashfs_get_id(sb, le16_to_cpu(sqsh_ino->guid), &inode->i_gid);
-	if (err)
-		return err;
+	if (msblk->gid)
+		inode->i_gid = msblk->gid;
+	else {
+		err = squashfs_get_id(sb, le16_to_cpu(sqsh_ino->guid), &inode->i_gid);
+		if (err)
+			return err;
+	}
 
 	inode->i_ino = le32_to_cpu(sqsh_ino->inode_number);
 	inode->i_mtime.tv_sec = le32_to_cpu(sqsh_ino->mtime);
@@ -208,8 +217,8 @@ int squashfs_read_inode(struct inode *inode, long long ino)
 		inode->i_op = &squashfs_inode_ops;
 		inode->i_fop = &generic_ro_fops;
 		inode->i_mode |= S_IFREG;
-		inode->i_blocks = ((inode->i_size -
-				le64_to_cpu(sqsh_ino->sparse) - 1) >> 9) + 1;
+		inode->i_blocks = (inode->i_size -
+				le64_to_cpu(sqsh_ino->sparse) + 511) >> 9;
 
 		squashfs_i(inode)->fragment_block = frag_blk;
 		squashfs_i(inode)->fragment_size = frag_size;

@@ -1,0 +1,16 @@
+/dts-v1/;
+
+
+/ {
+  #address-cells = <1>;
+  #size-cells = <1>;
+  model = "bcm11351_tablet";
+  compatible = "Broadcom,bcm11351_tablet";
+  timestamp = "v0.1, 2/15/2012 12:24:00 PM";
+
+  chosen {
+  };
+  /include/ "CapriBRT_EDN000.dtsi"
+  /include/ "CapriBRT_EDN000_PMU_59056.dtsi"
+  /include/ "CapriBRT_EDN000_VC.dtsi"
+};

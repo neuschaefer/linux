@@ -13,6 +13,9 @@
 # uncompression can be done without blocking on allocation).
 #
 
+# Roku: Speed up filesystem access
+ccflags-y += -O2
+
 obj-$(CONFIG_ZLIB_INFLATE) += zlib_inflate.o
 
 zlib_inflate-objs := inffast.o inflate.o infutil.o \

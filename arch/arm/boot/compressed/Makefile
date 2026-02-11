@@ -115,7 +115,7 @@ LDFLAGS_vmlinux += -X
 LDFLAGS_vmlinux += -T
 
 # For __aeabi_uidivmod
-lib1funcs = $(obj)/lib1funcs.o
+lib1funcs = $(obj)/lib1funcs.o $(obj)/divdi3.o
 
 $(obj)/lib1funcs.S: $(srctree)/arch/$(SRCARCH)/lib/lib1funcs.S FORCE
 	$(call cmd,shipped)
@@ -132,6 +132,12 @@ bad_syms=$$($(CROSS_COMPILE)nm $@ | sed -n 's/^.\{8\} [bc] \(.*\)/\1/p') && \
 [ -z "$$bad_syms" ] || \
   ( echo "following symbols must have non local/private scope:" >&2; \
     echo "$$bad_syms" >&2; rm -f $@; false )
+
+$(obj)/longlong.h: $(srctree)/arch/$(SRCARCH)/lib/longlong.h FORCE
+	$(call cmd,shipped)
+
+$(obj)/divdi3.c: $(srctree)/arch/$(SRCARCH)/lib/divdi3.c $(obj)/longlong.h FORCE
+	$(call cmd,shipped)
 
 $(obj)/vmlinux: $(obj)/vmlinux.lds $(obj)/$(HEAD) $(obj)/piggy.$(suffix_y).o \
 	 	$(addprefix $(obj)/, $(OBJS)) $(lib1funcs) FORCE

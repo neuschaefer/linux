@@ -10,6 +10,22 @@
  */
 
 /*
+ * sfinney@Roku, 11/2012 (adapted from 9/2012 change to 2.6.35 kernel)  
+ * There are significant issues here when hidraw_disconnect() is called 
+ * but user space still has the file open (particularly if hidraw_connect() 
+ * is called immediately thereafter,  potentially reusing the same 
+ * hidraw_table entry). waitqueue list corruption has been observed, 
+ * and memory leaks will happen. On 3.0.15, the symptom was a kernel crash
+ * in kobj_bcast_filter().
+ * This modification adds some mutex calls from later hidraw.c versions, and
+ * uses the list->hidraw pointer rather than hidraw_table[minor] once the
+ * device is opened, so that we'll always use the hidraw device from
+ * _our_ open(). A few other locking things have been tweaked in ways that
+ * make sense, but the locking in this is still severely lacking (see
+ * hiddev.c for what is probably a much more correct approach).
+ */
+
+/*
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
  * version 2, as published by the Free Software Foundation.
@@ -18,6 +34,7 @@
  * this program; if not, write to the Free Software Foundation, Inc.,
  * 51 Franklin St - Fifth Floor, Boston, MA 02110-1301 USA.
  */
+
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
@@ -105,17 +122,16 @@ out:
  * This function is to be called with the minors_lock mutex held */
 static ssize_t hidraw_send_report(struct file *file, const char __user *buffer, size_t count, unsigned char report_type)
 {
-	unsigned int minor = iminor(file->f_path.dentry->d_inode);
 	struct hid_device *dev;
 	__u8 *buf;
 	int ret = 0;
+	struct hidraw *hrdev = ((struct hidraw_list *)file->private_data)->hidraw;
 
-	if (!hidraw_table[minor]) {
+	if (!hrdev->exist) {
 		ret = -ENODEV;
 		goto out;
 	}
-
-	dev = hidraw_table[minor]->hid;
+	dev = hrdev->hid;
 
 	if (!dev->hid_output_raw_report) {
 		ret = -ENODEV;
@@ -173,13 +189,17 @@ static ssize_t hidraw_write(struct file *file, const char __user *buffer, size_t
  *  mutex held. */
 static ssize_t hidraw_get_report(struct file *file, char __user *buffer, size_t count, unsigned char report_type)
 {
-	unsigned int minor = iminor(file->f_path.dentry->d_inode);
 	struct hid_device *dev;
 	__u8 *buf;
 	int ret = 0, len;
 	unsigned char report_number;
+	struct hidraw *hrdev = ((struct hidraw_list *)file->private_data)->hidraw;
 
-	dev = hidraw_table[minor]->hid;
+	if (!hrdev->exist) {
+		ret = -ENODEV;
+		goto out;
+	}
+	dev = hrdev->hid;
 
 	if (!dev->hid_get_raw_report) {
 		ret = -ENODEV;
@@ -258,18 +278,18 @@ static int hidraw_open(struct inode *inode, struct file *file)
 	}
 
 	mutex_lock(&minors_lock);
-	if (!hidraw_table[minor]) {
+	dev = hidraw_table[minor];
+	if (!dev || !dev->exist) {
 		kfree(list);
 		err = -ENODEV;
 		goto out_unlock;
 	}
 
-	list->hidraw = hidraw_table[minor];
+	list->hidraw = dev;
 	mutex_init(&list->read_mutex);
-	list_add_tail(&list->node, &hidraw_table[minor]->list);
+	list_add_tail(&list->node, &dev->list);
 	file->private_data = list;
 
-	dev = hidraw_table[minor];
 	if (!dev->open++) {
 		err = hid_hw_power(dev->hid, PM_HINT_FULLON);
 		if (err < 0)
@@ -291,19 +311,13 @@ out:
 
 static int hidraw_release(struct inode * inode, struct file * file)
 {
-	unsigned int minor = iminor(inode);
-	struct hidraw *dev;
 	struct hidraw_list *list = file->private_data;
+	struct hidraw *dev = list->hidraw;
 	int ret;
 
 	mutex_lock(&minors_lock);
-	if (!hidraw_table[minor]) {
-		ret = -ENODEV;
-		goto unlock;
-	}
 
 	list_del(&list->node);
-	dev = hidraw_table[minor];
 	if (!--dev->open) {
 		if (list->hidraw->exist) {
 			hid_hw_power(dev->hid, PM_HINT_NORMAL);
@@ -323,15 +337,12 @@ unlock:
 static long hidraw_ioctl(struct file *file, unsigned int cmd,
 							unsigned long arg)
 {
-	struct inode *inode = file->f_path.dentry->d_inode;
-	unsigned int minor = iminor(inode);
+	struct hidraw *dev = ((struct hidraw_list *)file->private_data)->hidraw;
 	long ret = 0;
-	struct hidraw *dev;
 	void __user *user_arg = (void __user*) arg;
 
 	mutex_lock(&minors_lock);
-	dev = hidraw_table[minor];
-	if (!dev) {
+	if (!dev || !dev->exist) {
 		ret = -ENODEV;
 		goto out;
 	}
@@ -478,12 +489,21 @@ int hidraw_connect(struct hid_device *hid)
 		kfree(dev);
 		goto out;
 	}
+	init_waitqueue_head(&dev->wait);
+	INIT_LIST_HEAD(&dev->list);
 
+	dev->hid = hid;
+	dev->minor = minor;
+	dev->exist = 1;
+	hid->hidraw = dev;
+
+	/* The file may be accessed from user space after this call */
 	dev->dev = device_create(hidraw_class, &hid->dev, MKDEV(hidraw_major, minor),
 				 NULL, "%s%d", "hidraw", minor);
 
 	if (IS_ERR(dev->dev)) {
 		hidraw_table[minor] = NULL;
+		hid->hidraw = NULL;
 		mutex_unlock(&minors_lock);
 		result = PTR_ERR(dev->dev);
 		kfree(dev);
@@ -491,14 +511,6 @@ int hidraw_connect(struct hid_device *hid)
 	}
 
 	mutex_unlock(&minors_lock);
-	init_waitqueue_head(&dev->wait);
-	INIT_LIST_HEAD(&dev->list);
-
-	dev->hid = hid;
-	dev->minor = minor;
-
-	dev->exist = 1;
-	hid->hidraw = dev;
 
 out:
 	return result;
@@ -510,13 +522,12 @@ void hidraw_disconnect(struct hid_device *hid)
 {
 	struct hidraw *hidraw = hid->hidraw;
 
+	mutex_lock(&minors_lock);
 	hidraw->exist = 0;
 
 	device_destroy(hidraw_class, MKDEV(hidraw_major, hidraw->minor));
 
-	mutex_lock(&minors_lock);
 	hidraw_table[hidraw->minor] = NULL;
-	mutex_unlock(&minors_lock);
 
 	if (hidraw->open) {
 		hid_hw_close(hid);
@@ -524,6 +535,7 @@ void hidraw_disconnect(struct hid_device *hid)
 	} else {
 		kfree(hidraw);
 	}
+	mutex_unlock(&minors_lock);
 }
 EXPORT_SYMBOL_GPL(hidraw_disconnect);
 

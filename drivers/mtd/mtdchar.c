@@ -212,10 +212,10 @@ static ssize_t mtd_read(struct file *file, char __user *buf, size_t count,loff_t
 
 		switch (mfi->mode) {
 		case MTD_MODE_OTP_FACTORY:
-			ret = mtd->read_fact_prot_reg(mtd, *ppos, len, &retlen, kbuf);
+			ret = TIMED_CALL(mtd, mtd->read_fact_prot_reg(mtd, *ppos, len, &retlen, kbuf), read, &retlen);
 			break;
 		case MTD_MODE_OTP_USER:
-			ret = mtd->read_user_prot_reg(mtd, *ppos, len, &retlen, kbuf);
+			ret = TIMED_CALL(mtd, mtd->read_user_prot_reg(mtd, *ppos, len, &retlen, kbuf), read, &retlen);
 			break;
 		case MTD_MODE_RAW:
 		{
@@ -226,12 +226,12 @@ static ssize_t mtd_read(struct file *file, char __user *buf, size_t count,loff_t
 			ops.oobbuf = NULL;
 			ops.len = len;
 
-			ret = mtd->read_oob(mtd, *ppos, &ops);
+			ret = TIMED_CALL(mtd, mtd->read_oob(mtd, *ppos, &ops, 0), read, &ops.retlen); // retlen
 			retlen = ops.retlen;
 			break;
 		}
 		default:
-			ret = mtd->read(mtd, *ppos, len, &retlen, kbuf);
+			ret = TIMED_CALL(mtd, mtd->read(mtd, *ppos, len, &retlen, kbuf, 0), read, &retlen);
 		}
 		/* Nand returns -EBADMSG on ecc errors, but it returns
 		 * the data. For our userspace tools it is important
@@ -310,7 +310,7 @@ static ssize_t mtd_write(struct file *file, const char __user *buf, size_t count
 				ret = -EOPNOTSUPP;
 				break;
 			}
-			ret = mtd->write_user_prot_reg(mtd, *ppos, len, &retlen, kbuf);
+			ret = TIMED_CALL(mtd, mtd->write_user_prot_reg(mtd, *ppos, len, &retlen, kbuf), write, &retlen);
 			break;
 
 		case MTD_MODE_RAW:
@@ -323,13 +323,13 @@ static ssize_t mtd_write(struct file *file, const char __user *buf, size_t count
 			ops.ooboffs = 0;
 			ops.len = len;
 
-			ret = mtd->write_oob(mtd, *ppos, &ops);
+			ret = TIMED_CALL(mtd, mtd->write_oob(mtd, *ppos, &ops, 0), write, &ops.retlen); // retlen
 			retlen = ops.retlen;
 			break;
 		}
 
 		default:
-			ret = (*(mtd->write))(mtd, *ppos, len, &retlen, kbuf);
+			ret = TIMED_CALL(mtd, mtd->write(mtd, *ppos, len, &retlen, kbuf, 0), write, &retlen);
 		}
 		if (!ret) {
 			*ppos += retlen;
@@ -422,7 +422,7 @@ static int mtd_do_writeoob(struct file *file, struct mtd_info *mtd,
 		return PTR_ERR(ops.oobbuf);
 
 	start &= ~((uint64_t)mtd->oobsize - 1);
-	ret = mtd->write_oob(mtd, start, &ops);
+	ret = TIMED_CALL(mtd, mtd->write_oob(mtd, start, &ops, 0), write, &ops.oobretlen); // oobretlen
 
 	if (ops.oobretlen > 0xFFFFFFFFU)
 		ret = -EOVERFLOW;
@@ -464,7 +464,7 @@ static int mtd_do_readoob(struct mtd_info *mtd, uint64_t start,
 		return -ENOMEM;
 
 	start &= ~((uint64_t)mtd->oobsize - 1);
-	ret = mtd->read_oob(mtd, start, &ops);
+	ret = TIMED_CALL(mtd, mtd->read_oob(mtd, start, &ops, 0), read, &ops.oobretlen); // oobretlen
 
 	if (put_user(ops.oobretlen, retp))
 		ret = -EFAULT;
@@ -553,6 +553,8 @@ static int mtd_ioctl(struct file *file, u_int cmd, u_long arg)
 	int ret = 0;
 	u_long size;
 	struct mtd_info_user info;
+
+	pax_track_stack();
 
 	DEBUG(MTD_DEBUG_LEVEL0, "MTD_ioctl\n");
 
@@ -659,7 +661,7 @@ static int mtd_ioctl(struct file *file, u_int cmd, u_long arg)
 			  wq_head is no longer there when the
 			  callback routine tries to wake us up.
 			*/
-			ret = mtd->erase(mtd, erase);
+			ret = TIMED_CALL(mtd, mtd->erase(mtd, erase), erase, &erase->len);
 			if (!ret) {
 				set_current_state(TASK_UNINTERRUPTIBLE);
 				add_wait_queue(&waitq, &wait);

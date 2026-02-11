@@ -915,7 +915,9 @@ static int __init arch_hw_breakpoint_init(void)
 		pr_info("debug architecture 0x%x unsupported.\n", debug_arch);
 		return 0;
 	}
-
+#if defined(CONFIG_MACH_CAPRI_FPGA) || defined(CONFIG_ARCH_CAPRI)
+        return 0;
+#endif
 	/* Determine how many BRPs/WRPs are available. */
 	core_num_brps = get_num_brps();
 	core_num_reserved_brps = get_num_reserved_brps();

@@ -11,6 +11,7 @@
 #include <linux/rmap.h>
 #include <linux/swap.h>
 #include <linux/swapops.h>
+#include <linux/grinternal.h>
 
 #include <asm/elf.h>
 #include <asm/uaccess.h>
@@ -19,8 +20,12 @@
 
 void task_mem(struct seq_file *m, struct mm_struct *mm)
 {
-	unsigned long data, text, lib, swap;
+	unsigned long data, text, lib, swap, anon, file, shmem;
 	unsigned long hiwater_vm, total_vm, hiwater_rss, total_rss;
+
+	anon = get_mm_counter(mm, MM_ANONPAGES);
+	file = get_mm_counter(mm, MM_FILEPAGES);
+	shmem = get_mm_counter(mm, MM_SHMEMPAGES);
 
 	/*
 	 * Note: to minimize their overhead, mm maintains hiwater_vm and
@@ -32,7 +37,7 @@ void task_mem(struct seq_file *m, struct mm_struct *mm)
 	hiwater_vm = total_vm = mm->total_vm;
 	if (hiwater_vm < mm->hiwater_vm)
 		hiwater_vm = mm->hiwater_vm;
-	hiwater_rss = total_rss = get_mm_rss(mm);
+	hiwater_rss = total_rss = anon + file + shmem;
 	if (hiwater_rss < mm->hiwater_rss)
 		hiwater_rss = mm->hiwater_rss;
 
@@ -46,21 +51,38 @@ void task_mem(struct seq_file *m, struct mm_struct *mm)
 		"VmLck:\t%8lu kB\n"
 		"VmHWM:\t%8lu kB\n"
 		"VmRSS:\t%8lu kB\n"
+		"RssAnon:\t%8lu kB\n"
+		"RssFile:\t%8lu kB\n"
+		"RssShmem:\t%8lu kB\n"
 		"VmData:\t%8lu kB\n"
 		"VmStk:\t%8lu kB\n"
 		"VmExe:\t%8lu kB\n"
 		"VmLib:\t%8lu kB\n"
 		"VmPTE:\t%8lu kB\n"
-		"VmSwap:\t%8lu kB\n",
-		hiwater_vm << (PAGE_SHIFT-10),
+		"VmSwap:\t%8lu kB\n"
+
+#ifdef CONFIG_ARCH_TRACK_EXEC_LIMIT
+		"CsBase:\t%8lx\nCsLim:\t%8lx\n"
+#endif
+
+		,hiwater_vm << (PAGE_SHIFT-10),
 		(total_vm - mm->reserved_vm) << (PAGE_SHIFT-10),
 		mm->locked_vm << (PAGE_SHIFT-10),
 		hiwater_rss << (PAGE_SHIFT-10),
 		total_rss << (PAGE_SHIFT-10),
+		anon << (PAGE_SHIFT-10),
+		file << (PAGE_SHIFT-10),
+		shmem << (PAGE_SHIFT-10),
 		data << (PAGE_SHIFT-10),
 		mm->stack_vm << (PAGE_SHIFT-10), text, lib,
 		(PTRS_PER_PTE*sizeof(pte_t)*mm->nr_ptes) >> 10,
-		swap << (PAGE_SHIFT-10));
+		swap << (PAGE_SHIFT-10)
+
+#ifdef CONFIG_ARCH_TRACK_EXEC_LIMIT
+		, mm->context.user_cs_base, mm->context.user_cs_limit
+#endif
+
+	);
 }
 
 unsigned long task_vsize(struct mm_struct *mm)
@@ -72,7 +94,8 @@ unsigned long task_statm(struct mm_struct *mm,
 			 unsigned long *shared, unsigned long *text,
 			 unsigned long *data, unsigned long *resident)
 {
-	*shared = get_mm_counter(mm, MM_FILEPAGES);
+	*shared = get_mm_counter(mm, MM_FILEPAGES) +
+			get_mm_counter(mm, MM_SHMEMPAGES);
 	*text = (PAGE_ALIGN(mm->end_code) - (mm->start_code & PAGE_MASK))
 								>> PAGE_SHIFT;
 	*data = mm->total_vm - mm->shared_vm;
@@ -193,6 +216,7 @@ static int do_maps_open(struct inode *inode, struct file *file,
 {
 	struct proc_maps_private *priv;
 	int ret = -ENOMEM;
+
 	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
 	if (priv) {
 		priv->pid = proc_pid(inode);
@@ -206,6 +230,12 @@ static int do_maps_open(struct inode *inode, struct file *file,
 	}
 	return ret;
 }
+
+#ifdef CONFIG_GRKERNSEC_PROC_MEMMAP
+#define PAX_RAND_FLAGS(_mm) (_mm != NULL && _mm != current->mm && \
+			     (_mm->pax_flags & MF_PAX_RANDMMAP || \
+			      _mm->pax_flags & MF_PAX_SEGMEXEC))
+#endif
 
 static void show_map_vma(struct seq_file *m, struct vm_area_struct *vma)
 {
@@ -225,13 +255,17 @@ static void show_map_vma(struct seq_file *m, struct vm_area_struct *vma)
 		pgoff = ((loff_t)vma->vm_pgoff) << PAGE_SHIFT;
 	}
 
-	/* We don't show the stack guard page in /proc/maps */
 	start = vma->vm_start;
-	if (stack_guard_page_start(vma, start))
-		start += PAGE_SIZE;
 	end = vma->vm_end;
-	if (stack_guard_page_end(vma, end))
-		end -= PAGE_SIZE;
+
+#ifdef CONFIG_GRKERNSEC_PROC_MEMMAP
+	if( PAX_RAND_FLAGS(mm) && roku_grsec_enable_proc_memmap )
+	{
+		start = 0UL;
+		end = 0UL;
+		pgoff = 0UL;
+	}
+#endif
 
 	seq_printf(m, "%08lx-%08lx %c%c%c%c %08llx %02x:%02x %lu %n",
 			start,
@@ -249,7 +283,7 @@ static void show_map_vma(struct seq_file *m, struct vm_area_struct *vma)
 	 */
 	if (file) {
 		pad_len_spaces(m, len);
-		seq_path(m, &file->f_path, "\n");
+		seq_path(m, &file->f_path, "\n\\");
 	} else {
 		const char *name = arch_vma_name(vma);
 		if (!name) {
@@ -257,8 +291,9 @@ static void show_map_vma(struct seq_file *m, struct vm_area_struct *vma)
 				if (vma->vm_start <= mm->brk &&
 						vma->vm_end >= mm->start_brk) {
 					name = "[heap]";
-				} else if (vma->vm_start <= mm->start_stack &&
-					   vma->vm_end >= mm->start_stack) {
+				} else if ((vma->vm_flags & (VM_GROWSDOWN | VM_GROWSUP)) ||
+					   (vma->vm_start <= mm->start_stack &&
+					    vma->vm_end >= mm->start_stack)) {
 					name = "[stack]";
 				}
 			} else {
@@ -436,11 +471,16 @@ static int show_smap(struct seq_file *m, void *v)
 	};
 
 	memset(&mss, 0, sizeof mss);
-	mss.vma = vma;
-	/* mmap_sem is held in m_start */
-	if (vma->vm_mm && !is_vm_hugetlb_page(vma))
-		walk_page_range(vma->vm_start, vma->vm_end, &smaps_walk);
-
+#ifdef CONFIG_GRKERNSEC_PROC_MEMMAP
+	if (!PAX_RAND_FLAGS(vma->vm_mm)) {
+#endif
+		mss.vma = vma;
+		/* mmap_sem is held in m_start */
+		if (vma->vm_mm && !is_vm_hugetlb_page(vma))
+			walk_page_range(vma->vm_start, vma->vm_end, &smaps_walk);
+#ifdef CONFIG_GRKERNSEC_PROC_MEMMAP
+	}
+#endif
 	show_map_vma(m, vma);
 
 	seq_printf(m,
@@ -458,7 +498,11 @@ static int show_smap(struct seq_file *m, void *v)
 		   "KernelPageSize: %8lu kB\n"
 		   "MMUPageSize:    %8lu kB\n"
 		   "Locked:         %8lu kB\n",
+#ifdef CONFIG_GRKERNSEC_PROC_MEMMAP
+		   PAX_RAND_FLAGS(vma->vm_mm) ? 0UL : (vma->vm_end - vma->vm_start) >> 10,
+#else
 		   (vma->vm_end - vma->vm_start) >> 10,
+#endif
 		   mss.resident >> 10,
 		   (unsigned long)(mss.pss >> (10 + PSS_SHIFT)),
 		   mss.shared_clean  >> 10,
@@ -489,6 +533,10 @@ static const struct seq_operations proc_pid_smaps_op = {
 
 static int smaps_open(struct inode *inode, struct file *file)
 {
+#ifdef CONFIG_GRKERNSEC_ROKU_ENABLE_PROC_PAGE_MONITOR
+	if (roku_grsec_disable_proc_page_monitor)
+	    return -EPERM;
+#endif
 	return do_maps_open(inode, file, &proc_pid_smaps_op);
 }
 
@@ -596,7 +644,20 @@ static ssize_t clear_refs_write(struct file *file, const char __user *buf,
 	return count;
 }
 
+#ifdef CONFIG_GRKERNSEC_ROKU_ENABLE_PROC_PAGE_MONITOR
+static int pagemap_open(struct inode *inode, struct file *file)
+{
+	if (roku_grsec_disable_proc_page_monitor)
+	    return -EPERM;
+	else
+	    return 0;
+}
+#endif
+
 const struct file_operations proc_clear_refs_operations = {
+#ifdef CONFIG_GRKERNSEC_ROKU_ENABLE_PROC_PAGE_MONITOR
+	.open		= pagemap_open,
+#endif
 	.write		= clear_refs_write,
 	.llseek		= noop_llseek,
 };
@@ -863,6 +924,9 @@ out:
 }
 
 const struct file_operations proc_pagemap_operations = {
+#ifdef CONFIG_GRKERNSEC_ROKU_ENABLE_PROC_PAGE_MONITOR
+	.open		= pagemap_open,
+#endif
 	.llseek		= mem_lseek, /* borrow this */
 	.read		= pagemap_read,
 };
@@ -1043,7 +1107,7 @@ static int show_numa_map(struct seq_file *m, void *v)
 
 	if (file) {
 		seq_printf(m, " file=");
-		seq_path(m, &file->f_path, "\n\t= ");
+		seq_path(m, &file->f_path, "\n\t\\= ");
 	} else if (vma->vm_start <= mm->brk && vma->vm_end >= mm->start_brk) {
 		seq_printf(m, " heap");
 	} else if (vma->vm_start <= mm->start_stack &&

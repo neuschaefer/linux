@@ -115,39 +115,8 @@ static inline void __dma_page_dev_to_cpu(struct page *page, unsigned long off,
 		___dma_page_dev_to_cpu(page, off, size, dir);
 }
 
-/*
- * Return whether the given device DMA address mask can be supported
- * properly.  For example, if your device can only drive the low 24-bits
- * during bus mastering, then you would pass 0x00ffffff as the mask
- * to this function.
- *
- * FIXME: This should really be a platform specific issue - we should
- * return false if GFP_DMA allocations may not satisfy the supplied 'mask'.
- */
-static inline int dma_supported(struct device *dev, u64 mask)
-{
-	if (mask < ISA_DMA_THRESHOLD)
-		return 0;
-	return 1;
-}
-
-static inline int dma_set_mask(struct device *dev, u64 dma_mask)
-{
-#ifdef CONFIG_DMABOUNCE
-	if (dev->archdata.dmabounce) {
-		if (dma_mask >= ISA_DMA_THRESHOLD)
-			return 0;
-		else
-			return -EIO;
-	}
-#endif
-	if (!dev->dma_mask || !dma_supported(dev, dma_mask))
-		return -EIO;
-
-	*dev->dma_mask = dma_mask;
-
-	return 0;
-}
+extern int dma_supported(struct device *, u64);
+extern int dma_set_mask(struct device *, u64);
 
 /*
  * DMA errors are defined by all-bits-set in the DMA address.
@@ -235,6 +204,13 @@ extern void *dma_alloc_writecombine(struct device *, size_t, dma_addr_t *,
 
 int dma_mmap_writecombine(struct device *, struct vm_area_struct *,
 		void *, dma_addr_t, size_t);
+
+/*
+ * This can be called during boot to increase the size of the consistent
+ * DMA region above it's default value of 2MB. It must be called before the
+ * memory allocator is initialised, i.e. before any core_initcall.
+ */
+extern void __init init_consistent_dma_size(unsigned long size);
 
 
 #ifdef CONFIG_DMABOUNCE

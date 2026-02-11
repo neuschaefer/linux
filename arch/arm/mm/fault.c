@@ -23,6 +23,9 @@
 #include <asm/system.h>
 #include <asm/pgtable.h>
 #include <asm/tlbflush.h>
+#if defined(CONFIG_CDEBUGGER)
+#include <mach/cdebugger.h>
+#endif
 
 #include "fault.h"
 
@@ -147,6 +150,10 @@ __do_kernel_fault(struct mm_struct *mm, unsigned long addr, unsigned int fsr,
 	if (fixup_exception(regs))
 		return;
 
+#if defined(CONFIG_CDEBUGGER)
+	/* For saving Fault status . */
+	cdebugger_save_pte((void *)regs, (int)current);
+#endif
 	/*
 	 * No handler, we'll have to terminate things with extreme prejudice.
 	 */
@@ -179,6 +186,13 @@ __do_user_fault(struct task_struct *tsk, unsigned long addr,
 		       tsk->comm, sig, addr, fsr);
 		show_pte(tsk->mm, addr);
 		show_regs(regs);
+	}
+#endif
+
+#ifdef CONFIG_PAX_PAGEEXEC
+	if (fsr & FSR_LNX_PF) {
+		pax_report_fault(regs, (void *)regs->ARM_pc, (void *)regs->ARM_sp);
+		do_group_exit(SIGKILL);
 	}
 #endif
 
@@ -320,11 +334,11 @@ do_page_fault(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
 	fault = __do_page_fault(mm, addr, fsr, tsk);
 	up_read(&mm->mmap_sem);
 
-	perf_sw_event(PERF_COUNT_SW_PAGE_FAULTS, 1, 0, regs, addr);
+	perf_sw_event(PERF_COUNT_SW_PAGE_FAULTS, 1, regs, addr);
 	if (fault & VM_FAULT_MAJOR)
-		perf_sw_event(PERF_COUNT_SW_PAGE_FAULTS_MAJ, 1, 0, regs, addr);
+		perf_sw_event(PERF_COUNT_SW_PAGE_FAULTS_MAJ, 1, regs, addr);
 	else if (fault & VM_FAULT_MINOR)
-		perf_sw_event(PERF_COUNT_SW_PAGE_FAULTS_MIN, 1, 0, regs, addr);
+		perf_sw_event(PERF_COUNT_SW_PAGE_FAULTS_MIN, 1, regs, addr);
 
 	/*
 	 * Handle the "normal" case first - VM_FAULT_MAJOR / VM_FAULT_MINOR
@@ -380,6 +394,33 @@ do_page_fault(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
 	return 0;
 }
 #endif					/* CONFIG_MMU */
+
+#ifdef CONFIG_PAX_PAGEEXEC
+void pax_report_insns(void *pc, void *sp)
+{
+	long i;
+
+	printk(KERN_ERR "PAX: bytes at PC: ");
+	for (i = 0; i < 20; i++) {
+		unsigned char c;
+		if (get_user(c, (__force unsigned char __user *)pc+i))
+			printk(KERN_CONT "?? ");
+		else
+			printk(KERN_CONT "%02x ", c);
+	}
+	printk("\n");
+
+	printk(KERN_ERR "PAX: bytes at SP-4: ");
+	for (i = -1; i < 20; i++) {
+		unsigned long c;
+		if (get_user(c, (__force unsigned long __user *)sp+i))
+			printk(KERN_CONT "???????? ");
+		else
+			printk(KERN_CONT "%08lx ", c);
+	}
+	printk("\n");
+}
+#endif
 
 /*
  * First Level Translation Fault Handler

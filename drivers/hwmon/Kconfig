@@ -293,6 +293,13 @@ config SENSORS_DS620
 	  This driver can also be built as a module.  If so, the module
 	  will be called ds620.
 
+config SENSORS_KONA
+	tristate "Broadcom SoC Temperature Monitor"
+	depends on ARCH_KONA
+	help
+	  This driver provides support for the temperature monitor found
+	  in Broadcom SoCs based on the Kona architecture.
+
 config SENSORS_DS1621
 	tristate "Dallas Semiconductor DS1621 and DS1625"
 	depends on I2C
@@ -1357,6 +1364,14 @@ config SENSORS_MC13783_ADC
         depends on MFD_MC13783
         help
           Support for the A/D converter on MC13783 PMIC.
+
+config SENSORS_BCMPMU
+	tristate "BRCM PMUs"
+	depends on MFD_BCMPMU
+	default n
+	help
+	  If you say yes here you get support for ADC and Fuel Gauge
+	  on Broadcom PMUs
 
 if ACPI
 

@@ -188,7 +188,6 @@ config SA1100_WATCHDOG
 
 config MPCORE_WATCHDOG
 	tristate "MPcore watchdog"
-	depends on HAVE_ARM_TWD
 	help
 	  Watchdog timer embedded into the MPcore system.
 
@@ -330,6 +329,30 @@ config IMX2_WDT
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called imx2_wdt.
+
+config KONA_WATCHDOG
+	tristate "KONA Watchdog"
+	depends on ARCH_KONA
+	help
+	  Say Y here if to include support for the watchdog timer
+	  in the KONA architecture.
+	  This driver can be built as a module by choosing M. The module
+	  will be called island_wdt.
+
+	  Say N if you are unsure.
+
+
+config BCM59055_WATCHDOG
+	tristate "BCM59055 Watchdog"
+	depends on MFD_BCM_PMU590XX
+	help
+	  Say Y here if to include support for the watchdog timer
+	  in BCM59055 PMU.
+
+config WD_TAPPER
+	tristate "Watchdog Petter Enable"
+	help
+	  Say Y here if to enable the WD petter for BCMPMU
 
 # AVR32 Architecture
 

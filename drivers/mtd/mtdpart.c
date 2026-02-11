@@ -58,12 +58,13 @@ struct mtd_part {
  */
 
 static int part_read(struct mtd_info *mtd, loff_t from, size_t len,
-		size_t *retlen, u_char *buf)
+		size_t *retlen, u_char *buf, int encrypted)
 {
 	struct mtd_part *part = PART(mtd);
 	struct mtd_ecc_stats stats;
 	int res;
 
+	BUG_ON(encrypted);
 	stats = part->master->ecc_stats;
 
 	if (from >= mtd->size)
@@ -71,7 +72,7 @@ static int part_read(struct mtd_info *mtd, loff_t from, size_t len,
 	else if (from + len > mtd->size)
 		len = mtd->size - from;
 	res = part->master->read(part->master, from + part->offset,
-				   len, retlen, buf);
+				   len, retlen, buf, part->mtd.flags & MTD_ENCRYPTED);
 	if (unlikely(res)) {
 		if (res == -EUCLEAN)
 			mtd->ecc_stats.corrected += part->master->ecc_stats.corrected - stats.corrected;
@@ -113,11 +114,12 @@ static unsigned long part_get_unmapped_area(struct mtd_info *mtd,
 }
 
 static int part_read_oob(struct mtd_info *mtd, loff_t from,
-		struct mtd_oob_ops *ops)
+		struct mtd_oob_ops *ops, int encrypted)
 {
 	struct mtd_part *part = PART(mtd);
 	int res;
 
+	BUG_ON(encrypted);
 	if (from >= mtd->size)
 		return -EINVAL;
 	if (ops->datbuf && from + ops->len > mtd->size)
@@ -140,7 +142,7 @@ static int part_read_oob(struct mtd_info *mtd, loff_t from,
 			return -EINVAL;
 	}
 
-	res = part->master->read_oob(part->master, from + part->offset, ops);
+	res = part->master->read_oob(part->master, from + part->offset, ops, part->mtd.flags & MTD_ENCRYPTED);
 	if (unlikely(res)) {
 		if (res == -EUCLEAN)
 			mtd->ecc_stats.corrected++;
@@ -181,9 +183,11 @@ static int part_get_fact_prot_info(struct mtd_info *mtd, struct otp_info *buf,
 }
 
 static int part_write(struct mtd_info *mtd, loff_t to, size_t len,
-		size_t *retlen, const u_char *buf)
+		size_t *retlen, const u_char *buf, int encrypted)
 {
 	struct mtd_part *part = PART(mtd);
+
+	BUG_ON(encrypted);
 	if (!(mtd->flags & MTD_WRITEABLE))
 		return -EROFS;
 	if (to >= mtd->size)
@@ -191,13 +195,15 @@ static int part_write(struct mtd_info *mtd, loff_t to, size_t len,
 	else if (to + len > mtd->size)
 		len = mtd->size - to;
 	return part->master->write(part->master, to + part->offset,
-				    len, retlen, buf);
+				    len, retlen, buf, part->mtd.flags & MTD_ENCRYPTED);
 }
 
 static int part_panic_write(struct mtd_info *mtd, loff_t to, size_t len,
-		size_t *retlen, const u_char *buf)
+		size_t *retlen, const u_char *buf, int encrypted)
 {
 	struct mtd_part *part = PART(mtd);
+
+	BUG_ON(encrypted);
 	if (!(mtd->flags & MTD_WRITEABLE))
 		return -EROFS;
 	if (to >= mtd->size)
@@ -205,14 +211,15 @@ static int part_panic_write(struct mtd_info *mtd, loff_t to, size_t len,
 	else if (to + len > mtd->size)
 		len = mtd->size - to;
 	return part->master->panic_write(part->master, to + part->offset,
-				    len, retlen, buf);
+				    len, retlen, buf, part->mtd.flags & MTD_ENCRYPTED);
 }
 
 static int part_write_oob(struct mtd_info *mtd, loff_t to,
-		struct mtd_oob_ops *ops)
+		struct mtd_oob_ops *ops, int encrypted)
 {
 	struct mtd_part *part = PART(mtd);
 
+	BUG_ON(encrypted);
 	if (!(mtd->flags & MTD_WRITEABLE))
 		return -EROFS;
 
@@ -220,7 +227,7 @@ static int part_write_oob(struct mtd_info *mtd, loff_t to,
 		return -EINVAL;
 	if (ops->datbuf && to + ops->len > mtd->size)
 		return -EINVAL;
-	return part->master->write_oob(part->master, to + part->offset, ops);
+	return part->master->write_oob(part->master, to + part->offset, ops, part->mtd.flags & MTD_ENCRYPTED);
 }
 
 static int part_write_user_prot_reg(struct mtd_info *mtd, loff_t from,
@@ -239,13 +246,15 @@ static int part_lock_user_prot_reg(struct mtd_info *mtd, loff_t from,
 }
 
 static int part_writev(struct mtd_info *mtd, const struct kvec *vecs,
-		unsigned long count, loff_t to, size_t *retlen)
+		unsigned long count, loff_t to, size_t *retlen, int encrypted)
 {
 	struct mtd_part *part = PART(mtd);
+
+	BUG_ON(encrypted);
 	if (!(mtd->flags & MTD_WRITEABLE))
 		return -EROFS;
 	return part->master->writev(part->master, vecs, count,
-					to + part->offset, retlen);
+					to + part->offset, retlen, part->mtd.flags & MTD_ENCRYPTED);
 }
 
 static int part_erase(struct mtd_info *mtd, struct erase_info *instr)
@@ -400,6 +409,11 @@ static struct mtd_part *allocate_partition(struct mtd_info *master,
 	/* set up the MTD object for this partition */
 	slave->mtd.type = master->type;
 	slave->mtd.flags = master->flags & ~part->mask_flags;
+        if (part->mask_flags & MTD_UNENCRYPTED)
+                /* Kludge to deal with the fact that mask_flags can
+                 * only clear flags, and nothing can set them. */
+                slave->mtd.flags |= MTD_ENCRYPTED;
+
 	slave->mtd.size = part->size;
 	slave->mtd.writesize = master->writesize;
 	slave->mtd.writebufsize = master->writebufsize;

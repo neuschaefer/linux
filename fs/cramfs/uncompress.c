@@ -25,12 +25,10 @@ static z_stream stream;
 static int initialized;
 
 /* Returns length of decompressed data. */
-int cramfs_uncompress_block(void *dst, int dstlen, void *src, int srclen)
+int cramfs_uncompress_block(void *dst, int dstlen, void **src, int *srclen)
 {
 	int err;
-
-	stream.next_in = src;
-	stream.avail_in = srclen;
+	int i;
 
 	stream.next_out = dst;
 	stream.avail_out = dstlen;
@@ -42,14 +40,26 @@ int cramfs_uncompress_block(void *dst, int dstlen, void *src, int srclen)
 		zlib_inflateInit(&stream);
 	}
 
-	err = zlib_inflate(&stream, Z_FINISH);
+	for (i=0;srclen[i];i++) {
+		stream.next_in = src[i];
+		stream.avail_in = srclen[i];
+		err = zlib_inflate(&stream, Z_NO_FLUSH);
+		if (err == Z_STREAM_END) {
+			if (srclen[i+1])
+				goto err;
+			break;
+		}
+		if (err != Z_OK)
+			goto err;
+	}
+
 	if (err != Z_STREAM_END)
 		goto err;
 	return stream.total_out;
 
 err:
 	printk("Error %d while decompressing!\n", err);
-	printk("%p(%d)->%p(%d)\n", src, srclen, dst, dstlen);
+	printk("->%p(%d)\n", dst, dstlen);
 	return -EIO;
 }
 

@@ -44,6 +44,7 @@
 #define DRIVER_DESC "USB HID core driver"
 #define DRIVER_LICENSE "GPL"
 
+#define RESTRICT_HIDUSB_DEVICES
 /*
  * Module parameters.
  */
@@ -1155,6 +1156,19 @@ static int usbhid_probe(struct usb_interface *intf, const struct usb_device_id *
 	unsigned int n, has_in = 0;
 	size_t len;
 	int ret;
+
+#ifdef RESTRICT_HIDUSB_DEVICES
+	if(dev->bus == NULL) {
+		dbg_hid("null bus\n");
+		return -ENODEV;
+	}
+
+	//ignore hid devices from dwc_otg and other buses
+	if(dev->bus->bus_name == NULL || strcmp(dev->bus->bus_name,"ozwpan") != 0) {
+		dbg_hid("invalid bus name\n");
+		return -ENODEV;
+	}
+#endif
 
 	dbg_hid("HID probe called for ifnum %d\n",
 			intf->altsetting->desc.bInterfaceNumber);

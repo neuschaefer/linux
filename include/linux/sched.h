@@ -100,6 +100,7 @@ struct bio_list;
 struct fs_struct;
 struct perf_event_context;
 struct blk_plug;
+struct linux_binprm;
 
 /*
  * List of flags we want to share for kernel threads,
@@ -380,10 +381,13 @@ struct user_namespace;
 #define DEFAULT_MAX_MAP_COUNT	(USHRT_MAX - MAPCOUNT_ELF_CORE_MARGIN)
 
 extern int sysctl_max_map_count;
+extern unsigned long sysctl_heap_stack_gap;
 
 #include <linux/aio.h>
 
 #ifdef CONFIG_MMU
+extern bool check_heap_stack_gap(const struct vm_area_struct *vma, unsigned long addr, unsigned long len);
+extern unsigned long skip_heap_stack_gap(const struct vm_area_struct *vma, unsigned long len);
 extern void arch_pick_mmap_layout(struct mm_struct *mm);
 extern unsigned long
 arch_get_unmapped_area(struct file *, unsigned long, unsigned long,
@@ -629,19 +633,32 @@ struct signal_struct {
 #ifdef CONFIG_TASKSTATS
 	struct taskstats *stats;
 #endif
+
+#ifdef CONFIG_GRKERNSEC
+	u32 curr_ip;
+	u32 saved_ip;
+	u32 gr_saddr;
+	u32 gr_daddr;
+	u16 gr_sport;
+	u16 gr_dport;
+	u8 used_accept:1;
+#endif
+
 #ifdef CONFIG_AUDIT
 	unsigned audit_tty;
 	struct tty_audit_buf *tty_audit_buf;
 #endif
 #ifdef CONFIG_CGROUPS
 	/*
-	 * The threadgroup_fork_lock prevents threads from forking with
-	 * CLONE_THREAD while held for writing. Use this for fork-sensitive
-	 * threadgroup-wide operations. It's taken for reading in fork.c in
-	 * copy_process().
-	 * Currently only needed write-side by cgroups.
+	 * group_rwsem prevents new tasks from entering the threadgroup and
+	 * member tasks from exiting,a more specifically, setting of
+	 * PF_EXITING.  fork and exit paths are protected with this rwsem
+	 * using threadgroup_change_begin/end().  Users which require
+	 * threadgroup to remain stable should use threadgroup_[un]lock()
+	 * which also takes care of exec path.  Currently, cgroup is the
+	 * only user.
 	 */
-	struct rw_semaphore threadgroup_fork_lock;
+	struct rw_semaphore group_rwsem;
 #endif
 
 	int oom_adj;		/* OOM kill score adjustment (bit shift) */
@@ -708,6 +725,11 @@ struct user_struct {
 #ifdef CONFIG_KEYS
 	struct key *uid_keyring;	/* UID specific keyring */
 	struct key *session_keyring;	/* UID's default session keyring */
+#endif
+
+#if defined(CONFIG_GRKERNSEC_KERN_LOCKOUT) || defined(CONFIG_GRKERNSEC_BRUTE)
+	unsigned int banned;
+	unsigned long ban_expires;
 #endif
 
 	/* Hash table maintenance information */
@@ -1343,8 +1365,8 @@ struct task_struct {
 	struct list_head thread_group;
 
 	struct completion *vfork_done;		/* for vfork() */
-	int __user *set_child_tid;		/* CLONE_CHILD_SETTID */
-	int __user *clear_child_tid;		/* CLONE_CHILD_CLEARTID */
+	pid_t __user *set_child_tid;		/* CLONE_CHILD_SETTID */
+	pid_t __user *clear_child_tid;		/* CLONE_CHILD_CLEARTID */
 
 	cputime_t utime, stime, utimescaled, stimescaled;
 	cputime_t gtime;
@@ -1359,13 +1381,6 @@ struct task_struct {
 
 	struct task_cputime cputime_expires;
 	struct list_head cpu_timers[3];
-
-/* process credentials */
-	const struct cred __rcu *real_cred; /* objective and real subjective task
-					 * credentials (COW) */
-	const struct cred __rcu *cred;	/* effective (overridable) subjective task
-					 * credentials (COW) */
-	struct cred *replacement_session_keyring; /* for KEYCTL_SESSION_TO_PARENT */
 
 	char comm[TASK_COMM_LEN]; /* executable name excluding path
 				     - access with [gs]et_task_comm (which lock
@@ -1383,8 +1398,16 @@ struct task_struct {
 #endif
 /* CPU-specific state of this task */
 	struct thread_struct thread;
+/* thread_info moved to task_struct */
+#ifdef CONFIG_X86
+	struct thread_info tinfo;
+#endif
 /* filesystem information */
 	struct fs_struct *fs;
+
+	const struct cred __rcu *cred;	/* effective (overridable) subjective task
+					 * credentials (COW) */
+
 /* open file information */
 	struct files_struct *files;
 /* namespaces */
@@ -1430,6 +1453,11 @@ struct task_struct {
 	/* Deadlock detection and priority inheritance handling */
 	struct rt_mutex_waiter *pi_blocked_on;
 #endif
+
+/* process credentials */
+	const struct cred __rcu *real_cred; /* objective and real subjective task
+					 * credentials (COW) */
+	struct cred *replacement_session_keyring; /* for KEYCTL_SESSION_TO_PARENT */
 
 #ifdef CONFIG_DEBUG_MUTEXES
 	/* mutex deadlock detection */
@@ -1541,6 +1569,21 @@ struct task_struct {
 	unsigned long default_timer_slack_ns;
 
 	struct list_head	*scm_work_list;
+
+#ifdef CONFIG_GRKERNSEC
+	/* grsecurity */
+	struct dentry *gr_chroot_dentry;
+	struct acl_subject_label *acl;
+	struct acl_role_label *role;
+	struct file *exec_file;
+	u16 acl_role_id;
+	/* is this the task that authenticated to the special role */
+	u8 acl_sp_role;
+	u8 is_writable;
+	u8 brute;
+	u8 gr_is_chrooted;
+#endif
+
 #ifdef CONFIG_FUNCTION_GRAPH_TRACER
 	/* Index of current stored address in ret_stack */
 	int curr_ret_stack;
@@ -1574,6 +1617,57 @@ struct task_struct {
 	atomic_t ptrace_bp_refcnt;
 #endif
 };
+
+#define MF_PAX_PAGEEXEC		0x01000000	/* Paging based non-executable pages */
+#define MF_PAX_EMUTRAMP		0x02000000	/* Emulate trampolines */
+#define MF_PAX_MPROTECT		0x04000000	/* Restrict mprotect() */
+#define MF_PAX_RANDMMAP		0x08000000	/* Randomize mmap() base */
+/*#define MF_PAX_RANDEXEC		0x10000000*/	/* Randomize ET_EXEC base */
+#define MF_PAX_SEGMEXEC		0x20000000	/* Segmentation based non-executable pages */
+
+#ifdef CONFIG_PAX_SOFTMODE
+extern int pax_softmode;
+#endif
+
+extern int pax_check_flags(unsigned long *);
+
+/* if tsk != current then task_lock must be held on it */
+#if defined(CONFIG_PAX_NOEXEC) || defined(CONFIG_PAX_ASLR)
+static inline unsigned long pax_get_flags(struct task_struct *tsk)
+{
+	if (likely(tsk->mm))
+		return tsk->mm->pax_flags;
+	else
+		return 0UL;
+}
+
+/* if tsk != current then task_lock must be held on it */
+static inline long pax_set_flags(struct task_struct *tsk, unsigned long flags)
+{
+	if (likely(tsk->mm)) {
+		tsk->mm->pax_flags = flags;
+		return 0;
+	}
+	return -EINVAL;
+}
+#endif
+
+#ifdef CONFIG_PAX_HAVE_ACL_FLAGS
+extern void pax_set_initial_flags(struct linux_binprm *bprm);
+#elif defined(CONFIG_PAX_HOOK_ACL_FLAGS)
+extern void (*pax_set_initial_flags_func)(struct linux_binprm *bprm);
+#endif
+
+extern void pax_report_fault(struct pt_regs *regs, void *pc, void *sp);
+extern void pax_report_insns(void *pc, void *sp);
+extern void pax_report_refcount_overflow(struct pt_regs *regs);
+extern NORET_TYPE void pax_report_usercopy(const void *ptr, unsigned long len, bool to, const char *type) ATTRIB_NORET;
+
+#ifdef CONFIG_PAX_MEMORY_STACKLEAK
+extern void pax_track_stack(void);
+#else
+static inline void pax_track_stack(void) {}
+#endif
 
 /* Future-safe accessor for struct task_struct's cpus_allowed. */
 #define tsk_cpus_allowed(tsk) (&(tsk)->cpus_allowed)
@@ -1757,6 +1851,9 @@ static inline void put_task_struct(struct task_struct *t)
 extern void task_times(struct task_struct *p, cputime_t *ut, cputime_t *st);
 extern void thread_group_times(struct task_struct *p, cputime_t *ut, cputime_t *st);
 
+extern int task_free_register(struct notifier_block *n);
+extern int task_free_unregister(struct notifier_block *n);
+
 /*
  * Per process flags
  */
@@ -1771,6 +1868,7 @@ extern void thread_group_times(struct task_struct *p, cputime_t *ut, cputime_t *
 #define PF_DUMPCORE	0x00000200	/* dumped core */
 #define PF_SIGNALED	0x00000400	/* killed by a signal */
 #define PF_MEMALLOC	0x00000800	/* Allocating memory */
+#define PF_NPROC_EXCEEDED 0x00001000	/* set_user noticed that RLIMIT_NPROC was exceeded */
 #define PF_USED_MATH	0x00002000	/* if unset the fpu must be initialized before use */
 #define PF_FREEZING	0x00004000	/* freeze in progress. do not account to load */
 #define PF_NOFREEZE	0x00008000	/* this thread should not be frozen */
@@ -2047,6 +2145,14 @@ extern int sched_setscheduler(struct task_struct *, int,
 extern int sched_setscheduler_nocheck(struct task_struct *, int,
 				      const struct sched_param *);
 extern struct task_struct *idle_task(int cpu);
+/**
+ * is_idle_task - is the specified task an idle task?
+ * @tsk: the task in question.
+ */
+static inline bool is_idle_task(const struct task_struct *p)
+{
+	return p->pid == 0;
+}
 extern struct task_struct *curr_task(int cpu);
 extern void set_curr_task(int cpu, struct task_struct *p);
 
@@ -2058,7 +2164,9 @@ void yield(void);
 extern struct exec_domain	default_exec_domain;
 
 union thread_union {
+#ifndef CONFIG_X86
 	struct thread_info thread_info;
+#endif
 	unsigned long stack[THREAD_SIZE/sizeof(long)];
 };
 
@@ -2091,6 +2199,7 @@ extern struct pid_namespace init_pid_ns;
  */
 
 extern struct task_struct *find_task_by_vpid(pid_t nr);
+extern struct task_struct *find_task_by_vpid_unrestricted(pid_t nr);
 extern struct task_struct *find_task_by_pid_ns(pid_t nr,
 		struct pid_namespace *ns);
 
@@ -2227,7 +2336,7 @@ extern void __cleanup_sighand(struct sighand_struct *);
 extern void exit_itimers(struct signal_struct *);
 extern void flush_itimer_signals(void);
 
-extern NORET_TYPE void do_group_exit(int);
+extern NORET_TYPE void do_group_exit(int) ATTRIB_NORET;
 
 extern void daemonize(const char *, ...);
 extern int allow_signal(int);
@@ -2239,7 +2348,11 @@ extern int do_execve(const char *,
 extern long do_fork(unsigned long, unsigned long, struct pt_regs *, unsigned long, int __user *, int __user *);
 struct task_struct *fork_idle(int);
 
-extern void set_task_comm(struct task_struct *tsk, char *from);
+extern void __set_task_comm(struct task_struct *tsk, const char *from, bool exec);
+static inline void set_task_comm(struct task_struct *tsk, const char *from)
+{
+	__set_task_comm(tsk, from, false);
+}
 extern char *get_task_comm(char *to, struct task_struct *tsk);
 
 #ifdef CONFIG_SMP
@@ -2352,29 +2465,62 @@ static inline void unlock_task_sighand(struct task_struct *tsk,
 	spin_unlock_irqrestore(&tsk->sighand->siglock, *flags);
 }
 
-/* See the declaration of threadgroup_fork_lock in signal_struct. */
 #ifdef CONFIG_CGROUPS
-static inline void threadgroup_fork_read_lock(struct task_struct *tsk)
+static inline void threadgroup_change_begin(struct task_struct *tsk)
 {
-	down_read(&tsk->signal->threadgroup_fork_lock);
+	down_read(&tsk->signal->group_rwsem);
 }
-static inline void threadgroup_fork_read_unlock(struct task_struct *tsk)
+static inline void threadgroup_change_end(struct task_struct *tsk)
 {
-	up_read(&tsk->signal->threadgroup_fork_lock);
+	up_read(&tsk->signal->group_rwsem);
 }
-static inline void threadgroup_fork_write_lock(struct task_struct *tsk)
+
+/**
+ * threadgroup_lock - lock threadgroup
+ * @tsk: member task of the threadgroup to lock
+ *
+ * Lock the threadgroup @tsk belongs to.  No new task is allowed to enter
+ * and member tasks aren't allowed to exit (as indicated by PF_EXITING) or
+ * perform exec.  This is useful for cases where the threadgroup needs to
+ * stay stable across blockable operations.
+ *
+ * fork and exit paths explicitly call threadgroup_change_{begin|end}() for
+ * synchronization.  While held, no new task will be added to threadgroup
+ * and no existing live task will have its PF_EXITING set.
+ *
+ * During exec, a task goes and puts its thread group through unusual
+ * changes.  After de-threading, exclusive access is assumed to resources
+ * which are usually shared by tasks in the same group - e.g. sighand may
+ * be replaced with a new one.  Also, the exec'ing task takes over group
+ * leader role including its pid.  Exclude these changes while locked by
+ * grabbing cred_guard_mutex which is used to synchronize exec path.
+ */
+static inline void threadgroup_lock(struct task_struct *tsk)
 {
-	down_write(&tsk->signal->threadgroup_fork_lock);
+	/*
+	 * exec uses exit for de-threading nesting group_rwsem inside
+	 * cred_guard_mutex. Grab cred_guard_mutex first.
+	 */
+	mutex_lock(&tsk->signal->cred_guard_mutex);
+	down_write(&tsk->signal->group_rwsem);
 }
-static inline void threadgroup_fork_write_unlock(struct task_struct *tsk)
+
+/**
+ * threadgroup_unlock - unlock threadgroup
+ * @tsk: member task of the threadgroup to unlock
+ *
+ * Reverse threadgroup_lock().
+ */
+static inline void threadgroup_unlock(struct task_struct *tsk)
 {
-	up_write(&tsk->signal->threadgroup_fork_lock);
+	up_write(&tsk->signal->group_rwsem);
+	mutex_unlock(&tsk->signal->cred_guard_mutex);
 }
 #else
-static inline void threadgroup_fork_read_lock(struct task_struct *tsk) {}
-static inline void threadgroup_fork_read_unlock(struct task_struct *tsk) {}
-static inline void threadgroup_fork_write_lock(struct task_struct *tsk) {}
-static inline void threadgroup_fork_write_unlock(struct task_struct *tsk) {}
+static inline void threadgroup_change_begin(struct task_struct *tsk) {}
+static inline void threadgroup_change_end(struct task_struct *tsk) {}
+static inline void threadgroup_lock(struct task_struct *tsk) {}
+static inline void threadgroup_unlock(struct task_struct *tsk) {}
 #endif
 
 #ifndef __HAVE_THREAD_FUNCTIONS
@@ -2395,12 +2541,16 @@ static inline unsigned long *end_of_stack(struct task_struct *p)
 
 #endif
 
-static inline int object_is_on_stack(void *obj)
+static inline int object_starts_on_stack(void *obj)
 {
-	void *stack = task_stack_page(current);
+	const void *stack = task_stack_page(current);
 
 	return (obj >= stack) && (obj < (stack + THREAD_SIZE));
 }
+
+#ifdef CONFIG_PAX_USERCOPY
+extern int object_is_on_stack(const void *obj, unsigned long len);
+#endif
 
 extern void thread_info_cache_init(void);
 

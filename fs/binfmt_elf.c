@@ -32,9 +32,15 @@
 #include <linux/elf.h>
 #include <linux/utsname.h>
 #include <linux/coredump.h>
+#include <linux/vmalloc.h>
 #include <asm/uaccess.h>
 #include <asm/param.h>
 #include <asm/page.h>
+
+#if 1 /* CONFIG_LTCORE */
+#include <linux/zlib.h>
+#include <linux/coredump.h>
+#endif
 
 static int load_elf_binary(struct linux_binprm *bprm, struct pt_regs *regs);
 static int load_elf_library(struct file *);
@@ -49,6 +55,10 @@ static unsigned long elf_map(struct file *, unsigned long, struct elf_phdr *,
 static int elf_core_dump(struct coredump_params *cprm);
 #else
 #define elf_core_dump	NULL
+#endif
+
+#ifdef CONFIG_PAX_MPROTECT
+static void elf_handle_mprotect(struct vm_area_struct *vma, unsigned long newflags);
 #endif
 
 #if ELF_EXEC_PAGESIZE > PAGE_SIZE
@@ -70,6 +80,11 @@ static struct linux_binfmt elf_format = {
 	.load_binary	= load_elf_binary,
 	.load_shlib	= load_elf_library,
 	.core_dump	= elf_core_dump,
+
+#ifdef CONFIG_PAX_MPROTECT
+		.handle_mprotect= elf_handle_mprotect,
+#endif
+
 	.min_coredump	= ELF_EXEC_PAGESIZE,
 };
 
@@ -77,6 +92,8 @@ static struct linux_binfmt elf_format = {
 
 static int set_brk(unsigned long start, unsigned long end)
 {
+	unsigned long e = end;
+
 	start = ELF_PAGEALIGN(start);
 	end = ELF_PAGEALIGN(end);
 	if (end > start) {
@@ -87,7 +104,7 @@ static int set_brk(unsigned long start, unsigned long end)
 		if (BAD_ADDR(addr))
 			return addr;
 	}
-	current->mm->start_brk = current->mm->brk = end;
+	current->mm->start_brk = current->mm->brk = e;
 	return 0;
 }
 
@@ -148,12 +165,15 @@ create_elf_tables(struct linux_binprm *bprm, struct elfhdr *exec,
 	elf_addr_t __user *u_rand_bytes;
 	const char *k_platform = ELF_PLATFORM;
 	const char *k_base_platform = ELF_BASE_PLATFORM;
-	unsigned char k_rand_bytes[16];
+	u32 k_rand_bytes[4];
 	int items;
 	elf_addr_t *elf_info;
 	int ei_index = 0;
 	const struct cred *cred = current_cred();
 	struct vm_area_struct *vma;
+	unsigned long saved_auxv[AT_VECTOR_SIZE];
+
+	pax_track_stack();
 
 	/*
 	 * In some cases (e.g. Hyper-Threading), we want to avoid L1
@@ -195,8 +215,12 @@ create_elf_tables(struct linux_binprm *bprm, struct elfhdr *exec,
 	 * Generate 16 random bytes for userspace PRNG seeding.
 	 */
 	get_random_bytes(k_rand_bytes, sizeof(k_rand_bytes));
-	u_rand_bytes = (elf_addr_t __user *)
-		       STACK_ALLOC(p, sizeof(k_rand_bytes));
+	srandom32(k_rand_bytes[0] ^ random32());
+	srandom32(k_rand_bytes[1] ^ random32());
+	srandom32(k_rand_bytes[2] ^ random32());
+	srandom32(k_rand_bytes[3] ^ random32());
+	p = STACK_ROUND(p, sizeof(k_rand_bytes));
+	u_rand_bytes = (elf_addr_t __user *) p;
 	if (__copy_to_user(u_rand_bytes, k_rand_bytes, sizeof(k_rand_bytes)))
 		return -EFAULT;
 
@@ -308,9 +332,11 @@ create_elf_tables(struct linux_binprm *bprm, struct elfhdr *exec,
 		return -EFAULT;
 	current->mm->env_end = p;
 
+	memcpy(saved_auxv, elf_info, ei_index * sizeof(elf_addr_t));
+
 	/* Put the elf_info on the stack in the right place.  */
 	sp = (elf_addr_t __user *)envp + 1;
-	if (copy_to_user(sp, elf_info, ei_index * sizeof(elf_addr_t)))
+	if (copy_to_user(sp, saved_auxv, ei_index * sizeof(elf_addr_t)))
 		return -EFAULT;
 	return 0;
 }
@@ -381,10 +407,10 @@ static unsigned long load_elf_interp(struct elfhdr *interp_elf_ex,
 {
 	struct elf_phdr *elf_phdata;
 	struct elf_phdr *eppnt;
-	unsigned long load_addr = 0;
+	unsigned long load_addr = 0, pax_task_size = TASK_SIZE;
 	int load_addr_set = 0;
 	unsigned long last_bss = 0, elf_bss = 0;
-	unsigned long error = ~0UL;
+	unsigned long error = -EINVAL;
 	unsigned long total_size;
 	int retval, i, size;
 
@@ -430,6 +456,11 @@ static unsigned long load_elf_interp(struct elfhdr *interp_elf_ex,
 		goto out_close;
 	}
 
+#ifdef CONFIG_PAX_SEGMEXEC
+	if (current->mm->pax_flags & MF_PAX_SEGMEXEC)
+		pax_task_size = SEGMEXEC_TASK_SIZE;
+#endif
+
 	eppnt = elf_phdata;
 	for (i = 0; i < interp_elf_ex->e_phnum; i++, eppnt++) {
 		if (eppnt->p_type == PT_LOAD) {
@@ -473,8 +504,8 @@ static unsigned long load_elf_interp(struct elfhdr *interp_elf_ex,
 			k = load_addr + eppnt->p_vaddr;
 			if (BAD_ADDR(k) ||
 			    eppnt->p_filesz > eppnt->p_memsz ||
-			    eppnt->p_memsz > TASK_SIZE ||
-			    TASK_SIZE - eppnt->p_memsz < k) {
+			    eppnt->p_memsz > pax_task_size ||
+			    pax_task_size - eppnt->p_memsz < k) {
 				error = -ENOMEM;
 				goto out_close;
 			}
@@ -528,6 +559,193 @@ out:
 	return error;
 }
 
+#if (defined(CONFIG_PAX_EI_PAX) || defined(CONFIG_PAX_PT_PAX_FLAGS)) && defined(CONFIG_PAX_SOFTMODE)
+static unsigned long pax_parse_softmode(const struct elf_phdr * const elf_phdata)
+{
+	unsigned long pax_flags = 0UL;
+
+#ifdef CONFIG_PAX_PAGEEXEC
+	if (elf_phdata->p_flags & PF_PAGEEXEC)
+		pax_flags |= MF_PAX_PAGEEXEC;
+#endif
+
+#ifdef CONFIG_PAX_SEGMEXEC
+	if (elf_phdata->p_flags & PF_SEGMEXEC)
+		pax_flags |= MF_PAX_SEGMEXEC;
+#endif
+
+#if defined(CONFIG_PAX_PAGEEXEC) && defined(CONFIG_PAX_SEGMEXEC)
+	if ((pax_flags & (MF_PAX_PAGEEXEC | MF_PAX_SEGMEXEC)) == (MF_PAX_PAGEEXEC | MF_PAX_SEGMEXEC)) {
+		if ((__supported_pte_mask & _PAGE_NX))
+			pax_flags &= ~MF_PAX_SEGMEXEC;
+		else
+			pax_flags &= ~MF_PAX_PAGEEXEC;
+	}
+#endif
+
+#ifdef CONFIG_PAX_EMUTRAMP
+	if (elf_phdata->p_flags & PF_EMUTRAMP)
+		pax_flags |= MF_PAX_EMUTRAMP;
+#endif
+
+#ifdef CONFIG_PAX_MPROTECT
+	if (elf_phdata->p_flags & PF_MPROTECT)
+		pax_flags |= MF_PAX_MPROTECT;
+#endif
+
+#if defined(CONFIG_PAX_RANDMMAP) || defined(CONFIG_PAX_RANDUSTACK)
+	if (randomize_va_space && (elf_phdata->p_flags & PF_RANDMMAP))
+		pax_flags |= MF_PAX_RANDMMAP;
+#endif
+
+	return pax_flags;
+}
+#endif
+
+#ifdef CONFIG_PAX_PT_PAX_FLAGS
+static unsigned long pax_parse_hardmode(const struct elf_phdr * const elf_phdata)
+{
+	unsigned long pax_flags = 0UL;
+
+#ifdef CONFIG_PAX_PAGEEXEC
+	if (!(elf_phdata->p_flags & PF_NOPAGEEXEC))
+		pax_flags |= MF_PAX_PAGEEXEC;
+#endif
+
+#ifdef CONFIG_PAX_SEGMEXEC
+	if (!(elf_phdata->p_flags & PF_NOSEGMEXEC))
+		pax_flags |= MF_PAX_SEGMEXEC;
+#endif
+
+#if defined(CONFIG_PAX_PAGEEXEC) && defined(CONFIG_PAX_SEGMEXEC)
+	if ((pax_flags & (MF_PAX_PAGEEXEC | MF_PAX_SEGMEXEC)) == (MF_PAX_PAGEEXEC | MF_PAX_SEGMEXEC)) {
+		if ((__supported_pte_mask & _PAGE_NX))
+			pax_flags &= ~MF_PAX_SEGMEXEC;
+		else
+			pax_flags &= ~MF_PAX_PAGEEXEC;
+	}
+#endif
+
+#ifdef CONFIG_PAX_EMUTRAMP
+	if (!(elf_phdata->p_flags & PF_NOEMUTRAMP))
+		pax_flags |= MF_PAX_EMUTRAMP;
+#endif
+
+#ifdef CONFIG_PAX_MPROTECT
+	if (!(elf_phdata->p_flags & PF_NOMPROTECT))
+		pax_flags |= MF_PAX_MPROTECT;
+#endif
+
+#if defined(CONFIG_PAX_RANDMMAP) || defined(CONFIG_PAX_RANDUSTACK)
+	if (randomize_va_space && !(elf_phdata->p_flags & PF_NORANDMMAP))
+		pax_flags |= MF_PAX_RANDMMAP;
+#endif
+
+	return pax_flags;
+}
+#endif
+
+#ifdef CONFIG_PAX_EI_PAX
+static unsigned long pax_parse_ei_pax(const struct elfhdr * const elf_ex)
+{
+	unsigned long pax_flags = 0UL;
+
+#ifdef CONFIG_PAX_PAGEEXEC
+	if (!(elf_ex->e_ident[EI_PAX] & EF_PAX_PAGEEXEC))
+		pax_flags |= MF_PAX_PAGEEXEC;
+#endif
+
+#ifdef CONFIG_PAX_SEGMEXEC
+	if (!(elf_ex->e_ident[EI_PAX] & EF_PAX_SEGMEXEC))
+		pax_flags |= MF_PAX_SEGMEXEC;
+#endif
+
+#if defined(CONFIG_PAX_PAGEEXEC) && defined(CONFIG_PAX_SEGMEXEC)
+	if ((pax_flags & (MF_PAX_PAGEEXEC | MF_PAX_SEGMEXEC)) == (MF_PAX_PAGEEXEC | MF_PAX_SEGMEXEC)) {
+		if ((__supported_pte_mask & _PAGE_NX))
+			pax_flags &= ~MF_PAX_SEGMEXEC;
+		else
+			pax_flags &= ~MF_PAX_PAGEEXEC;
+	}
+#endif
+
+#ifdef CONFIG_PAX_EMUTRAMP
+	if ((pax_flags & (MF_PAX_PAGEEXEC | MF_PAX_SEGMEXEC)) && (elf_ex->e_ident[EI_PAX] & EF_PAX_EMUTRAMP))
+		pax_flags |= MF_PAX_EMUTRAMP;
+#endif
+
+#ifdef CONFIG_PAX_MPROTECT
+	if ((pax_flags & (MF_PAX_PAGEEXEC | MF_PAX_SEGMEXEC)) && !(elf_ex->e_ident[EI_PAX] & EF_PAX_MPROTECT))
+		pax_flags |= MF_PAX_MPROTECT;
+#endif
+
+#ifdef CONFIG_PAX_ASLR
+	if (randomize_va_space && !(elf_ex->e_ident[EI_PAX] & EF_PAX_RANDMMAP))
+		pax_flags |= MF_PAX_RANDMMAP;
+#endif
+
+	return pax_flags;
+}
+#endif
+
+#if defined(CONFIG_PAX_EI_PAX) || defined(CONFIG_PAX_PT_PAX_FLAGS)
+static long pax_parse_elf_flags(const struct elfhdr * const elf_ex, const struct elf_phdr * const elf_phdata)
+{
+	unsigned long pax_flags = 0UL;
+
+#ifdef CONFIG_PAX_PT_PAX_FLAGS
+	unsigned long i;
+	int found_flags = 0;
+#endif
+
+#ifdef CONFIG_PAX_EI_PAX
+	pax_flags = pax_parse_ei_pax(elf_ex);
+#endif
+
+#ifdef CONFIG_PAX_PT_PAX_FLAGS
+	for (i = 0UL; i < elf_ex->e_phnum; i++)
+		if (elf_phdata[i].p_type == PT_PAX_FLAGS) {
+			if (((elf_phdata[i].p_flags & PF_PAGEEXEC) && (elf_phdata[i].p_flags & PF_NOPAGEEXEC)) ||
+			    ((elf_phdata[i].p_flags & PF_SEGMEXEC) && (elf_phdata[i].p_flags & PF_NOSEGMEXEC)) ||
+			    ((elf_phdata[i].p_flags & PF_EMUTRAMP) && (elf_phdata[i].p_flags & PF_NOEMUTRAMP)) ||
+			    ((elf_phdata[i].p_flags & PF_MPROTECT) && (elf_phdata[i].p_flags & PF_NOMPROTECT)) ||
+			    ((elf_phdata[i].p_flags & PF_RANDMMAP) && (elf_phdata[i].p_flags & PF_NORANDMMAP)))
+				return -EINVAL;
+
+#ifdef CONFIG_PAX_SOFTMODE
+			if (pax_softmode)
+				pax_flags = pax_parse_softmode(&elf_phdata[i]);
+			else
+#endif
+
+				pax_flags = pax_parse_hardmode(&elf_phdata[i]);
+			found_flags = 1;
+			break;
+		}
+#endif
+
+#if !defined(CONFIG_PAX_EI_PAX) && defined(CONFIG_PAX_PT_PAX_FLAGS)
+	if (found_flags == 0) {
+		struct elf_phdr phdr;
+		memset(&phdr, 0, sizeof(phdr));
+		phdr.p_flags = PF_NOEMUTRAMP;
+#ifdef CONFIG_PAX_SOFTMODE
+		if (pax_softmode)
+			pax_flags = pax_parse_softmode(&phdr);
+		else
+#endif
+			pax_flags = pax_parse_hardmode(&phdr);
+	}
+#endif
+
+	if (0 > pax_check_flags(&pax_flags))
+		return -EINVAL;
+
+	current->mm->pax_flags = pax_flags;
+	return 0;
+}
+#endif
+
 /*
  * These are the functions used to load ELF style executables and shared
  * libraries.  There is no binary dependent code anywhere else.
@@ -544,6 +762,11 @@ static unsigned long randomize_stack_top(unsigned long stack_top)
 {
 	unsigned int random_variable = 0;
 
+#ifdef CONFIG_PAX_RANDUSTACK
+	if (randomize_va_space)
+		return stack_top - current->mm->delta_stack;
+#endif
+
 	if ((current->flags & PF_RANDOMIZE) &&
 		!(current->personality & ADDR_NO_RANDOMIZE)) {
 		random_variable = get_random_int() & STACK_RND_MASK;
@@ -556,13 +779,67 @@ static unsigned long randomize_stack_top(unsigned long stack_top)
 #endif
 }
 
+#if 1 /* CONFIG_LTCORE */
+unsigned long find_section(char *sec_name, struct elfhdr *ehdr, struct file *file)
+{
+	struct elf_shdr *sec_tbl;
+	unsigned sec_tbl_size;
+	char *str_tbl;
+	unsigned str_tbl_size;
+	unsigned long addr = 0;
+	int retval;
+	int i;
+
+	if (ehdr->e_shstrndx >= ehdr->e_shnum)
+		return 0;
+
+	/* Read section table */
+	sec_tbl_size = ehdr->e_shentsize * ehdr->e_shnum;
+	sec_tbl = kmalloc(sec_tbl_size, GFP_KERNEL);
+	if (!sec_tbl)
+		return 0;
+	retval = kernel_read(file, ehdr->e_shoff, (char *)sec_tbl, sec_tbl_size);
+	if (retval != sec_tbl_size) {
+		kfree(sec_tbl);
+		return 0;
+	}
+
+	/* Read string table */
+	str_tbl_size = sec_tbl[ehdr->e_shstrndx].sh_size;
+	str_tbl = kmalloc(str_tbl_size, GFP_KERNEL);
+	if (!str_tbl) {
+		kfree(sec_tbl);
+		return 0;
+	}
+	retval = kernel_read(file, sec_tbl[ehdr->e_shstrndx].sh_offset, str_tbl, str_tbl_size);
+	if (retval != str_tbl_size) {
+		kfree(str_tbl);
+		kfree(sec_tbl);
+		return 0;
+	}
+
+	/* Look for desired section in section table */
+	for (i = 0; i < ehdr->e_shnum; i++) {
+		if (strcmp(sec_name, str_tbl + sec_tbl[i].sh_name) == 0) {
+			addr = sec_tbl[i].sh_addr;
+			break;
+		}
+	}
+	kfree(str_tbl);
+	kfree(sec_tbl);
+	if (!addr)
+		pr_err("%s: %s section not found.\n", __func__, sec_name);	
+	return addr;
+}
+#endif
+
 static int load_elf_binary(struct linux_binprm *bprm, struct pt_regs *regs)
 {
 	struct file *interpreter = NULL; /* to shut gcc up */
  	unsigned long load_addr = 0, load_bias = 0;
 	int load_addr_set = 0;
 	char * elf_interpreter = NULL;
-	unsigned long error;
+	unsigned long error = 0;
 	struct elf_phdr *elf_ppnt, *elf_phdata;
 	unsigned long elf_bss, elf_brk;
 	int retval, i;
@@ -572,11 +849,11 @@ static int load_elf_binary(struct linux_binprm *bprm, struct pt_regs *regs)
 	unsigned long start_code, end_code, start_data, end_data;
 	unsigned long reloc_func_desc __maybe_unused = 0;
 	int executable_stack = EXSTACK_DEFAULT;
-	unsigned long def_flags = 0;
 	struct {
 		struct elfhdr elf_ex;
 		struct elfhdr interp_elf_ex;
 	} *loc;
+	unsigned long pax_task_size = TASK_SIZE;
 
 	loc = kmalloc(sizeof(*loc), GFP_KERNEL);
 	if (!loc) {
@@ -713,12 +990,93 @@ static int load_elf_binary(struct linux_binprm *bprm, struct pt_regs *regs)
 		goto out_free_dentry;
 
 	/* OK, This is the point of no return */
+
+#if 1 /* CONFIG_LTCORE */
+#ifdef CONFIG_MIPS
+	current->mm->rdebug = find_section(".rld_map", &loc->elf_ex, bprm->file);
+#else
+	current->mm->rdebug = find_section(".dynamic", &loc->elf_ex, bprm->file);
+#endif
+	if (!current->mm->rdebug)
+		pr_err("%s: find_section() failed.\n", __func__);	
+#endif
+
 	current->flags &= ~PF_FORKNOEXEC;
-	current->mm->def_flags = def_flags;
+
+#if defined(CONFIG_PAX_NOEXEC) || defined(CONFIG_PAX_ASLR)
+	current->mm->pax_flags = 0UL;
+#endif
+
+#ifdef CONFIG_PAX_DLRESOLVE
+	current->mm->call_dl_resolve = 0UL;
+#endif
+
+#if defined(CONFIG_PPC32) && defined(CONFIG_PAX_EMUSIGRT)
+	current->mm->call_syscall = 0UL;
+#endif
+
+#ifdef CONFIG_PAX_ASLR
+	current->mm->delta_mmap = 0UL;
+	current->mm->delta_stack = 0UL;
+#endif
+
+	current->mm->def_flags = 0;
+
+#if defined(CONFIG_PAX_EI_PAX) || defined(CONFIG_PAX_PT_PAX_FLAGS)
+	if (0 > pax_parse_elf_flags(&loc->elf_ex, elf_phdata)) {
+		send_sig(SIGKILL, current, 0);
+		goto out_free_dentry;
+	}
+#endif
+
+#ifdef CONFIG_PAX_HAVE_ACL_FLAGS
+	pax_set_initial_flags(bprm);
+#elif defined(CONFIG_PAX_HOOK_ACL_FLAGS)
+	if (pax_set_initial_flags_func)
+		(pax_set_initial_flags_func)(bprm);
+#endif
+
+#ifdef CONFIG_ARCH_TRACK_EXEC_LIMIT
+	if ((current->mm->pax_flags & MF_PAX_PAGEEXEC) && !(__supported_pte_mask & _PAGE_NX)) {
+		current->mm->context.user_cs_limit = PAGE_SIZE;
+		current->mm->def_flags |= VM_PAGEEXEC;
+	}
+#endif
+
+#ifdef CONFIG_PAX_SEGMEXEC
+	if (current->mm->pax_flags & MF_PAX_SEGMEXEC) {
+		current->mm->context.user_cs_base = SEGMEXEC_TASK_SIZE;
+		current->mm->context.user_cs_limit = TASK_SIZE-SEGMEXEC_TASK_SIZE;
+		pax_task_size = SEGMEXEC_TASK_SIZE;
+		current->mm->def_flags |= VM_NOHUGEPAGE;
+	}
+#endif
+
+#if defined(CONFIG_ARCH_TRACK_EXEC_LIMIT) || defined(CONFIG_PAX_SEGMEXEC)
+	if (current->mm->pax_flags & (MF_PAX_PAGEEXEC | MF_PAX_SEGMEXEC)) {
+		set_user_cs(current->mm->context.user_cs_base, current->mm->context.user_cs_limit, get_cpu());
+		put_cpu();
+	}
+#endif
 
 	/* Do this immediately, since STACK_TOP as used in setup_arg_pages
 	   may depend on the personality.  */
 	SET_PERSONALITY(loc->elf_ex);
+
+#ifdef CONFIG_PAX_ASLR
+	if (current->mm->pax_flags & MF_PAX_RANDMMAP) {
+		current->mm->delta_mmap = (pax_get_random_long() & ((1UL << PAX_DELTA_MMAP_LEN)-1)) << PAGE_SHIFT;
+		current->mm->delta_stack = (pax_get_random_long() & ((1UL << PAX_DELTA_STACK_LEN)-1)) << PAGE_SHIFT;
+	}
+#endif
+
+#if defined(CONFIG_PAX_PAGEEXEC) || defined(CONFIG_PAX_SEGMEXEC)
+	if (current->mm->pax_flags & (MF_PAX_PAGEEXEC | MF_PAX_SEGMEXEC)) {
+		executable_stack = EXSTACK_DISABLE_X;
+		current->personality &= ~READ_IMPLIES_EXEC;
+	} else
+#endif
+
 	if (elf_read_implies_exec(loc->elf_ex, executable_stack))
 		current->personality |= READ_IMPLIES_EXEC;
 
@@ -809,6 +1167,20 @@ static int load_elf_binary(struct linux_binprm *bprm, struct pt_regs *regs)
 #else
 			load_bias = ELF_PAGESTART(ELF_ET_DYN_BASE - vaddr);
 #endif
+
+#ifdef CONFIG_PAX_RANDMMAP
+			/* PaX: randomize base address at the default exe base if requested */
+			if ((current->mm->pax_flags & MF_PAX_RANDMMAP) && elf_interpreter) {
+#ifdef CONFIG_SPARC64
+				load_bias = (pax_get_random_long() & ((1UL << PAX_DELTA_MMAP_LEN) - 1)) << (PAGE_SHIFT+1);
+#else
+				load_bias = (pax_get_random_long() & ((1UL << PAX_DELTA_MMAP_LEN) - 1)) << PAGE_SHIFT;
+#endif
+				load_bias = ELF_PAGESTART(PAX_ELF_ET_DYN_BASE - vaddr + load_bias);
+				elf_flags |= MAP_FIXED;
+			}
+#endif
+
 		}
 
 		error = elf_map(bprm->file, load_bias + vaddr, elf_ppnt,
@@ -841,9 +1213,9 @@ static int load_elf_binary(struct linux_binprm *bprm, struct pt_regs *regs)
 		 * allowed task size. Note that p_filesz must always be
 		 * <= p_memsz so it is only necessary to check p_memsz.
 		 */
-		if (BAD_ADDR(k) || elf_ppnt->p_filesz > elf_ppnt->p_memsz ||
-		    elf_ppnt->p_memsz > TASK_SIZE ||
-		    TASK_SIZE - elf_ppnt->p_memsz < k) {
+		if (k >= pax_task_size || elf_ppnt->p_filesz > elf_ppnt->p_memsz ||
+		    elf_ppnt->p_memsz > pax_task_size ||
+		    pax_task_size - elf_ppnt->p_memsz < k) {
 			/* set_brk can never work. Avoid overflows. */
 			send_sig(SIGKILL, current, 0);
 			retval = -EINVAL;
@@ -871,6 +1243,11 @@ static int load_elf_binary(struct linux_binprm *bprm, struct pt_regs *regs)
 	start_data += load_bias;
 	end_data += load_bias;
 
+#ifdef CONFIG_PAX_RANDMMAP
+	if (current->mm->pax_flags & MF_PAX_RANDMMAP)
+		elf_brk += PAGE_SIZE + ((pax_get_random_long() & ~PAGE_MASK) << 4);
+#endif
+
 	/* Calling set_brk effectively mmaps the pages that we need
 	 * for the bss and break sections.  We must do this before
 	 * mapping in the interpreter, to make sure it doesn't wind
@@ -882,9 +1259,11 @@ static int load_elf_binary(struct linux_binprm *bprm, struct pt_regs *regs)
 		goto out_free_dentry;
 	}
 	if (likely(elf_bss != elf_brk) && unlikely(padzero(elf_bss))) {
-		send_sig(SIGSEGV, current, 0);
-		retval = -EFAULT; /* Nobody gets to see this, but.. */
-		goto out_free_dentry;
+		/*
+		 * This bss-zeroing can fail if the ELF
+		 * file specifies odd protections. So
+		 * we don't check the return value
+		 */
 	}
 
 	if (elf_interpreter) {
@@ -1088,6 +1467,87 @@ out:
 }
 
 #ifdef CONFIG_ELF_CORE
+
+#if 1 /* CONFIG_LTCORE */
+
+int little_core_dump = 0;
+unsigned core_dumped __attribute__ ((section (".bss_noinit")));
+unsigned ltcore_dump_cnt __attribute__ ((section (".bss_noinit")));
+char ltcore_dump_file[LTCORE_MAX_PAGES*PAGE_SIZE] __attribute__ ((section (".bss_noinit")));
+#ifdef LTCORE_USE_ZLIB
+z_stream ltcore_dump_zstr;
+static void* zlib_deflate_buffer = NULL;
+#endif
+
+ssize_t read_ltcore(struct file *file, char __user *buf,
+               size_t count, loff_t *ppos)
+{
+#ifdef LTCORE_USE_ZLIB
+	z_streamp zstr;
+	void *userbuf;
+	int ret;
+	if (ltcore_dump_cnt == 0)
+		return 0;
+
+	zstr = (z_streamp)file->private_data;
+	if (zstr == 0)
+		return 0;
+
+	userbuf = kmalloc(count, GFP_KERNEL);
+	zstr->next_out = userbuf;
+	if (zstr->next_out == 0)
+	{
+		pr_err("%s: Can't %d bytes allocate user buffer space\n", __func__, count);
+		ltcore_dump_cnt = 0;
+		core_dumped = 0;
+		return 0;
+	}
+	zstr->avail_out = count;
+	ret = zlib_inflate(zstr, Z_SYNC_FLUSH);
+	if (ret == Z_NEED_DICT || ret == Z_DATA_ERROR || ret == Z_MEM_ERROR)
+	{
+		pr_err("%s: Inflation error\n", __func__);
+		kfree(userbuf);
+		ltcore_dump_cnt = 0;
+		core_dumped = 0;
+		return 0;
+	}
+
+	/* We'll assume the user isn't skipping over things and mostly ignore ppos */
+	if (copy_to_user(buf, userbuf, count - zstr->avail_out))
+	{
+		kfree(userbuf);
+		return -EFAULT;
+	}
+	count -= zstr->avail_out;
+	*ppos += count;
+	kfree(userbuf);
+
+	if (ret == Z_STREAM_END)
+	{
+		ltcore_dump_cnt = 0;
+		core_dumped = 0;
+	}
+#else
+	if (*ppos >= ltcore_dump_cnt) {
+		if (ltcore_dump_cnt > 0) {
+			core_dumped = 0;
+			ltcore_dump_cnt = 0;
+		}
+		return 0;
+	}
+	if (count + *ppos > ltcore_dump_cnt)
+		count = ltcore_dump_cnt - *ppos;
+	if (copy_to_user(buf, ltcore_dump_file + *ppos, count))
+		return -EFAULT;
+	*ppos += count;
+#endif
+	return count;
+}
+
+#endif /* CONFIG_LTCORE */
+
+
 /*
  * ELF core dumper
  *
@@ -1099,7 +1559,7 @@ out:
  * Decide what to dump of a segment, part, all or none.
  */
 static unsigned long vma_dump_size(struct vm_area_struct *vma,
-				   unsigned long mm_flags)
+				   unsigned long mm_flags, long signr)
 {
 #define FILTER(type)	(mm_flags & (1UL << MMF_DUMP_##type))
 
@@ -1133,7 +1593,7 @@ static unsigned long vma_dump_size(struct vm_area_struct *vma,
 	if (vma->vm_file == NULL)
 		return 0;
 
-	if (FILTER(MAPPED_PRIVATE))
+	if (signr == SIGKILL || FILTER(MAPPED_PRIVATE))
 		goto whole;
 
 	/*
@@ -1355,11 +1815,206 @@ static void fill_auxv_note(struct memelfnote *note, struct mm_struct *mm)
 {
 	elf_addr_t *auxv = (elf_addr_t *) mm->saved_auxv;
 	int i = 0;
-	do
+	do {
 		i += 2;
-	while (auxv[i - 2] != AT_NULL);
+	} while (auxv[i - 2] != AT_NULL);
 	fill_note(note, "CORE", NT_AUXV, i * sizeof(elf_addr_t), auxv);
 }
+
+static struct vm_area_struct *first_vma(struct task_struct *tsk,
+					struct vm_area_struct *gate_vma)
+{
+	struct vm_area_struct *ret = tsk->mm->mmap;
+
+	if (ret)
+		return ret;
+	return gate_vma;
+}
+
+/*
+ * Helper function for iterating across a vma list.  It ensures that the caller
+ * will visit `gate_vma' prior to terminating the search.
+ */
+static struct vm_area_struct *next_vma(struct vm_area_struct *this_vma,
+					struct vm_area_struct *gate_vma)
+{
+	struct vm_area_struct *ret;
+
+	ret = this_vma->vm_next;
+	if (ret)
+		return ret;
+	if (this_vma == gate_vma)
+		return NULL;
+	return gate_vma;
+}
+
+#if 1 /* CONFIG_LTCORE */
+
+static unsigned char* ltcore_idx[32];
+
+static int ltcore_set_alloc(void)
+{
+	int i;
+	if (!little_core_dump) return 1;
+	for (i = 0; i < sizeof(ltcore_idx)/sizeof(*ltcore_idx); i++) {
+		ltcore_idx[i] = (unsigned char*)kmalloc(4096, GFP_ATOMIC);
+		if (!ltcore_idx[i]) {
+			printk("ltcore_set_alloc: kmalloc failed!\n");
+			return 0;
+		}
+		memset(ltcore_idx[i], 0, 4096);
+	}
+	return 1;
+}
+
+static void ltcore_add_page(unsigned long pg)
+{
+	ltcore_idx[pg >> 15][(pg >> 3) & 4095] |= 1 << (pg & 7);
+}
+
+static int ltcore_has_page(unsigned long pg)
+{
+	return ltcore_idx[pg >> 15][(pg >> 3) & 4095] & (1 << (pg & 7));
+}
+
+static void ltcore_add_range(unsigned long start, unsigned long end)
+{
+	unsigned long s = start >> 12;
+	unsigned long e = end >> 12;
+	unsigned long i;
+
+//printk("ltcore_add_range %lx - %lx\n", start, end);
+	if (start >= 0xC0000000 || end >= 0xC0000000) return;
+	if (end & 0xfff) ++e;
+	for (i = s; i < e; i++) ltcore_add_page(i);
+}
+
+static void ltcore_trim(unsigned long* vm_start, unsigned long* vm_end)
+{
+	unsigned long i;
+	if (!little_core_dump) return;
+//printk("ltcore_trim: %lx - %lx\n", *vm_start, *vm_end);
+	//tracek("ltcore_trim In: %lx, %lx", *vm_start, *vm_end);
+	while (*vm_start < *vm_end && !ltcore_has_page(*vm_start >> 12))
+		*vm_start += 0x1000;
+	for (i = *vm_start; i < *vm_end; i += 0x1000)
+		if (!ltcore_has_page(i >> 12)) {
+			*vm_end = i & ~0xfff;
+			break;
+		}
+//printk("ltcore_trim done: %lx - %lx\n", *vm_start, *vm_end);
+	//tracek("ltcore_trim Out: %lx, %lx", *vm_start, *vm_end);
+}
+
+static void ltcore_add_stack(unsigned long sp)
+{
+	struct vm_area_struct *vma;
+	if (!little_core_dump) return;
+//printk("ltcore_add_stack %lx\n", sp);
+	for (vma = current->mm->mmap; vma != NULL; vma = vma->vm_next) {
+		if (vma->vm_start <= sp && sp < vma->vm_end) {
+			unsigned long end = vma->vm_end;
+			if (end - sp > 0x10000) end = sp + 0x10000;
+			ltcore_add_range(sp, end);
+		}
+	}
+}
+
+static void ltcore_add_rdebug(void)
+{
+	const unsigned long dynamic_addr  = current->mm->rdebug;
+	const int max_dynamic_size        = 2048;
+	const int r_debug_size            = 1024; /* 744 is the current size */
+	const int r_map_size              = 1024;
+	const int l_name_size             = 256;
+
+	unsigned long r_debug = 0;
+	unsigned long r_map;
+	unsigned long addr;
+	Elf32_Dyn dyn;
+
+	#define GET_USER_VAR(local_, uaddr_) do { \
+	    if (__copy_from_user_inatomic(&local_, \
+		    (const char __user *) (uaddr_), sizeof(local_))) \
+			{pr_err("%s: __copy_from_user_inatomic failed.\n",__func__);return;} } while (0)
+
+	if (!little_core_dump) return;
+
+	/* Search the .dynamic table for the DT_DEBUG entry. */
+	if (dynamic_addr == 0) {
+		pr_err("%s: dynamic_addr is 0.\n",__func__);
+		return;
+	}
+
+	for (addr = dynamic_addr;;) {
+		if (addr >= dynamic_addr + max_dynamic_size) {
+			/* Not reasonable for .dynamic to be this big. */
+			pr_err("%s: dynamic section size exceeds the limit: size = %ld, max_size = %d\n", 
+				__func__, addr - dynamic_addr, max_dynamic_size);
+			return;
+		}
+		GET_USER_VAR(dyn, addr);
+		addr += sizeof(dyn);
+		if (dyn.d_tag == DT_NULL) {
+			/* End of table. */
+			break;
+		}
+		if (dyn.d_tag == DT_DEBUG) {
+			/* DT_DEBUG contains the addr of r_debug.
+			 * But keep searching until DT_NULL so we know how big 
+			 * the whole table is. */
+			r_debug = dyn.d_un.d_ptr;
+//printk("found r_debug %lx\n", r_debug);
+		}
+	}
+
+	/* Dump the .dynamic table. */
+	ltcore_add_range(dynamic_addr, addr); 
+	/* Dump the r_debug structure. */
+	ltcore_add_range(r_debug, r_debug + r_debug_size);
+
+	/* Walk the r_map list and dump each r_map entry and l_name data. */
+	GET_USER_VAR(r_map, r_debug+4);
+	while (r_map) {
+		unsigned long l_name;
+		unsigned long l_next;
+		ltcore_add_range(r_map, r_map + r_map_size);
+		GET_USER_VAR(l_name, r_map+4);
+		GET_USER_VAR(l_next, r_map+12);
+		if (l_name) ltcore_add_range(l_name, l_name + l_name_size);
+		r_map = l_next;
+	}
+}
+
+static int ltcore_get_seg_count(struct vm_area_struct *gate_vma, long signr)
+{
+	struct vm_area_struct *vma;
+	int cnt = 0;
+	unsigned long mm_flags = current->mm->flags;
+
+	if (!little_core_dump)
+		return current->mm->map_count;
+
+	for (vma = first_vma(current, gate_vma); vma != NULL;
+			vma = next_vma(vma, gate_vma)) {
+		unsigned long vm_start = vma->vm_start;
+		unsigned long end = vma->vm_start + vma_dump_size(vma, mm_flags, signr);
+		unsigned long vm_end = end;
+
+	phdr_again:
+		ltcore_trim(&vm_start, &vm_end);
+		if (vm_start >= vm_end) continue;
+
+		++cnt;
+		if (vm_end == end) continue;
+		vm_start = vm_end;
+		vm_end = end;
+		goto phdr_again;
+	}
+	return cnt;
+}
+
+#endif /* CONFIG_LTCORE */
 
 #ifdef CORE_DUMP_USE_REGSET
 #include <linux/regset.h>
@@ -1522,9 +2177,13 @@ static int fill_note_info(struct elfhdr *elf, int phdrs,
 	/*
 	 * Now fill in each thread's information.
 	 */
-	for (t = info->thread; t != NULL; t = t->next)
+	for (t = info->thread; t != NULL; t = t->next) {
+#if 1 /* ifdef CONFIG_LTCORE */
+		ltcore_add_stack(KSTK_ESP(t->task));
+#endif
 		if (!fill_thread_core_info(t, view, signr, &info->size))
 			return 0;
+	}
 
 	/*
 	 * Fill in the two process-wide notes.
@@ -1697,6 +2356,9 @@ static int fill_note_info(struct elfhdr *elf, int phdrs,
 		struct core_thread *ct;
 		struct elf_thread_status *ets;
 
+#if 1 /* ifdef CONFIG_LTCORE */
+		ltcore_add_stack(KSTK_ESP(current));
+#endif
 		for (ct = current->mm->core_state->dumper.next;
 						ct; ct = ct->next) {
 			ets = kzalloc(sizeof(*ets), GFP_KERNEL);
@@ -1705,6 +2367,9 @@ static int fill_note_info(struct elfhdr *elf, int phdrs,
 
 			ets->thread = ct->task;
 			list_add(&ets->list, &info->thread_list);
+#if 1 /* ifdef CONFIG_LTCORE */
+			ltcore_add_stack(KSTK_ESP(ct->task));
+#endif
 		}
 
 		list_for_each(t, &info->thread_list) {
@@ -1809,32 +2474,6 @@ static void free_note_info(struct elf_note_info *info)
 
 #endif
 
-static struct vm_area_struct *first_vma(struct task_struct *tsk,
-					struct vm_area_struct *gate_vma)
-{
-	struct vm_area_struct *ret = tsk->mm->mmap;
-
-	if (ret)
-		return ret;
-	return gate_vma;
-}
-/*
- * Helper function for iterating across a vma list.  It ensures that the caller
- * will visit `gate_vma' prior to terminating the search.
- */
-static struct vm_area_struct *next_vma(struct vm_area_struct *this_vma,
-					struct vm_area_struct *gate_vma)
-{
-	struct vm_area_struct *ret;
-
-	ret = this_vma->vm_next;
-	if (ret)
-		return ret;
-	if (this_vma == gate_vma)
-		return NULL;
-	return gate_vma;
-}
-
 static void fill_extnum_info(struct elfhdr *elf, struct elf_shdr *shdr4extnum,
 			     elf_addr_t e_shoff, int segs)
 {
@@ -1852,14 +2491,33 @@ static void fill_extnum_info(struct elfhdr *elf, struct elf_shdr *shdr4extnum,
 }
 
 static size_t elf_core_vma_data_size(struct vm_area_struct *gate_vma,
-				     unsigned long mm_flags)
+				     struct coredump_params *cprm)
 {
 	struct vm_area_struct *vma;
 	size_t size = 0;
 
 	for (vma = first_vma(current, gate_vma); vma != NULL;
-	     vma = next_vma(vma, gate_vma))
-		size += vma_dump_size(vma, mm_flags);
+	     vma = next_vma(vma, gate_vma)) {
+#if 1 /* ifdef CONFIG_LTCORE */
+		unsigned long vm_start = vma->vm_start;
+		unsigned long end = vma->vm_start + vma_dump_size(vma, cprm->mm_flags, cprm->signr);
+		unsigned long vm_end = end;
+	    phdr_again:
+		if (!little_core_dump) {
+			size += vma_dump_size(vma, cprm->mm_flags, cprm->signr);
+		} else {
+			ltcore_trim(&vm_start, &vm_end);
+			if (little_core_dump && vm_start >= vm_end) continue;
+			size += vm_end - vm_start;
+			if (vm_end == end) continue;
+			vm_start = vm_end;
+			vm_end = end;
+			goto phdr_again;
+		}
+#else
+		size += vma_dump_size(vma, cprm->mm_flags, cprm->signr);
+#endif
+	}
 	return size;
 }
 
@@ -1901,14 +2559,31 @@ static int elf_core_dump(struct coredump_params *cprm)
 	elf = kmalloc(sizeof(*elf), GFP_KERNEL);
 	if (!elf)
 		goto out;
+
+#if 1 /* ifdef CONFIG_LTCORE */
+	if (!ltcore_set_alloc())
+		goto out;
+	ltcore_add_rdebug();
+
+	/*
+	 * Collect all the non-memory information about the process for the
+	 * notes.  This also sets up the file header.
+	 */
+	if (!fill_note_info(elf, 0, &info, cprm->signr, cprm->regs))
+		goto cleanup;
 	/*
 	 * The number of segs are recored into ELF header as 16bit value.
 	 * Please check DEFAULT_MAX_MAP_COUNT definition when you modify here.
 	 */
+	gate_vma = get_gate_vma(current->mm);
+	segs = ltcore_get_seg_count(gate_vma, cprm->signr);
+	segs += elf_core_extra_phdrs();
+#else
 	segs = current->mm->map_count;
 	segs += elf_core_extra_phdrs();
 
 	gate_vma = get_gate_vma(current->mm);
+#endif
 	if (gate_vma != NULL)
 		segs++;
 
@@ -1920,12 +2595,16 @@ static int elf_core_dump(struct coredump_params *cprm)
 	 * include/linux/elf.h for further information. */
 	e_phnum = segs > PN_XNUM ? PN_XNUM : segs;
 
+#if 1 /* ifdef CONFIG_LTCORE */
+	elf->e_phnum = e_phnum;
+#else
 	/*
 	 * Collect all the non-memory information about the process for the
 	 * notes.  This also sets up the file header.
 	 */
 	if (!fill_note_info(elf, e_phnum, &info, cprm->signr, cprm->regs))
 		goto cleanup;
+#endif
 
 	has_dumped = 1;
 	current->flags |= PF_DUMPCORE;
@@ -1953,7 +2632,7 @@ static int elf_core_dump(struct coredump_params *cprm)
 
 	dataoff = offset = roundup(offset, ELF_EXEC_PAGESIZE);
 
-	offset += elf_core_vma_data_size(gate_vma, cprm->mm_flags);
+	offset += elf_core_vma_data_size(gate_vma, cprm);
 	offset += elf_core_extra_data_size();
 	e_shoff = offset;
 
@@ -1967,10 +2646,12 @@ static int elf_core_dump(struct coredump_params *cprm)
 	offset = dataoff;
 
 	size += sizeof(*elf);
+	gr_learn_resource(current, RLIMIT_CORE, size, 1);
 	if (size > cprm->limit || !dump_write(cprm->file, elf, sizeof(*elf)))
 		goto end_coredump;
 
 	size += sizeof(*phdr4note);
+	gr_learn_resource(current, RLIMIT_CORE, size, 1);
 	if (size > cprm->limit
 	    || !dump_write(cprm->file, phdr4note, sizeof(*phdr4note)))
 		goto end_coredump;
@@ -1979,13 +2660,34 @@ static int elf_core_dump(struct coredump_params *cprm)
 	for (vma = first_vma(current, gate_vma); vma != NULL;
 			vma = next_vma(vma, gate_vma)) {
 		struct elf_phdr phdr;
+#if 1 /* ifdef CONFIG_LTCORE */
+		unsigned long filesz;
+		unsigned long memsz;
+		unsigned long vm_start = vma->vm_start;
+		unsigned long end = vma->vm_start + vma_dump_size(vma, cprm->mm_flags, cprm->signr);
+		unsigned long vm_end = end;
 
+	    phdr_again:
+		ltcore_trim(&vm_start, &vm_end);
+		if (little_core_dump && vm_start >= vm_end) continue;
+		filesz = vm_end - vm_start;
+		memsz = little_core_dump ? filesz : (vma->vm_end - vma->vm_start);
+#else
+		filesz = vma_dump_size(vma, cprm->mm_flags, cprm->signr);
+		memsz = vma->vm_end - vma->vm_start;
+#endif
 		phdr.p_type = PT_LOAD;
 		phdr.p_offset = offset;
-		phdr.p_vaddr = vma->vm_start;
 		phdr.p_paddr = 0;
-		phdr.p_filesz = vma_dump_size(vma, cprm->mm_flags);
+#if 1 /* ifdef CONFIG_LTCORE */
+		phdr.p_vaddr = vm_start;
+		phdr.p_filesz = filesz;
+		phdr.p_memsz = memsz;
+#else
+		phdr.p_vaddr = vma->vm_start;
+		phdr.p_filesz = vma_dump_size(vma, cprm->mm_flags, cprm->signr);
 		phdr.p_memsz = vma->vm_end - vma->vm_start;
+#endif
 		offset += phdr.p_filesz;
 		phdr.p_flags = vma->vm_flags & VM_READ ? PF_R : 0;
 		if (vma->vm_flags & VM_WRITE)
@@ -1995,9 +2697,16 @@ static int elf_core_dump(struct coredump_params *cprm)
 		phdr.p_align = ELF_EXEC_PAGESIZE;
 
 		size += sizeof(phdr);
+		gr_learn_resource(current, RLIMIT_CORE, size, 1);
 		if (size > cprm->limit
 		    || !dump_write(cprm->file, &phdr, sizeof(phdr)))
 			goto end_coredump;
+#if 1 /* ifdef CONFIG_LTCORE */
+		if (vm_end == end) continue;
+		vm_start = vm_end;
+		vm_end = end;
+		goto phdr_again;
+#endif
 	}
 
 	if (!elf_core_write_extra_phdrs(cprm->file, offset, &size, cprm->limit))
@@ -2017,17 +2726,35 @@ static int elf_core_dump(struct coredump_params *cprm)
 	for (vma = first_vma(current, gate_vma); vma != NULL;
 			vma = next_vma(vma, gate_vma)) {
 		unsigned long addr;
-		unsigned long end;
+#if 1 /* ifdef CONFIG_LTCORE */
+		unsigned long vm_start = vma->vm_start;
+		unsigned long end = vma->vm_start + vma_dump_size(vma, cprm->mm_flags, cprm->signr);
+		unsigned long vm_end = end;
+	    vma_again:
+		ltcore_trim(&vm_start, &vm_end);
+		if (vm_start >= vm_end) continue;
 
-		end = vma->vm_start + vma_dump_size(vma, cprm->mm_flags);
+		for (addr = vm_start; addr < vm_end; addr += PAGE_SIZE) {
+			if (little_core_dump) {
+				static unsigned char buf[PAGE_SIZE];
+				if (__copy_from_user_inatomic(buf, (const char __user *)addr, PAGE_SIZE))
+					memset(buf,0xbe,PAGE_SIZE);
+				if (!dump_write(0, buf, PAGE_SIZE))
+					goto end_coredump;
+			} else {
+#else
+		unsigned long end;
+		end = vma->vm_start + vma_dump_size(vma, cprm->mm_flags, cprm->signr);
 
 		for (addr = vma->vm_start; addr < end; addr += PAGE_SIZE) {
+#endif
 			struct page *page;
 			int stop;
 
 			page = get_dump_page(addr);
 			if (page) {
 				void *kaddr = kmap(page);
+				gr_learn_resource(current, RLIMIT_CORE, size + PAGE_SIZE, 1);
 				stop = ((size += PAGE_SIZE) > cprm->limit) ||
 					!dump_write(cprm->file, kaddr,
 						    PAGE_SIZE);
@@ -2038,6 +2765,13 @@ static int elf_core_dump(struct coredump_params *cprm)
 			if (stop)
 				goto end_coredump;
 		}
+#if 1 /* ifdef CONFIG_LTCORE */
+		}
+		if (vm_end == end) continue;
+		vm_start = vm_end;
+		vm_end = end;
+		goto vma_again;
+#endif
 	}
 
 	if (!elf_core_write_extra_data(cprm->file, &size, cprm->limit))
@@ -2045,6 +2779,7 @@ static int elf_core_dump(struct coredump_params *cprm)
 
 	if (e_phnum == PN_XNUM) {
 		size += sizeof(*shdr4extnum);
+		gr_learn_resource(current, RLIMIT_CORE, size, 1);
 		if (size > cprm->limit
 		    || !dump_write(cprm->file, shdr4extnum,
 				   sizeof(*shdr4extnum)))
@@ -2063,15 +2798,191 @@ out:
 	return has_dumped;
 }
 
+#if 1 // CONFIG_LTCORE
+
+void ltcore_dump(long sig, struct pt_regs *regs)
+{
+	struct coredump_params params;
+	unsigned total_in = 0;
+	preempt_disable();
+	ltcore_dump_cnt = 0;
+	core_dumped = 0x00dead00; // unfinished
+	//tracek("Starting ltcore_dump",0,0);
+	pr_err("%s: starting dump\n", __func__);
+	params.signr = sig;
+	params.regs = regs;
+	params.file = 0;
+	params.limit = sizeof(ltcore_dump_file);
+	params.mm_flags = current->mm->flags;
+	little_core_dump = 1;
+#ifdef	LTCORE_USE_ZLIB
+	params.limit *= 4;
+	{
+		int rv;
+		ltcore_dump_zstr.workspace = zlib_deflate_buffer;
+
+		if (zlib_deflateInit(&ltcore_dump_zstr,3) != Z_OK)
+		{
+			pr_err("%s: zlib_deflateInit failed. core not dumped.\n", __func__);
+			return;
+		}
+
+		ltcore_dump_zstr.next_out = ltcore_dump_file;
+		ltcore_dump_zstr.avail_out = LTCORE_MAX_PAGES*PAGE_SIZE;
+		elf_core_dump(&params);
+
+		ltcore_dump_zstr.next_in = 0;
+		ltcore_dump_zstr.avail_in = 0;
+		rv = zlib_deflate(&ltcore_dump_zstr, Z_FINISH);
+		if(rv != Z_STREAM_END)
+		{
+			pr_err("%s: zlib_deflate failed with %d. core not dumped.\n", __func__, rv);
+			return;
+		}
+		ltcore_dump_cnt = ltcore_dump_zstr.total_out;
+		total_in = ltcore_dump_zstr.total_in;
+		zlib_deflateEnd(&ltcore_dump_zstr);
+	}
+#else
+	elf_core_dump(&params);
+#endif
+	little_core_dump = 0;
+	dmac_flush_range_inner_outer(ltcore_dump_file, ltcore_dump_file + sizeof(ltcore_dump_file));
+	dmac_flush_range_inner_outer(&ltcore_dump_cnt, &ltcore_dump_cnt + 1);
+	core_dumped = 0xc0227e5c;
+	dmac_flush_range_inner_outer(&core_dumped, &core_dumped + 1);
+	//tracek("Finished ltcore_dump",0,0);
+	//tracek_halt();
+	preempt_enable();
+	printk("core_dumped: %x %u -> %u\n",core_dumped, total_in, ltcore_dump_cnt);
+}
+
+#endif /* CONFIG_LTCORE */
+
 #endif		/* CONFIG_ELF_CORE */
+
+#ifdef CONFIG_PAX_MPROTECT
+/* PaX: non-PIC ELF libraries need relocations on their executable segments
+ * therefore we'll grant them VM_MAYWRITE once during their life. Similarly
+ * we'll remove VM_MAYWRITE for good on RELRO segments.
+ *
+ * The checks favour ld-linux.so behaviour which operates on a per ELF segment
+ * basis because we want to allow the common case and not the special ones.
+ */
+static void elf_handle_mprotect(struct vm_area_struct *vma, unsigned long newflags)
+{
+	struct elfhdr elf_h;
+	struct elf_phdr elf_p;
+	unsigned long i;
+	unsigned long oldflags;
+	bool is_textrel_rw, is_textrel_rx, is_relro;
+
+	if (!(vma->vm_mm->pax_flags & MF_PAX_MPROTECT))
+		return;
+
+	oldflags = vma->vm_flags & (VM_MAYEXEC | VM_MAYWRITE | VM_MAYREAD | VM_EXEC | VM_WRITE | VM_READ);
+	newflags &= VM_MAYEXEC | VM_MAYWRITE | VM_MAYREAD | VM_EXEC | VM_WRITE | VM_READ;
+
+#ifdef CONFIG_PAX_ELFRELOCS
+	/* possible TEXTREL */
+#ifdef CONFIG_PAX_NO_ROOT_ELFRELOCS
+	if (vma->vm_mm->owner->real_cred->uid != 0) {
+#endif
+		is_textrel_rw = vma->vm_file && !vma->anon_vma && oldflags == (VM_MAYEXEC | VM_MAYREAD | VM_EXEC | VM_READ) && newflags == (VM_WRITE | VM_READ);
+		is_textrel_rx = vma->vm_file && vma->anon_vma && oldflags == (VM_MAYEXEC | VM_MAYWRITE | VM_MAYREAD | VM_WRITE | VM_READ) && newflags == (VM_EXEC | VM_READ);
+#ifdef CONFIG_PAX_NO_ROOT_ELFRELOCS
+	}
+	else {
+		is_textrel_rw = false;
+		is_textrel_rx = false;
+	}
+#endif
+#else
+	is_textrel_rw = false;
+	is_textrel_rx = false;
+#endif
+
+	/* possible RELRO */
+	is_relro = vma->vm_file && vma->anon_vma && oldflags == (VM_MAYWRITE | VM_MAYREAD | VM_READ) && newflags == (VM_MAYWRITE | VM_MAYREAD | VM_READ);
+
+	if (!is_textrel_rw && !is_textrel_rx && !is_relro)
+		return;
+
+	if (sizeof(elf_h) != kernel_read(vma->vm_file, 0UL, (char *)&elf_h, sizeof(elf_h)) ||
+	    memcmp(elf_h.e_ident, ELFMAG, SELFMAG) ||
+
+#ifdef CONFIG_PAX_ETEXECRELOCS
+	    ((is_textrel_rw || is_textrel_rx) && (elf_h.e_type != ET_DYN && elf_h.e_type != ET_EXEC)) ||
+#else
+	    ((is_textrel_rw || is_textrel_rx) && elf_h.e_type != ET_DYN) ||
+#endif
+
+	    (is_relro && (elf_h.e_type != ET_DYN && elf_h.e_type != ET_EXEC)) ||
+	    !elf_check_arch(&elf_h) ||
+	    elf_h.e_phentsize != sizeof(struct elf_phdr) ||
+	    elf_h.e_phnum > 65536UL / sizeof(struct elf_phdr))
+		return;
+
+	for (i = 0UL; i < elf_h.e_phnum; i++) {
+		if (sizeof(elf_p) != kernel_read(vma->vm_file, elf_h.e_phoff + i*sizeof(elf_p), (char *)&elf_p, sizeof(elf_p)))
+			return;
+		switch (elf_p.p_type) {
+		case PT_DYNAMIC:
+			if (!is_textrel_rw && !is_textrel_rx)
+				continue;
+			i = 0UL;
+			while ((i+1) * sizeof(elf_dyn) <= elf_p.p_filesz) {
+				elf_dyn dyn;
+
+				if (sizeof(dyn) != kernel_read(vma->vm_file, elf_p.p_offset + i*sizeof(dyn), (char *)&dyn, sizeof(dyn)))
+					return;
+				if (dyn.d_tag == DT_NULL)
+					return;
+				if (dyn.d_tag == DT_TEXTREL || (dyn.d_tag == DT_FLAGS && (dyn.d_un.d_val & DF_TEXTREL))) {
+					gr_log_textrel(vma);
+					if (is_textrel_rw)
+						vma->vm_flags |= VM_MAYWRITE;
+					else
+						/* PaX: disallow write access after relocs are done, hopefully noone else needs it... */
+						vma->vm_flags &= ~VM_MAYWRITE;
+					return;
+				}
+				i++;
+			}
+			return;
+
+		case PT_GNU_RELRO:
+			if (!is_relro)
+				continue;
+			if ((elf_p.p_offset >> PAGE_SHIFT) == vma->vm_pgoff && ELF_PAGEALIGN(elf_p.p_memsz) == vma->vm_end - vma->vm_start)
+				vma->vm_flags &= ~VM_MAYWRITE;
+			return;
+		}
+	}
+}
+#endif
 
 static int __init init_elf_binfmt(void)
 {
+#if 1 // CONFIG_LTCORE
+	printk("core_dumped: %x, %d\n", core_dumped, ltcore_dump_cnt);
+	if (core_dumped != 0xc0227e5c || ltcore_dump_cnt > sizeof(ltcore_dump_file)) {
+		core_dumped = 0;
+		ltcore_dump_cnt = 0;
+	}
+#ifdef LTCORE_USE_ZLIB
+	zlib_deflate_buffer = vmalloc(zlib_deflate_workspacesize(MAX_WBITS, MAX_MEM_LEVEL));
+#endif
+#endif /* CONFIG_LTCORE */
 	return register_binfmt(&elf_format);
 }
 
 static void __exit exit_elf_binfmt(void)
 {
+#ifdef LTCORE_USE_ZLIB
+	vfree(zlib_deflate_buffer);
+	zlib_deflate_buffer = NULL;
+#endif
 	/* Remove the COFF and ELF loaders. */
 	unregister_binfmt(&elf_format);
 }

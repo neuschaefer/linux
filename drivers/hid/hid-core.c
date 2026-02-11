@@ -1054,16 +1054,26 @@ void hid_report_raw_event(struct hid_device *hid, int type, u8 *data, int size,
 		memset(cdata + csize, 0, rsize - csize);
 	}
 
+	/* Roku hack: Comment out all HID processing except raw; this saves 
+ 	 * a significant amount of CPU time on motion events. No devices 
+ 	 * using this kernel should have any need for non-raw HID events.
+         */
+#if 0
 	if ((hid->claimed & HID_CLAIMED_HIDDEV) && hid->hiddev_report_event)
 		hid->hiddev_report_event(hid, report);
+#endif
+
 	if (hid->claimed & HID_CLAIMED_HIDRAW)
 		hidraw_report_event(hid, data, size);
 
+#if 0
 	for (a = 0; a < report->maxfield; a++)
 		hid_input_field(hid, report->field[a], cdata, interrupt);
 
 	if (hid->claimed & HID_CLAIMED_INPUT)
 		hidinput_report_event(hid, report);
+#endif 
+
 }
 EXPORT_SYMBOL_GPL(hid_report_raw_event);
 
@@ -1943,7 +1953,7 @@ static bool hid_ignore(struct hid_device *hdev)
 
 int hid_add_device(struct hid_device *hdev)
 {
-	static atomic_t id = ATOMIC_INIT(0);
+	static atomic_unchecked_t id = ATOMIC_INIT(0);
 	int ret;
 
 	if (WARN_ON(hdev->status & HID_STAT_ADDED))
@@ -1958,7 +1968,7 @@ int hid_add_device(struct hid_device *hdev)
 	/* XXX hack, any other cleaner solution after the driver core
 	 * is converted to allow more than 20 bytes as the device name? */
 	dev_set_name(&hdev->dev, "%04X:%04X:%04X.%04X", hdev->bus,
-		     hdev->vendor, hdev->product, atomic_inc_return(&id));
+		     hdev->vendor, hdev->product, atomic_inc_return_unchecked(&id));
 
 	hid_debug_register(hdev, dev_name(&hdev->dev));
 	ret = device_add(&hdev->dev);

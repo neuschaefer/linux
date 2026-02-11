@@ -1,0 +1,5 @@
+        reg = <0x80000000 0x8000000>;
+        cma-lwm = <0x01000000>;
+        cma-hwm = <0x02000000>;
+        mempool-start = <0x00000000>;
+        mempool-end = <0x06300000>;

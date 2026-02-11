@@ -36,6 +36,7 @@ static const char *_name = DM_NAME;
 
 static unsigned int major = 0;
 static unsigned int _major = 0;
+unsigned int dm_major = 0;
 
 static DEFINE_IDR(_minor_idr);
 
@@ -164,9 +165,9 @@ struct mapped_device {
 	/*
 	 * Event handling.
 	 */
-	atomic_t event_nr;
+	atomic_unchecked_t event_nr;
 	wait_queue_head_t eventq;
-	atomic_t uevent_seq;
+	atomic_unchecked_t uevent_seq;
 	struct list_head uevent_list;
 	spinlock_t uevent_lock; /* Protect access to uevent_list */
 
@@ -203,15 +204,21 @@ static struct kmem_cache *_io_cache;
 static struct kmem_cache *_tio_cache;
 static struct kmem_cache *_rq_tio_cache;
 static struct kmem_cache *_rq_bio_info_cache;
+static struct bio_set *_dm_bio_set;
 
 static int __init local_init(void)
 {
 	int r = -ENOMEM;
 
+	/* allocate a bioset for the dm */
+	_dm_bio_set = bioset_create(16, 0);
+	if (!_dm_bio_set)
+		return r;
+
 	/* allocate a slab for the dm_ios */
 	_io_cache = KMEM_CACHE(dm_io, 0);
 	if (!_io_cache)
-		return r;
+		goto out_free_bio_set;
 
 	/* allocate a slab for the target ios */
 	_tio_cache = KMEM_CACHE(dm_target_io, 0);
@@ -237,6 +244,7 @@ static int __init local_init(void)
 
 	if (!_major)
 		_major = r;
+	dm_major = _major;
 
 	return 0;
 
@@ -250,6 +258,8 @@ out_free_tio_cache:
 	kmem_cache_destroy(_tio_cache);
 out_free_io_cache:
 	kmem_cache_destroy(_io_cache);
+out_free_bio_set:
+	bioset_free(_dm_bio_set);
 
 	return r;
 }
@@ -260,6 +270,7 @@ static void local_exit(void)
 	kmem_cache_destroy(_rq_tio_cache);
 	kmem_cache_destroy(_tio_cache);
 	kmem_cache_destroy(_io_cache);
+	bioset_free(_dm_bio_set);
 	unregister_blkdev(_major, _name);
 	dm_uevent_exit();
 
@@ -1868,8 +1879,8 @@ static struct mapped_device *alloc_dev(int minor)
 	rwlock_init(&md->map_lock);
 	atomic_set(&md->holders, 1);
 	atomic_set(&md->open_count, 0);
-	atomic_set(&md->event_nr, 0);
-	atomic_set(&md->uevent_seq, 0);
+	atomic_set_unchecked(&md->event_nr, 0);
+	atomic_set_unchecked(&md->uevent_seq, 0);
 	INIT_LIST_HEAD(&md->uevent_list);
 	spin_lock_init(&md->uevent_lock);
 
@@ -1949,7 +1960,7 @@ static void free_dev(struct mapped_device *md)
 		mempool_destroy(md->tio_pool);
 	if (md->io_pool)
 		mempool_destroy(md->io_pool);
-	if (md->bs)
+	if (md->bs && md->bs != _dm_bio_set)
 		bioset_free(md->bs);
 	blk_integrity_unregister(md->disk);
 	del_gendisk(md->disk);
@@ -2003,7 +2014,7 @@ static void event_callback(void *context)
 
 	dm_send_uevents(&uevents, &disk_to_dev(md->disk)->kobj);
 
-	atomic_inc(&md->event_nr);
+	atomic_inc_unchecked(&md->event_nr);
 	wake_up(&md->eventq);
 }
 
@@ -2579,18 +2590,18 @@ int dm_kobject_uevent(struct mapped_device *md, enum kobject_action action,
 
 uint32_t dm_next_uevent_seq(struct mapped_device *md)
 {
-	return atomic_add_return(1, &md->uevent_seq);
+	return atomic_add_return_unchecked(1, &md->uevent_seq);
 }
 
 uint32_t dm_get_event_nr(struct mapped_device *md)
 {
-	return atomic_read(&md->event_nr);
+	return atomic_read_unchecked(&md->event_nr);
 }
 
 int dm_wait_event(struct mapped_device *md, int event_nr)
 {
 	return wait_event_interruptible(md->eventq,
-			(event_nr != atomic_read(&md->event_nr)));
+			(event_nr != atomic_read_unchecked(&md->event_nr)));
 }
 
 void dm_uevent_add(struct mapped_device *md, struct list_head *elist)
@@ -2673,7 +2684,8 @@ struct dm_md_mempools *dm_alloc_md_mempools(unsigned type, unsigned integrity)
 	if (!pools->tio_pool)
 		goto free_io_pool_and_out;
 
-	pools->bs = bioset_create(pool_size, 0);
+	pools->bs = (type == DM_TYPE_BIO_BASED) ?
+			  _dm_bio_set : bioset_create(pool_size, 0);
 	if (!pools->bs)
 		goto free_tio_pool_and_out;
 
@@ -2708,7 +2720,7 @@ void dm_free_md_mempools(struct dm_md_mempools *pools)
 	if (pools->tio_pool)
 		mempool_destroy(pools->tio_pool);
 
-	if (pools->bs)
+	if (pools->bs && pools->bs != _dm_bio_set)
 		bioset_free(pools->bs);
 
 	kfree(pools);

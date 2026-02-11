@@ -50,6 +50,10 @@
 #include <linux/seq_file.h>
 #include "udp_impl.h"
 
+#ifdef CONFIG_GRKERNSEC_BLACKHOLE
+extern int grsec_enable_blackhole;
+#endif
+
 int ipv6_rcv_saddr_equal(const struct sock *sk, const struct sock *sk2)
 {
 	const struct in6_addr *sk_rcv_saddr6 = &inet6_sk(sk)->rcv_saddr;
@@ -345,6 +349,7 @@ int udpv6_recvmsg(struct kiocb *iocb, struct sock *sk,
 	int err;
 	int is_udplite = IS_UDPLITE(sk);
 	int is_udp4;
+	bool checksum_valid = false;
 	bool slow;
 
 	if (addr_len)
@@ -377,11 +382,12 @@ try_again:
 	 */
 
 	if (len < ulen || UDP_SKB_CB(skb)->partial_cov) {
-		if (udp_lib_checksum_complete(skb))
+        checksum_valid = !udp_lib_checksum_complete(skb);
+        if(!checksum_valid)
 			goto csum_copy_err;
 	}
 
-	if (skb_csum_unnecessary(skb))
+	if (checksum_valid || skb_csum_unnecessary(skb))
 		err = skb_copy_datagram_iovec(skb, sizeof(struct udphdr),
 					      msg->msg_iov,len);
 	else {
@@ -548,7 +554,7 @@ int udpv6_queue_rcv_skb(struct sock * sk, struct sk_buff *skb)
 
 	return 0;
 drop:
-	atomic_inc(&sk->sk_drops);
+	atomic_inc_unchecked(&sk->sk_drops);
 drop_no_sk_drops_inc:
 	UDP6_INC_STATS_BH(sock_net(sk), UDP_MIB_INERRORS, is_udplite);
 	kfree_skb(skb);
@@ -624,7 +630,7 @@ static void flush_stack(struct sock **stack, unsigned int count,
 			continue;
 		}
 drop:
-		atomic_inc(&sk->sk_drops);
+		atomic_inc_unchecked(&sk->sk_drops);
 		UDP6_INC_STATS_BH(sock_net(sk),
 				UDP_MIB_RCVBUFERRORS, IS_UDPLITE(sk));
 		UDP6_INC_STATS_BH(sock_net(sk),
@@ -779,6 +785,9 @@ int __udp6_lib_rcv(struct sk_buff *skb, struct udp_table *udptable,
 		UDP6_INC_STATS_BH(net, UDP_MIB_NOPORTS,
 				proto == IPPROTO_UDPLITE);
 
+#ifdef CONFIG_GRKERNSEC_BLACKHOLE
+		if (!grsec_enable_blackhole || (skb->dev->flags & IFF_LOOPBACK))
+#endif
 		icmpv6_send(skb, ICMPV6_DEST_UNREACH, ICMPV6_PORT_UNREACH, 0);
 
 		kfree_skb(skb);
@@ -795,7 +804,7 @@ int __udp6_lib_rcv(struct sk_buff *skb, struct udp_table *udptable,
 	if (!sock_owned_by_user(sk))
 		udpv6_queue_rcv_skb(sk, skb);
 	else if (sk_add_backlog(sk, skb)) {
-		atomic_inc(&sk->sk_drops);
+		atomic_inc_unchecked(&sk->sk_drops);
 		bh_unlock_sock(sk);
 		sock_put(sk);
 		goto discard;
@@ -1408,8 +1417,13 @@ static void udp6_sock_seq_show(struct seq_file *seq, struct sock *sp, int bucket
 		   0, 0L, 0,
 		   sock_i_uid(sp), 0,
 		   sock_i_ino(sp),
-		   atomic_read(&sp->sk_refcnt), sp,
-		   atomic_read(&sp->sk_drops));
+		   atomic_read(&sp->sk_refcnt),
+#ifdef CONFIG_GRKERNSEC_HIDESYM
+		   NULL,
+#else
+		   sp,
+#endif
+		   atomic_read_unchecked(&sp->sk_drops));
 }
 
 int udp6_seq_show(struct seq_file *seq, void *v)

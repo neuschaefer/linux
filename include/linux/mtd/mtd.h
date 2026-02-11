@@ -28,7 +28,7 @@
 
 #include <mtd/mtd-abi.h>
 
-#include <asm/div64.h>
+#include <asm-generic/div64.h>
 
 #define MTD_CHAR_MAJOR 90
 #define MTD_BLOCK_MAJOR 31
@@ -40,6 +40,31 @@
 #define MTD_ERASE_FAILED        0x10
 
 #define MTD_FAIL_ADDR_UNKNOWN -1LL
+
+/* performance instrumentation */
+static void update_stats(size_t *retlen, ktime_t start, ktime_t end, __u32 *num, __u32 *mean)
+{
+	if (*retlen)
+	{
+		__u64 delta = ktime_us_delta(end, start);
+		__u32 duration = __div64_32(&delta, (__u32)*retlen);
+		if ((*num)++)
+			*mean = (duration > *mean) ? *mean + (duration - *mean) / *num : *mean - (*mean - duration) / *num;
+		else
+			*mean = duration;
+	}
+}
+
+/* cat is either read, write or erase */
+#define TIMED_CALL(mtd, func, cat, retlen) \
+	({ \
+		ktime_t _start = ktime_get(); \
+		int _answer = func; /* func expected tomodify *retlen as a side effect */ \
+		ktime_t _end = ktime_get(); \
+		update_stats(retlen, _start, _end, &mtd->perf_stats.num_ ## cat, &mtd->perf_stats.mean_ ## cat); \
+		update_stats(retlen, _start, _end, &mtd->perf_stats.cumulative_num_ ## cat, &mtd->perf_stats.cumulative_mean_ ## cat); \
+		_answer; \
+	})
 
 /* If the erase fails, fail_addr might indicate exactly which block failed.  If
    fail_addr = MTD_FAIL_ADDR_UNKNOWN, the failure was not at the device level or was not
@@ -213,8 +238,8 @@ struct mtd_info {
 	struct backing_dev_info *backing_dev_info;
 
 
-	int (*read) (struct mtd_info *mtd, loff_t from, size_t len, size_t *retlen, u_char *buf);
-	int (*write) (struct mtd_info *mtd, loff_t to, size_t len, size_t *retlen, const u_char *buf);
+	int (*read) (struct mtd_info *mtd, loff_t from, size_t len, size_t *retlen, u_char *buf, int encrypted);
+	int (*write) (struct mtd_info *mtd, loff_t to, size_t len, size_t *retlen, const u_char *buf, int encrypted);
 
 	/* In blackbox flight recorder like scenarios we want to make successful
 	   writes in interrupt context. panic_write() is only intended to be
@@ -223,12 +248,12 @@ struct mtd_info {
 	   longer, this function can break locks and delay to ensure the write
 	   succeeds (but not sleep). */
 
-	int (*panic_write) (struct mtd_info *mtd, loff_t to, size_t len, size_t *retlen, const u_char *buf);
+	int (*panic_write) (struct mtd_info *mtd, loff_t to, size_t len, size_t *retlen, const u_char *buf, int encrypted);
 
 	int (*read_oob) (struct mtd_info *mtd, loff_t from,
-			 struct mtd_oob_ops *ops);
+			 struct mtd_oob_ops *ops, int encrypted);
 	int (*write_oob) (struct mtd_info *mtd, loff_t to,
-			 struct mtd_oob_ops *ops);
+			 struct mtd_oob_ops *ops, int encrypted);
 
 	/*
 	 * Methods to access the protection register area, present in some
@@ -246,7 +271,7 @@ struct mtd_info {
 	   NB: The 'count' parameter is the number of _vectors_, each of
 	   which contains an (ofs, len) tuple.
 	*/
-	int (*writev) (struct mtd_info *mtd, const struct kvec *vecs, unsigned long count, loff_t to, size_t *retlen);
+	int (*writev) (struct mtd_info *mtd, const struct kvec *vecs, unsigned long count, loff_t to, size_t *retlen, int encrypted);
 
 	/* Sync */
 	void (*sync) (struct mtd_info *mtd);
@@ -268,6 +293,9 @@ struct mtd_info {
 
 	/* ECC status information */
 	struct mtd_ecc_stats ecc_stats;
+	/* Additional status information */
+	struct mtd_perf_stats perf_stats;
+
 	/* Subpage shift (NAND) */
 	int subpage_sft;
 
@@ -346,10 +374,10 @@ extern void register_mtd_user (struct mtd_notifier *new);
 extern int unregister_mtd_user (struct mtd_notifier *old);
 
 int default_mtd_writev(struct mtd_info *mtd, const struct kvec *vecs,
-		       unsigned long count, loff_t to, size_t *retlen);
+		       unsigned long count, loff_t to, size_t *retlen, int encrypted);
 
 int default_mtd_readv(struct mtd_info *mtd, struct kvec *vecs,
-		      unsigned long count, loff_t from, size_t *retlen);
+		      unsigned long count, loff_t from, size_t *retlen, int encrypted);
 
 void *mtd_kmalloc_up_to(const struct mtd_info *mtd, size_t *size);
 

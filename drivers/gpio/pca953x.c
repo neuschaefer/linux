@@ -392,6 +392,7 @@ static uint16_t pca953x_irq_pending(struct pca953x_chip *chip)
 	uint16_t old_stat;
 	uint16_t pending;
 	uint16_t trigger;
+	uint16_t missed;
 	int ret, offset = 0;
 
 	switch (chip->chip_type) {
@@ -412,7 +413,14 @@ static uint16_t pca953x_irq_pending(struct pca953x_chip *chip)
 	old_stat = chip->irq_stat;
 	trigger = (cur_stat ^ old_stat) & chip->irq_mask;
 
-	if (!trigger)
+	/* Account for possible missed edges */
+	missed = ((~cur_stat & chip->irq_trig_fall) |
+	          (cur_stat & chip->irq_trig_raise )) & chip->irq_mask;
+
+	/* remove both edges */
+	missed &= ~(chip->irq_trig_fall & chip->irq_trig_raise);
+
+	if (!trigger & !missed)
 		return 0;
 
 	chip->irq_stat = cur_stat;
@@ -420,6 +428,9 @@ static uint16_t pca953x_irq_pending(struct pca953x_chip *chip)
 	pending = (old_stat & chip->irq_trig_fall) |
 		  (cur_stat & chip->irq_trig_raise);
 	pending &= trigger;
+
+	/* Account for possible missed edges */
+	pending |=  missed;
 
 	return pending;
 }
@@ -437,6 +448,7 @@ static irqreturn_t pca953x_irq_handler(int irq, void *devid)
 
 	do {
 		level = __ffs(pending);
+		/* use nested irq handler since calling from irq thread */
 		handle_nested_irq(level + chip->irq_base);
 
 		pending &= ~(1 << level);
@@ -481,7 +493,7 @@ static int pca953x_irq_setup(struct pca953x_chip *chip,
 			int irq = lvl + chip->irq_base;
 
 			irq_set_chip_data(irq, chip);
-			irq_set_chip(irq, &pca953x_irq_chip);
+			irq_set_chip(irq, &pca953x_irq_chip)
 			irq_set_nested_thread(irq, true);
 #ifdef CONFIG_ARM
 			set_irq_flags(irq, IRQF_VALID);

@@ -75,6 +75,7 @@ __setup("fpe=", fpe_setup);
 extern void paging_init(struct machine_desc *desc);
 extern void sanity_check_meminfo(void);
 extern void reboot_setup(char *str);
+extern void setup_dma_zone(struct machine_desc *desc);
 
 unsigned int processor_id;
 EXPORT_SYMBOL(processor_id);
@@ -677,6 +678,18 @@ static int __init parse_tag_cmdline(const struct tag *tag)
 
 __tagtable(ATAG_CMDLINE, parse_tag_cmdline);
 
+unsigned char _esn_mac[10];
+unsigned char _esn_mac_extra[32];
+
+static int __init parse_tag_esn(const struct tag *tag)
+{
+	memcpy(_esn_mac,tag->u.esn.esn_mac,10);
+	memcpy(_esn_mac_extra,tag->u.esn.extra,32);
+	return 0;
+}
+
+__tagtable(ATAG_ESN, parse_tag_esn);
+
 /*
  * Scan the tag table for this tag, and call its parse function.
  * The tag table is built by the linker from all the __tagtable
@@ -886,6 +899,8 @@ void __init setup_arch(char **cmdline_p)
 		mdesc = setup_machine_tags(machine_arch_type);
 	machine_desc = mdesc;
 	machine_name = mdesc->name;
+
+	setup_dma_zone(mdesc);
 
 	if (mdesc->soft_reboot)
 		reboot_setup("s");

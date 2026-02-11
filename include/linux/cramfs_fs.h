@@ -1,8 +1,12 @@
 #ifndef __CRAMFS_H
 #define __CRAMFS_H
 
-#include <linux/types.h>
 #include <linux/magic.h>
+
+#ifndef _ASM_GENERIC_INT_LL64_H
+typedef unsigned char __u8;
+typedef unsigned int __u32;
+#endif
 
 #define CRAMFS_SIGNATURE	"Compressed ROMFS"
 
@@ -11,11 +15,11 @@
  * Primarily used to generate warnings in mkcramfs.
  */
 #define CRAMFS_MODE_WIDTH 16
-#define CRAMFS_UID_WIDTH 16
-#define CRAMFS_SIZE_WIDTH 24
-#define CRAMFS_GID_WIDTH 8
-#define CRAMFS_NAMELEN_WIDTH 6
-#define CRAMFS_OFFSET_WIDTH 26
+#define CRAMFS_UID_WIDTH 32
+#define CRAMFS_SIZE_WIDTH 32
+#define CRAMFS_GID_WIDTH 32
+#define CRAMFS_NAMELEN_WIDTH 8
+#define CRAMFS_OFFSET_WIDTH 30
 
 /*
  * Since inode.namelen is a unsigned 6-bit number, the maximum cramfs
@@ -27,18 +31,20 @@
  * Reasonably terse representation of the inode data.
  */
 struct cramfs_inode {
-	__u32 mode:CRAMFS_MODE_WIDTH, uid:CRAMFS_UID_WIDTH;
+	__u32 mode:CRAMFS_MODE_WIDTH, namelen:CRAMFS_NAMELEN_WIDTH;
 	/* SIZE for device files is i_rdev */
-	__u32 size:CRAMFS_SIZE_WIDTH, gid:CRAMFS_GID_WIDTH;
 	/* NAMELEN is the length of the file name, divided by 4 and
            rounded up.  (cramfs doesn't support hard links.) */
+	__u32 size /* :CRAMFS_SIZE_WIDTH */ ;
 	/* OFFSET: For symlinks and non-empty regular files, this
 	   contains the offset (divided by 4) of the file data in
 	   compressed form (starting with an array of block pointers;
 	   see README).  For non-empty directories it is the offset
 	   (divided by 4) of the inode of the first file in that
 	   directory.  For anything else, offset is zero. */
-	__u32 namelen:CRAMFS_NAMELEN_WIDTH, offset:CRAMFS_OFFSET_WIDTH;
+	__u32 offset /* :CRAMFS_OFFSET_WIDTH */ ;
+	__u32 uid;
+	__u32 gid;
 };
 
 struct cramfs_info {
@@ -73,6 +79,7 @@ struct cramfs_super {
 #define CRAMFS_FLAG_HOLES		0x00000100	/* support for holes */
 #define CRAMFS_FLAG_WRONG_SIGNATURE	0x00000200	/* reserved */
 #define CRAMFS_FLAG_SHIFTED_ROOT_OFFSET	0x00000400	/* shifted root fs */
+#define CRAMFS_FLAG_AUTHENTICATED	0x00001000	/* authdata follows cramfs */
 
 /*
  * Valid values in super.flags.  Currently we refuse to mount
@@ -82,11 +89,12 @@ struct cramfs_super {
 #define CRAMFS_SUPPORTED_FLAGS	( 0x000000ff \
 				| CRAMFS_FLAG_HOLES \
 				| CRAMFS_FLAG_WRONG_SIGNATURE \
-				| CRAMFS_FLAG_SHIFTED_ROOT_OFFSET )
+				| CRAMFS_FLAG_SHIFTED_ROOT_OFFSET \
+				| CRAMFS_FLAG_AUTHENTICATED)
 
 #ifdef __KERNEL__
 /* Uncompression interfaces to the underlying zlib */
-int cramfs_uncompress_block(void *dst, int dstlen, void *src, int srclen);
+int cramfs_uncompress_block(void *dst, int dstlen, void **src, int *srclen);
 int cramfs_uncompress_init(void);
 void cramfs_uncompress_exit(void);
 #endif /* __KERNEL__ */

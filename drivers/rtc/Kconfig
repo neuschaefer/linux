@@ -106,6 +106,24 @@ config RTC_INTF_DEV_UIE_EMUL
 	  clock several times per second, please enable this option
 	  only if you know that you really need it.
 
+config RTC_INTF_ALARM
+	bool "Android alarm driver"
+	depends on RTC_CLASS
+	default y
+	help
+	  Provides non-wakeup and rtc backed wakeup alarms based on rtc or
+	  elapsed realtime, and a non-wakeup alarm on the monotonic clock.
+	  Also provides an interface to set the wall time which must be used
+	  for elapsed realtime to work.
+
+config RTC_INTF_ALARM_DEV
+	bool "Android alarm device"
+	depends on RTC_INTF_ALARM
+	default y
+	help
+	  Exports the alarm interface to user-space.
+
+
 config RTC_DRV_TEST
 	tristate "Test driver/device"
 	help
@@ -134,6 +152,17 @@ config RTC_DRV_88PM860X
 
 	  This driver can also be built as a module. If so, the module
 	  will be called rtc-88pm860x.
+
+config RTC_DRV_BCM59055
+        tristate "Broadcom BCM59055 PMU RTC"
+        depends on MFD_BCM_PMU590XX
+        select RTC_ANDROID_ALARM_WORKAROUND
+        help
+          If you say yes here you will get support for the RTC subsystem
+          of Broadcom BCM59035 PMU chip
+
+          This driver can also be built as a module. If so, the module
+          will be called "rtc-bcm59055".
 
 config RTC_DRV_DS1307
 	tristate "Dallas/Maxim DS1307/37/38/39/40, ST M41T00, EPSON RX-8025"
@@ -829,6 +858,12 @@ config RTC_DRV_AT32AP700X
 	  Driver for the internal RTC (Realtime Clock) on Atmel AVR32
 	  AT32AP700x family processors.
 
+config RTC_DRV_ISLAND
+	tristate "AT32AP700X series RTC"
+	help
+	  Driver for the internal RTC (Realtime Clock) on Atmel AVR32
+	  AT32AP700x family processors.
+
 config RTC_DRV_AT91RM9200
 	tristate "AT91RM9200 or some AT91SAM9 RTC"
 	depends on ARCH_AT91RM9200 || ARCH_AT91SAM9RL || ARCH_AT91SAM9G45
@@ -1059,5 +1094,11 @@ config RTC_DRV_PUV3
 
 	  This drive can also be built as a module. If so, the module
 	  will be called rtc-puv3.
+
+config RTC_DRV_BCMPMU
+	tristate "BCM PMU RTC"
+	depends on MFD_BCMPMU
+	help
+	  To support RTC driver on BCM PMUs
 
 endif # RTC_CLASS

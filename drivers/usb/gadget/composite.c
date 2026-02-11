@@ -37,10 +37,55 @@
  */
 
 /* big enough to hold our biggest descriptor */
-#define USB_BUFSIZ	1024
+#define USB_BUFSIZ						1024
+#define USB_PRE_CONFIG_CURRENT		100
+#define USB_OTG_PRE_CONFIG_CURRENT	2
+
+#ifdef CONFIG_USB_OTG
+static struct usb_otg_descriptor otg_descriptor = {
+	.bLength =		sizeof otg_descriptor,
+	.bDescriptorType =	USB_DT_OTG,
+	.bmAttributes =	USB_OTG_SRP | USB_OTG_HNP,
+};
+
+static const struct usb_descriptor_header *otg_desc[] = {
+	(struct usb_descriptor_header *) &otg_descriptor,
+	NULL,
+};
+#endif
+
+#ifdef CONFIG_USB_LPM
+#define USB_DEVICE_CAPABILITY_20_EXTENSION	0x02
+#define USB_20_EXT_LPM				0x02
+struct usb_dev_cap_20_ext_desc {
+	__u8 bLength;
+	__u8 bDescriptorType;
+	__u8 bDevCapabilityType;
+	__le32 bmAttributes;
+} __attribute__ ((__packed__)) usb_dev_cap_20_ext_desc_t;
+
+static struct usb_bos_20_ext_desc {
+	struct usb_bos_descriptor bos_desc;
+	struct usb_dev_cap_20_ext_desc dev_cap_20_ext_desc;
+} __attribute__ ((__packed__)) bos_20_ext_desc = {
+	{
+		.bLength =		sizeof(struct usb_bos_descriptor),
+		.bDescriptorType =	USB_DT_BOS,
+		.wTotalLength =	sizeof(struct usb_bos_20_ext_desc),
+		.bNumDeviceCaps = 1,
+	},
+	{
+		.bLength =		sizeof(struct usb_dev_cap_20_ext_desc),
+		.bDescriptorType =	USB_DT_DEVICE_CAPABILITY,
+		.bDevCapabilityType =	USB_DEVICE_CAPABILITY_20_EXTENSION,
+		.bmAttributes =	USB_20_EXT_LPM,
+	},
+};
+#endif
 
 static struct usb_composite_driver *composite;
 static int (*composite_gadget_bind)(struct usb_composite_dev *cdev);
+
 
 /* Some systems will need runtime overrides for the  product identifiers
  * published in the device descriptor, either numbers or strings or both.
@@ -322,6 +367,21 @@ static int config_desc(struct usb_composite_dev *cdev, unsigned w_value)
 	return -EINVAL;
 }
 
+#ifdef CONFIG_USB_OTG
+static int fill_otg_desc(struct usb_composite_dev *cdev)
+{
+	struct usb_configuration	*c = list_first_entry(&cdev->configs,
+				struct usb_configuration, list);
+
+	if (c->descriptors && cdev->req && cdev->req->buf) {
+		memcpy(cdev->req->buf, *c->descriptors, USB_BUFSIZ);
+		return (*c->descriptors)->bLength;
+	}
+
+	return -EINVAL;
+}
+#endif
+
 static int count_configs(struct usb_composite_dev *cdev, unsigned type)
 {
 	struct usb_gadget		*gadget = cdev->gadget;
@@ -410,10 +470,18 @@ static int set_config(struct usb_composite_dev *cdev,
 	INFO(cdev, "%s speed config #%d: %s\n",
 		({ char *speed;
 		switch (gadget->speed) {
-		case USB_SPEED_LOW:	speed = "low"; break;
-		case USB_SPEED_FULL:	speed = "full"; break;
-		case USB_SPEED_HIGH:	speed = "high"; break;
-		default:		speed = "?"; break;
+		case USB_SPEED_LOW:
+			speed = "low";
+			break;
+		case USB_SPEED_FULL:
+			speed = "full";
+			break;
+		case USB_SPEED_HIGH:
+			speed = "high";
+			break;
+		default:
+			speed = "?";
+			break;
 		} ; speed; }), number, c ? c->label : "unconfigured");
 
 	if (!c)
@@ -476,6 +544,7 @@ static int set_config(struct usb_composite_dev *cdev,
 	power = c->bMaxPower ? (2 * c->bMaxPower) : CONFIG_USB_GADGET_VBUS_DRAW;
 done:
 	usb_gadget_vbus_draw(gadget, power);
+
 	if (result >= 0 && cdev->delayed_status)
 		result = USB_GADGET_DELAYED_STATUS;
 	return result;
@@ -519,10 +588,30 @@ int usb_add_config(struct usb_composite_dev *cdev,
 	}
 
 	config->cdev = cdev;
+
 	list_add_tail(&config->list, &cdev->configs);
+
+#ifdef CONFIG_USB_OTG
+	if (gadget_is_otg(cdev->gadget)) {
+
+		config->descriptors = otg_desc;
+		config->bmAttributes |= USB_CONFIG_ATT_WAKEUP;
+
+		if (gadget_is_otg2(cdev->gadget)) {
+			otg_descriptor.bcdOTG = __constant_cpu_to_le16(0x0200);
+			otg_descriptor.bmAttributes |= USB_OTG_ADP;
+		}
+	}
+#endif
+
+#ifdef CONFIG_USB_LPM
+	if (gadget_is_lpm(cdev->gadget))
+		config->bmAttributes |= USB_CONFIG_ATT_WAKEUP;
+#endif
 
 	INIT_LIST_HEAD(&config->functions);
 	config->next_interface_id = 0;
+	memset(config->interface, '\0', sizeof(config->interface));
 
 	status = bind(config);
 	if (status < 0) {
@@ -560,6 +649,45 @@ done:
 		DBG(cdev, "added config '%s'/%u --> %d\n", config->label,
 				config->bConfigurationValue, status);
 	return status;
+}
+
+static int remove_config(struct usb_composite_dev *cdev,
+			      struct usb_configuration *config)
+{
+	while (!list_empty(&config->functions)) {
+		struct usb_function		*f;
+
+		f = list_first_entry(&config->functions,
+				struct usb_function, list);
+		list_del(&f->list);
+		if (f->unbind) {
+			DBG(cdev, "unbind function '%s'/%p\n", f->name, f);
+			f->unbind(config, f);
+			/* may free memory for "f" */
+		}
+	}
+	list_del(&config->list);
+	if (config->unbind) {
+		DBG(cdev, "unbind config '%s'/%p\n", config->label, config);
+		config->unbind(config);
+			/* may free memory for "c" */
+	}
+	return 0;
+}
+
+int usb_remove_config(struct usb_composite_dev *cdev,
+		      struct usb_configuration *config)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&cdev->lock, flags);
+
+	if (cdev->config == config)
+		reset_config(cdev);
+
+	spin_unlock_irqrestore(&cdev->lock, flags);
+
+	return remove_config(cdev, config);
 }
 
 /*-------------------------------------------------------------------------*/
@@ -669,9 +797,13 @@ static int get_string(struct usb_composite_dev *cdev,
 	else
 		str = NULL;
 	if (str) {
+		/* Init with NULL str in last element */
+		struct usb_string language_string_array[2] = {
+			{ 0xff, str}, {0xff, NULL}
+	    };
 		struct usb_gadget_strings strings = {
 			.language = language,
-			.strings  = &(struct usb_string) { 0xff, str }
+			.strings  = language_string_array
 		};
 		return usb_gadget_get_string(&strings, 0xff, buf);
 	}
@@ -836,6 +968,12 @@ composite_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 		switch (w_value >> 8) {
 
 		case USB_DT_DEVICE:
+			if (gadget_is_lpm(gadget)) {
+				/* LPM needs support for BOS descriptor
+				 * so need to use 2.01 or later */
+				cdev->desc.bcdUSB = 0x201;
+			}
+
 			cdev->desc.bNumConfigurations =
 				count_configs(cdev, USB_DT_DEVICE);
 			value = min(w_length, (u16) sizeof cdev->desc);
@@ -863,6 +1001,30 @@ composite_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 			if (value >= 0)
 				value = min(w_length, (u16) value);
 			break;
+#ifdef CONFIG_USB_OTG
+		case USB_DT_OTG:
+			if (!gadget_is_otg(gadget))
+				break;
+
+			value = fill_otg_desc(cdev);
+			if (value >= 0)
+				value = min(w_length, (u16) value);
+			break;
+#endif
+
+#ifdef CONFIG_USB_LPM
+		case USB_DT_BOS:
+			if (usb_gadget_test_lpm_support(gadget))
+				bos_20_ext_desc.dev_cap_20_ext_desc.
+				  bmAttributes |= USB_20_EXT_LPM;
+			else
+				bos_20_ext_desc.dev_cap_20_ext_desc.
+				  bmAttributes &= ~USB_20_EXT_LPM;
+
+			value = min(w_length, (u16)sizeof bos_20_ext_desc);
+			memcpy(req->buf, &bos_20_ext_desc, value);
+			break;
+#endif
 		}
 		break;
 
@@ -1002,6 +1164,10 @@ static void composite_disconnect(struct usb_gadget *gadget)
 	struct usb_composite_dev	*cdev = get_gadget_data(gadget);
 	unsigned long			flags;
 
+#ifdef CONFIG_USB_OTG
+	gadget->host_request = 0;
+#endif
+
 	/* REVISIT:  should we have config and device level
 	 * disconnect callbacks?
 	 */
@@ -1011,6 +1177,13 @@ static void composite_disconnect(struct usb_gadget *gadget)
 	if (composite->disconnect)
 		composite->disconnect(cdev);
 	spin_unlock_irqrestore(&cdev->lock, flags);
+
+
+	usb_gadget_vbus_draw(gadget,
+		gadget_is_otg(gadget) ?
+		    USB_OTG_PRE_CONFIG_CURRENT :
+		    USB_PRE_CONFIG_CURRENT);
+
 }
 
 /*-------------------------------------------------------------------------*/
@@ -1027,6 +1200,22 @@ static ssize_t composite_show_suspended(struct device *dev,
 
 static DEVICE_ATTR(suspended, 0444, composite_show_suspended, NULL);
 
+#ifdef CONFIG_USB_OTG
+static ssize_t composite_set_host_request(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct usb_gadget *gadget = dev_to_usb_gadget(dev);
+	int value;
+
+	if (sscanf(buf, "%d", &value) != 1)
+		return -EINVAL;
+
+	gadget->host_request = !!value;
+	return count;
+}
+static DEVICE_ATTR(host_request, S_IWUSR, NULL, composite_set_host_request);
+#endif
+
 static void
 composite_unbind(struct usb_gadget *gadget)
 {
@@ -1041,28 +1230,9 @@ composite_unbind(struct usb_gadget *gadget)
 
 	while (!list_empty(&cdev->configs)) {
 		struct usb_configuration	*c;
-
 		c = list_first_entry(&cdev->configs,
 				struct usb_configuration, list);
-		while (!list_empty(&c->functions)) {
-			struct usb_function		*f;
-
-			f = list_first_entry(&c->functions,
-					struct usb_function, list);
-			list_del(&f->list);
-			if (f->unbind) {
-				DBG(cdev, "unbind function '%s'/%p\n",
-						f->name, f);
-				f->unbind(c, f);
-				/* may free memory for "f" */
-			}
-		}
-		list_del(&c->list);
-		if (c->unbind) {
-			DBG(cdev, "unbind config '%s'/%p\n", c->label, c);
-			c->unbind(c);
-			/* may free memory for "c" */
-		}
+		remove_config(cdev, c);
 	}
 	if (composite->unbind)
 		composite->unbind(cdev);
@@ -1071,6 +1241,10 @@ composite_unbind(struct usb_gadget *gadget)
 		kfree(cdev->req->buf);
 		usb_ep_free_request(gadget->ep0, cdev->req);
 	}
+
+#ifdef CONFIG_USB_OTG
+	device_remove_file(&gadget->dev, &dev_attr_host_request);
+#endif
 	device_remove_file(&gadget->dev, &dev_attr_suspended);
 	kfree(cdev);
 	set_gadget_data(gadget, NULL);
@@ -1181,6 +1355,12 @@ static int composite_bind(struct usb_gadget *gadget)
 	status = device_create_file(&gadget->dev, &dev_attr_suspended);
 	if (status)
 		goto fail;
+
+#ifdef CONFIG_USB_OTG
+	status = device_create_file(&gadget->dev, &dev_attr_host_request);
+	if (status)
+		goto fail;
+#endif
 
 	INFO(cdev, "%s ready\n", composite->name);
 	return 0;
@@ -1348,4 +1528,5 @@ void usb_composite_setup_continue(struct usb_composite_dev *cdev)
 
 	spin_unlock_irqrestore(&cdev->lock, flags);
 }
+
 

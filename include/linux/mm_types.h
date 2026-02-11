@@ -198,6 +198,8 @@ struct vm_area_struct {
 #ifdef CONFIG_NUMA
 	struct mempolicy *vm_policy;	/* NUMA policy for the VMA */
 #endif
+
+	struct vm_area_struct *vm_mirror;/* PaX: mirror vma or NULL */
 };
 
 struct core_thread {
@@ -212,9 +214,10 @@ struct core_state {
 };
 
 enum {
-	MM_FILEPAGES,
-	MM_ANONPAGES,
-	MM_SWAPENTS,
+	MM_FILEPAGES,	/* Resident file mapping pages */
+	MM_ANONPAGES,	/* Resident anonymous pages */
+	MM_SWAPENTS,	/* Anonymous swap entries */
+	MM_SHMEMPAGES,	/* Resident shared memory pages */
 	NR_MM_COUNTERS
 };
 
@@ -330,6 +333,25 @@ struct mm_struct {
 #ifdef CONFIG_CPUMASK_OFFSTACK
 	struct cpumask cpumask_allocation;
 #endif
+
+#if defined(CONFIG_PAX_EI_PAX) || defined(CONFIG_PAX_PT_PAX_FLAGS) || defined(CONFIG_PAX_NOEXEC) || defined(CONFIG_PAX_ASLR)
+	unsigned long pax_flags;
+#endif
+
+#ifdef CONFIG_PAX_DLRESOLVE
+	unsigned long call_dl_resolve;
+#endif
+
+#if defined(CONFIG_PPC32) && defined(CONFIG_PAX_EMUSIGRT)
+	unsigned long call_syscall;
+#endif
+
+#ifdef CONFIG_PAX_ASLR
+	unsigned long delta_mmap;		/* randomized offset */
+	unsigned long delta_stack;		/* randomized offset */
+#endif
+
+	unsigned long rdebug;
 };
 
 static inline void mm_init_cpumask(struct mm_struct *mm)

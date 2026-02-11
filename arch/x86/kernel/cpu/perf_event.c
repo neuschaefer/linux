@@ -781,6 +781,8 @@ static int x86_schedule_events(struct cpu_hw_events *cpuc, int n, int *assign)
 	int i, j, w, wmax, num = 0;
 	struct hw_perf_event *hwc;
 
+	pax_track_stack();
+
 	bitmap_zero(used_mask, X86_PMC_IDX_MAX);
 
 	for (i = 0; i < n; i++) {
@@ -1332,7 +1334,7 @@ static int x86_pmu_handle_irq(struct pt_regs *regs)
 		if (!x86_perf_event_set_period(event))
 			continue;
 
-		if (perf_event_overflow(event, 1, &data, regs))
+		if (perf_event_overflow(event, &data, regs))
 			x86_pmu_stop(event, 0);
 	}
 
@@ -1875,7 +1877,7 @@ perf_callchain_user(struct perf_callchain_entry *entry, struct pt_regs *regs)
 			break;
 
 		perf_callchain_store(entry, frame.return_address);
-		fp = frame.next_frame;
+		fp = (const void __force_user *)frame.next_frame;
 	}
 }
 
