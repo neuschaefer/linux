@@ -31,6 +31,10 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
+/*
+Includes Intel Corporation's changes/modifications dated: 2014.
+Changed/modified portions - Copyright © 2014, Intel Corporation.
+*/
 
 #ifndef __MUSB_CORE_H__
 #define __MUSB_CORE_H__
@@ -88,6 +92,14 @@ enum {
 #ifndef MUSB_C_NUM_EPS
 #define MUSB_C_NUM_EPS ((u8)16)
 #endif
+
+/* ** Number of Tx endpoints ** */
+/* Legal values are 1 - 16 (this value includes EP0) */
+#define MUSB_C_NUM_EPT 5
+
+/* ** Number of Rx endpoints ** */
+/* Legal values are 1 - 16 (this value includes EP0) */
+#define MUSB_C_NUM_EPR 5
 
 #ifndef MUSB_MAX_END0_PACKET
 #define MUSB_MAX_END0_PACKET ((u16)MUSB_EP0_FIFOSIZE)
@@ -216,6 +228,7 @@ struct musb_hw_ep {
 
 	/* index in musb->endpoints[]  */
 	u8			epnum;
+	u8			dma_mode;
 
 	/* hardware configuration, possibly dynamic */
 	bool			is_shared_fifo;
@@ -423,6 +436,9 @@ struct musb {
 	int			xceiv_old_state;
 #ifdef CONFIG_DEBUG_FS
 	struct dentry		*debugfs_root;
+#endif
+#ifdef CONFIG_PM
+	unsigned power_status;
 #endif
 };
 

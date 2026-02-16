@@ -9,6 +9,12 @@
  *
  *  This file is included thrice in entry-common.S
  */
+
+/*
+ * Includes Intel Corporation's changes/modifications dated: 2017.
+ * Changed/modified portions - Copyright (c) 2017, Intel Corporation.
+ */
+
 /* 0 */		CALL(sys_restart_syscall)
 		CALL(sys_exit)
 		CALL(sys_fork)
@@ -389,6 +395,7 @@
 		CALL(sys_process_vm_writev)
 		CALL(sys_kcmp)
 		CALL(sys_finit_module)
+/* 380 */	CALL(sys_arm_cache_flush)
 #ifndef syscalls_counted
 .equ syscalls_padding, ((NR_syscalls + 3) & ~3) - NR_syscalls
 #define syscalls_counted

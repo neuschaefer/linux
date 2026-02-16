@@ -54,6 +54,9 @@ static inline unsigned int ip_hdrlen(const struct sk_buff *skb)
 struct ipcm_cookie {
 	__be32			addr;
 	int			oif;
+#ifdef CONFIG_TI_META_DATA
+    unsigned int        ti_meta_info;
+#endif /* CONFIG_TI_META_DATA */
 	struct ip_options_rcu	*opt;
 	__u8			tx_flags;
 };

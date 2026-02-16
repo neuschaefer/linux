@@ -4,6 +4,10 @@
  * Begun April 1, 1996, Mike Shaver.
  * Added /proc/sys/net/ipv4 directory entry (empty =) ). [MS]
  */
+/*
+Includes Intel Corporation's changes/modifications dated: [23/3/2015]. 
+Changed/modified portions - Copyright © [2015], Intel Corporation.   All Rights Reserved
+*/
 
 #include <linux/mm.h>
 #include <linux/module.h>
@@ -430,12 +434,20 @@ static struct ctl_table ipv4_table[] = {
 		.procname	= "tcp_fastopen",
 		.data		= &sysctl_tcp_fastopen,
 		.maxlen		= sizeof(int),
+#ifdef CONFIG_CRYPTO
 		.mode		= 0644,
+#else
+		.mode		= 0444,
+#endif
 		.proc_handler	= proc_dointvec,
 	},
 	{
 		.procname	= "tcp_fastopen_key",
+#ifdef CONFIG_CRYPTO
 		.mode		= 0600,
+#else
+		.mode		= 0400,
+#endif
 		.maxlen		= ((TCP_FASTOPEN_KEY_LENGTH * 2) + 10),
 		.proc_handler	= proc_tcp_fastopen_key,
 	},

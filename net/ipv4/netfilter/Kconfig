@@ -1,3 +1,5 @@
+# Includes Intel Corporation's changes/modifications dated: 2014.
+# Changed/modified portions - Copyright © 2014, Intel Corporation.
 #
 # IP netfilter configuration
 #
@@ -140,6 +142,14 @@ config IP_NF_TARGET_ULOG
 	  The appropriate userspace logging daemon (ulogd) may be obtained from
 	  <http://www.netfilter.org/projects/ulogd/index.html>
 
+	  To compile it as a module, choose M here.  If unsure, say N.
+
+config IP_NF_TARGET_TRIGGER
+	tristate "TRIGGER target support"
+	depends on INTEL_NF_TRIGGER_SUPPORT
+	default m if NETFILTER_ADVANCED=n
+	help
+	  Implemenets  port trigger action which occur on any matching packet.
 	  To compile it as a module, choose M here.  If unsure, say N.
 
 # NAT + specific targets: nf_conntrack

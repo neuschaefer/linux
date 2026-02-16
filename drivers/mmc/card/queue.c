@@ -9,6 +9,15 @@
  * published by the Free Software Foundation.
  *
  */
+
+/******************************************************************
+ 
+ Includes Intel Corporation's changes/modifications dated: 07/2011.
+ Changed/modified portions - Copyright(c) 2011-2014, Intel Corporation. 
+
+******************************************************************/
+
+
 #include <linux/slab.h>
 #include <linux/module.h>
 #include <linux/blkdev.h>
@@ -18,6 +27,9 @@
 
 #include <linux/mmc/card.h>
 #include <linux/mmc/host.h>
+#ifdef CONFIG_ARCH_GEN3
+#include <linux/mmc/bp.h>
+#endif
 #include "queue.h"
 
 #define MMC_QUEUE_BOUNCESZ	65536
@@ -37,7 +49,7 @@ static int mmc_prep_request(struct request_queue *q, struct request *req)
 		return BLKPREP_KILL;
 	}
 
-	if (mq && mmc_card_removed(mq->card))
+	if (mq && (mmc_card_removed(mq->card) || mmc_access_rpmb(mq)))
 		return BLKPREP_KILL;
 
 	req->cmd_flags |= REQ_DONTPREP;
@@ -286,6 +298,12 @@ int mmc_init_queue(struct mmc_queue *mq, struct mmc_card *card,
 			goto cleanup_queue;
 	}
 
+#ifdef CONFIG_ARCH_GEN3
+	mq->bp_sg = mmc_alloc_sg(host->max_segs, &ret);
+	if (ret)
+		goto cleanup_queue;
+#endif
+
 	sema_init(&mq->thread_sem, 1);
 
 	mq->thread = kthread_run(mmc_queue_thread, mq, "mmcqd/%d%s",
@@ -313,6 +331,11 @@ int mmc_init_queue(struct mmc_queue *mq, struct mmc_card *card,
 	mqrq_prev->sg = NULL;
 	kfree(mqrq_prev->bounce_buf);
 	mqrq_prev->bounce_buf = NULL;
+
+#ifdef CONFIG_ARCH_GEN3
+    kfree(mq->bp_sg);
+	mq->bp_sg = NULL;
+#endif
 
 	blk_cleanup_queue(mq->queue);
 	return ret;
@@ -354,6 +377,11 @@ void mmc_cleanup_queue(struct mmc_queue *mq)
 
 	kfree(mqrq_prev->bounce_buf);
 	mqrq_prev->bounce_buf = NULL;
+
+#ifdef CONFIG_ARCH_GEN3
+    kfree(mq->bp_sg);
+	mq->bp_sg = NULL;
+#endif
 
 	mq->card = NULL;
 }

@@ -22,6 +22,7 @@ menuconfig NET
 	  recommended to read the NET-HOWTO, available from
 	  <http://www.tldp.org/docs.html#howto>.
 
+
 if NET
 
 config WANT_COMPAT_NETLINK_MESSAGES
@@ -53,8 +54,8 @@ source "net/iucv/Kconfig"
 
 config INET
 	bool "TCP/IP networking"
-	select CRYPTO
-	select CRYPTO_AES
+	#select CRYPTO
+	#select CRYPTO_AES
 	---help---
 	  These are the protocols used on the Internet and on most local
 	  Ethernets. It is highly recommended to say Y here (this will enlarge
@@ -175,7 +176,7 @@ config BRIDGE_NETFILTER
 	bool "Bridged IP/ARP packets filtering"
 	depends on BRIDGE && NETFILTER && INET
 	depends on NETFILTER_ADVANCED
-	default y
+	default n
 	---help---
 	  Enabling this option will let arptables resp. iptables see bridged
 	  ARP resp. IP traffic. If you want a bridging firewall, you probably
@@ -334,6 +335,10 @@ source "net/rxrpc/Kconfig"
 
 config FIB_RULES
 	bool
+
+# TI Specific Networking Extensions
+source "net/ti.Kconfig"
+
 
 menuconfig WIRELESS
 	bool "Wireless"

@@ -1,3 +1,5 @@
+# Includes Intel Corporation's changes/modifications dated: 2014.
+# Changed/modified portions - Copyright © 2014, Intel Corporation.
 #
 # Makefile for the netfilter modules on top of IPv4.
 #
@@ -48,6 +50,7 @@ obj-$(CONFIG_IP_NF_TARGET_MASQUERADE) += ipt_MASQUERADE.o
 obj-$(CONFIG_IP_NF_TARGET_REJECT) += ipt_REJECT.o
 obj-$(CONFIG_IP_NF_TARGET_SYNPROXY) += ipt_SYNPROXY.o
 obj-$(CONFIG_IP_NF_TARGET_ULOG) += ipt_ULOG.o
+obj-$(CONFIG_IP_NF_TARGET_TRIGGER) += ipt_TRIGGER.o
 
 # generic ARP tables
 obj-$(CONFIG_IP_NF_ARPTABLES) += arp_tables.o

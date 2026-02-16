@@ -1,3 +1,5 @@
+# Includes Intel Corporation's changes/modifications dated: 2014.
+# Changed/modified portions - Copyright © 2014, Intel Corporation.
 #
 # Makefile for MMC/SD host controller drivers
 #
@@ -61,6 +63,8 @@ obj-$(CONFIG_MMC_SDHCI_OF_ESDHC)	+= sdhci-of-esdhc.o
 obj-$(CONFIG_MMC_SDHCI_OF_HLWD)		+= sdhci-of-hlwd.o
 obj-$(CONFIG_MMC_SDHCI_BCM_KONA)	+= sdhci-bcm-kona.o
 obj-$(CONFIG_MMC_SDHCI_BCM2835)		+= sdhci-bcm2835.o
+obj-$(CONFIG_MMC_SDHCI_PUMA6)		+= sdhci-puma6.o
+obj-$(CONFIG_MMC_SDHCI_PUMA7)		+= sdhci-puma7.o
 
 ifeq ($(CONFIG_CB710_DEBUG),y)
 	CFLAGS-cb710-mmc	+= -DDEBUG

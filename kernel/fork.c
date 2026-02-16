@@ -11,6 +11,11 @@
  * management can be a bitch. See 'mm/memory.c': 'copy_page_range()'
  */
 
+/*
+ * Includes Intel Corporation's changes/modifications dated: 2017.
+ * Changed/modified portions - Copyright (c) 2017 , Intel Corporation.
+ */
+
 #include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/unistd.h>
@@ -361,7 +366,9 @@ static int dup_mmap(struct mm_struct *mm, struct mm_struct *oldmm)
 	 */
 	down_write_nested(&mm->mmap_sem, SINGLE_DEPTH_NESTING);
 
+#ifndef CONFIG_MLOCK_APPS
 	mm->locked_vm = 0;
+#endif
 	mm->mmap = NULL;
 	mm->mmap_cache = NULL;
 	mm->map_count = 0;
@@ -405,14 +412,16 @@ static int dup_mmap(struct mm_struct *mm, struct mm_struct *oldmm)
 		tmp->vm_mm = mm;
 		if (anon_vma_fork(tmp, mpnt))
 			goto fail_nomem_anon_vma_fork;
+#ifndef CONFIG_MLOCK_APPS
 		tmp->vm_flags &= ~VM_LOCKED;
+#endif
 		tmp->vm_next = tmp->vm_prev = NULL;
 		file = tmp->vm_file;
 		if (file) {
 			struct inode *inode = file_inode(file);
 			struct address_space *mapping = file->f_mapping;
 
-			get_file(file);
+			vma_get_file(tmp);
 			if (tmp->vm_flags & VM_DENYWRITE)
 				atomic_dec(&inode->i_writecount);
 			mutex_lock(&mapping->i_mmap_mutex);
@@ -540,7 +549,11 @@ static struct mm_struct *mm_init(struct mm_struct *mm, struct task_struct *p)
 	clear_tlb_flush_pending(mm);
 
 	if (likely(!mm_alloc_pgd(mm))) {
+#ifdef CONFIG_MLOCK_APPS
+		mm->def_flags = (current->mm) ? current->mm->def_flags & VM_LOCKED : 0;
+#else
 		mm->def_flags = 0;
+#endif
 		mmu_notifier_mm_init(mm);
 		return mm;
 	}

@@ -1,0 +1,14 @@
+obj-$(CONFIG_MRPC) += core/
+obj-$(CONFIG_MRPC_EXAMPLES) += examples/
+obj-$(CONFIG_MRPC_MODPHY_SERVER) += modphy_server.o
+obj-$(CONFIG_MRPC_PP_SERVER) += pp_server.o
+obj-$(CONFIG_MRPC_WIFI_PROXY_SERVER) += wifi_proxy_server.o
+obj-$(CONFIG_MRPC_HANDSHAKE_SERVER) += handshake_server.o
+obj-$(CONFIG_MRPC_HANDSHAKE_CLIENT) += handshake_client.o
+obj-$(CONFIG_MRPC_CONNTRACK_SERVER) += conntrack_server.o
+obj-$(CONFIG_MRPC_HIL_CMDS_SERVER)  += hil_cmds_server.o
+obj-$(CONFIG_MRPC_CPPI_SERVER) += cppi_server.o
+obj-$(CONFIG_MRPC_CPPI_CLIENT)	        += cppi_client.o
+obj-$(CONFIG_MRPC_SGC_CLIENT) += sgc_client.o
+obj-$(CONFIG_MRPC_REMOTE_CONFIG_CLIENT) += remote_config_client.o
+obj-$(CONFIG_MRPC_GPIO_SERVER) += gpio_server.o

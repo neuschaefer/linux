@@ -7,6 +7,10 @@
  * Rusty Russell (C)2000 -- This code is GPL.
  * Patrick McHardy (c) 2006-2012
  */
+/*
+Includes Intel Corporation's changes/modifications dated: 2014.
+Changed/modified portions - Copyright © 2014, Intel Corporation.
+*/
 #include <linux/kernel.h>
 #include <linux/netfilter.h>
 #include <net/protocol.h>
@@ -23,6 +27,7 @@
 #include <linux/slab.h>
 #include <net/net_namespace.h>
 #include <net/sock.h>
+#include <linux/ti_hil.h>
 
 #include "nf_internals.h"
 
@@ -187,6 +192,35 @@ next_hook:
 	if (verdict == NF_ACCEPT || verdict == NF_STOP) {
 		ret = 1;
 	} else if ((verdict & NF_VERDICT_MASK) == NF_DROP) {
+#ifdef CONFIG_TI_PACKET_PROCESSOR
+
+#define MAC_ISMULTICAST( pa, hw )    ( ((pa)->hw[0] & 0x01)  ) 
+#define MAC_ISBROADCAST( pa, hw ) ( ~0xFF ==( (~(pa)->hw[0]) | \
+                                              (~(pa)->hw[1]) | \
+                                              (~(pa)->hw[2]) | \
+                                              (~(pa)->hw[3]) | \
+                                              (~(pa)->hw[4]) | \
+                                              (~(pa)->hw[5]) ))
+
+		int skip_pp_discard=0;
+		struct ethhdr* ptr_ethhdr = NULL;
+		ptr_ethhdr = eth_hdr(skb);
+
+		if (  ptr_ethhdr)
+		{
+			/* Check if the package is the multicast type, but not a broadcast */
+			if (  ( ! (MAC_ISBROADCAST (ptr_ethhdr, h_dest)) )  &&
+				  (   MAC_ISMULTICAST (ptr_ethhdr, h_dest))  )
+			{
+				skip_pp_discard=1;
+			}
+		}
+
+		if ( likely( ! skip_pp_discard ) )
+		{
+			ti_hil_pp_event (TI_CT_NETFILTER_DISCARD_PKT, (void *)skb);
+		}
+#endif //CONFIG_TI_PACKET_PROCESSOR
 		kfree_skb(skb);
 		ret = NF_DROP_GETERR(verdict);
 		if (ret == 0)

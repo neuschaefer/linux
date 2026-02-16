@@ -11,6 +11,11 @@
  *	2 of the License, or (at your option) any later version.
  */
 
+/* 
+ * Includes Intel Corporation's changes/modifications dated: [11/07/2011].
+ * Changed/modified portions - Copyright © [2011], Intel Corporation.
+ */
+
 #include <linux/capability.h>
 #include <linux/kernel.h>
 #include <linux/if_bridge.h>
@@ -19,6 +24,7 @@
 #include <linux/times.h>
 #include <net/net_namespace.h>
 #include <asm/uaccess.h>
+#include <linux/ti_hil.h>
 #include "br_private.h"
 
 /* called with RTNL */
@@ -99,7 +105,12 @@ static int add_del_if(struct net_bridge *br, int ifindex, int isadd)
 	if (isadd)
 		ret = br_add_if(br, dev);
 	else
+	{
 		ret = br_del_if(br, dev);
+#ifdef CONFIG_TI_PACKET_PROCESSOR
+        ti_hil_pp_event (TI_BRIDGE_PORT_DELETE, (void *)dev);
+#endif
+	}
 
 	return ret;
 }

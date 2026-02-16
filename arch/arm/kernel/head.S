@@ -571,8 +571,13 @@ __fixup_pv_table:
 	add	r5, r5, r3	@ adjust table end address
 	add	r7, r7, r3	@ adjust __pv_phys_offset address
 	str	r8, [r7]	@ save computed PHYS_OFFSET to __pv_phys_offset
+#ifndef CONFIG_ARM_PATCH_PHYS_VIRT_16BIT
 	mov	r6, r3, lsr #24	@ constant for add/sub instructions
 	teq	r3, r6, lsl #24 @ must be 16MiB aligned
+#else
+	mov	r6, r3, lsr #16	@ constant for add/sub instructions
+	teq	r3, r6, lsl #16	@ must be 64kiB aligned
+#endif
 THUMB(	it	ne		@ cross section branch )
 	bne	__error
 	str	r6, [r7, #4]	@ save to __pv_offset
@@ -588,6 +593,19 @@ ENDPROC(__fixup_pv_table)
 	.text
 __fixup_a_pv_table:
 #ifdef CONFIG_THUMB2_KERNEL
+#ifdef CONFIG_ARM_PATCH_PHYS_VIRT_16BIT
+#error VIRT_16BIT with THUMB2_KERNEL is not tested
+	lsls	r0, r6, #24
+	lsr	r6, #8
+	beq	1f
+	clz	r7, r0
+	lsr	r0, #24
+	lsl	r0, r7
+	bic	r0, 0x0080
+	lsrs	r7, #1
+	orrcs   r0, #0x0080
+	orr	r0, r0, r7, lsl #12
+#endif
 	lsls	r6, #24
 	beq	2f
 	clz	r7, r6
@@ -600,6 +618,15 @@ __fixup_a_pv_table:
 	orr	r6, #0x4000
 	b	2f
 1:	add     r7, r3
+#ifdef CONFIG_ARM_PATCH_PHYS_VIRT_16BIT
+	ldrh	ip, [r7]
+	tst	ip, 0x0400	@ the i bit tells us LS or MS byte
+	beq	3f
+	cmp	r0, #0		@ set C flag, and ...
+	biceq	ip, 0x0400	@ immediate zero value has a special encoding
+	streqh	ip, [r7]	@ that requires the i bit cleared
+3:
+#endif
 	ldrh	ip, [r7, #2]
 	and	ip, 0x8f00
 	orr	ip, r6	@ mask in offset bits 31-24
@@ -609,10 +636,20 @@ __fixup_a_pv_table:
 	bcc	1b
 	bx	lr
 #else
+#ifdef CONFIG_ARM_PATCH_PHYS_VIRT_16BIT
+	and	r0, r6, #255	@ offset bits 23-16
+	mov	r6, r6, lsr #8	@ offset bits 31-24
+#endif
 	b	2f
 1:	ldr	ip, [r7, r3]
 	bic	ip, ip, #0x000000ff
+#ifdef CONFIG_ARM_PATCH_PHYS_VIRT_16BIT
+	tst	ip, #0x400	@ rotate shift tells us LS or MS byte
+	orrne	ip, ip, r6	@ mask in offset bits 31-24
+	orreq	ip, ip, r0	@ mask in offset bits 23-16
+#else
 	orr	ip, ip, r6	@ mask in offset bits 31-24
+#endif
 	str	ip, [r7, r3]
 2:	cmp	r4, r5
 	ldrcc	r7, [r4], #4	@ use branch for delay slot

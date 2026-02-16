@@ -1,3 +1,11 @@
+/******************************************************************
+ 
+ Includes Intel Corporation's changes/modifications dated: 07/2011.
+ Changed/modified portions - Copyright(c) 2011, Intel Corporation. 
+
+******************************************************************/
+
+
 #ifndef MMC_QUEUE_H
 #define MMC_QUEUE_H
 
@@ -50,6 +58,10 @@ struct mmc_queue {
 	unsigned int		flags;
 #define MMC_QUEUE_SUSPENDED	(1 << 0)
 #define MMC_QUEUE_NEW_REQUEST	(1 << 1)
+#ifdef CONFIG_ARCH_GEN3
+	char			*bp_buf;
+	struct scatterlist	*bp_sg;
+#endif
 
 	int			(*issue_fn)(struct mmc_queue *, struct request *);
 	void			*data;
@@ -72,5 +84,7 @@ extern void mmc_queue_bounce_post(struct mmc_queue_req *);
 
 extern int mmc_packed_init(struct mmc_queue *, struct mmc_card *);
 extern void mmc_packed_clean(struct mmc_queue *);
+
+extern int mmc_access_rpmb(struct mmc_queue *);
 
 #endif

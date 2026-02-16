@@ -1,3 +1,8 @@
+/*
+ * Includes Intel Corporation's changes/modifications dated: 2012-2017.
+ * Changed/modified portions - Copyright © 2012-2017 , Intel Corporation.
+ */
+
 /* interrupt.h */
 #ifndef _LINUX_INTERRUPT_H
 #define _LINUX_INTERRUPT_H
@@ -60,6 +65,7 @@
  *                resume time.
  */
 #define IRQF_DISABLED		0x00000020
+#define SA_INTERRUPT        IRQF_DISABLED
 #define IRQF_SHARED		0x00000080
 #define IRQF_PROBE_SHARED	0x00000100
 #define __IRQF_TIMER		0x00000200
@@ -184,6 +190,7 @@ extern void disable_irq(unsigned int irq);
 extern void disable_percpu_irq(unsigned int irq);
 extern void enable_irq(unsigned int irq);
 extern void enable_percpu_irq(unsigned int irq, unsigned int type);
+extern void ack_irq(unsigned int irq);
 
 /* The following three functions are for the core kernel use only. */
 extern void suspend_device_irqs(void);
@@ -193,6 +200,11 @@ extern int check_wakeup_irqs(void);
 #else
 static inline int check_wakeup_irqs(void) { return 0; }
 #endif
+
+#ifdef CONFIG_INTEL_IRQ_THREAD_CHANGE_PRIORITY
+    struct task_struct *irq_set_sched(unsigned int irq, int policy, unsigned int priority);
+#endif
+
 
 #if defined(CONFIG_SMP)
 

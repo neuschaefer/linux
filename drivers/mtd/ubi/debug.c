@@ -100,6 +100,7 @@ void ubi_dump_vid_hdr(const struct ubi_vid_hdr *vid_hdr)
 		       vid_hdr, UBI_VID_HDR_SIZE, 1);
 }
 
+#ifdef CONFIG_MTD_UBI_DEBUG
 /**
  * ubi_dump_vol_info - dump volume information.
  * @vol: UBI volume description object
@@ -447,3 +448,5 @@ void ubi_debugfs_exit_dev(struct ubi_device *ubi)
 	if (IS_ENABLED(CONFIG_DEBUG_FS))
 		debugfs_remove_recursive(ubi->dbg.dfs_dir);
 }
+
+#endif /* CONFIG_MTD_UBI_DEBUG */

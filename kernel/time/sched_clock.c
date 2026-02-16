@@ -5,6 +5,10 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
+/*
+Includes Intel Corporation's changes/modifications dated: 2014.
+Changed/modified portions - Copyright © 2014, Intel Corporation.
+*/
 #include <linux/clocksource.h>
 #include <linux/init.h>
 #include <linux/jiffies.h>
@@ -166,22 +170,34 @@ void __init setup_sched_clock(u32 (*read)(void), int bits, unsigned long rate)
 	pr_debug("Registered %pF as sched_clock source\n", read);
 }
 
+// sched_clock is used directly from puma specific code. below is vanilla
+#if 0
+static unsigned long long notrace sched_clock_32(void)
+{
+	u32 cyc = read_sched_clock();
+	return cyc_to_sched_clock(cyc, sched_clock_mask);
+}
+
 unsigned long long __read_mostly (*sched_clock_func)(void) = sched_clock_32;
 
 unsigned long long notrace sched_clock(void)
 {
 	return sched_clock_func();
 }
+#endif
 
 void __init sched_clock_postinit(void)
 {
+// sched_clock is used directly from puma specific code. below is vanilla
+#if 0
+
 	/*
 	 * If no sched_clock function has been provided at that point,
 	 * make it the final one one.
 	 */
 	if (read_sched_clock == jiffy_sched_clock_read)
 		setup_sched_clock(jiffy_sched_clock_read, 32, HZ);
-
+#endif
 	sched_clock_poll(sched_clock_timer.data);
 }
 

@@ -10,11 +10,15 @@
  *	as published by the Free Software Foundation; either version
  *	2 of the License, or (at your option) any later version.
  */
-
+/* 
+ * Includes Intel Corporation's changes/modifications dated: [11/07/2011].
+ * Changed/modified portions - Copyright © [2011], Intel Corporation.
+ */
 #include <linux/kernel.h>
 #include <linux/kmod.h>
 #include <linux/etherdevice.h>
 #include <linux/rtnetlink.h>
+#include <linux/ti_hil.h>
 
 #include "br_private.h"
 #include "br_private_stp.h"
@@ -117,6 +121,10 @@ void br_stp_disable_port(struct net_bridge_port *p)
 	br_configuration_update(br);
 
 	br_port_state_selection(br);
+#ifdef CONFIG_TI_PACKET_PROCESSOR
+    /* Generate the event indicating that the port has been disabled. */
+    ti_hil_pp_event(TI_BRIDGE_PORT_DISABLED, (void *)p->dev);
+#endif
 
 	if (br_is_root_bridge(br) && !wasroot)
 		br_become_root_bridge(br);

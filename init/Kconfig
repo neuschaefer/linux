@@ -1,3 +1,8 @@
+#
+# Includes Intel Corporation's changes/modifications dated: 2017.
+# Changed/modified portions - Copyright (c) 2017, Intel Corporation.
+#
+
 config ARCH
 	string
 	option env="ARCH"
@@ -1388,6 +1393,14 @@ config PCSPKR_PLATFORM
 	help
           This option allows to disable the internal PC-Speaker
           support, saving some memory.
+
+config FULL_PANIC
+       bool "Full panic reporting data"
+       default y
+       help
+         This includes text descriptions of panics in addition to stack dumps.
+          Disabling compiles out the explanations for panics, saving
+         string space. Use with caution.
 
 config BASE_FULL
 	default y

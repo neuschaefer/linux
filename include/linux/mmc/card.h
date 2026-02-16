@@ -7,6 +7,14 @@
  *
  *  Card driver specific definitions.
  */
+
+/******************************************************************
+ 
+ Includes Intel Corporation's changes/modifications dated: 07/2011.
+ Changed/modified portions - Copyright(c) 2011-2014, Intel Corporation. 
+
+******************************************************************/
+
 #ifndef LINUX_MMC_CARD_H
 #define LINUX_MMC_CARD_H
 
@@ -115,6 +123,11 @@ struct mmc_ext_csd {
 
 	unsigned int            feature_support;
 #define MMC_DISCARD_FEATURE	BIT(0)                  /* CMD38 feature */
+#ifdef CONFIG_ARCH_GEN3
+	unsigned char		boot_size_mult;
+	unsigned char		boot_config;
+	unsigned long		gp_size[4];
+#endif
 };
 
 struct sd_scr {

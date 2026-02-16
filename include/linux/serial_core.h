@@ -17,6 +17,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
+/*
+Includes Intel Corporation's changes/modifications dated: 2014.
+Changed/modified portions - Copyright © 2014, Intel Corporation.
+*/
 #ifndef LINUX_SERIAL_CORE_H
 #define LINUX_SERIAL_CORE_H
 
@@ -201,6 +205,7 @@ struct uart_port {
 	unsigned char		irq_wake;
 	unsigned char		unused[2];
 	void			*private_data;		/* generic platform data pointer */
+	unsigned int     histogram_RX_stats [16];   /*histogram of number of bytes read from the fifo at interrupt */
 };
 
 static inline int serial_port_in(struct uart_port *up, int offset)

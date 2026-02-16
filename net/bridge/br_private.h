@@ -9,6 +9,10 @@
  *	as published by the Free Software Foundation; either version
  *	2 of the License, or (at your option) any later version.
  */
+/* 
+ * Includes Intel Corporation's changes/modifications dated: [11/07/2011].
+ * Changed/modified portions - Copyright © [2011], Intel Corporation.
+ */
 
 #ifndef _BR_PRIVATE_H
 #define _BR_PRIVATE_H
@@ -53,6 +57,21 @@ struct mac_addr
 {
 	unsigned char	addr[6];
 };
+
+/* Packet Processor Specific Flags */
+#ifdef CONFIG_TI_PACKET_PROCESSOR
+
+/* The status of a FDB entry is defaulted to this, indicating that there is no
+ * PP session activity corresponding to this FDB entry and can be deleted 
+ * as per bridge aging logic. */
+#define     TI_PP_FDB_INACTIVE      0x0
+
+/* When this flag is set in the status of a FDB entry, it indicates that PP has 
+ * a session active corresponding to it and it should not be deleted although
+ * "aged out" in the bridge. */
+#define     TI_PP_FDB_ACTIVE        0x1
+
+#endif //CONFIG_TI_PACKET_PROCESSOR
 
 struct br_ip
 {
@@ -105,6 +124,19 @@ struct net_bridge_fdb_entry
 	unsigned char			is_local;
 	unsigned char			is_static;
 	__u16				vlan_id;
+
+#ifdef CONFIG_TI_PACKET_PROCESSOR
+    /* To maintain and monitor FDB entry to PP session mapping, we store 
+     * the corresponding PP session handle in the FDB entry. */
+    int                 ti_pp_session_handle;
+   
+    /* The status indicates whether a corresponding session exists 
+     * in the PP for this FDB entry. The legal values for this flag 
+     * are "TI_PP_FDB_INACTIVE" (default) and "TI_PP_FDB_ACTIVE" 
+     * (set when PP has a mapping for this FDB entry). */
+    int                 ti_pp_fdb_status;
+#endif /* CONFIG_TI_PACKET_PROCESSOR */
+
 };
 
 struct net_bridge_port_group {
@@ -218,6 +250,21 @@ struct br_cpu_netstats {
 	struct u64_stats_sync	syncp;
 };
 
+#ifdef CONFIG_TI_L2_SELECTIVE_PACKET_HANDLING
+struct l2_sph
+{
+    /* Function that handles the packet */
+    int (*packet_handler)(struct sk_buff *skb);
+    /* Priority of the function handler. Handlers installed with lower 
+     * priority number are called before a handler installed with 
+     * a higher priority number 
+     */
+    int priority;
+    struct l2_sph *prev;
+    struct l2_sph *next;
+};
+#endif /* CONFIG_TI_L2_SELECTIVE_PACKET_HANDLING */
+
 struct net_bridge
 {
 	spinlock_t			lock;
@@ -301,6 +348,12 @@ struct net_bridge
 	u8				vlan_enabled;
 	struct net_port_vlans __rcu	*vlan_info;
 #endif
+#ifdef CONFIG_TI_L2_SELECTIVE_PACKET_HANDLING
+    struct l2_sph    *selective_packet_handler;
+#endif /* CONFIG_TI_L2_SELECTIVE_PACKET_HANDLING */
+#ifdef CONFIG_INTEL_L2VPN_L2CP_FORWARD
+    int (*l2vpn_packet_handler)(struct sk_buff *skb, int *l2vpnRelate);
+#endif /* CONFIG_INTEL_L2VPN_L2CP_FORWARD */
 };
 
 struct br_input_skb_cb {

@@ -16,6 +16,31 @@
  *  membase is an 'ioremapped' cookie.
  */
 
+/* Copyright 2008, Texas Instruments Incorporated
+ *
+ * This program has been modified from its original operation by Texas Instruments
+ * to do the following:
+ * 1) Set uartclk in serial8250_resume_port to support arm frequency change in
+ * Puma5.
+ *
+ * THIS MODIFIED SOFTWARE AND DOCUMENTATION ARE PROVIDED
+ * "AS IS," AND TEXAS INSTRUMENTS MAKES NO REPRESENTATIONS
+ * OR WARRENTIES, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+ * TO, WARRANTIES OF MERCHANTABILITY OR FITNESS FOR ANY
+ * PARTICULAR PURPOSE OR THAT THE USE OF THE SOFTWARE OR
+ * DOCUMENTATION WILL NOT INFRINGE ANY THIRD PARTY PATENTS,
+ * COPYRIGHTS, TRADEMARKS OR OTHER RIGHTS.
+ * See The GNU General Public License for more details.
+ *
+ * These changes are covered under version 2 of the GNU General Public License,
+ * dated June 1991.
+ */
+
+/*
+Includes Intel Corporation's changes/modifications dated: 2017.
+Changed/modified portions - Copyright (c) 2017, Intel Corporation.
+*/
+
 #if defined(CONFIG_SERIAL_8250_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
 #define SUPPORT_SYSRQ
 #endif
@@ -47,6 +72,20 @@
 
 #include "8250.h"
 
+#include <asm-arm/arch-avalanche/generic/pal.h>
+
+#if CONFIG_MACH_PUMA6
+#include <asm-arm/arch-avalanche/puma6/puma6.h>
+#endif
+
+#if CONFIG_MACH_PUMA7
+#include <asm-arm/arch-avalanche/puma7/puma7.h>
+#endif
+
+#ifdef CONFIG_INTEL_UART_ENABLE_CONTROL
+#include <io_ctrl/puma7_io_ctrl.h>
+#endif
+
 /*
  * Configuration:
  *   share_irqs - whether we pass IRQF_SHARED to request_irq().  This option
@@ -64,6 +103,10 @@ static int serial_index(struct uart_port *port)
 }
 
 static unsigned int skip_txen_test; /* force skip of txen test at init time */
+
+#ifdef CONFIG_INTEL_UART_ENABLE_CONTROL
+static int serial_sysfs_create_uart_enable_ctrl(void);
+#endif
 
 /*
  * Debugging.
@@ -323,7 +366,54 @@ static const struct serial8250_config uart_config[] = {
 		.fcr		= UART_FCR_ENABLE_FIFO | UART_FCR_R_TRIG_10,
 		.flags		= UART_CAP_FIFO | UART_CAP_AFE,
 	},
+    [PORT_TI_16550A] = {
+		.name		= "TI 16550A",
+		.fifo_size	= 16,
+		.tx_loadsz	= 16,
+		.fcr		= UART_FCR_ENABLE_FIFO | UART_FCR_R_TRIG_10,
+		.flags		= UART_CAP_FIFO | UART_CAP_UUE,
+    },
 };
+
+#ifdef CONFIG_INTEL_UART_ENABLE_CONTROL
+static ssize_t serial_get_attr_enable_ctrl(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	int enable;
+
+	if (IO_CTRL_readDocsisUartCtrl(&enable) != IOCNFG_OK)
+		printk(KERN_ERR "Unable to read DocsisUartCtrl status\n");
+
+	return sprintf(buf, "%d\n", enable);
+}
+
+static ssize_t serial_set_attr_enable_ctrl(struct device *dev, struct device_attribute *attr,
+	const char *buf, size_t count)
+{
+	int enable;
+
+	enable = (int)(buf[0] - '0');
+	if ((enable == 0) || (enable == 1))
+		IO_CTRL_configDocsisUartCtrl(enable);
+	else
+		printk(KERN_ERR "uart_enable_ctrl: 0(disable) / 1(enable) UART\n");
+
+	return count;
+}
+
+/* Initialize device attribute structure */
+static DEVICE_ATTR(uart_enable_ctrl, S_IRUSR | S_IWUSR, serial_get_attr_enable_ctrl, serial_set_attr_enable_ctrl);
+
+static int serial_sysfs_create_uart_enable_ctrl(void)
+{
+	int retval = sysfs_create_file(kernel_kobj, &dev_attr_uart_enable_ctrl.attr);
+
+	if (retval)
+		return -ENOMEM;
+
+	return retval;
+}
+#endif
 
 /* Uart divisor latch read */
 static int default_serial_dl_read(struct uart_8250_port *up)
@@ -989,6 +1079,15 @@ static void autoconfig_16550a(struct uart_8250_port *up)
 	 * already a 1 and maybe locked there before we even start start.
 	 */
 	iersave = serial_in(up, UART_IER);
+
+    /* TI default UART_IER upper nibble to 0 */
+    if((iersave & 0xF0) == 0) {
+		DEBUG_AUTOCONF("TI 16550A");
+		up->port.type = PORT_TI_16550A;
+		up->capabilities |= UART_CAP_UUE;
+	return;
+    }
+
 	serial_out(up, UART_IER, iersave & ~UART_IER_UUE);
 	if (!(serial_in(up, UART_IER) & UART_IER_UUE)) {
 		/*
@@ -1415,6 +1514,14 @@ serial8250_rx_chars(struct uart_8250_port *up, unsigned char lsr)
 ignore_char:
 		lsr = serial_in(up, UART_LSR);
 	} while ((lsr & (UART_LSR_DR | UART_LSR_BI)) && (max_count-- > 0));
+	if (256 - max_count > 15)
+	{
+		up->port.histogram_RX_stats[15]++;
+	}
+	else
+	{
+		up->port.histogram_RX_stats[256 - max_count]++;
+	}
 	spin_unlock(&port->lock);
 	tty_flip_buffer_push(&port->state->port);
 	spin_lock(&port->lock);
@@ -2325,6 +2432,17 @@ serial8250_do_set_termios(struct uart_port *port, struct ktermios *termios,
 		if (baud < 2400 || fifo_bug) {
 			fcr &= ~UART_FCR_TRIGGER_MASK;
 			fcr |= UART_FCR_TRIGGER_1;
+		} else {
+#if (CONFIG_MACH_PUMA6 || CONFIG_MACH_PUMA7)
+            if (up->port.irq == AVALANCHE_UART1_INT) {
+				fcr &= ~UART_FCR_TRIGGER_MASK;
+				fcr |= UART_FCR_TRIGGER_1;
+            }
+			else
+#endif
+            {
+                fcr = uart_config[up->port.type].fcr;
+            }
 		}
 	}
 
@@ -2341,7 +2459,10 @@ serial8250_do_set_termios(struct uart_port *port, struct ktermios *termios,
 		if (termios->c_cflag & CRTSCTS)
 			up->mcr |= UART_MCR_AFE;
 	}
-
+	if (termios->c_cflag & CRTSCTS)
+	{
+		up->mcr |= UART_MCR_AFE;
+	}
 	/*
 	 * Ok, we're now changing the port state.  Do it with
 	 * interrupts disabled.
@@ -2843,7 +2964,7 @@ static void serial8250_console_putchar(struct uart_port *port, int ch)
 	struct uart_8250_port *up =
 		container_of(port, struct uart_8250_port, port);
 
-	wait_for_xmitr(up, UART_LSR_THRE);
+	wait_for_xmitr(up, BOTH_EMPTY);
 	serial_port_out(port, UART_TX, ch);
 }
 
@@ -2854,7 +2975,7 @@ static void serial8250_console_putchar(struct uart_port *port, int ch)
  *	The console_lock must be held when we get here.
  */
 static void
-serial8250_console_write(struct console *co, const char *s, unsigned int count)
+serial8250_console_write1(struct console *co, const char *s, unsigned int count)
 {
 	struct uart_8250_port *up = &serial8250_ports[co->index];
 	struct uart_port *port = &up->port;
@@ -2905,6 +3026,17 @@ serial8250_console_write(struct console *co, const char *s, unsigned int count)
 	if (locked)
 		spin_unlock(&port->lock);
 	local_irq_restore(flags);
+}
+
+static void
+serial8250_console_write(struct console *co, const char *s, unsigned int count)
+{
+	int i;
+    struct uart_8250_port *up = &serial8250_ports[co->index];
+    for (i = 0; i < count; i++)
+    {
+        serial8250_console_write1(co, &s[i], 1);
+    }
 }
 
 static int __init serial8250_console_setup(struct console *co, char *options)
@@ -3045,6 +3177,12 @@ void serial8250_suspend_port(int line)
 void serial8250_resume_port(int line)
 {
 	struct uart_8250_port *up = &serial8250_ports[line];
+#if defined (CONFIG_MACH_PUMA5)
+        extern unsigned int avalanche_get_vbus_freq(void);
+        serial8250_ports[line].port.uartclk = avalanche_get_vbus_freq ();
+#else /* CONFIG_MACH_PUMA6  For Puma-6 SoC */
+        serial8250_ports[line].port.uartclk = PAL_sysClkcGetFreq(PAL_SYS_CLKC_UART0);
+#endif
 	struct uart_port *port = &up->port;
 
 	if (up->capabilities & UART_NATSEMI) {
@@ -3345,6 +3483,11 @@ static int __init serial8250_init(void)
 	ret = serial8250_pnp_init();
 	if (ret)
 		goto unreg_uart_drv;
+
+#ifdef CONFIG_INTEL_UART_ENABLE_CONTROL
+	if (serial_sysfs_create_uart_enable_ctrl())
+		goto out;
+#endif
 
 	serial8250_isa_devs = platform_device_alloc("serial8250",
 						    PLAT8250_DEV_LEGACY);

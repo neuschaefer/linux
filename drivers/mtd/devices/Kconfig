@@ -224,4 +224,52 @@ config BCH_CONST_T
 	default 4
 endif
 
+config MTD_SFL
+	tristate "Generic Serial Flash MTD Driver Support"
+	depends on MTD && SPI
+	---help---
+	  This provides a MTD device driver for the most of the Serial Flash devices over SPI interface.	
+
+config SFL_SFI
+	int "Serial Flash mode (0/1)"
+	default 1
+    depends on MTD_SFL 
+    help
+      Set 0 for core SPI mode
+      Set 1 for SFI mode
+
+config SFL_FAST_READ
+        int
+        default 0 if SFL_NORMAL_READ_MODE
+        default 1 if SFL_FAST_READ_MODE
+        default 2 if SFL_DUAL_FAST_READ_MODE
+choice
+        prompt "Serial Flash read mode option"
+        depends on MTD_SFL 
+        default SFL_NORMAL_READ
+
+config SFL_NORMAL_READ_MODE
+        bool "Normal read"
+
+config SFL_FAST_READ_MODE
+        bool "Fast read"
+
+config SFL_DUAL_FAST_READ_MODE
+        bool "Dual-Fast read"
+endchoice
+
+config AVALANCHE_SFL_CLK
+   int "Serial Flash Clock rate 50MHz (maximum)"
+   default 40000000
+   depends on MTD_SFL
+   help
+     Set the Clock rate for Serial Flash device
+
+config SFL_EXTENDED_FLASH
+        bool "Enable support for 32MB monolithic flash in kernel (Puma5)"
+        help
+          Select this option to compile the SPI flash driver with support of 32Mb monolithic flash.
+          The driver will use extended memory operations for flash to access higher addresses.
+        default n
+
 endmenu

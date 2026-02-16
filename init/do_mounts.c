@@ -558,6 +558,7 @@ void __init prepare_namespace(void)
 		root_device_name = saved_root_name;
 		if (!strncmp(root_device_name, "mtd", 3) ||
 		    !strncmp(root_device_name, "ubi", 3)) {
+			printk("root device name :%s\r\n",root_device_name);
 			mount_block_root(root_device_name, root_mountflags);
 			goto out;
 		}

@@ -49,6 +49,10 @@
  *	Alexey Kuznetsov		allow both IPv4 and IPv6 sockets to bind
  *					a single port at the same time.
  */
+/*
+Includes Intel Corporation's changes/modifications dated: [23/3/2015]. 
+Changed/modified portions - Copyright © [2015], Intel Corporation. 
+*/
 
 #define pr_fmt(fmt) "TCP: " fmt
 
@@ -1561,7 +1565,11 @@ int tcp_v4_conn_request(struct sock *sk, struct sk_buff *skb)
 		if (dst == NULL)
 			goto drop_and_free;
 	}
+#ifdef CONFIG_CRYPTO
 	do_fastopen = tcp_fastopen_check(sk, skb, req, &foc, &valid_foc);
+#else
+	do_fastopen = false;
+#endif
 
 	/* We don't call tcp_v4_send_synack() directly because we need
 	 * to make sure a child socket can be created successfully before

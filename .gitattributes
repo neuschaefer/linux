@@ -1,0 +1,20 @@
+# These files should be treated as text
+
+*.c       text
+*.cpp     text
+*.h       text
+*.pcd     text
+*.sh      text
+*.mib     text
+*.ctl     text
+*.awk     text
+*.xdc     text
+*.bld     text
+*.mk      text
+*.in      text
+*.py      text
+*.am      text
+*.S       text
+Makefile  text
+Kbuild    text
+Kconfig   text

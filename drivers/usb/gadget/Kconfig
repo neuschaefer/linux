@@ -1,3 +1,5 @@
+# Includes Intel Corporation's changes/modifications dated: 2014.
+# Changed/modified portions - Copyright © 2014, Intel Corporation.
 #
 # USB Gadget support on a system involves
 #    (a) a peripheral controller, and
@@ -475,6 +477,14 @@ config USB_DUMMY_HCD
 # first and will be selected by default.
 
 endmenu
+
+config USB_GADGET_DUALSPEED
+	bool
+	depends on USB_GADGET
+	default n
+	help
+	  Means that gadget drivers should include extra descriptors
+	  and code to handle dual-speed controllers.
 
 #
 # USB Gadget Drivers

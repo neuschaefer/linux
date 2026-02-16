@@ -1,3 +1,7 @@
+ /*
+Includes Intel Corporation's changes/modifications dated: [2/3/2014]. 
+Changed/modified portions - Copyright © [2014], Intel Corporation. 
+*/
 #ifndef _ADDRCONF_H
 #define _ADDRCONF_H
 
@@ -84,6 +88,11 @@ int __ipv6_get_lladdr(struct inet6_dev *idev, struct in6_addr *addr,
 		      unsigned char banned_flags);
 int ipv6_get_lladdr(struct net_device *dev, struct in6_addr *addr,
 		    unsigned char banned_flags);
+#ifdef CONFIG_INTEL_NS_DEVICE_FILTER
+extern int intel_ipv6_ns_filter(struct net_device *dev,
+								struct in6_addr* dst_addr,
+								unsigned char banned_flags);
+#endif
 int ipv6_rcv_saddr_equal(const struct sock *sk, const struct sock *sk2);
 void addrconf_join_solict(struct net_device *dev, const struct in6_addr *addr);
 void addrconf_leave_solict(struct inet6_dev *idev, const struct in6_addr *addr);
@@ -192,6 +201,8 @@ static inline bool ipv6_is_mld(struct sk_buff *skb, int nexthdr, int offset)
 
 void addrconf_prefix_rcv(struct net_device *dev,
 			 u8 *opt, int len, bool sllao);
+void addrconf_prefix_rcv_by_table(struct net_device *dev,
+			 u8 *opt, int len, bool sllao, u32 table_id);
 
 /*
  *	anycast prototypes (anycast.c)

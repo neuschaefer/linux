@@ -1,0 +1,119 @@
+config MRPC
+    tristate "RPC over HW Mailbox support"
+    depends on HAVE_HW_MBOX
+    default y
+    help
+       Enable RPC over HW mailbox driver support
+
+config MRPC_EXAMPLES
+    bool "RPC over HW Mailbox examples"
+    depends on MRPC
+    default n
+    help
+       Choose y to compile client/server examples
+
+config MRPC_CLIENT_EXAMPLE
+    tristate "RPC over HW Mailbox client example"
+    depends on MRPC_EXAMPLES
+    default n
+    help
+       RPC over HW mailbox example client
+
+config MRPC_SERVER_EXAMPLE
+    tristate "RPC over HW Mailbox server example"
+    depends on MRPC_EXAMPLES
+    default n
+    help
+       RPC over HW mailbox example server
+
+config MRPC_MODPHY_SERVER
+    tristate "modphy MRPC server"
+    depends on MRPC
+    default n
+    help
+       modphy MRPC server driver support
+
+config MRPC_PP_SERVER
+    tristate "Packet Processor MRPC server"
+    depends on MRPC
+    default n
+    help
+       Packet Processor MRPC server driver support
+
+config MRPC_WIFI_PROXY_SERVER
+    tristate "Wifi Proxy MRPC server"
+    depends on MRPC
+    default n
+    help
+       Wifi Proxy MRPC server driver support
+
+config WIFI_PROXY_SUPPORT_MULTI_VAP
+    tristate "Support multi VAP"
+    depends on MRPC
+    default n
+    help
+       Wifi Proxy MRPC server driver support
+
+config MRPC_HANDSHAKE_SERVER
+    tristate "handshake MRPC server"
+    depends on MRPC
+    default n
+    help
+       handshake MRPC server driver support
+
+config MRPC_HANDSHAKE_CLIENT
+    tristate "handshake MRPC client"
+    depends on MRPC
+    default n
+    help
+       handshake MRPC client driver support
+
+config MRPC_CONNTRACK_SERVER
+    bool "Conntrack server RPC over HW Mailbox"
+    depends on MRPC
+    default n
+    help
+       Choose y to compile conntrack server module
+
+config MRPC_HIL_CMDS_SERVER
+    bool "Hil commands handle server over HW Mailbox"
+    depends on MRPC
+    default n
+    help
+      Choose y to compile hil cmds server moudle
+      
+config MRPC_CPPI_CLIENT
+    tristate "CPPI MRPC client"
+    depends on MRPC
+    default n
+    help
+       CPPI MRPC client provides CPPI related operations that are implemented
+       on ARM side over MRPC interface.
+
+config MRPC_CPPI_SERVER
+    tristate "cppi MRPC server"
+    depends on MRPC
+    default n
+    help
+       cppi MRPC server driver support
+
+config MRPC_SGC_CLIENT
+    tristate "Session Group Counter client"
+    depends on MRPC
+    default n
+    help
+       Session Group Counter MRPC client driver support
+
+config MRPC_REMOTE_CONFIG_CLIENT
+    tristate "Remote Config client"
+    depends on MRPC
+    default n
+    help
+       Remote config MRPC client driver support
+
+config MRPC_GPIO_SERVER
+    tristate "gpio MRPC server"
+    depends on MRPC
+    default n
+    help
+       gpio MRPC server driver support

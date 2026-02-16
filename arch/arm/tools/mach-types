@@ -20,6 +20,9 @@
 #
 # machine_is_xxx	CONFIG_xxxx		MACH_TYPE_xxx		number
 #
+# Includes Intel Corporation's changes/modifications dated: 2014.
+# Changed/modified portions - Copyright © 2014, Intel Corporation.
+
 ebsa110			ARCH_EBSA110		EBSA110			0
 riscpc			ARCH_RPC		RISCPC			1
 ebsa285			ARCH_EBSA285		EBSA285			4
@@ -264,7 +267,10 @@ herald			MACH_HERALD		HERALD			1461
 sim_one			MACH_SIM_ONE		SIM_ONE			1476
 jive			MACH_JIVE		JIVE			1490
 sam9_l9260		MACH_SAM9_L9260		SAM9_L9260		1501
+puma5			MACH_PUMA5		PUMA5		        1147
 realview_pb1176		MACH_REALVIEW_PB1176	REALVIEW_PB1176		1504
+puma6			MACH_PUMA6		PUMA6			1505
+puma7			MACH_PUMA7		PUMA7			1506
 yl9200			MACH_YL9200		YL9200			1507
 rd88f5182		MACH_RD88F5182		RD88F5182		1508
 kurobox_pro		MACH_KUROBOX_PRO	KUROBOX_PRO		1509

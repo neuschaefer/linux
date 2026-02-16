@@ -9,6 +9,10 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
+/*
+Includes Intel Corporation's changes/modifications dated: 2014.
+Changed/modified portions - Copyright © 2014, Intel Corporation.
+*/
 
 #include <linux/module.h>
 #include <linux/skbuff.h>
@@ -102,8 +106,7 @@ static int map_addr(struct sk_buff *skb, unsigned int protoff,
 	union nf_inet_addr newaddr;
 	__be16 newport;
 
-	if (nf_inet_addr_cmp(&ct->tuplehash[dir].tuple.src.u3, addr) &&
-	    ct->tuplehash[dir].tuple.src.u.udp.port == port) {
+	if (nf_inet_addr_cmp(&ct->tuplehash[dir].tuple.src.u3, addr)) {
 		newaddr = ct->tuplehash[!dir].tuple.dst.u3;
 		newport = ct->tuplehash[!dir].tuple.dst.u.udp.port;
 	} else if (nf_inet_addr_cmp(&ct->tuplehash[dir].tuple.dst.u3, addr) &&
@@ -184,8 +187,7 @@ static unsigned int nf_nat_sip(struct sk_buff *skb, unsigned int protoff,
 		 * connection */
 		if (request) {
 			if (!nf_inet_addr_cmp(&addr,
-					&ct->tuplehash[dir].tuple.src.u3) ||
-			    port != ct->tuplehash[dir].tuple.src.u.udp.port)
+					&ct->tuplehash[dir].tuple.src.u3))
 				goto next;
 		} else {
 			if (!nf_inet_addr_cmp(&addr,
@@ -549,6 +551,8 @@ static unsigned int nf_nat_sdp_media(struct sk_buff *skb, unsigned int protoff,
 	struct nf_conn *ct = nf_ct_get(skb, &ctinfo);
 	enum ip_conntrack_dir dir = CTINFO2DIR(ctinfo);
 	u_int16_t port;
+	u_int16_t orig_port;
+	bool rtp_port_found = false;
 
 	/* Connection will come from reply */
 	if (nf_inet_addr_cmp(&ct->tuplehash[dir].tuple.src.u3,
@@ -570,33 +574,37 @@ static unsigned int nf_nat_sdp_media(struct sk_buff *skb, unsigned int protoff,
 	rtcp_exp->expectfn = nf_nat_sip_expected;
 
 	/* Try to get same pair of ports: if not, try to change them. */
-	for (port = ntohs(rtp_exp->tuple.dst.u.udp.port);
-	     port != 0; port += 2) {
+	orig_port = ntohs(rtp_exp->tuple.dst.u.udp.port);
+	if (orig_port < 1024)
+		goto  err1;
+
+	port = orig_port;
+	do {
 		int ret;
 
 		rtp_exp->tuple.dst.u.udp.port = htons(port);
 		ret = nf_ct_expect_related(rtp_exp);
-		if (ret == -EBUSY)
-			continue;
-		else if (ret < 0) {
-			port = 0;
-			break;
+		if (ret != -EBUSY) {
+			if (ret < 0) {
+				break;
+			}
+			rtcp_exp->tuple.dst.u.udp.port = htons(port + 1);
+			ret = nf_ct_expect_related(rtcp_exp);
+			if (ret == 0) {
+				rtp_port_found = true;
+				break;
+			} else if ((ret < 0) && (ret != -EBUSY)) {
+				nf_ct_unexpect_related(rtp_exp);
+				break;
+			}
 		}
-		rtcp_exp->tuple.dst.u.udp.port = htons(port + 1);
-		ret = nf_ct_expect_related(rtcp_exp);
-		if (ret == 0)
-			break;
-		else if (ret == -EBUSY) {
-			nf_ct_unexpect_related(rtp_exp);
-			continue;
-		} else if (ret < 0) {
-			nf_ct_unexpect_related(rtp_exp);
-			port = 0;
-			break;
+		port += 2;
+		if (port == 0) {
+			port = 1024;
 		}
-	}
+	} while (port != orig_port);
 
-	if (port == 0) {
+	if (rtp_port_found == false) {
 		nf_ct_helper_log(skb, ct, "all ports in use for SDP media");
 		goto err1;
 	}

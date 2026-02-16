@@ -488,7 +488,20 @@ int ip6_datagram_recv_ctl(struct sock *sk, struct msghdr *msg,
 		src_info.ipi6_addr = ipv6_hdr(skb)->daddr;
 		put_cmsg(msg, SOL_IPV6, IPV6_PKTINFO, sizeof(src_info), &src_info);
 	}
+#ifdef CONFIG_TI_IP_PKTINFO_SOCKOPT
+    if (np->rxopt.bits.ti_rxinfo) {
+		struct ti_pktinfo info;
+        struct ethhdr *ehdr;
+#ifdef CONFIG_TI_META_DATA
+		info.ifcpe_side = skb->ti_meta_info;
+        skb->ti_meta_info=0;
+#endif
+        ehdr = eth_hdr(skb);
+        memcpy( info.mac_addr, ehdr->h_source, sizeof(info.mac_addr));
 
+		put_cmsg(msg, SOL_IPV6, TI_IPV6_PKTINFO, sizeof(info), &info);
+	}
+#endif
 	if (np->rxopt.bits.rxhlim) {
 		int hlim = ipv6_hdr(skb)->hop_limit;
 		put_cmsg(msg, SOL_IPV6, IPV6_HOPLIMIT, sizeof(hlim), &hlim);

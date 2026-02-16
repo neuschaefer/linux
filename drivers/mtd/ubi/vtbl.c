@@ -61,7 +61,12 @@
 #include <asm/div64.h>
 #include "ubi.h"
 
+#ifdef CONFIG_MTD_UBI_DEBUG
 static void self_vtbl_check(const struct ubi_device *ubi);
+#else
+#define self_vtbl_check(ubi)
+#define ubi_dump_av(av)
+#endif
 
 /* Empty volume table record */
 static struct ubi_vtbl_record empty_vtbl_record;
@@ -852,6 +857,8 @@ out_free:
 	return err;
 }
 
+#ifdef CONFIG_MTD_UBI_DEBUG
+
 /**
  * self_vtbl_check - check volume table.
  * @ubi: UBI device description object
@@ -866,3 +873,5 @@ static void self_vtbl_check(const struct ubi_device *ubi)
 		BUG();
 	}
 }
+
+#endif

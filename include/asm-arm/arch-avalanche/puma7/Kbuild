@@ -1,0 +1,30 @@
+#include/asm-arm/arch-avalanche/puma7/Kbuild
+#
+# destination-y is the destination directory and is relative to ti/
+# it must be defined and not blank! (if top level is required use destination-y := include/).
+#
+# header-y is a list of headers to be exported.
+# header-y also indicates which subdirectories to visit (use trailing '/').
+#
+destination-y := include/
+header-y += docsis_ip_boot_params.h
+header-y += puma7_cppi.h
+header-y += puma7_cppi_prv.h
+header-y += puma7_cppi_lqmgr_q.h
+header-y += puma7_cppi_gqmgr0_q.h
+header-y += puma7_cppi_gqmgr1_q.h
+header-y += puma7_cppi_gqmgr2_q.h
+header-y += puma7_cppi_dsgqmgr_q.h
+header-y += puma7_cppi_usqmgr_q.h
+header-y += puma7_cppi_bmgr_pools.h
+header-y += puma7_npcpu_appcpu_defs.h
+header-y += modphy_api.h
+header-y += puma7_interrupts.h
+header-y += puma7_pp.h
+header-y += synopsys_gbe_interface.h
+header-y += spi_master/
+header-y += hw_mbox/
+header-y += io_ctrl/
+header-y += iosfsb_drv/
+header-y += ppsgc_defs.h
+header-y += spdtst_defs.h

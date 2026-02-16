@@ -91,6 +91,7 @@
 #include <linux/slab.h>
 #include "ubi.h"
 
+#ifdef CONFIG_MTD_UBI_DEBUG
 static int self_check_not_bad(const struct ubi_device *ubi, int pnum);
 static int self_check_peb_ec_hdr(const struct ubi_device *ubi, int pnum);
 static int self_check_ec_hdr(const struct ubi_device *ubi, int pnum,
@@ -100,6 +101,14 @@ static int self_check_vid_hdr(const struct ubi_device *ubi, int pnum,
 			      const struct ubi_vid_hdr *vid_hdr);
 static int self_check_write(struct ubi_device *ubi, const void *buf, int pnum,
 			    int offset, int len);
+#else
+#define self_check_not_bad(ubi, pnum) 0
+#define self_check_peb_ec_hdr(ubi, pnum) 0
+#define self_check_ec_hdr(ubi, pnum, ec_hdr) 0
+#define self_check_peb_vid_hdr(ubi, pnum) 0
+#define self_check_vid_hdr(ubi, pnum, vid_hdr) 0
+#define self_check_write(ubi, buf, pnum, offset, len) 0
+#endif
 
 /**
  * ubi_io_read - read data from a physical eraseblock.
@@ -1120,6 +1129,7 @@ int ubi_io_write_vid_hdr(struct ubi_device *ubi, int pnum,
 	return err;
 }
 
+#ifdef CONFIG_MTD_UBI_DEBUG
 /**
  * self_check_not_bad - ensure that a physical eraseblock is not bad.
  * @ubi: UBI device description object
@@ -1434,3 +1444,4 @@ error:
 	vfree(buf);
 	return err;
 }
+#endif

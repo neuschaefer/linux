@@ -1,3 +1,6 @@
+# Includes Intel Corporation's changes/modifications dated: 2014. 
+# Changed/modified portions - Copyright © 2014, Intel Corporation.
+
 #
 # USB device configuration
 #
@@ -40,7 +43,7 @@ menuconfig USB_SUPPORT
 if USB_SUPPORT
 
 config USB_COMMON
-	tristate
+	bool
 	default y
 	depends on USB || USB_GADGET
 
@@ -94,8 +97,6 @@ source "drivers/usb/wusbcore/Kconfig"
 
 source "drivers/usb/host/Kconfig"
 
-source "drivers/usb/musb/Kconfig"
-
 source "drivers/usb/renesas_usbhs/Kconfig"
 
 source "drivers/usb/class/Kconfig"
@@ -105,6 +106,8 @@ source "drivers/usb/storage/Kconfig"
 source "drivers/usb/image/Kconfig"
 
 endif
+
+source "drivers/usb/musb/Kconfig"
 
 source "drivers/usb/dwc3/Kconfig"
 

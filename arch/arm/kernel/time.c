@@ -11,6 +11,10 @@
  *  This file contains the ARM-specific time handling details:
  *  reading the RTC at bootup, etc...
  */
+/*
+Includes Intel Corporation's changes/modifications dated: 2014.
+Changed/modified portions - Copyright © 2014, Intel Corporation.
+*/
 #include <linux/export.h>
 #include <linux/kernel.h>
 #include <linux/interrupt.h>
@@ -64,7 +68,7 @@ unsigned long profile_pc(struct pt_regs *regs)
 EXPORT_SYMBOL(profile_pc);
 #endif
 
-#ifndef CONFIG_GENERIC_CLOCKEVENTS
+/*#ifndef CONFIG_GENERIC_CLOCKEVENTS
 /*
  * Kernel system timer support.
  */
@@ -76,7 +80,7 @@ void timer_tick(void)
 	update_process_times(user_mode(get_irq_regs()));
 #endif
 }
-#endif
+/*#endif*/
 
 static void dummy_clock_access(struct timespec *ts)
 {

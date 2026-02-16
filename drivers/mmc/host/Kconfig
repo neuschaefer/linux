@@ -141,6 +141,32 @@ config MMC_SDHCI_CNS3XXX
 
 	  If unsure, say N.
 
+config MMC_SDHCI_PUMA6
+	bool "SDHCI support on the Cat Mountain SoC"
+    depends on MMC_SDHCI_PLTFM
+    select MMC_SDHCI_IO_ACCESSORS
+	help
+	  This selects the SDHCI support for eMMC on Cat Mountain System-on-Chip devices.
+
+	  If unsure, say N.
+
+config MMC_SDHCI_PUMA7
+	bool "SDHCI support on the Cougar Mountain SoC"
+    depends on MMC_SDHCI_PLTFM
+    select MMC_SDHCI_IO_ACCESSORS
+	help
+	  This selects the SDHCI support for eMMC on Cougar Mountain System-on-Chip devices.
+
+	  If unsure, say N.
+
+config ARCH_GEN3
+	bool "SDHCI support Intel Gen3 - support some eMMC 4.4 feature"
+    depends on MMC_SDHCI_PUMA6 || MMC_SDHCI_PUMA7
+	help
+	  This selects the eMMC support for some eMMC 4.4 feature.
+
+	  If unsure, say N.
+
 config MMC_SDHCI_ESDHC_IMX
 	tristate "SDHCI support for the Freescale eSDHC/uSDHC i.MX controller"
 	depends on ARCH_MXC

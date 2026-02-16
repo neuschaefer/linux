@@ -103,6 +103,16 @@ static int ip6_finish_output2(struct sk_buff *skb)
 			return 0;
 		}
 	}
+#ifdef CONFIG_TI_PACKET_PROCESSOR
+#if defined(CONFIG_NF_CONNTRACK) || defined(CONFIG_NF_CONNTRACK_MODULE)
+    const struct nf_conn *ct = (struct nf_conn *)skb->nfct;
+    
+    if (ct != NULL)
+    {
+        ti_hil_pp_event( TI_CT_NETFILTER_CANCEL_DISCARD_ACCELERATION, (void *)ct );
+    }
+#endif
+#endif
 
 	rcu_read_lock_bh();
 	nexthop = rt6_nexthop((struct rt6_info *)dst);

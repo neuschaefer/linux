@@ -82,7 +82,7 @@ struct st_proto_s {
 	unsigned char len_size;
 	unsigned char reserve;
 };
-
+#if defined(__KERNEL__)
 extern long st_register(struct st_proto_s *);
 extern long st_unregister(struct st_proto_s *);
 
@@ -447,5 +447,5 @@ struct ti_st_plat_data {
 	int (*chip_asleep) (struct kim_data_s *);
 	int (*chip_awake) (struct kim_data_s *);
 };
-
+#endif /*KERNEL*/
 #endif /* TI_WILINK_ST_H */

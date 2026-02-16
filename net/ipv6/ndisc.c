@@ -1147,7 +1147,7 @@ static void ndisc_router_discovery(struct sk_buff *skb)
 		pref = ICMPV6_ROUTER_PREF_MEDIUM;
 #endif
 
-	rt = rt6_get_dflt_router(&ipv6_hdr(skb)->saddr, skb->dev);
+	rt = rt6_get_dflt_router_by_table(&ipv6_hdr(skb)->saddr, skb->dev, in6_dev->cnf.accept_ra_table);
 
 	if (rt) {
 		neigh = dst_neigh_lookup(&rt->dst, &ipv6_hdr(skb)->saddr);
@@ -1167,7 +1167,7 @@ static void ndisc_router_discovery(struct sk_buff *skb)
 	if (rt == NULL && lifetime) {
 		ND_PRINTK(3, dbg, "RA: adding default router\n");
 
-		rt = rt6_add_dflt_router(&ipv6_hdr(skb)->saddr, skb->dev, pref);
+		rt = rt6_add_dflt_router_by_table(&ipv6_hdr(skb)->saddr, skb->dev, pref, in6_dev->cnf.accept_ra_table);
 		if (rt == NULL) {
 			ND_PRINTK(0, err,
 				  "RA: %s failed to add default route\n",
@@ -1279,8 +1279,8 @@ skip_linkparms:
 #endif
 			if (ri->prefix_len > in6_dev->cnf.accept_ra_rt_info_max_plen)
 				continue;
-			rt6_route_rcv(skb->dev, (u8*)p, (p->nd_opt_len) << 3,
-				      &ipv6_hdr(skb)->saddr);
+			rt6_route_rcv_by_table(skb->dev, (u8*)p, (p->nd_opt_len) << 3,
+				      &ipv6_hdr(skb)->saddr, in6_dev->cnf.accept_ra_table);
 		}
 	}
 
@@ -1298,9 +1298,9 @@ skip_routeinfo:
 		for (p = ndopts.nd_opts_pi;
 		     p;
 		     p = ndisc_next_option(p, ndopts.nd_opts_pi_end)) {
-			addrconf_prefix_rcv(skb->dev, (u8 *)p,
+			addrconf_prefix_rcv_by_table(skb->dev, (u8 *)p,
 					    (p->nd_opt_len) << 3,
-					    ndopts.nd_opts_src_lladdr != NULL);
+					    ndopts.nd_opts_src_lladdr != NULL, in6_dev->cnf.accept_ra_table);
 		}
 	}
 

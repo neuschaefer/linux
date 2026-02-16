@@ -10,6 +10,9 @@
 #
 # Copyright (C) 1995-2001 by Russell King
 
+# Includes Intel Corporation's changes/modifications dated: 2014. 
+# Changed/modified portions - Copyright © 2014, Intel Corporation. 
+
 # Ensure linker flags are correct
 LDFLAGS		:=
 
@@ -92,8 +95,8 @@ tune-$(CONFIG_CPU_SA1100)	=-mtune=strongarm1100
 tune-$(CONFIG_CPU_XSCALE)	=$(call cc-option,-mtune=xscale,-mtune=strongarm110) -Wa,-mcpu=xscale
 tune-$(CONFIG_CPU_XSC3)		=$(call cc-option,-mtune=xscale,-mtune=strongarm110) -Wa,-mcpu=xscale
 tune-$(CONFIG_CPU_FEROCEON)	=$(call cc-option,-mtune=marvell-f,-mtune=xscale)
-tune-$(CONFIG_CPU_V6)		=$(call cc-option,-mtune=arm1136j-s,-mtune=strongarm)
-tune-$(CONFIG_CPU_V6K)		=$(call cc-option,-mtune=arm1136j-s,-mtune=strongarm)
+tune-$(CONFIG_CPU_V6)		=$(call cc-option,-mtune=arm1136j-s,-mtune=arm1136jfs)
+tune-$(CONFIG_CPU_V6K)		=$(call cc-option,-mtune=arm1176jz-s,-mtune=arm1176jz-s)
 
 # Evaluate tune cc-option calls now
 tune-y := $(tune-y)
@@ -104,8 +107,13 @@ else
 CFLAGS_ABI	:=$(call cc-option,-mapcs-32,-mabi=apcs-gnu) $(call cc-option,-mno-thumb-interwork,)
 endif
 
+# Need -Uarm for gcc < 3.x
+CFLAGS		+=$(CFLAGS_ABI) $(arch-y) $(tune-y) $(call cc-option,-mshort-load-bytes,$(call cc-option,-malignment-traps,)) -msoft-float -Uarm
+AFLAGS		+=$(CFLAGS_ABI) $(arch-y) $(tune-y) -msoft-float
+
+
 ifeq ($(CONFIG_ARM_UNWIND),y)
-CFLAGS_ABI	+=-funwind-tables
+CFLAGS_ABI	+=#-funwind-tables
 endif
 
 ifeq ($(CONFIG_THUMB2_KERNEL),y)
@@ -141,10 +149,13 @@ endif
 textofs-$(CONFIG_ARCH_MSM7X30) := 0x00208000
 textofs-$(CONFIG_ARCH_MSM8X60) := 0x00208000
 textofs-$(CONFIG_ARCH_MSM8960) := 0x00208000
+textofs-$(CONFIG_ARCH_AVALANCHE) := 0x00018000
+
 
 # Machine directory name.  This list is sorted alphanumerically
 # by CONFIG_* macro name.
 machine-$(CONFIG_ARCH_AT91)		+= at91
+machine-$(CONFIG_ARCH_AVALANCHE)	+= avalanche
 machine-$(CONFIG_ARCH_BCM)		+= bcm
 machine-$(CONFIG_ARCH_BCM2835)		+= bcm2835
 machine-$(CONFIG_ARCH_CLPS711X)		+= clps711x
@@ -228,6 +239,12 @@ endif
 
 # The byte offset of the kernel image in RAM from the start of RAM.
 TEXT_OFFSET := $(textofs-y)
+
+ifeq ($(incdir-y),)
+incdir-y := $(machine-y)
+endif
+INCDIR   := arch-$(incdir-y)
+
 
 # The first directory contains additional information for the boot setup code
 ifneq ($(machine-y),)

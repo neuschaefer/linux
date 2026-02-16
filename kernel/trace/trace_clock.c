@@ -21,6 +21,30 @@
 #include <linux/ktime.h>
 #include <linux/trace_clock.h>
 
+extern unsigned long long notrace avalanche_clock_p(void);
+u64 notrace trace_clock_p(void)
+{
+	u64 clock;
+
+	preempt_disable_notrace();
+	clock = avalanche_clock_p();
+	preempt_enable_notrace();
+
+	return clock;
+}
+
+extern unsigned long long notrace avalanche_clock_vp(void);
+u64 notrace trace_clock_vp(void)
+{
+	u64 clock;
+
+	preempt_disable_notrace();
+	clock = avalanche_clock_vp();
+	preempt_enable_notrace();
+
+	return clock;
+}
+
 /*
  * trace_clock_local(): the simplest and least coherent tracing clock.
  *

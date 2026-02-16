@@ -1,0 +1,397 @@
+#----------------------------------------------------------------
+# Copyright 2006-2007, Texas Instruments Incorporated
+#
+#   Kconfig file which defines and control all of the TI
+#   extensions to the networking stack.
+#
+# THIS MODIFIED SOFTWARE AND DOCUMENTATION ARE PROVIDED
+# "AS IS," AND TEXAS INSTRUMENTS MAKES NO REPRESENTATIONS 
+# OR WARRENTIES, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED 
+# TO, WARRANTIES OF MERCHANTABILITY OR FITNESS FOR ANY 
+# PARTICULAR PURPOSE OR THAT THE USE OF THE SOFTWARE OR 
+# DOCUMENTATION WILL NOT INFRINGE ANY THIRD PARTY PATENTS, 
+# COPYRIGHTS, TRADEMARKS OR OTHER RIGHTS. 
+#----------------------------------------------------------------
+# TI Specific configurations
+
+menu "Texas Instruments Kernel Extensions"
+config TI_DEVICE_PROTOCOL_HANDLING
+	bool "TI Device Specific Protocol Handling"
+	default y
+	help
+     This feature allows specific protocol handlers to be installed on a 
+     per device basis to do custom protocol specific handling. These handler
+     have higher precedence then the NET & Bridge stacks and allows the
+     custom protocol handler to be able to capture the packets and bypass 
+     the Networking stacks.
+
+config TI_UNMANAGED_BRIDGE
+	bool "TI Unmanaged Bridge"
+    depends on TI_DEVICE_PROTOCOL_HANDLING
+    default y
+	help
+        This feature enables the bridged interfaces to be unmanaged i.e. there is no
+        connectivity from a bridged interface to the local stack. 
+config INTEL_KERNEL_DOCSIS_SUPPORT
+	bool "INTEL DOCSIS support in kernel"
+        default y
+	help
+	This feature is available for DOCSIS support in kernel. 
+config INTEL_KERNEL_BBU_SUPPORT
+	bool "INTEL BBU support in kernel"
+        default n
+	help
+	This feature is available for BBU support in kernel. 
+config TI_META_DATA
+	bool "TI Meta Data"
+    default y
+	help
+        This feature is available for applications to add meta data while send out packets
+        The meta data is transferred from the socket layer into the networking packet and 
+        is available for all networking layers. The feature does not define the format of 
+        meta data but 4 bytes are available for storing information.
+         
+config INTEL_NF_TRIGGER_SUPPORT
+	bool "Intel Netfilter Port Trigger"
+    default y
+	help
+        This feature allows to use Port Trigger module of iptables/Netfilter 
+
+config INTEL_NF_GWMETA_SUPPORT
+	bool "Intel Gateway Packet Meta Data"
+    default y
+	help
+        This feature allows to label skb data of ip packets (GWMETA module of iptables/Netfilter )
+config INTEL_NF_WEBSTR_SUPPORT
+         bool "WEBSTR match support"
+    default y
+	help
+        This option allows to match string in http web header
+
+config TI_IP_PKTINFO_SOCKOPT
+	bool "TI IP level socket options <TI_IP_PKTINFO>/<TI_IPV6_PKTINFO>"
+    default y
+	help
+        The socket option level for IP is SOL_IP. A boolean integer flag is zero when it 
+        is false, otherwise true. Pass an TI_IP_PKTINFO ancillary message that contains 
+        a ti_pktinfo structure that supplies some information about the incoming packet. 
+        This only works for datagram oriented sockets. The argument is a flag that tells 
+        the socket whether the TI_IP_PKTINFO/TI_IPV6_PKTINFO message should be passed or
+        not. The message itself can only be sent/retrieved as control message with a 
+        packet using recvmsg(2) or sendmsg(2).  
+
+config TI_AUXDATA_SOCKOPT
+        bool "TI socket level socket option <TI_AUXDATA>"
+    default y
+        help
+        The socket option level for layer 2 is SOL_PACKET. Pass a TI_AUXDATA ancillary 
+	message that contains a ti_auxdata structure which supplies some TI proprietary
+	information about the incoming packet.  The argument is a flag that tells
+        the socket whether the TI_AUXDATA O message should be passed or not. The message
+	itself can only be sent/retrieved as control message with a packet using 
+	recvmsg(2) or sendmsg(2).
+
+config TI_META_DATA_CONSOLE_DUMP
+	bool "TI Meta Data Console Dump"
+    default n
+    depends on TI_META_DATA
+	help
+        This feature dumps the meta-information output at various stages in the networking
+        layer to showcase that the meta-information is valid and available at various layers.
+        This feature is only available for DEBUG and should be turned OFF on production releases
+        Make sure that the kernel conosle error level is set to debug to see the messages on the
+        console. 
+
+config TI_DOCSIS_INPUT_DEV
+	bool "TI Docsis Input Device"
+    default y
+	help
+        This feature is an extension to SKB to support docsis specific requirement.
+
+config INTEL_DOCSIS_ICMP_IIF
+	bool "Intel  Docsis ICMP Interface Index"
+    default y
+	help
+        This feature is an extension to ICMP to support docsis specific requirement
+	We use the docsis_icmp_iif to support ICMP when wan0, mta0 or erouter0 are on the same subnet
+
+config TI_L2_SELECTIVE_FORWARDER
+	bool "TI Layer2 Selective Forwarder"
+    default y
+    select TI_DEVICE_INDEX_REUSE
+    select TI_L2_SELECTIVE_PACKET_HANDLING
+	help
+        This feature is an extension to the Layer 2 bridge to selectively forward multicast 
+        and broadcast packets.
+
+config TI_L2_SELECTIVE_FORWARDER_TEST
+	bool "Test TI Layer2 Selective Forwarder"
+    default n
+    depends on TI_L2_SELECTIVE_FORWARDER
+	help
+        This feature tests the Layer 2 Selective Forwarder feature. This feature is for debug and 
+        testing purposes only and SHOULD be turned OFF in production version
+
+config INTEL_L2VPN_L2CP_FORWARD
+        bool "Intel L2VPN L2 Control Protocol Forward"
+        default y
+        help
+        This feature enables L2VPN L2 Control Protocol handling according to L2VPN specification
+
+config INTEL_L2VPN_MAC_AGING
+        bool "L2VPN MAC AGING"
+        depends on TI_PACKET_PROCESSOR
+        default y
+        help
+        This feature enables L2VPN MAC aging according to L2VPN specification
+
+config TI_DEVICE_INDEX_REUSE
+	bool "TI Device Index Reuse"
+    default n
+	help
+        This feature allows the device indexes to be reused when freed instead of infinetely incrementing it.
+        The maximum device index limit is set to 32.
+
+config TI_L2_SELECTIVE_PACKET_HANDLING
+	bool "TI Layer2 Selective Packet Handling Framework"
+    default n
+	help
+     This feature allows multiple packet handlers to be installed on a bridge to do 
+     custom packet handling. The handlers are called in the order of priority with which 
+     they are installed. Handlers installed with lower priority number are called before 
+     a handler installed with a higher priority number
+
+config TI_DOCSIS_EGRESS_HOOK
+	bool "TI DOCSIS Egress Hook"
+	default n
+	help
+        This feature allows dicsis bridge specified hooks to be installed on a per device
+        basis. The hooks are installed just before the packet is passed to the 
+	driver for transmission.
+
+config TI_DDH_GW
+        bool "TI DDH GW"
+        default n
+        help
+        This flag indicates that DDH should operate under GW condition 
+
+config TI_GW_EGRESS_HOOK
+	bool "TI GW Egress Hook"
+	default n
+	help
+        This feature inteand for GW it allows user specified hooks to be installed 
+	on a per device basis. The hooks are installed just before the packet is passed 
+	to the driver for transmission.
+
+config TI_EGRESS_HOOK
+	bool "TI Egress Hook"
+	default n
+	help
+        This feature allows user specified hooks to be installed on a per device
+        basis. The hooks are installed just before the packet is passed to the 
+        driver for transmission. The hook is the "Egress" counterpoint for the 
+        Device protocol handling.
+
+config TI_ICMP_ECHO_REPLY_NETFILTER_BYPASS
+	bool "TI ICMP echo reply netfilter bypass"
+	default n
+	help
+		Hack to bypass the Netfilter logic for ICMP echo reply. This bypass may be 
+		necessary when the Netfilter logic change the ICMP echo reply source MAC addres.
+
+config INTEL_NS_DEVICE_FILTER
+	bool "INTEL neighbour solicit device filter"
+	default y
+	help
+		This feature allows a neighbour solicit handler to be installed on a 
+		per device basis to do neighbour solicit filtering to neighbour solicit packets not destined
+		to the device.
+
+menu "TI Packet Processor Subsystem"
+
+config TI_PACKET_PROCESSOR
+	bool "TI Packet Processor"
+    default n
+	help
+        The TI packet processor is a hardware acclerator which can be used to acclerate
+        sessions and can improve the throughput of the system. 
+
+config TI_PACKET_PROCESSOR_STATS
+	bool "TI Packet Processor statistics"
+    	default y
+    	depends on TI_PACKET_PROCESSOR
+	help
+        Enable TI packet processor statistics mechanism. 
+
+config TI_PACKET_PROCESSOR_EXT_SWITCH
+    bool "TI Packet Processor external switch support"
+    default n
+    depends on TI_PACKET_PROCESSOR
+    help
+        This feature allows special tagging of outgoing ethernet packets for further
+        prioritization by the external ethernet switch hardware. The VLAN tagging technique
+        might be used.
+    
+config TI_HIL_DEBUG
+	bool "Enable HIL Debug"
+    default y
+    depends on TI_PACKET_PROCESSOR
+	help
+        Enable this to see debug output from the HIL profiles.
+
+choice
+    prompt "HIL Profile selection"
+    default TI_HIL_PROFILE_INTRUSIVE_P7
+    depends on TI_PACKET_PROCESSOR
+
+config TI_HIL_PROFILE_INTRUSIVE
+	bool "HIL Intrusive Profile"
+    select TI_EGRESS_HOOK
+    select TI_DEVICE_PROTOCOL_HANDLING
+	help
+      The HIL Intrusive mode profile hooks into the data path to capture necessary 
+      information for session creation. 
+
+config INTEL_HIL_REMOTE_PROFILE
+	bool "HIL Remote profile"
+	help
+      The HIL remote profile transfers events to ATOM HIL Intrusive profile
+
+config TI_HIL_PROFILE_STATIC
+	bool "HIL Static Profile"
+	help
+      The HIL static profile demonstrates the creation of the PP session data 
+      structure, i.e LUT and modification record based on user input from the console.
+
+config TI_HIL_PROFILE_INTRUSIVE_PP2K
+	bool "HIL Intrusive Profile PP2K"
+    select TI_EGRESS_HOOK
+    select TI_DEVICE_PROTOCOL_HANDLING
+	help
+      The HIL Intrusive mode profile hooks into the data path to capture necessary 
+      information for session creation. 
+
+config TI_HIL_PROFILE_INTRUSIVE_P7
+	bool "HIL Intrusive Profile Puma7"
+    select TI_EGRESS_HOOK
+    select TI_DEVICE_PROTOCOL_HANDLING
+	help
+      The HIL Intrusive mode profile hooks into the data path to capture necessary 
+      information for session creation. 
+endchoice
+
+config INTEL_PP_TUNNEL_SUPPORT
+	bool "L2TPv3 and GRE-MPLS Tunnels"
+        default n
+        depends on TI_PACKET_PROCESSOR
+	help
+      Enable this to support L2TPv3 and GRE-MPLS tunnels by PP.
+      This tunnels should be configured statically and regular session will not be created by PP.
+
+config INTEL_KERNEL_PP_DRIVER_LOCAL
+    bool "Packet Processor is running on current CPU"
+        default y
+        depends on TI_PACKET_PROCESSOR
+    help
+      The Packet Processor is running either locally or remotely
+
+config PP_SANITY_TESTS
+    bool "Enable SanityTestModule"
+    	default n
+	depends on TI_PACKET_PROCESSOR
+    help
+      Select if Sanity test module support is needed
+
+config NP_APP_DATAPIPE
+        bool "NP-CPU APP-CPU Datapipe network device"
+        default y
+        ---help---
+          If gateway capabilities is on APP-CPU(Atom)
+          than select yes.
+          If gateway capabilities is on NP-CPU(Arm11)
+          than select no.
+
+config SESS_TIMEOUT_BY_THRESH
+    	bool "Enable Session timeout by thresholds mechanism"
+    	default n
+	depends on TI_PACKET_PROCESSOR
+    help
+      Select if Sessions should be timedout according to high and low thresholds
+
+config DPD_TOGGLE_SCHEDULING_METHOD
+        bool "Support scheduling method toggling"
+        default n
+	depends on NP_APP_DATAPIPE
+        ---help---
+	  Support high<->low priority scheduling
+	  toggle in datapipe netdevice
+
+config DPD_RX_PACKET_COUNT_THRESHOLD
+        int "Packet count threshold for scheduling method toggle"
+        depends on DPD_TOGGLE_SCHEDULING_METHOD
+	default 10000        
+	range 0 50000
+        ---help---
+	 Amount of packet continuously processed
+         after which we toggle from High priority
+         scheduling to Low priority scheduling
+endmenu
+
+config INTEL_IRQ_THREAD_CHANGE_PRIORITY
+	bool "Change scheduler policy and priority "
+        default y
+        depends on IRQ_FORCED_THREADING
+	help
+      Enable to change scheduler policy and priority
+
+config INTEL_DEFAULT_IPV6_AUTOCONF_DISABLES_IPV6_AUTOCONF
+	bool "Disable IPv6 Autoconf if the default Autoconf is False"
+        default y
+	help
+      Enable to allow the default Autoconf (set to False) to disable IPv6 Autoconf for newly created interfaces
+
+config INTEL_MAX_BRIDGE_MACS_LIMIT
+	bool "Enable limitation upon max briged CPE macs"
+	default y
+	help
+       Enable limitaion upon maximun number of CPE MAC addresses that can be saved in bridge DB. this is to eliminate memory leak
+
+config INTEL_MAX_BRIDGE_MACS
+        int "INTEL maximum bridge macs"
+	depends on INTEL_MAX_BRIDGE_MACS_LIMIT
+        default 1024
+        range 1 65536
+        help
+       Maximun number of CEPs MACs connected to bridge.
+
+config INTEL_KERNEL_VOICE_SUPPORT
+	bool "INTEL VOICE support in kernel"
+        default n
+	help
+	This feature is available for VOICE support in kernel. 
+
+
+config INTEL_KERNEL_FORCE_IPV6_DOWN_WHEN_NO_ADDRES
+	bool "INTEL force ipv6 down on network interface"
+        default y
+	help
+	force ipv6 down on network interface when it has no ipv6 address.  
+endmenu
+
+config INTEL_KERNEL_SKB_COOKIE
+    bool "Support Aggregated SKB Cookie"
+        default n
+    help
+    Allow support of the aggregated cookie inside SKB
+
+config TI_KERNEL_GW_APPCPU
+        bool "INTEL run GW on APPCPU"
+        default n
+        help
+          Support for running GW on Atom
+
+config MOCA_CTP_BUILD
+        bool "MoCA CTP Build"
+        default n
+        help
+          Support for running MoCA Certification tests 

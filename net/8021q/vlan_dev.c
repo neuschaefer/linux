@@ -19,6 +19,10 @@
  *		as published by the Free Software Foundation; either version
  *		2 of the License, or (at your option) any later version.
  */
+/*
+Includes Intel Corporation's changes/modifications dated: 2014.
+Changed/modified portions - Copyright © 2014-2017, Intel Corporation.
+*/
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
@@ -34,6 +38,8 @@
 #include "vlanproc.h"
 #include <linux/if_vlan.h>
 #include <linux/netpoll.h>
+
+#include <mach/puma.h>
 
 /*
  *	Rebuild the Ethernet MAC header. This is called after an ARP
@@ -71,6 +77,15 @@ static int vlan_dev_rebuild_header(struct sk_buff *skb)
 static inline u16
 vlan_dev_get_egress_qos_mask(struct net_device *dev, struct sk_buff *skb)
 {
+#if defined(PUMA6_OR_NEWER_SOC_TYPE)
+	if ((skb->ti_ds_traffic_prio < 2) && (dev->priv_flags & IFF_BONDING))
+	{
+		/* Increase VLAN priority for traffic directed to the LAG */
+		return (VLAN_PRIO_MASK & ((2) << VLAN_PRIO_SHIFT));
+	}
+	return (VLAN_PRIO_MASK & (((u16)(skb->ti_ds_traffic_prio)) << VLAN_PRIO_SHIFT));
+#else
+
 	struct vlan_priority_tci_mapping *mp;
 
 	smp_rmb(); /* coupled with smp_wmb() in vlan_dev_set_egress_priority() */
@@ -85,6 +100,7 @@ vlan_dev_get_egress_qos_mask(struct net_device *dev, struct sk_buff *skb)
 		mp = mp->next;
 	}
 	return 0;
+#endif
 }
 
 /*

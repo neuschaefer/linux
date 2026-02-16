@@ -1,3 +1,7 @@
+/*
+Includes Intel Corporation's changes/modifications dated: 2014.
+Changed/modified portions - Copyright © 2014, Intel Corporation.
+*/
 #ifndef __ASM_GENERIC_IOCTLS_H
 #define __ASM_GENERIC_IOCTLS_H
 
@@ -93,6 +97,8 @@
 
 #define TIOCMIWAIT	0x545C	/* wait for a change on serial input line(s) */
 #define TIOCGICOUNT	0x545D	/* read serial port inline interrupt counts */
+#define TIOCUARTINRESET    	 0x5470  /* in reset of uart in the cru */
+#define TIOCUARTOUTOFRESET   0x5471  /* out reset of uart in the cru */
 
 /*
  * Some arches already define FIOQSIZE due to a historical

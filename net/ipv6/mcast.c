@@ -46,7 +46,6 @@
 #include <linux/slab.h>
 #include <linux/pkt_sched.h>
 #include <net/mld.h>
-
 #include <linux/netfilter.h>
 #include <linux/netfilter_ipv6.h>
 
@@ -212,7 +211,6 @@ int ipv6_sock_mc_join(struct sock *sk, int ifindex, const struct in6_addr *addr)
 	spin_unlock(&ipv6_sk_mc_lock);
 
 	rcu_read_unlock();
-
 	return 0;
 }
 
@@ -245,7 +243,6 @@ int ipv6_sock_mc_drop(struct sock *sk, int ifindex, const struct in6_addr *addr)
 			dev = dev_get_by_index_rcu(net, mc_lst->ifindex);
 			if (dev != NULL) {
 				struct inet6_dev *idev = __in6_dev_get(dev);
-
 				(void) ip6_mc_leave_src(sk, mc_lst, idev);
 				if (idev)
 					__ipv6_dev_mc_dec(idev, &mc_lst->addr);

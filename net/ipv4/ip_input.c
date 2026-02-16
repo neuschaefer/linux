@@ -112,6 +112,11 @@
  *		as published by the Free Software Foundation; either version
  *		2 of the License, or (at your option) any later version.
  */
+/*
+         Includes Intel Corporation's changes/modifications dated: [Dec.2013].
+         Changed/modified portions - Copyright © 2011, Intel Corporation
+         1. PP Hook
+*/
 
 #define pr_fmt(fmt) "IPv4: " fmt
 
@@ -146,6 +151,10 @@
 #include <net/xfrm.h>
 #include <linux/mroute.h>
 #include <linux/netlink.h>
+
+#ifdef CONFIG_TI_PACKET_PROCESSOR
+#include <linux/ti_hil.h>
+#endif
 
 /*
  *	Process Router Attention IP option (RFC 2113)
@@ -366,6 +375,10 @@ static int ip_rcv_finish(struct sk_buff *skb)
 	return dst_input(skb);
 
 drop:
+#ifdef CONFIG_TI_PACKET_PROCESSOR
+    /* Create a NULL PP device, to drop all dropped packets before they reach the host */
+    ti_hil_pp_event (TI_IP_DISCARD_PKT_IPV4, (void *)skb);
+#endif //CONFIG_TI_PACKET_PROCESSOR	
 	kfree_skb(skb);
 	return NET_RX_DROP;
 }

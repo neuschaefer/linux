@@ -37,6 +37,10 @@
  *						selection; consider scope,
  *						status etc.
  */
+  /*
+  Includes Intel Corporation's changes/modifications dated: [2/3/2014]. 
+  Changed/modified portions - Copyright © [2014], Intel Corporation. 
+  */
 
 #define pr_fmt(fmt) "IPv6: " fmt
 
@@ -155,6 +159,10 @@ static struct rt6_info *addrconf_get_prefix_route(const struct in6_addr *pfx,
 						  int plen,
 						  const struct net_device *dev,
 						  u32 flags, u32 noflags);
+static struct rt6_info *addrconf_get_prefix_route_by_table(const struct in6_addr *pfx,
+						  int plen,
+						  const struct net_device *dev,
+						  u32 flags, u32 noflags, u32 table_id);
 
 static void addrconf_dad_start(struct inet6_ifaddr *ifp);
 static void addrconf_dad_timer(unsigned long data);
@@ -174,6 +182,7 @@ static struct ipv6_devconf ipv6_devconf __read_mostly = {
 	.hop_limit		= IPV6_DEFAULT_HOPLIMIT,
 	.mtu6			= IPV6_MIN_MTU,
 	.accept_ra		= 1,
+	.accept_ra_table    = RT6_TABLE_DFLT,
 	.accept_redirects	= 1,
 	.autoconf		= 1,
 	.force_mld_version	= 0,
@@ -193,6 +202,7 @@ static struct ipv6_devconf ipv6_devconf __read_mostly = {
 	.max_addresses		= IPV6_MAX_ADDRESSES,
 	.accept_ra_defrtr	= 1,
 	.accept_ra_pinfo	= 1,
+	.accept_ra_pinfo_autoconf = 1,
 #ifdef CONFIG_IPV6_ROUTER_PREF
 	.accept_ra_rtr_pref	= 1,
 	.rtr_probe_interval	= 60 * HZ,
@@ -212,6 +222,7 @@ static struct ipv6_devconf ipv6_devconf_dflt __read_mostly = {
 	.hop_limit		= IPV6_DEFAULT_HOPLIMIT,
 	.mtu6			= IPV6_MIN_MTU,
 	.accept_ra		= 1,
+	.accept_ra_table    = RT6_TABLE_DFLT,
 	.accept_redirects	= 1,
 	.autoconf		= 1,
 	.force_mld_version	= 0,
@@ -231,6 +242,7 @@ static struct ipv6_devconf ipv6_devconf_dflt __read_mostly = {
 	.max_addresses		= IPV6_MAX_ADDRESSES,
 	.accept_ra_defrtr	= 1,
 	.accept_ra_pinfo	= 1,
+    .accept_ra_pinfo_autoconf = 1,
 #ifdef CONFIG_IPV6_ROUTER_PREF
 	.accept_ra_rtr_pref	= 1,
 	.rtr_probe_interval	= 60 * HZ,
@@ -1446,6 +1458,46 @@ int ipv6_get_lladdr(struct net_device *dev, struct in6_addr *addr,
 	return err;
 }
 
+/*! \fn int intel_ipv6_ns_filter(struct net_device *dev,struct in6_addr* dst_addr,unsigned char banned_flags)
+ *  \brief filter neighbour solicit packets not destined to the device 
+ *  \param[in] - dev - the device the packet was received in
+ *  \param[in] - dst_addr - the destination address of the packet
+ *  \param[in] - banned_flags - ipv6 address banned flags. the banned flags are the ipv6 adress flags that we want to ignore
+ *  the flags could be
+ *  IFA_F_TEMPORARY,IFA_F_SECONDARY,IFA_F_NODAD, IFA_F_OPTIMISTIC,IFA_F_DADFAILED,IFA_F_HOMEADDRESS,IFA_F_DEPRECATED,IFA_F_TENTATIVE
+ *  so if we want to ignore addresses that are temporary ipv6 addresses we'll add IFA_F_TEMPORARY to banned_flags
+ *  \return 1/0 - 1 = accept, 0 = drop
+ */
+int intel_ipv6_ns_filter(struct net_device *dev, struct	in6_addr* dst_addr,unsigned char banned_flags)
+{
+	struct inet6_dev *idev;
+	int accept = 0;
+
+	idev = __in6_dev_get(dev);
+	if (idev) 
+    {
+        struct inet6_ifaddr *ifp;
+        read_lock_bh(&idev->lock);
+		list_for_each_entry(ifp, &idev->addr_list, if_list) 
+        {
+            if (!(ifp->flags & banned_flags)) 
+            {
+				/* compare the last 3 bytes of the destination address to the last 3 bytes of the device's ipv6 address*/
+                if ((ifp->addr.in6_u.u6_addr8[15] == dst_addr->in6_u.u6_addr8[15]) &&
+                    (ifp->addr.in6_u.u6_addr8[14] == dst_addr->in6_u.u6_addr8[14]) &&
+                    (ifp->addr.in6_u.u6_addr8[13] == dst_addr->in6_u.u6_addr8[13]))
+                    {
+					accept =1;
+                    break;
+                    }
+            }
+        }
+        read_unlock_bh(&idev->lock);
+    }
+	return accept;
+}
+
+
 static int ipv6_count_addresses(struct inet6_dev *idev)
 {
 	int cnt = 0;
@@ -1926,11 +1978,11 @@ static void  __ipv6_try_regen_rndid(struct inet6_dev *idev, struct in6_addr *tmp
  */
 
 static void
-addrconf_prefix_route(struct in6_addr *pfx, int plen, struct net_device *dev,
-		      unsigned long expires, u32 flags)
+addrconf_prefix_route_by_table(struct in6_addr *pfx, int plen, struct net_device *dev,
+		      unsigned long expires, u32 flags, u32 table_id)
 {
 	struct fib6_config cfg = {
-		.fc_table = RT6_TABLE_PREFIX,
+		.fc_table = table_id,
 		.fc_metric = IP6_RT_PRIO_ADDRCONF,
 		.fc_ifindex = dev->ifindex,
 		.fc_expires = expires,
@@ -1953,18 +2005,24 @@ addrconf_prefix_route(struct in6_addr *pfx, int plen, struct net_device *dev,
 
 	ip6_route_add(&cfg);
 }
+static void
+addrconf_prefix_route(struct in6_addr *pfx, int plen, struct net_device *dev,
+		      unsigned long expires, u32 flags)
+{
+    return addrconf_prefix_route_by_table(pfx, plen, dev, expires, flags, RT6_TABLE_PREFIX);
+}
 
 
-static struct rt6_info *addrconf_get_prefix_route(const struct in6_addr *pfx,
+static struct rt6_info *addrconf_get_prefix_route_by_table(const struct in6_addr *pfx,
 						  int plen,
 						  const struct net_device *dev,
-						  u32 flags, u32 noflags)
+						  u32 flags, u32 noflags, u32 table_id)
 {
 	struct fib6_node *fn;
 	struct rt6_info *rt = NULL;
 	struct fib6_table *table;
 
-	table = fib6_get_table(dev_net(dev), RT6_TABLE_PREFIX);
+	table = fib6_get_table(dev_net(dev), table_id);
 	if (table == NULL)
 		return NULL;
 
@@ -1986,7 +2044,13 @@ out:
 	read_unlock_bh(&table->tb6_lock);
 	return rt;
 }
-
+static struct rt6_info *addrconf_get_prefix_route(const struct in6_addr *pfx,
+						  int plen,
+						  const struct net_device *dev,
+						  u32 flags, u32 noflags)
+{
+    return addrconf_get_prefix_route_by_table(pfx, plen, dev, flags, noflags, RT6_TABLE_PREFIX);
+}
 
 /* Create "default" multicast route to the interface */
 
@@ -2044,6 +2108,10 @@ static struct inet6_dev *addrconf_add_dev(struct net_device *dev)
 }
 
 void addrconf_prefix_rcv(struct net_device *dev, u8 *opt, int len, bool sllao)
+{
+    return addrconf_prefix_rcv_by_table(dev, opt, len, sllao, RT6_TABLE_PREFIX);
+}
+void addrconf_prefix_rcv_by_table(struct net_device *dev, u8 *opt, int len, bool sllao, u32 table_id)
 {
 	struct prefix_info *pinfo;
 	__u32 valid_lft;
@@ -2107,11 +2175,11 @@ void addrconf_prefix_rcv(struct net_device *dev, u8 *opt, int len, bool sllao)
 		if (addrconf_finite_timeout(rt_expires))
 			rt_expires *= HZ;
 
-		rt = addrconf_get_prefix_route(&pinfo->prefix,
+		rt = addrconf_get_prefix_route_by_table(&pinfo->prefix,
 					       pinfo->prefix_len,
 					       dev,
 					       RTF_ADDRCONF | RTF_PREFIX_RT,
-					       RTF_GATEWAY | RTF_DEFAULT);
+					       RTF_GATEWAY | RTF_DEFAULT, table_id);
 
 		if (rt) {
 			/* Autoconf prefix route */
@@ -2132,15 +2200,15 @@ void addrconf_prefix_rcv(struct net_device *dev, u8 *opt, int len, bool sllao)
 				flags |= RTF_EXPIRES;
 				expires = jiffies_to_clock_t(rt_expires);
 			}
-			addrconf_prefix_route(&pinfo->prefix, pinfo->prefix_len,
-					      dev, expires, flags);
+			addrconf_prefix_route_by_table(&pinfo->prefix, pinfo->prefix_len,
+					      dev, expires, flags, table_id);
 		}
 		ip6_rt_put(rt);
 	}
 
 	/* Try to figure out our local address for this prefix */
 
-	if (pinfo->autoconf && in6_dev->cnf.autoconf) {
+	if (pinfo->autoconf && in6_dev->cnf.autoconf && in6_dev->cnf.accept_ra_pinfo_autoconf) {
 		struct inet6_ifaddr *ifp;
 		struct in6_addr addr;
 		int create = 0, update_lft = 0;
@@ -2488,6 +2556,17 @@ static int inet6_addr_del(struct net *net, int ifindex, const struct in6_addr *p
 			read_unlock_bh(&idev->lock);
 
 			ipv6_del_addr(ifp);
+#ifdef CONFIG_INTEL_KERNEL_FORCE_IPV6_DOWN_WHEN_NO_ADDRES
+            /*Added this code in order to avoid transmit messages over
+              IPv6 w/o receiving DHCP Advertisment messages*/
+			/* If the last address is deleted administratively,
+			   disable IPv6 on this interface.
+			 */
+			if (list_empty(&idev->addr_list))
+            {
+				addrconf_ifdown(idev->dev, 1);
+            }
+#endif
 			return 0;
 		}
 	}
@@ -2694,6 +2773,16 @@ static void addrconf_dev_config(struct net_device *dev)
 	idev = addrconf_add_dev(dev);
 	if (IS_ERR(idev))
 		return;
+
+#ifdef CONFIG_INTEL_DEFAULT_IPV6_AUTOCONF_DISABLES_IPV6_AUTOCONF
+   /* NETDK: Check if autoconfiguration is enabled for the network device or
+     * not? */
+    if (idev->cnf.autoconf == 0)
+    {
+        printk ("Autoconfiguration disabled for %s\n", dev->name);
+        return;
+    }
+#endif
 
 	memset(&addr, 0, sizeof(struct in6_addr));
 	addr.s6_addr32[0] = htonl(0xFE800000);
@@ -4115,6 +4204,7 @@ static inline void ipv6_store_devconf(struct ipv6_devconf *cnf,
 	array[DEVCONF_HOPLIMIT] = cnf->hop_limit;
 	array[DEVCONF_MTU6] = cnf->mtu6;
 	array[DEVCONF_ACCEPT_RA] = cnf->accept_ra;
+	array[DEVCONF_ACCEPT_RA_TABLE] = cnf->accept_ra_table;
 	array[DEVCONF_ACCEPT_REDIRECTS] = cnf->accept_redirects;
 	array[DEVCONF_AUTOCONF] = cnf->autoconf;
 	array[DEVCONF_DAD_TRANSMITS] = cnf->dad_transmits;
@@ -4138,6 +4228,7 @@ static inline void ipv6_store_devconf(struct ipv6_devconf *cnf,
 	array[DEVCONF_MAX_ADDRESSES] = cnf->max_addresses;
 	array[DEVCONF_ACCEPT_RA_DEFRTR] = cnf->accept_ra_defrtr;
 	array[DEVCONF_ACCEPT_RA_PINFO] = cnf->accept_ra_pinfo;
+	array[DEVCONF_ACCEPT_RA_PINFO_AUTOCONF] = cnf->accept_ra_pinfo_autoconf;
 #ifdef CONFIG_IPV6_ROUTER_PREF
 	array[DEVCONF_ACCEPT_RA_RTR_PREF] = cnf->accept_ra_rtr_pref;
 	array[DEVCONF_RTR_PROBE_INTERVAL] =
@@ -4764,6 +4855,13 @@ static struct addrconf_sysctl_table
 			.proc_handler	= proc_dointvec,
 		},
 		{
+			.procname	= "accept_ra_table",
+			.data		= &ipv6_devconf.accept_ra_table,
+			.maxlen		= sizeof(int),
+			.mode		= 0644,
+			.proc_handler	= proc_dointvec,
+		},
+		{
 			.procname	= "accept_redirects",
 			.data		= &ipv6_devconf.accept_redirects,
 			.maxlen		= sizeof(int),
@@ -4882,6 +4980,13 @@ static struct addrconf_sysctl_table
 		{
 			.procname	= "accept_ra_pinfo",
 			.data		= &ipv6_devconf.accept_ra_pinfo,
+			.maxlen		= sizeof(int),
+			.mode		= 0644,
+			.proc_handler	= proc_dointvec,
+		},
+		{
+			.procname	= "accept_ra_pinfo_autoconf",
+			.data		= &ipv6_devconf.accept_ra_pinfo_autoconf,
 			.maxlen		= sizeof(int),
 			.mode		= 0644,
 			.proc_handler	= proc_dointvec,
@@ -5233,3 +5338,6 @@ void addrconf_cleanup(void)
 	del_timer(&addr_chk_timer);
 	rtnl_unlock();
 }
+
+
+EXPORT_SYMBOL(intel_ipv6_ns_filter); 

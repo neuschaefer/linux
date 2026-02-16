@@ -87,7 +87,7 @@ quiet_cmd_install = INSTALL $(printdir) ($(words $(all-files))\
         touch $@
 
 quiet_cmd_remove = REMOVE  $(unwanted)
-      cmd_remove = rm -f $(unwanted-file)
+      cmd_remove = #rm -f $(unwanted-file)
 
 quiet_cmd_check = CHECK   $(printdir) ($(words $(all-files)) files)
 # Headers list can be pretty long, xargs helps to avoid

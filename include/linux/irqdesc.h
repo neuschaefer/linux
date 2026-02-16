@@ -1,3 +1,7 @@
+/*
+Includes Intel Corporation's changes/modifications dated: 2014.
+Changed/modified portions - Copyright © 2014, Intel Corporation.
+*/
 #ifndef _LINUX_IRQDESC_H
 #define _LINUX_IRQDESC_H
 
@@ -67,6 +71,10 @@ struct irq_desc {
 #ifdef CONFIG_PROC_FS
 	struct proc_dir_entry	*dir;
 #endif
+#ifdef CONFIG_INTEL_IRQ_THREAD_CHANGE_PRIORITY
+    int policy;
+    unsigned int sched_priority; 
+#endif
 	int			parent_irq;
 	struct module		*owner;
 	const char		*name;
@@ -74,6 +82,7 @@ struct irq_desc {
 
 #ifndef CONFIG_SPARSE_IRQ
 extern struct irq_desc irq_desc[NR_IRQS];
+typedef struct irq_desc irq_desc_t;
 #endif
 
 static inline struct irq_data *irq_desc_get_irq_data(struct irq_desc *desc)

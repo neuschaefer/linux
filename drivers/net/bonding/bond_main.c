@@ -421,6 +421,13 @@ static void bond_update_speed_duplex(struct slave *slave)
 	u32 slave_speed;
 	int res;
 
+	if (slave->man_link != -1)
+	{
+		slave->speed = slave->man_speed;
+		slave->duplex = slave->man_duplex;
+		return;
+	}
+
 	slave->speed = SPEED_UNKNOWN;
 	slave->duplex = DUPLEX_UNKNOWN;
 
@@ -1378,6 +1385,27 @@ int bond_enslave(struct net_device *bond_dev, struct net_device *slave_dev)
 		goto err_undo_flags;
 	}
 	INIT_LIST_HEAD(&new_slave->list);
+
+	/* Create manual link params override sysfs */
+	new_slave->man_speed = SPEED_UNKNOWN;
+	new_slave->man_duplex = DUPLEX_UNKNOWN;
+	new_slave->man_link = -1; /* no define for unk */
+
+	sysfs_attr_init(&new_slave->man_linkprop.attr);
+	new_slave->man_linkprop.attr.name = kzalloc(strlen(slave_dev->name) + sizeof("_man_linkprop") + 1, GFP_KERNEL);
+	sprintf(new_slave->man_linkprop.attr.name, "%s_man_linkprop", slave_dev->name);
+
+	new_slave->man_linkprop.attr.mode = 0644;
+	new_slave->man_linkprop.show = bonding_show_man_linkprop;
+	new_slave->man_linkprop.store = bonding_store_man_linkprop;
+
+	res = sysfs_add_file_to_group(&bond_dev->dev.kobj, &new_slave->man_linkprop.attr, bond_dev->sysfs_groups[0]->name);
+	if (res)
+	{
+		pr_debug("Error %d calling sysfs_add_file_to_group\n", res);
+		goto err_free;
+	}
+
 	/*
 	 * Set the new_slave's queue_id to be zero.  Queue ID mapping
 	 * is set via sysfs or module option if desired.
@@ -1693,6 +1721,8 @@ err_restore_mtu:
 	dev_set_mtu(slave_dev, new_slave->original_mtu);
 
 err_free:
+	if (new_slave->man_linkprop.attr.name)
+		kfree(new_slave->man_linkprop.attr.name);
 	kfree(new_slave);
 
 err_undo_flags:
@@ -1891,6 +1921,9 @@ static int __bond_release_one(struct net_device *bond_dev,
 
 	slave_dev->priv_flags &= ~IFF_BONDING;
 
+	/* remove slave attribute from sysfs sysfs */
+	sysfs_remove_file_from_group(&bond_dev->dev.kobj, &slave->man_linkprop.attr, bond_dev->sysfs_groups[0]->name);
+	kfree(slave->man_linkprop.attr.name);
 	kfree(slave);
 
 	return 0;  /* deletion OK */
@@ -2025,9 +2058,16 @@ static int bond_miimon_inspect(struct bonding *bond)
 	ignore_updelay = !bond->curr_active_slave ? true : false;
 
 	bond_for_each_slave(bond, slave) {
+
 		slave->new_link = BOND_LINK_NOCHANGE;
 
-		link_state = bond_check_dev_link(bond, slave->dev, 0);
+		/* override, upcasting  */
+		if (slave->man_link != -1) {
+			link_state = slave->man_link ? BMSR_LSTATUS : 0;
+		}
+		else {
+			link_state = bond_check_dev_link(bond, slave->dev, 0);
+		}
 
 		switch (slave->link) {
 		case BOND_LINK_UP:
@@ -2917,7 +2957,7 @@ static int bond_master_netdev_event(unsigned long event,
 	return NOTIFY_DONE;
 }
 
-static int bond_slave_netdev_event(unsigned long event,
+int bond_slave_netdev_event(unsigned long event,
 				   struct net_device *slave_dev)
 {
 	struct slave *slave = bond_slave_get_rtnl(slave_dev);

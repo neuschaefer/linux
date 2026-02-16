@@ -1,0 +1,677 @@
+/*
+ * puma7_pp.h
+ * Description:
+ * See below.
+ *
+   This file is provided under a dual BSD/GPLv2 license.  When using or
+  redistributing this file, you may do so under either license.
+
+  GPL LICENSE SUMMARY
+
+  Copyright(c) 2014-2017 Intel Corporation.
+
+  This program is free software; you can redistribute it and/or modify
+  it under the terms of version 2 of the GNU General Public License as
+  published by the Free Software Foundation.
+
+  This program is distributed in the hope that it will be useful, but
+  WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+  General Public License for more details.
+
+  You should have received a copy of the GNU General Public License
+  along with this program; if not, write to the Free Software
+  Foundation, Inc., 51 Franklin St - Fifth Floor, Boston, MA 02110-1301 USA.
+  The full GNU General Public License is included in this distribution
+  in the file called LICENSE.GPL.
+
+
+  Contact Information:
+  Intel Corporation
+  2200 Mission College Blvd.
+  Santa Clara, CA  97052
+
+  BSD LICENSE
+
+  Copyright(c) 2014-2017 Intel Corporation. All rights reserved.
+
+  Redistribution and use in source and binary forms, with or without
+  modification, are permitted provided that the following conditions
+  are met:
+
+    * Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+
+    * Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in
+      the documentation and/or other materials provided with the
+      distribution.
+
+    * Neither the name of Intel Corporation nor the names of its
+      contributors may be used to endorse or promote products derived
+      from this software without specific prior written permission.
+
+  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*/
+
+
+/*
+ * This file contains Packet Processor configuration. All the configurations
+ * here are system level and hence a complete knowledge of configurations of all
+ * devices/drivers related to the Packet Processor is required before modifying
+ * any value.
+ *
+ * The private data structures used by avalanche_ppd_init() are also present in
+ * this file and should not be modified unless the function avalanche_ppd_init
+ * in file puma7_pp.c is also required to be modified for PP configuration.
+ *
+ */
+
+#ifndef _INCLUDE_PUMA7_PP_H
+#define _INCLUDE_PUMA7_PP_H
+
+#define DEFAULT_SESSION_TIMEOUT_SEC  1
+#define PP_DEFAULT_MTU_SIZE    (1500)
+#define MAX_IP_PACKET_SIZE      1514
+#define MIN_IP_PACKET_SIZE      64
+
+/* Queue threshold (short/long/xl) */
+#define THRESHOLD_0_VALUE       (PAL_CPPI_PP_SHARED_RX_LOW_1KB_BUFFER_SIZE - PAL_CPPI_PP_START_OF_PACKET_OFFSET - SKB_DATA_ALIGN(sizeof(struct skb_shared_info)))
+#define THRESHOLD_1_VALUE       (PAL_CPPI_PP_SHARED_RX_LOW_2KB_BUFFER_SIZE - PAL_CPPI_PP_START_OF_PACKET_OFFSET - SKB_DATA_ALIGN(sizeof(struct skb_shared_info)))
+
+/*
+ * PID Range configurations
+ */
+typedef enum PP_PID_NUM
+{
+    PP_DOCSIS_RX_PID_NUM,              // 0
+    PP_RESERVED_PID_NUM_1,             // 1
+    PP_RESERVED_PID_NUM_2,             // 2
+    PP_SGMII0_RX_PID_NUM,              // 3
+    PP_SGMII1_RX_PID_NUM,              // 4
+    PP_RGMII0_RX_PID_NUM,              // 5
+    PP_MoCA_RX_PID_NUM,                // 6
+    PP_ATOM_RX_PID_NUM,                // 7
+    PP_RGMII1_RX_PID_NUM,              // 8
+    PP_VOICE_DSP_C55_PID_NUM,          // 9
+    PP_RESERVED_PID_NUM_10,            // 10
+    PP_RESERVED_PID_NUM_11,            // 11
+    PP_RESERVED_PID_NUM_12,            // 12
+    PP_RESERVED_PID_NUM_13,            // 13
+    PP_RESERVED_PID_NUM_14,            // 14
+    PP_RESERVED_PID_NUM_15,            // 15
+    PP_WiFi_PORT0_PID_NUM,             // 16
+    PP_WiFi_PORT1_PID_NUM,             // 17
+    PP_WiFi_PORT2_PID_NUM,             // 18
+    PP_WiFi_PORT3_PID_NUM,             // 19
+    PP_RESERVED_PID_NUM_20,            // 20
+    PP_RESERVED_PID_NUM_21,            // 21
+    PP_RESERVED_PID_NUM_22,            // 22
+    PP_RESERVED_PID_NUM_23,            // 23
+    PP_RESERVED_PID_NUM_24,            // 24
+    PP_RESERVED_PID_NUM_25,            // 25
+    PP_RESERVED_PID_NUM_26,            // 26
+    PP_RESERVED_PID_NUM_27,            // 27
+    PP_RESERVED_PID_NUM_28,            // 28
+    PP_RESERVED_PID_NUM_29,            // 29
+    PP_RESERVED_PID_NUM_30,            // 30
+    PP_RESERVED_PID_NUM_31,            // 31
+}PP_PID_NUM_e;
+
+#define PP_PID_NUM_ALL      (0xFE)
+#define PP_PID_NUM_INVALID  (0xFF)
+
+#if 0
+#define PP_ETH_PID_COUNT    1   // for backward compatible
+#define PP_ETH_PID_BASE     31  // for backward compatible
+#define PP_USB_PID_COUNT    4   // for backward compatible
+#define PP_USB_PID_BASE     26  // for backward compatible
+#endif
+
+#define PP_C55_PID_COUNT    1   /* configuration for C55 DSP */
+#define PP_C55_PID_BASE     PP_VOICE_DSP_C55_PID_NUM  /* configuration for C55 DSP */
+
+/* QoS Clusters definitions */
+typedef enum PAL_CPPI41_PP_QOS_CLUSTERS
+{
+    PAL_CPPI41_PP_DOCSIS_TX_QOS_CLUSTER_BASE,
+        PAL_CPPI41_PP_DOCSIS_TX_BE0_QOS_CLUSTER_NUM = PAL_CPPI41_PP_DOCSIS_TX_QOS_CLUSTER_BASE,     // 0
+        PAL_CPPI41_PP_DOCSIS_TX_BE1_QOS_CLUSTER_NUM,                                                // 1
+        PAL_CPPI41_PP_DOCSIS_TX_BE2_QOS_CLUSTER_NUM,                                                // 2
+        PAL_CPPI41_PP_DOCSIS_TX_BE3_QOS_CLUSTER_NUM,                                                // 3
+        PAL_CPPI41_PP_DOCSIS_TX_BE4_QOS_CLUSTER_NUM,                                                // 4
+        PAL_CPPI41_PP_DOCSIS_TX_BE5_QOS_CLUSTER_NUM,                                                // 5
+        PAL_CPPI41_PP_DOCSIS_TX_BE6_QOS_CLUSTER_NUM,                                                // 6
+        PAL_CPPI41_PP_DOCSIS_TX_BE7_QOS_CLUSTER_NUM,                                                // 7
+        PAL_CPPI41_PP_DOCSIS_TX_BE8_QOS_CLUSTER_NUM,                                                // 8
+        PAL_CPPI41_PP_DOCSIS_TX_BE9_QOS_CLUSTER_NUM,                                                // 9
+        PAL_CPPI41_PP_DOCSIS_TX_BE10_QOSl_CLUSTER_NUM,                                               // 10
+        PAL_CPPI41_PP_DOCSIS_TX_BE11_QOS_CLUSTER_NUM,                                               // 11
+        PAL_CPPI41_PP_DOCSIS_TX_BE12_QOS_CLUSTER_NUM,                                               // 12
+        PAL_CPPI41_PP_DOCSIS_TX_BE13_QOS_CLUSTER_NUM,                                               // 13
+        PAL_CPPI41_PP_DOCSIS_TX_BE14_QOS_CLUSTER_NUM,                                               // 14
+        PAL_CPPI41_PP_DOCSIS_TX_BE15_QOS_CLUSTER_NUM,                                               // 15
+    PAL_CPPI41_PP_DOCSIS_TX_QOS_CLUSTER_LAST = PAL_CPPI41_PP_DOCSIS_TX_BE15_QOS_CLUSTER_NUM,
+
+    PAL_CPPI41_PP_MoCA_QOS_CLUSTER_NUM,                                                             // 16
+
+    PAL_CPPI_GBE_QOS_CLUSTER_BASE,
+    PAL_CPPI41_PP_ATOM_QOS_CLUSTER_NUM = PAL_CPPI_GBE_QOS_CLUSTER_BASE,                             // 17
+    PAL_CPPI41_PP_RGMII0_QOS_CLUSTER_NUM,                                                           // 18
+    PAL_CPPI41_PP_RGMII1_QOS_CLUSTER_NUM,                                                           // 19
+    PAL_CPPI41_PP_SGMII0_QOS_CLUSTER_NUM,                                                           // 20
+    PAL_CPPI41_PP_SGMII1_QOS_CLUSTER_NUM,                                                           // 21
+    PAL_CPPI41_PP_GBE_QOS_CLUSTER_LAST = PAL_CPPI41_PP_SGMII1_QOS_CLUSTER_NUM,
+
+    PAL_CPPI41_PP_WiFi_PORT0_QOS_CLUSTER_NUM,                                                       // 22
+    PAL_CPPI41_PP_WiFi_PORT1_QOS_CLUSTER_NUM,                                                       // 23
+    PAL_CPPI41_PP_WiFi_PORT2_QOS_CLUSTER_NUM,                                                       // 24
+    PAL_CPPI41_PP_WiFi_PORT3_QOS_CLUSTER_NUM,                                                       // 25
+    PAL_CPPI41_PP_WiFi_PORT4_QOS_CLUSTER_NUM,                                                       // 26
+    PAL_CPPI41_PP_WiFi_PORT5_QOS_CLUSTER_NUM,                                                       // 27
+    PAL_CPPI41_PP_WiFi_PORT6_QOS_CLUSTER_NUM,                                                       // 28
+    PAL_CPPI41_PP_WiFi_PORT7_QOS_CLUSTER_NUM,                                                       // 29
+    PAL_CPPI41_PP_WiFi_PORT8_QOS_CLUSTER_NUM,                                                       // 30
+    PAL_CPPI41_PP_WiFi_PORT9_QOS_CLUSTER_NUM,                                                       // 31
+    PAL_CPPI41_PP_WiFi_PORT10_QOS_CLUSTER_NUM,                                                      // 32
+    PAL_CPPI41_PP_WiFi_PORT11_QOS_CLUSTER_NUM,                                                      // 33
+    PAL_CPPI41_PP_WiFi_PORT12_QOS_CLUSTER_NUM,                                                      // 34
+    PAL_CPPI41_PP_WiFi_PORT13_QOS_CLUSTER_NUM,                                                      // 35
+    PAL_CPPI41_PP_WiFi_PORT14_QOS_CLUSTER_NUM,                                                      // 36
+    PAL_CPPI41_PP_WiFi_PORT15_QOS_CLUSTER_NUM,                                                      // 37
+
+    PAL_CPPI41_PP_QOS_CLUSTERS_COUNT,
+    PAL_CPPI41_PP_QOS_CLUSTERS_MAX = PAL_CPPI41_PP_QOS_CLUSTERS_COUNT
+
+}PAL_CPPI41_PP_QOS_CLUSTERS_e;
+
+#define PAL_CPPI41_PP_DOCSIS_TX_QOS_CLUSTER_COUNT       (PAL_CPPI41_PP_DOCSIS_TX_QOS_CLUSTER_LAST - PAL_CPPI41_PP_DOCSIS_TX_QOS_CLUSTER_BASE + 1)
+#define PAL_CPPI41_PP_L2SW_QOS_CLUSTER_COUNT            (PAL_CPPI41_PP_L2SW_QOS_CLUSTER_LAST - PAL_CPPI41_PP_L2SW_QOS_CLUSTER_BASE + 1)
+
+/**
+ * wifi device indexes enumeration
+ */
+typedef enum {
+    WIFI_DEV_ID_0,
+    WIFI_DEV_ID_1,
+    WIFI_DEV_ID_2,
+    WIFI_DEV_ID_3,
+    WIFI_DEVS_CNT
+} wifi_dev_id_e;
+
+#if defined(CONFIG_WIFI_PROXY) || defined(CONFIG_PUMA_LITEPATH)
+#define WIFI_DEVICE_ID_VALID(dev_id)                    (WIFI_DEV_ID_0 <= (dev_id) && (dev_id) < WIFI_DEVS_CNT)
+#define FOR_EACH_WIFI_DEVICE_ID(i)                      for (i = WIFI_DEV_ID_0; i < WIFI_DEVS_CNT; i++)
+#define WIFI_DEVICE_TO_PID(dev_id)                      ((dev_id) + PP_WiFi_PORT0_PID_NUM)
+#define PID_TO_WIFI_DEVICE(pid)                         ((pid) - PP_WiFi_PORT0_PID_NUM)
+#define IS_WIFI_PID(pid)                                (((pid) >= PP_WiFi_PORT0_PID_NUM) && ((pid) <= (PP_WiFi_PORT0_PID_NUM + (WIFI_DEVS_CNT - 1))))
+
+/**
+ * wifi vap indexes enumeration
+ */
+typedef enum {
+    WIFI_VAP_ID_0,
+    WIFI_VAP_ID_1,
+    WIFI_VAP_ID_2,
+    WIFI_VAP_ID_3,
+    WIFI_VAP_ID_4,
+    WIFI_VAP_ID_5,
+    WIFI_VAP_ID_6,
+    WIFI_VAP_ID_7,
+    WIFI_VAP_ID_8,
+    WIFI_VAP_ID_9,
+    WIFI_VAP_ID_10,
+    WIFI_VAP_ID_11,
+    WIFI_VAP_ID_12,
+    WIFI_VAP_ID_13,
+    WIFI_VAP_ID_14,
+    WIFI_VAP_ID_15,
+    WIFI_VAP_ID_16,
+    WIFI_VAP_ID_17,
+    WIFI_VAP_ID_18,
+    WIFI_VAP_ID_19,
+    WIFI_VAP_ID_20,
+    WIFI_VAP_ID_21,
+    WIFI_VAP_ID_22,
+    WIFI_VAP_ID_23,
+    WIFI_VAP_ID_24,
+    WIFI_VAP_ID_25,
+    WIFI_VAP_ID_26,
+    WIFI_VAP_ID_27,
+    WIFI_VAP_ID_28,
+    WIFI_VAP_ID_29,
+    WIFI_VAP_ID_30,
+    WIFI_VAP_ID_31,
+    WIFI_VAPS_CNT
+} wifi_vap_id_e;
+
+#define WIFI_VAP_ID_VALID(vap_id)       \
+            (WIFI_VAP_ID_0 <= (vap_id) && (vap_id) < WIFI_VAPS_CNT)
+#define FOR_EACH_WIFI_VAP_ID(i)         \
+            for (i = WIFI_VAP_ID_0; i < WIFI_VAPS_CNT; i++)
+
+/**
+ * wifi device states enumeration
+ */
+typedef enum {
+    WIFI_DEV_STATE_ACTIVE,
+    WIFI_DEV_STATE_SUSPEND,
+    WIFI_DEV_STATE_INVALID,
+    WIFI_DEV_STATSE_CNT
+} wifi_dev_state_e;
+#endif
+
+
+/*************************************/
+/* PP Registers addresses and macros */
+/*************************************/
+#define AVALANCHE_PP_PHY_ADDR_RGN_BASE                  0xF3000000
+#define AVALANCHE_PP_CLOCK                              480000000                                   // 480MHz
+
+#define AVALANCHE_PP_CLASSIFIER_1_0_IRAM_RGN_BASE       (IO_ADDRESS(0xF3000000))
+#define AVALANCHE_PP_CLASSIFIER_1_0_DBG_RGN_BASE        (IO_ADDRESS(0xF3002000))
+#define AVALANCHE_PP_CLASSIFIER_1_0_CTRL_RGN_BASE       (IO_ADDRESS(0xF3003000))
+#define AVALANCHE_PP_CLASSIFIER_1_1_IRAM_RGN_BASE       (IO_ADDRESS(0xF3004000))
+#define AVALANCHE_PP_CLASSIFIER_1_1_DBG_RGN_BASE        (IO_ADDRESS(0xF3006000))
+#define AVALANCHE_PP_CLASSIFIER_1_1_CTRL_RGN_BASE       (IO_ADDRESS(0xF3007000))
+#define AVALANCHE_PP_CLASSIFIER_1_2_IRAM_RGN_BASE       (IO_ADDRESS(0xF3008000))
+#define AVALANCHE_PP_CLASSIFIER_1_2_DBG_RGN_BASE        (IO_ADDRESS(0xF300A000))
+#define AVALANCHE_PP_CLASSIFIER_1_2_CTRL_RGN_BASE       (IO_ADDRESS(0xF300B000))
+#define AVALANCHE_PP_CLASSIFIER_1_3_IRAM_RGN_BASE       (IO_ADDRESS(0xF300C000))
+#define AVALANCHE_PP_CLASSIFIER_1_3_DBG_RGN_BASE        (IO_ADDRESS(0xF300E000))
+#define AVALANCHE_PP_CLASSIFIER_1_3_CTRL_RGN_BASE       (IO_ADDRESS(0xF300F000))
+#define AVALANCHE_PP_CLASSIFIER_1_0_CMD_RGN_BASE        (IO_ADDRESS(0xF3020000))
+#define AVALANCHE_PP_CLASSIFIER_1_1_CMD_RGN_BASE        (IO_ADDRESS(0xF3020000))
+#define AVALANCHE_PP_CLASSIFIER_1_2_CMD_RGN_BASE        (IO_ADDRESS(0xF3020000))
+#define AVALANCHE_PP_CLASSIFIER_1_3_CMD_RGN_BASE        (IO_ADDRESS(0xF3020000))
+#define AVALANCHE_PP_CLASSIFIER_1_0_PARAM_RGN_BASE      (IO_ADDRESS(0xF3020004))
+#define AVALANCHE_PP_CLASSIFIER_1_1_PARAM_RGN_BASE      (IO_ADDRESS(0xF3020004))
+#define AVALANCHE_PP_CLASSIFIER_1_2_PARAM_RGN_BASE      (IO_ADDRESS(0xF3020004))
+#define AVALANCHE_PP_CLASSIFIER_1_3_PARAM_RGN_BASE      (IO_ADDRESS(0xF3020004))
+
+#define AVALANCHE_PP_CLASSIFIER_2_0_IRAM_RGN_BASE       (IO_ADDRESS(0xF3080000))
+#define AVALANCHE_PP_CLASSIFIER_2_0_DBG_RGN_BASE        (IO_ADDRESS(0xF3082000))
+#define AVALANCHE_PP_CLASSIFIER_2_0_CTRL_RGN_BASE       (IO_ADDRESS(0xF3083000))
+#define AVALANCHE_PP_CLASSIFIER_2_1_IRAM_RGN_BASE       (IO_ADDRESS(0xF3084000))
+#define AVALANCHE_PP_CLASSIFIER_2_1_DBG_RGN_BASE        (IO_ADDRESS(0xF3086000))
+#define AVALANCHE_PP_CLASSIFIER_2_1_CTRL_RGN_BASE       (IO_ADDRESS(0xF3087000))
+#define AVALANCHE_PP_CLASSIFIER_2_2_IRAM_RGN_BASE       (IO_ADDRESS(0xF3088000))
+#define AVALANCHE_PP_CLASSIFIER_2_2_DBG_RGN_BASE        (IO_ADDRESS(0xF308A000))
+#define AVALANCHE_PP_CLASSIFIER_2_2_CTRL_RGN_BASE       (IO_ADDRESS(0xF308B000))
+#define AVALANCHE_PP_CLASSIFIER_2_3_IRAM_RGN_BASE       (IO_ADDRESS(0xF308C000))
+#define AVALANCHE_PP_CLASSIFIER_2_3_DBG_RGN_BASE        (IO_ADDRESS(0xF308E000))
+#define AVALANCHE_PP_CLASSIFIER_2_3_CTRL_RGN_BASE       (IO_ADDRESS(0xF308F000))
+#define AVALANCHE_PP_CLASSIFIER_2_0_CMD_RGN_BASE        (IO_ADDRESS(0xF30A0000))
+#define AVALANCHE_PP_CLASSIFIER_2_1_CMD_RGN_BASE        (IO_ADDRESS(0xF30A0000))
+#define AVALANCHE_PP_CLASSIFIER_2_2_CMD_RGN_BASE        (IO_ADDRESS(0xF30A0000))
+#define AVALANCHE_PP_CLASSIFIER_2_3_CMD_RGN_BASE        (IO_ADDRESS(0xF30A0000))
+#define AVALANCHE_PP_CLASSIFIER_2_0_PARAM_RGN_BASE      (IO_ADDRESS(0xF30A0004))
+#define AVALANCHE_PP_CLASSIFIER_2_1_PARAM_RGN_BASE      (IO_ADDRESS(0xF30A0004))
+#define AVALANCHE_PP_CLASSIFIER_2_2_PARAM_RGN_BASE      (IO_ADDRESS(0xF30A0004))
+#define AVALANCHE_PP_CLASSIFIER_2_3_PARAM_RGN_BASE      (IO_ADDRESS(0xF30A0004))
+#define AVALANCHE_PP_MTA_TURN_OFF_HIGH_PRIORITY_QUEUE   (IO_ADDRESS(0xF30A0406)) /* If this byte is not 0 PP will turn off high priority queue. */
+
+#define AVALANCHE_PP_MODIFIER_0_IRAM_RGN_BASE           (IO_ADDRESS(0xF3100000))
+#define AVALANCHE_PP_MODIFIER_0_DBG_RGN_BASE            (IO_ADDRESS(0xF3102000))
+#define AVALANCHE_PP_MODIFIER_0_CTRL_RGN_BASE           (IO_ADDRESS(0xF3103000))
+#define AVALANCHE_PP_MODIFIER_1_IRAM_RGN_BASE           (IO_ADDRESS(0xF3104000))
+#define AVALANCHE_PP_MODIFIER_1_DBG_RGN_BASE            (IO_ADDRESS(0xF3106000))
+#define AVALANCHE_PP_MODIFIER_1_CTRL_RGN_BASE           (IO_ADDRESS(0xF3107000))
+#define AVALANCHE_PP_MODIFIER_2_IRAM_RGN_BASE           (IO_ADDRESS(0xF3108000))
+#define AVALANCHE_PP_MODIFIER_2_DBG_RGN_BASE            (IO_ADDRESS(0xF310A000))
+#define AVALANCHE_PP_MODIFIER_2_CTRL_RGN_BASE           (IO_ADDRESS(0xF310B000))
+#define AVALANCHE_PP_MODIFIER_3_IRAM_RGN_BASE           (IO_ADDRESS(0xF310C000))
+#define AVALANCHE_PP_MODIFIER_3_DBG_RGN_BASE            (IO_ADDRESS(0xF310E000))
+#define AVALANCHE_PP_MODIFIER_3_CTRL_RGN_BASE           (IO_ADDRESS(0xF310F000))
+#define AVALANCHE_PP_MODIFIER_0_CMD_RGN_BASE            (IO_ADDRESS(0xF3120000))
+#define AVALANCHE_PP_MODIFIER_1_CMD_RGN_BASE            (IO_ADDRESS(0xF3120000))
+#define AVALANCHE_PP_MODIFIER_2_CMD_RGN_BASE            (IO_ADDRESS(0xF3120000))
+#define AVALANCHE_PP_MODIFIER_3_CMD_RGN_BASE            (IO_ADDRESS(0xF3120000))
+#define AVALANCHE_PP_MODIFIER_0_PARAM_RGN_BASE          (IO_ADDRESS(0xF3120004))
+#define AVALANCHE_PP_MODIFIER_1_PARAM_RGN_BASE          (IO_ADDRESS(0xF3120004))
+#define AVALANCHE_PP_MODIFIER_2_PARAM_RGN_BASE          (IO_ADDRESS(0xF3120004))
+#define AVALANCHE_PP_MODIFIER_3_PARAM_RGN_BASE          (IO_ADDRESS(0xF3120004))
+#define AVALANCHE_PP_MODIFIER_MTU_TABLE_BASE            (IO_ADDRESS(0xF3120100))    // Modifier PDSP MTU table
+
+#define AVALANCHE_PP_MODIFIER_MTU_TABLE_UPDATE(vpidId, mtuSize)              \
+{                                                                            \
+    volatile Uint16 *mtu_per_vpid = 0;                                       \
+    mtu_per_vpid = (Uint16 *)AVALANCHE_PP_MODIFIER_MTU_TABLE_BASE + (vpidId);\
+    *mtu_per_vpid = cpu_to_be16(mtuSize);                                    \
+}
+
+#define AVALANCHE_PP_DS_RESEQ_CMD_RGN_BASE              (IO_ADDRESS(0xF3EC0000))
+#define AVALANCHE_PP_DS_RESEQ_PARAM_RGN_BASE            (IO_ADDRESS(0xF3EC0004))
+#define AVALANCHE_PP_DS_RESEQ_IRAM_RGN_BASE             (IO_ADDRESS(0xF3EEC000))
+#define AVALANCHE_PP_DS_RESEQ_CTRL_RGN_BASE             (IO_ADDRESS(0xF3EEE000))
+#define AVALANCHE_PP_DS_RESEQ_DBG_RGN_BASE              (IO_ADDRESS(0xF3EEF000))
+#define AVALANCHE_PP_DS_RESEQ_INTRPT_BNDL_RGN_BASE      (IO_ADDRESS(0xF3C21340)) 
+
+
+#define AVALANCHE_PP_SESSION_CACHE_CMD_RGN_BASE         (IO_ADDRESS(0xF3330000))
+#define AVALANCHE_PP_SESSION_CACHE_PARAM_RGN_BASE       (IO_ADDRESS(0xF3330004))
+#define AVALANCHE_PP_SESSION_CACHE_IRAM_RGN_BASE        (IO_ADDRESS(0xF3340000))
+#define AVALANCHE_PP_SESSION_CACHE_DBG_RGN_BASE         (IO_ADDRESS(0xF3342000))
+#define AVALANCHE_PP_SESSION_CACHE_CTRL_RGN_BASE        (IO_ADDRESS(0xF3342300))
+#define AVALANCHE_PP_SESSION_CACHE_TIMER_RGN_BASE       (IO_ADDRESS(0xF3362000))
+
+#define AVALANCHE_PP_PREFETCHER_0_IRAM_RGN_BASE         (IO_ADDRESS(0xF3400000))
+#define AVALANCHE_PP_PREFETCHER_0_DBG_RGN_BASE          (IO_ADDRESS(0xF3402000))
+#define AVALANCHE_PP_PREFETCHER_0_CTRL_RGN_BASE         (IO_ADDRESS(0xF3403000))
+#define AVALANCHE_PP_PREFETCHER_1_IRAM_RGN_BASE         (IO_ADDRESS(0xF3404000))
+#define AVALANCHE_PP_PREFETCHER_1_DBG_RGN_BASE          (IO_ADDRESS(0xF3406000))
+#define AVALANCHE_PP_PREFETCHER_1_CTRL_RGN_BASE         (IO_ADDRESS(0xF3407000))
+#define AVALANCHE_PP_PREFETCHER_2_IRAM_RGN_BASE         (IO_ADDRESS(0xF3408000))
+#define AVALANCHE_PP_PREFETCHER_2_DBG_RGN_BASE          (IO_ADDRESS(0xF340A000))
+#define AVALANCHE_PP_PREFETCHER_2_CTRL_RGN_BASE         (IO_ADDRESS(0xF340B000))
+#define AVALANCHE_PP_PREFETCHER_3_IRAM_RGN_BASE         (IO_ADDRESS(0xF340C000))
+#define AVALANCHE_PP_PREFETCHER_3_DBG_RGN_BASE          (IO_ADDRESS(0xF340E000))
+#define AVALANCHE_PP_PREFETCHER_3_CTRL_RGN_BASE         (IO_ADDRESS(0xF340F000))
+
+#define AVALANCHE_PP_PREFETCHER_0_CMD_RGN_BASE          (IO_ADDRESS(0xF3420000))
+#define AVALANCHE_PP_PREFETCHER_1_CMD_RGN_BASE          (IO_ADDRESS(0xF3420000))
+#define AVALANCHE_PP_PREFETCHER_2_CMD_RGN_BASE          (IO_ADDRESS(0xF3420000))
+#define AVALANCHE_PP_PREFETCHER_3_CMD_RGN_BASE          (IO_ADDRESS(0xF3420000))
+#define AVALANCHE_PP_PREFETCHER_0_PARAM_RGN_BASE        (IO_ADDRESS(0xF3420004))
+#define AVALANCHE_PP_PREFETCHER_1_PARAM_RGN_BASE        (IO_ADDRESS(0xF3420004))
+#define AVALANCHE_PP_PREFETCHER_2_PARAM_RGN_BASE        (IO_ADDRESS(0xF3420004))
+#define AVALANCHE_PP_PREFETCHER_3_PARAM_RGN_BASE        (IO_ADDRESS(0xF3420004))
+
+#define AVALANCHE_PP_TurboDOX_IRAM_RGN_BASE             (IO_ADDRESS(0xF3600000))
+#define AVALANCHE_PP_TurboDOX_DBG_RGN_BASE              (IO_ADDRESS(0xF3602000))
+#define AVALANCHE_PP_TurboDOX_CTRL_RGN_BASE             (IO_ADDRESS(0xF3603000))
+#define AVALANCHE_PP_TurboDOX_CMD_RGN_BASE              (IO_ADDRESS(0xF3610000))
+#define AVALANCHE_PP_TurboDOX_PARAM_RGN_BASE            (IO_ADDRESS(0xF3610004))
+
+#define AVALANCHE_PP_RESEQUENCER_IRAM_RGN_BASE          (IO_ADDRESS(0xF3640000))
+#define AVALANCHE_PP_RESEQUENCER_DBG_RGN_BASE           (IO_ADDRESS(0xF3642000))
+#define AVALANCHE_PP_RESEQUENCER_CTRL_RGN_BASE          (IO_ADDRESS(0xF3643000))
+#define AVALANCHE_PP_RESEQUENCER_CMD_RGN_BASE           (IO_ADDRESS(0xF3650000))
+#define AVALANCHE_PP_RESEQUENCER_PARAM_RGN_BASE         (IO_ADDRESS(0xF3650004))
+
+#define AVALANCHE_PP_STATISTICAL_FRC_S1_CTL_BASE        (IO_ADDRESS(0xF36C3FF0))
+#define AVALANCHE_PP_STATISTICAL_FRC_S1_RESET_BASE      (IO_ADDRESS(0xF36C3FF4))
+#define AVALANCHE_PP_STATISTICAL_FRC_S1_L_BASE          (IO_ADDRESS(0xF36C3FF8))
+#define AVALANCHE_PP_STATISTICAL_FRC_S1_H_BASE          (IO_ADDRESS(0xF36C3FFC))
+
+#define AVALANCHE_PP_CRYPTO_CMD_RGN_BASE                (IO_ADDRESS(0xF3806000))
+
+
+#define AVALANCHE_PP_CDMA_RGN_BASE                      (IO_ADDRESS(0xF3940000))
+
+#define AVALANCHE_PP_CDMA_CLK_CTRL_REG                  (IO_ADDRESS(0xF394003C))
+
+/* AVALANCHE_PP_CDMA_CLK_CTRL_REG definitions */
+#define AVALANCHE_PP_CDMA_CLK_CTRL_DS_OFDM0             0x00000001
+#define AVALANCHE_PP_CDMA_CLK_CTRL_DS_OFDM1             0x00000002
+#define AVALANCHE_PP_CDMA_CLK_CTRL_DOCSIS30             0x00000004
+#define AVALANCHE_PP_CDMA_CLK_CTRL_SGMII_RX0            0x00000008
+#define AVALANCHE_PP_CDMA_CLK_CTRL_SGMII_RX1            0x00000010
+#define AVALANCHE_PP_CDMA_CLK_CTRL_SGMII_RX2            0x00000020
+#define AVALANCHE_PP_CDMA_CLK_CTRL_MOCA                 0x00000040
+#define AVALANCHE_PP_CDMA_CLK_CTRL_ATOM_GBE             0x00000080
+#define AVALANCHE_PP_CDMA_CLK_CTRL_MP2TS                0x00000100
+#define AVALANCHE_PP_CDMA_CLK_CTRL_ATOM_WIFI            0x00000200
+#define AVALANCHE_PP_CDMA_CLK_CTRL_USB_PP2ATOM          0x00000400
+#define AVALANCHE_PP_CDMA_CLK_CTRL_USB_ATOM2PP          0x00000800
+#define AVALANCHE_PP_CDMA_CLK_CTRL_US_OFDMA0            0x00001000
+#define AVALANCHE_PP_CDMA_CLK_CTRL_US_OFDMA1            0x00002000
+#define AVALANCHE_PP_CDMA_CLK_CTRL_SGMII_TX0            0x00004000
+#define AVALANCHE_PP_CDMA_CLK_CTRL_SGMII_TX1            0x00008000
+#define AVALANCHE_PP_CDMA_CLK_CTRL_SGMII_TX2            0x00010000
+#define AVALANCHE_PP_CDMA_CLK_CTRL_COPROC_USI           0x00200000
+#define AVALANCHE_PP_CDMA_CLK_CTRL_COPROC_USO           0x00400000
+#define AVALANCHE_PP_CDMA_CLK_CTRL_SGMII3               0x00800000
+#define AVALANCHE_PP_CDMA_CLK_CTRL_DMAC_MPEG_TOP        0x01000000
+
+
+#define AVALANCHE_PP_AQM_IRAM_RGN_BASE                  (IO_ADDRESS(0xF3C00000))
+#define AVALANCHE_PP_AQM_DBG_RGN_BASE                   (IO_ADDRESS(0xF3C02000))
+#define AVALANCHE_PP_AQM_CTRL_RGN_BASE                  (IO_ADDRESS(0xF3C03000))
+#define AVALANCHE_PP_AQM_CMD_RGN_BASE                   (IO_ADDRESS(0xF3C10000))
+#define AVALANCHE_PP_AQM_PARAM_RGN_BASE                 (IO_ADDRESS(0xF3C10004))
+
+#define AVALANCHE_PP_RANDOMIZER_AQM_BASE                (IO_ADDRESS(0xF3C04100))
+#define AVALANCHE_PP_RANDOMIZER_QOS_BASE                (IO_ADDRESS(0xF3E08300))
+
+/* MAILBOX */
+#define AVALANCHE_PP_MAILBOX_CLK_CTRL_REG_STAGE1        (IO_ADDRESS(0xF3C20108))
+
+/* AVALANCHE_PP_MAILBOX_CLK_CTRL definition for STAGE 1 */
+#define AVALANCHE_PP_MAILBOX_CLK_CTRL_CLASSIFIER_1_0    0x00000001
+#define AVALANCHE_PP_MAILBOX_CLK_CTRL_CLASSIFIER_1_1    0x00000002
+#define AVALANCHE_PP_MAILBOX_CLK_CTRL_CLASSIFIER_1_2    0x00000004
+#define AVALANCHE_PP_MAILBOX_CLK_CTRL_CLASSIFIER_1_3    0x00000008
+#define AVALANCHE_PP_MAILBOX_CLK_CTRL_CLASSIFIER_2_0    0x00000010
+#define AVALANCHE_PP_MAILBOX_CLK_CTRL_CLASSIFIER_2_1    0x00000020
+#define AVALANCHE_PP_MAILBOX_CLK_CTRL_CLASSIFIER_2_2    0x00000040
+#define AVALANCHE_PP_MAILBOX_CLK_CTRL_CLASSIFIER_2_3    0x00000080
+#define AVALANCHE_PP_MAILBOX_CLK_CTRL_MODIFIER_0        0x00000100
+#define AVALANCHE_PP_MAILBOX_CLK_CTRL_MODIFIER_1        0x00000200
+#define AVALANCHE_PP_MAILBOX_CLK_CTRL_MODIFIER_2        0x00000400
+#define AVALANCHE_PP_MAILBOX_CLK_CTRL_MODIFIER_3        0x00000800
+#define AVALANCHE_PP_MAILBOX_CLK_CTRL_PREFETCHER_0      0x00001000
+#define AVALANCHE_PP_MAILBOX_CLK_CTRL_PREFETCHER_1      0x00002000
+#define AVALANCHE_PP_MAILBOX_CLK_CTRL_PREFETCHER_2      0x00004000
+#define AVALANCHE_PP_MAILBOX_CLK_CTRL_PREFETCHER_3      0x00008000
+#define AVALANCHE_PP_MAILBOX_CLK_CTRL_TDOX              0x00010000
+#define AVALANCHE_PP_MAILBOX_CLK_CTRL_RE_SEQ            0x00020000
+#define AVALANCHE_PP_MAILBOX_CLK_CTRL_SESSION_CACHE     0x00040000
+
+#define AVALANCHE_PP_MAILBOX_CLK_CTRL_REG_STAGE2        (IO_ADDRESS(0xF3C2010C))
+
+/* AVALANCHE_PP_MAILBOX_CLK_CTRL definition for STAGE 2 */
+#define AVALANCHE_PP_MAILBOX_CLK_CTRL_AQM               0x00000001
+#define AVALANCHE_PP_MAILBOX_CLK_CTRL_SEQUENCER         0x00000002
+#define AVALANCHE_PP_MAILBOX_CLK_CTRL_CRYPTO_PDSP       0x00000004
+#define AVALANCHE_PP_MAILBOX_CLK_CTRL_SEC_ENGINE        0x00000008
+#define AVALANCHE_PP_MAILBOX_CLK_CTRL_MC                0x00000010
+#define AVALANCHE_PP_MAILBOX_CLK_CTRL_WIFI_RX           0x00000020
+#define AVALANCHE_PP_MAILBOX_CLK_CTRL_WIFI_TX           0x00000040
+#define AVALANCHE_PP_MAILBOX_CLK_CTRL_MOCA              0x00000080
+#define AVALANCHE_PP_MAILBOX_CLK_CTRL_ACCUMULATOR       0x00000100
+#define AVALANCHE_PP_MAILBOX_CLK_CTRL_DS_RESEQ          0x00000200
+#define AVALANCHE_PP_MAILBOX_CLK_CTRL_DECRYPT           0x00000400
+#define AVALANCHE_PP_MAILBOX_CLK_CTRL_ENCRYPT           0x00000800
+#define AVALANCHE_PP_MAILBOX_CLK_CTRL_RCE               0x00001000
+#define AVALANCHE_PP_MAILBOX_CLK_CTRL_RECYCLER          0x00002000
+#define AVALANCHE_PP_MAILBOX_CLK_CTRL_DPI               0x00004000
+#define AVALANCHE_PP_MAILBOX_CLK_CTRL_QOS_1             0x00008000
+#define AVALANCHE_PP_MAILBOX_CLK_CTRL_QOS_0             0x00010000
+#define AVALANCHE_PP_MAILBOX_CLK_CTRL_US_PROCESSING     0x00020000
+
+
+#define AVALANCHE_PP_MAILBOX_CLK_CTRL_REG_MISC          (IO_ADDRESS(0xF3C20110))
+
+/* AVALANCHE_PP_MAILBOX_CLK_CTRL definition misc*/
+#define AVALANCHE_PP_MAILBOX_CLK_CTRL_MPC_RCE_STATE     0x00000001
+
+#define AVALANCHE_PP_CLASSIFIER_1_0_INTRPT_BNDL_RGN_BASE (IO_ADDRESS(0xF3C21000))
+#define AVALANCHE_PP_CLASSIFIER_1_1_INTRPT_BNDL_RGN_BASE (IO_ADDRESS(0xF3C21020))
+#define AVALANCHE_PP_CLASSIFIER_1_2_INTRPT_BNDL_RGN_BASE (IO_ADDRESS(0xF3C21040))
+#define AVALANCHE_PP_CLASSIFIER_1_3_INTRPT_BNDL_RGN_BASE (IO_ADDRESS(0xF3C21060))
+#define AVALANCHE_PP_CLASSIFIER_2_0_INTRPT_BNDL_RGN_BASE (IO_ADDRESS(0xF3C21080))
+#define AVALANCHE_PP_CLASSIFIER_2_1_INTRPT_BNDL_RGN_BASE (IO_ADDRESS(0xF3C210A0))
+#define AVALANCHE_PP_CLASSIFIER_2_2_INTRPT_BNDL_RGN_BASE (IO_ADDRESS(0xF3C210C0))
+#define AVALANCHE_PP_CLASSIFIER_2_3_INTRPT_BNDL_RGN_BASE (IO_ADDRESS(0xF3C210E0))
+#define AVALANCHE_PP_MODIFIER_0_INTRPT_BNDL_RGN_BASE     (IO_ADDRESS(0xF3C21100))
+#define AVALANCHE_PP_MODIFIER_1_INTRPT_BNDL_RGN_BASE     (IO_ADDRESS(0xF3C21120))
+#define AVALANCHE_PP_MODIFIER_2_INTRPT_BNDL_RGN_BASE     (IO_ADDRESS(0xF3C21140))
+#define AVALANCHE_PP_MODIFIER_3_INTRPT_BNDL_RGN_BASE     (IO_ADDRESS(0xF3C21160))
+#define AVALANCHE_PP_PREFETCHER_0_INTRPT_BNDL_RGN_BASE   (IO_ADDRESS(0xF3C21180))
+#define AVALANCHE_PP_PREFETCHER_1_INTRPT_BNDL_RGN_BASE   (IO_ADDRESS(0xF3C211A0))
+#define AVALANCHE_PP_PREFETCHER_2_INTRPT_BNDL_RGN_BASE   (IO_ADDRESS(0xF3C211C0))
+#define AVALANCHE_PP_PREFETCHER_3_INTRPT_BNDL_RGN_BASE   (IO_ADDRESS(0xF3C211E0))
+#define AVALANCHE_PP_SESSION_CACHE_INTRPT_BNDL_RGN_BASE  (IO_ADDRESS(0xF3C21200))
+#define AVALANCHE_PP_TurboDOX_INTRPT_BNDL_RGN_BASE       (IO_ADDRESS(0xF3C21220))
+#define AVALANCHE_PP_RESEQUENCER_INTRPT_BNDL_RGN_BASE    (IO_ADDRESS(0xF3C21240))
+#define AVALANCHE_PP_QOS_0_INTRPT_BNDL_RGN_BASE          (IO_ADDRESS(0xF3C21260))
+#define AVALANCHE_PP_QOS_1_INTRPT_BNDL_RGN_BASE          (IO_ADDRESS(0xF3C21280))
+#define AVALANCHE_PP_DPI_INTRPT_BNDL_RGN_BASE            (IO_ADDRESS(0xF3C212A0))
+#define AVALANCHE_PP_RECYCLER_INTRPT_BNDL_RGN_BASE       (IO_ADDRESS(0xF3C212C0))
+#define AVALANCHE_PP_RCE_INTRPT_BNDL_RGN_BASE            (IO_ADDRESS(0xF3C212E0))
+#define AVALANCHE_PP_ENCRYPT_INTRPT_BNDL_RGN_BASE        (IO_ADDRESS(0xF3C21300))
+#define AVALANCHE_PP_DECRYPT_INTRPT_BNDL_RGN_BASE        (IO_ADDRESS(0xF3C21320))
+#define AVALANCHE_PP_ACCUMULATOR_INTRPT_BNDL_RGN_BASE    (IO_ADDRESS(0xF3C21360))
+#define AVALANCHE_PP_MOCA_INTRPT_BNDL_RGN_BASE           (IO_ADDRESS(0xF3C21380))
+#define AVALANCHE_PP_WIFI_TX_INTRPT_BNDL_RGN_BASE        (IO_ADDRESS(0xF3C213A0))
+#define AVALANCHE_PP_WIFI_RX_INTRPT_BNDL_RGN_BASE        (IO_ADDRESS(0xF3C213C0))
+#define AVALANCHE_PP_MC_INTRPT_BNDL_RGN_BASE             (IO_ADDRESS(0xF3C21400))
+#define AVALANCHE_PP_SEQUENCER_INTRPT_BNDL_RGN_BASE      (IO_ADDRESS(0xF3C21420))
+#define AVALANCHE_PP_AQM_INTRPT_BNDL_RGN_BASE            (IO_ADDRESS(0xF3C21440))
+#define AVALANCHE_PP_CRYPTO_INTRPT_BNDL_RGN_BASE         (IO_ADDRESS(0xF3C21460))
+#define AVALANCHE_PP_HOST_INTRPT_0_BNDL_RGN_BASE         (IO_ADDRESS(0xF3C21800))
+
+#define AVALANCHE_PP_HOST_INTRPT_0_BNDL_PP_EVENT        0x00000002
+// Following are in PP region but are actually used by DS FW Reseqencer PDSP
+#define AVALANCHE_DS_FW_RESEQ_INTRPT_0_BNDL_RGN_BASE    0xF3C21820
+#define AVALANCHE_DS_FW_RESEQ_INTRPT_1_BNDL_RGN_BASE    0xF3C21840
+#define AVALANCHE_DS_FW_RESEQ_INTRPT_2_BNDL_RGN_BASE    0xF3C21860
+
+//#define AVALANCHE_INTD_BASE                             (IO_ADDRESS(0xF3C22000))
+
+#define AVALANCHE_PP_STATISTICAL_FRC_S2_CTL_BASE        (IO_ADDRESS(0xF3C33FF0))
+#define AVALANCHE_PP_STATISTICAL_FRC_S2_RESET_BASE      (IO_ADDRESS(0xF3C33FF4))
+#define AVALANCHE_PP_STATISTICAL_FRC_S2_L_BASE          (IO_ADDRESS(0xF3C33FF8))
+#define AVALANCHE_PP_STATISTICAL_FRC_S2_H_BASE          (IO_ADDRESS(0xF3C33FFC))
+
+#define AVALANCHE_PP_QOS_0_IRAM_RGN_BASE                (IO_ADDRESS(0xF3E00000))
+#define AVALANCHE_PP_QOS_0_DBG_RGN_BASE                 (IO_ADDRESS(0xF3E02000))
+#define AVALANCHE_PP_QOS_0_CTRL_RGN_BASE                (IO_ADDRESS(0xF3E03000))
+#define AVALANCHE_PP_QOS_1_IRAM_RGN_BASE                (IO_ADDRESS(0xF3E04000))
+#define AVALANCHE_PP_QOS_1_DBG_RGN_BASE                 (IO_ADDRESS(0xF3E06000))
+#define AVALANCHE_PP_QOS_1_CTRL_RGN_BASE                (IO_ADDRESS(0xF3E07000))
+#define AVALANCHE_PP_QOS_0_CMD_RGN_BASE                 (IO_ADDRESS(0xF3E10000))
+#define AVALANCHE_PP_QOS_1_CMD_RGN_BASE                 (IO_ADDRESS(0xF3E10100))
+#define AVALANCHE_PP_QOS_0_PARAM_RGN_BASE               (IO_ADDRESS(0xF3E10004))
+#define AVALANCHE_PP_QOS_1_PARAM_RGN_BASE               (IO_ADDRESS(0xF3E10104))
+
+#define AVALANCHE_PP_ACCUMULATOR_CMD_RGN_BASE           (IO_ADDRESS(0xF3E20000))
+#define AVALANCHE_PP_ACCUMULATOR_PARAM_RGN_BASE         (IO_ADDRESS(0xF3E20004))
+#define AVALANCHE_PP_ACCUMULATOR_IRAM_RGN_BASE          (IO_ADDRESS(0xF3E30000))
+#define AVALANCHE_PP_ACCUMULATOR_DBG_RGN_BASE           (IO_ADDRESS(0xF3E32000))
+#define AVALANCHE_PP_ACCUMULATOR_CTRL_RGN_BASE          (IO_ADDRESS(0xF3E33000))
+
+#define AVALANCHE_PP_ENCRYPT_CMD_RGN_BASE                 (IO_ADDRESS(0xF3E40000))
+#define AVALANCHE_PP_DECRYPT_CMD_RGN_BASE                 (IO_ADDRESS(0xF3E40100))
+#define AVALANCHE_PP_ENCRYPT_PARAM_RGN_BASE               (IO_ADDRESS(0xF3E40004))
+#define AVALANCHE_PP_DECRYPT_PARAM_RGN_BASE               (IO_ADDRESS(0xF3E40104))
+#define AVALANCHE_PP_ENCRYPT_IRAM_RGN_BASE                (IO_ADDRESS(0xF3E60000))
+#define AVALANCHE_PP_ENCRYPT_DBG_RGN_BASE                 (IO_ADDRESS(0xF3E61000))
+#define AVALANCHE_PP_ENCRYPT_CTRL_RGN_BASE                (IO_ADDRESS(0xF3E62000))
+#define AVALANCHE_PP_DECRYPT_IRAM_RGN_BASE                (IO_ADDRESS(0xF3E63000))
+#define AVALANCHE_PP_DECRYPT_DBG_RGN_BASE                 (IO_ADDRESS(0xF3E64000))
+#define AVALANCHE_PP_DECRYPT_CTRL_RGN_BASE                (IO_ADDRESS(0xF3E65000))
+
+#define AVALANCHE_PP_MOCA_IRAM_RGN_BASE                 (IO_ADDRESS(0xF3EA0000))
+#define AVALANCHE_PP_MOCA_DBG_RGN_BASE                  (IO_ADDRESS(0xF3EA2000))
+#define AVALANCHE_PP_MOCA_CTRL_RGN_BASE                 (IO_ADDRESS(0xF3EA3000))
+#define AVALANCHE_PP_MOCA_CMD_RGN_BASE                  (IO_ADDRESS(0xF3EB0000))
+#define AVALANCHE_PP_MOCA_PARAM_RGN_BASE                (IO_ADDRESS(0xF3EB0004))
+
+#define AVALANCHE_PP_RECYCLER_CMD_RGN_BASE              (IO_ADDRESS(0xF3F00000))
+#define AVALANCHE_PP_RECYCLER_PARAM_RGN_BASE            (IO_ADDRESS(0xF3F00004))
+#define AVALANCHE_PP_RECYCLER_IRAM_RGN_BASE             (IO_ADDRESS(0xF3F10000))
+#define AVALANCHE_PP_RECYCLER_DBG_RGN_BASE              (IO_ADDRESS(0xF3F12000))
+#define AVALANCHE_PP_RECYCLER_CTRL_RGN_BASE             (IO_ADDRESS(0xF3F13000))
+
+#define AVALANCHE_PP_MC_IRAM_RGN_BASE                   (IO_ADDRESS(0xF3F20000))
+#define AVALANCHE_PP_MC_DBG_RGN_BASE                    (IO_ADDRESS(0xF3F22000))
+#define AVALANCHE_PP_MC_CTRL_RGN_BASE                   (IO_ADDRESS(0xF3F23000))
+#define AVALANCHE_PP_MC_CMD_RGN_BASE                    (IO_ADDRESS(0xF3F30000))
+#define AVALANCHE_PP_MC_PARAM_RGN_BASE                  (IO_ADDRESS(0xF3F30004))
+#define AVALNACHE_PP_MC_MTU_TABLE_BASE                  (IO_ADDRESS(0xF3F30100))    // MC PDSP MTU table
+
+#define AVALANCHE_PP_MC_MTU_TABLE_UPDATE(vpidId, mtuSize)              \
+{                                                                      \
+    volatile Uint16 *mtu_per_vpid = 0;                                 \
+    mtu_per_vpid = (Uint16 *)AVALNACHE_PP_MC_MTU_TABLE_BASE + (vpidId);\
+    *mtu_per_vpid = cpu_to_be16(mtuSize);                              \
+}
+
+#define AVALANCHE_PP_DPI_CMD_RGN_BASE                   (IO_ADDRESS(0xF3F40000))
+#define AVALANCHE_PP_DPI_PARAM_RGN_BASE                 (IO_ADDRESS(0xF3F40004))
+#define AVALANCHE_PP_DPI_IRAM_RGN_BASE                  (IO_ADDRESS(0xF3F50000))
+#define AVALANCHE_PP_DPI_DBG_RGN_BASE                   (IO_ADDRESS(0xF3F52000))
+#define AVALANCHE_PP_DPI_CTRL_RGN_BASE                  (IO_ADDRESS(0xF3F53000))
+
+#define AVALANCHE_PP_CRYPTO_CMD_RGN_BASE                (IO_ADDRESS(0xF3806000))
+#define AVALANCHE_PP_CRYPTO_PARAM_RGN_BASE              (IO_ADDRESS(0xF3806004))
+#define AVALANCHE_PP_CRYPTO_IRAM_RGN_BASE               (IO_ADDRESS(0xF3800000))
+#define AVALANCHE_PP_CRYPTO_DBG_RGN_BASE                (IO_ADDRESS(0xF3802000))
+#define AVALANCHE_PP_CRYPTO_CTRL_RGN_BASE               (IO_ADDRESS(0xF3803000))
+
+#define AVALANCHE_PP_RCE_CMD_RGN_BASE                   (IO_ADDRESS(0xF3E80000))
+#define AVALANCHE_PP_RCE_PARAM_RGN_BASE                 (IO_ADDRESS(0xF3E80004))
+#define AVALANCHE_PP_RCE_IRAM_RGN_BASE                  (IO_ADDRESS(0xF3E90000))
+#define AVALANCHE_PP_RCE_DBG_RGN_BASE                   (IO_ADDRESS(0xF3E94000))
+#define AVALANCHE_PP_RCE_CTRL_RGN_BASE                  (IO_ADDRESS(0xF3E98000))
+
+#define AVALANCHE_PP_WIFI_TX_CMD_RGN_BASE               (IO_ADDRESS(0xF3F60000))
+#define AVALANCHE_PP_WIFI_TX_PARAM_RGN_BASE             (IO_ADDRESS(0xF3F60004))
+#define AVALANCHE_PP_WIFI_TX_IRAM_RGN_BASE              (IO_ADDRESS(0xF3F70000))
+#define AVALANCHE_PP_WIFI_TX_DBG_RGN_BASE               (IO_ADDRESS(0xF3F72000))
+#define AVALANCHE_PP_WIFI_TX_CTRL_RGN_BASE              (IO_ADDRESS(0xF3F73000))
+
+#define AVALANCHE_PP_WIFI_RX_CMD_RGN_BASE               (IO_ADDRESS(0xF3FE0000))
+#define AVALANCHE_PP_WIFI_RX_PARAM_RGN_BASE             (IO_ADDRESS(0xF3FE0004))
+#define AVALANCHE_PP_WIFI_RX_IRAM_RGN_BASE              (IO_ADDRESS(0xF3FF0000))
+#define AVALANCHE_PP_WIFI_RX_DBG_RGN_BASE               (IO_ADDRESS(0xF3FF2000))
+#define AVALANCHE_PP_WIFI_RX_CTRL_RGN_BASE              (IO_ADDRESS(0xF3FF3000))
+
+#define AVALANCHE_PP_SEQUENCER_IRAM_RGN_BASE            (IO_ADDRESS(0xF3FC0000))
+#define AVALANCHE_PP_SEQUENCER_DBG_RGN_BASE             (IO_ADDRESS(0xF3FC2000))
+#define AVALANCHE_PP_SEQUENCER_CTRL_RGN_BASE            (IO_ADDRESS(0xF3FC3000))
+#define AVALANCHE_PP_SEQUENCER_CMD_RGN_BASE             (IO_ADDRESS(0xF3FD0000))
+#define AVALANCHE_PP_SEQUENCER_PARAM_RGN_BASE           (IO_ADDRESS(0xF3FD0004))
+
+
+/*********************/
+/* General PP macros */
+/*********************/
+
+/* PP Free running counter */
+#define FREE_RUNNING_COUNTER_ENABLE()                   {(*(volatile unsigned int *)AVALANCHE_PP_STATISTICAL_FRC_S1_CTL_BASE) |= cpu_to_be32(0x1); (*(volatile unsigned int *)AVALANCHE_PP_STATISTICAL_FRC_S2_CTL_BASE) |= cpu_to_be32(0x1);}
+#define FREE_RUNNING_COUNTER_RESET()                    {(*(volatile unsigned int *)AVALANCHE_PP_STATISTICAL_FRC_S1_RESET_BASE) |= cpu_to_be32(0x1); (*(volatile unsigned int *)AVALANCHE_PP_STATISTICAL_FRC_S2_RESET_BASE) |= cpu_to_be32(0x1);}
+#define FREE_RUNNING_COUNTER_L_GET()                    be32_to_cpu(*(volatile unsigned int *)AVALANCHE_PP_STATISTICAL_FRC_S2_L_BASE)
+#define FREE_RUNNING_COUNTER_H_GET()                    be32_to_cpu(*(volatile unsigned int *)AVALANCHE_PP_STATISTICAL_FRC_S2_H_BASE)
+
+/* Randomizer seeding */
+#define RANDOMIZER_AQM_SEED(seed)                      {(*(volatile unsigned int *)AVALANCHE_PP_RANDOMIZER_AQM_BASE) = cpu_to_be32(seed);}
+#define RANDOMIZER_QOS_SEED(seed)                      {(*(volatile unsigned int *)AVALANCHE_PP_RANDOMIZER_QOS_BASE) = cpu_to_be32(seed);}
+
+
+/* PP MTU size */
+#define UPDATE_MTU_TABLE_IN_PDSP_DMEM(vpidId, mtuSize)        \
+    AVALANCHE_PP_MODIFIER_MTU_TABLE_UPDATE(vpidId, mtuSize);  \
+    AVALANCHE_PP_MC_MTU_TABLE_UPDATE(vpidId, mtuSize);
+
+/* PP PDSPs Offsets in mailbox to get the PDSP and PP versions */
+#define AVALANCHE_PP_PDSPs_PP_VERSION_OFFSET                0xF8
+#define AVALANCHE_PP_PDSPs_PDSP_VERSION_OFFSET              0xFC
+
+/* PP Session Cache timer settings */
+#define SESSION_CACHE_TOTAL_SESSIONS_SUPPORTED              (35 * 1024)
+#define SESSION_CACHE_SESSIONS_TIMEOUTS_PER_TIMER           256
+#define SESSION_CACHE_NUM_TIMEOUT_EVENTS_UNTIL_WRAP         (SESSION_CACHE_TOTAL_SESSIONS_SUPPORTED / SESSION_CACHE_SESSIONS_TIMEOUTS_PER_TIMER)        // 140
+#define SESSION_CACHE_TOTAL_CACHED_SESSIONS                 1024
+#define SESSION_CACHE_SESSION_UPDATES_PER_TIMER             16
+#define SESSION_CACHE_NUM_UPDATE_EVENTS_UNTIL_WRAP          (SESSION_CACHE_TOTAL_CACHED_SESSIONS / SESSION_CACHE_SESSION_UPDATES_PER_TIMER)             // 64
+#define SESSION_CACHE_NUM_EVENTS_UNTIL_WRAP                 (SESSION_CACHE_NUM_TIMEOUT_EVENTS_UNTIL_WRAP + SESSION_CACHE_NUM_UPDATE_EVENTS_UNTIL_WRAP)  // We would like to have total of 204 events in 1 second
+#define SESSION_CACHE_TIMER_PRESCALER_REG_VAL               0b1100                                                                                      // Divides the frequency of the timer by a factor of 8192
+#define SESSION_CACHE_TIMER_PRESCALER_DIV_VAL               (1 << (SESSION_CACHE_TIMER_PRESCALER_REG_VAL + 1))                                          // 8192
+#define SESSION_CACHE_TIMER_LOAD_VAL_FOR_1SEC_LOOP          ((AVALANCHE_PP_CLOCK / SESSION_CACHE_NUM_EVENTS_UNTIL_WRAP) / SESSION_CACHE_TIMER_PRESCALER_DIV_VAL)
+
+extern int avalanche_pp_kernel_post_init (void);
+
+#endif /* !_INCLUDE_PUMA7_PP_H */

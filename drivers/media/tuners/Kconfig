@@ -1,3 +1,6 @@
+# Includes Intel Corporation's changes/modifications dated: 2014.
+# Changed/modified portions - Copyright © 2014, Intel Corporation.
+
 # Analog TV tuners, auto-loaded via tuner.ko
 config MEDIA_TUNER
 	tristate
@@ -15,7 +18,7 @@ config MEDIA_TUNER
 	select MEDIA_TUNER_MC44S803 if MEDIA_SUBDRV_AUTOSELECT
 
 menu "Customize TV tuners"
-	visible if !MEDIA_SUBDRV_AUTOSELECT
+	depends on !MEDIA_SUBDRV_AUTOSELECT
 	depends on MEDIA_ANALOG_TV_SUPPORT || MEDIA_DIGITAL_TV_SUPPORT || MEDIA_RADIO_SUPPORT
 
 config MEDIA_TUNER_SIMPLE

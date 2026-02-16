@@ -39,6 +39,12 @@
 	      ((((dev)->flags & IFF_UP) == IFF_UP)	&& \
 	       netif_running(dev)			&& \
 	       netif_carrier_ok(dev))
+/* TODO: Use the following macro for querying the slve UP state replacing the IS_UP macro
+ define IS_SLAVE_UP(slave)					   \
+	      (((((slave)->dev)->flags & IFF_UP) == IFF_UP)	&& \
+	       netif_running((slave)->dev)			&& \
+		   ((slave)->man_link == -1) ? netif_carrier_ok(dev)) | ((slave)->man_link == 1))
+*/
 
 /*
  * Checks whether slave is ready for transmit.
@@ -210,6 +216,12 @@ struct slave {
 #ifdef CONFIG_NET_POLL_CONTROLLER
 	struct netpoll *np;
 #endif
+
+	struct device_attribute man_linkprop;
+
+	int man_speed;
+	int man_duplex;
+	int man_link;
 };
 
 /*
@@ -457,6 +469,13 @@ void bond_debug_unregister(struct bonding *bond);
 void bond_debug_reregister(struct bonding *bond);
 const char *bond_mode_name(int mode);
 
+ssize_t bonding_store_man_linkprop(struct device *dev, struct device_attribute *attr,
+		 const char *buf, size_t count);
+ssize_t bonding_show_man_linkprop(struct device *dev, struct device_attribute *attr,
+		char *buf);
+
+int bond_slave_netdev_event(unsigned long event,
+				   struct net_device *slave_dev);
 struct bond_net {
 	struct net *		net;	/* Associated network namespace */
 	struct list_head	dev_list;

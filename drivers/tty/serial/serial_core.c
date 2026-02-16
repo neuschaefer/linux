@@ -20,6 +20,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
+/*
+Includes Intel Corporation's changes/modifications dated: 2014, 2017.
+Changed/modified portions - Copyright (c) 2014-2017, Intel Corporation.
+*/
 #include <linux/module.h>
 #include <linux/tty.h>
 #include <linux/tty_flip.h>
@@ -1619,6 +1623,7 @@ static void uart_line_info(struct seq_file *m, struct uart_driver *drv, int i)
 	char stat_buf[32];
 	unsigned int status;
 	int mmio;
+	int j;
 
 	if (!uport)
 		return;
@@ -1686,6 +1691,14 @@ static void uart_line_info(struct seq_file *m, struct uart_driver *drv, int i)
 		seq_puts(m, stat_buf);
 	}
 	seq_putc(m, '\n');
+    seq_printf(m, "Rx histogram (num of bytes read from fifo): \n");
+    if (uport->irq == 8)
+    {
+        for (j=0;j<16;j++)
+        {
+            seq_printf(m,"%d bytes: %d\n",j+1,uport->histogram_RX_stats[j]);
+        }
+    }
 #undef STATBIT
 #undef INFOBIT
 }

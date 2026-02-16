@@ -1,0 +1,248 @@
+menu "TI Puma5 Configuration"
+    depends on MACH_PUMA5 = 'y'
+
+#
+# All the configuration options specific to a particular SoC come here.
+#
+
+# Get to know the reference board the user wants to compile for
+choice
+	prompt "Puma5 reference board type"
+	help
+      Select the Puma5 Ref. Design Board that you are using. If you are not 
+      using any of these, choose the one closest to your design and make 
+      modifications to the kernel as required.
+
+config MACH_PUMA5_VOLCANO
+	bool "Volcano FPGA Emulation Board"
+
+config MACH_PUMA5EVM
+	bool "Puma5 EVM Board"
+
+endchoice
+
+menu "Puma5 Memory Configuration"
+
+config ARM_AVALANCHE_SDRAM_PHYS_ADDRESS
+    hex "ARM physical start address of SDRAM"
+    default 0x80000000
+    help
+        ARM start address in SDRAM.
+        For Puma5 it must be 0x80000000.
+
+config ARM_AVALANCHE_SDRAM_PHYS_OFFSET
+    hex "ARM Kernel start offset in SDRAM"
+    default 0x00000000
+    help
+        ARM start address in SDRAM.
+        For Puma5 it must be 0x40000000.
+
+config ARM_AVALANCHE_KERNEL_ZRELADDR_OFFSET
+    hex "ARM Kernel ZRELADDR start offset in kernel space"
+    default 0x00018000
+    help
+        ARM Kernel ZRELADDR start offset from the beginning of the Kernel address space.
+        For Puma6 it must be 0x18000
+
+config ARM_AVALANCHE_KERNEL_INITRD_OFFSET
+    hex "ARM Kernel INITRD start offset in kernel space"
+    default 0x00400000
+    help
+        ARM Kernel INITRD start offset from the beginning of the Kernel address space.
+        For Puma6 it must be 0x00400000
+
+config ARM_AVALANCHE_KERNEL_PARAMS_OFFSET
+    hex "ARM Kernel PARAMS start offset in kernel space"
+    default 0x00000100
+    help
+        ARM Kernel PARAMS start offset from the beginning of the Kernel address space.
+        For Puma6 it must be 0x100
+
+config ARM_AVALANCHE_SDRAM_ADDRESS
+    hex "(recalculated) ARM Kernel start address in SDRAM"
+    default 0x80000000
+	help
+        ARM start address in SDRAM.
+        For Puma5 it must be 0x80000000.
+        This value is going to be recalculated by the external script
+
+config ARM_AVALANCHE_KERNEL_ZRELADDR_ADDRESS
+    hex "(recalculated) ARM Kernel ZRELADDR start address in SDRAM"
+    default 0x80018000
+	help
+        ARM Kernel ZRELADDR start address in SDRAM.
+        For Puma5 it must be ARM_AVALANCHE_SDRAM_ADDRESS + 0x18000
+        This value is going to be recalculated by the external script
+
+config ARM_AVALANCHE_KERNEL_INITRD_ADDRESS
+    hex "(recalculated) ARM Kernel INITRD start address in SDRAM"
+    default 0x80400000
+	help
+        ARM Kernel INITRD start address in SDRAM.
+        For Puma5 it must be ARM_AVALANCHE_SDRAM_ADDRESS +  0x400000
+        This value is going to be recalculated by the external script
+
+config ARM_AVALANCHE_KERNEL_PARAMS_ADDRESS
+    hex "(recalculated) ARM Kernel PARAMS start address in SDRAM"
+    default 0x80000100
+	help
+        ARM Kernel PARAMS start address in SDRAM.
+        For Puma5 it must be ARM_AVALANCHE_SDRAM_ADDRESS + 0x100
+        This value is going to be recalculated by the external script
+endmenu
+
+
+config AVALANCHE_U_BOOT
+        bool "Avalanche U-Boot support"
+        default y
+        help
+          Choose y to build and use U-Boot bootloader.
+
+config ARM_AVALANCHE_SPI
+        bool "Avalanche SPI support"
+        depends on SPI
+        default y
+        help
+          Choose y to compile the Avalanche SPI driver.
+
+config PSP_TRACE
+        bool "PSP trace support"
+        default y
+        help
+          choose y to compile psp trace support
+		  
+config ARM_AVALANCHE_CPGMAC_F
+	tristate "Texas Instruments Avalanche CPGMAC support"       
+    default m
+    select AVALANCHE_LOW_CPMAC 
+    help
+        Choose y/m, to compile the TI Avalanche CPMAC driver.
+
+config  ARM_CPMAC_PORTS 
+	int 
+	range 1 1
+	default "1"
+
+config  AVALANCHE_LOW_CPMAC 
+    bool 
+
+config  ARM_EXTERNAL_SWITCH
+	bool	"External Switch Support"
+	default n
+	help
+		Generic external switch framework
+choice
+	prompt "External Switch model"
+	depends on ARM_EXTERNAL_SWITCH
+	default ARM_AVALANCHE_ATHEROS_8328N
+	help
+      Select switch vendor and type.
+config ARM_AVALANCHE_MARVELL_6063
+	bool "The switch is MARVELL_6063"
+config ARM_AVALANCHE_MARVELL_6060
+	bool "The switch is MARVELL_6060"
+config ARM_AVALANCHE_ATHEROS_8328N
+	bool "The switch is ATHEROS 8328N"
+endchoice
+config ARM_CPMAC_DS_TRAFFIC_PRIORITY
+        bool "Downstream Traffic Priority support"
+        default y
+        select TI_META_DATA
+	help
+          choose y enable Downstream Traffic Priority support
+
+config ARM_AVALANCHE_PPD
+    tristate "Texas Instruments Packet Processor Driver"
+    default y
+    help
+        Choose y to compile in the packet processor driver for packet processing acceleration.
+
+config ARM_AVALANCHE_PPD_TEST
+    bool "Packet Processor Test"
+    depends on ARM_AVALANCHE_PPD
+    default y
+    help
+        Choose y to compile in the test support for packet processor driver.
+
+config ARM_CPMAC_INIT_BUF_MALLOC
+        bool "CPGMAC Init Buffer Malloc"
+        depends on ARM_AVALANCHE_CPGMAC_F
+        default n if MACH_PUMA5_VOLCANO
+
+
+config ARM_AVALANCHE_USB20_OTG
+    tristate "Texas Instruments Avalanche USB 2.0 OTG support"
+    default n
+    help
+      Choose y/m, to compile the TI Avalanche USB 2.0 OTG driver.
+
+config AVALANCHE_NUM_SER_PORTS
+	depends on ARM_AVALANCHE_SOC
+	int "Number of serial ports"
+	default 2
+	help
+      Choose the correct number of serial ports on your soc here. If unsure
+      consult the SoC specification from your vendor, but do not put a 
+      wrong value here.
+
+config AVALANCHE_CONSOLE_PORT
+	depends on ARM_AVALANCHE_SOC
+    int "Port number of the console"
+	default 0 
+	help
+      Choose the Avalanche serial port number functioning as the ttyS0 (console)
+      port. The valid values range from 0 through AVALANCHE_NUM_SER_PORTS - 1.
+
+config ARM_AVALANCHE_VLYNQ
+    bool "Texas Instruments VLYNQ (TM) bus support"
+    default n 
+    help
+      Choose Y, to compile the TI VLYNQ (TM) bus support.
+
+config ARM_AVALANCHE_VLYNQ_PORTS
+    int
+	depends on ARM_AVALANCHE_VLYNQ
+    default 1
+    help
+      Define the number of VLYNQ (TM) ports on the board/SoC here.
+
+config AVALANCHE_VLYNQ_POLARITY_LOW
+	depends on ARM_AVALANCHE_VLYNQ
+    bool
+    default y
+    help
+      Define the number of VLYNQ (TM) ports on the board/SoC here.
+
+config AVALANCHE_VLYNQ_CLK_LOCAL
+	depends on ARM_AVALANCHE_VLYNQ
+    default n
+    bool
+    help
+      Define whether the VLYNQ (TM) clock is sourced locally or remotely.
+
+config ARM_AVALANCHE_COLORED_LED
+    bool "COLOR LED support"
+    default y 
+    help
+      Choose Y, to compile the LED support.
+
+config ARM_AVALANCHE_VLYNQ_PORTS
+    int "Number of VLYNQ ports"
+	depends on ARM_AVALANCHE_VLYNQ
+    default 1
+    help
+      Define the number of VLYNQ (TM) ports on the board/SoC here.
+
+config AVALANCHE_VLYNQ_POLARITY_LOW
+	depends on ARM_AVALANCHE_VLYNQ
+    default y
+    help
+      Define the number of VLYNQ (TM) ports on the board/SoC here.
+
+config AVALANCHE_VLYNQ_CLK_LOCAL
+	depends on ARM_AVALANCHE_VLYNQ
+    default n
+    help
+      Define whether the VLYNQ (TM) clock is sourced locally or remotely.
+
+endmenu

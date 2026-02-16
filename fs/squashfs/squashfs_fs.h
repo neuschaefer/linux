@@ -38,7 +38,12 @@
 #define SQUASHFS_DEVBLK_SIZE 1024
 #endif
 
+#ifdef CONFIG_ARCH_AVALANCHE
+#define SQUASHFS_FILE_MAX_SIZE		CONFIG_SQUASHFS_MAX_BLOCK_SIZE
+#else
 #define SQUASHFS_FILE_MAX_SIZE		1048576
+#endif
+
 #define SQUASHFS_FILE_MAX_LOG		20
 
 /* Max length of filename (not 255) */
@@ -240,6 +245,7 @@ struct meta_index {
 #define LZMA_COMPRESSION	2
 #define LZO_COMPRESSION		3
 #define XZ_COMPRESSION		4
+#define LZ4_COMPRESSION		5
 
 struct squashfs_super_block {
 	__le32			s_magic;

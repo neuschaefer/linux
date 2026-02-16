@@ -1,3 +1,5 @@
+# Includes Intel Corporation's changes/modifications dated: 2014. 
+# Changed/modified portions - Copyright © 2014, Intel Corporation. 
 VERSION = 3
 PATCHLEVEL = 12
 SUBLEVEL = 14
@@ -241,7 +243,7 @@ CONFIG_SHELL := $(shell if [ -x "$$BASH" ]; then echo $$BASH; \
 
 HOSTCC       = gcc
 HOSTCXX      = g++
-HOSTCFLAGS   = -Wall -Wmissing-prototypes -Wstrict-prototypes -O2 -fomit-frame-pointer
+HOSTCFLAGS   = -Wall -Wmissing-prototypes -Wstrict-prototypes -O2 -fno-omit-frame-pointer #-fomit-frame-pointer
 HOSTCXXFLAGS = -O2
 
 # Decide whether to build built-in, modular, or both.
@@ -365,7 +367,20 @@ LINUXINCLUDE    := \
 		-Iarch/$(hdr-arch)/include/generated \
 		$(if $(KBUILD_SRC), -I$(srctree)/include) \
 		-Iinclude \
-		$(USERINCLUDE)
+		$(USERINCLUDE) \
+		-include include/generated/autoconf.h \
+		-include include/linux/puma_autoconf.h \
+		-I$(srctree)/include/asm-arm/arch-avalanche/generic
+
+ifeq ($(DOCSIS_SOC),PUMA5)
+LINUXINCLUDE += -I$(srctree)/include/asm-arm/arch-avalanche/puma5
+endif
+ifeq ($(DOCSIS_SOC),PUMA6)
+LINUXINCLUDE += -I$(srctree)/include/asm-arm/arch-avalanche/puma6
+endif
+ifeq ($(DOCSIS_SOC),PUMA7)
+LINUXINCLUDE += -I$(srctree)/include/asm-arm/arch-avalanche/puma7
+endif
 
 KBUILD_CPPFLAGS := -D__KERNEL__
 
@@ -610,7 +625,7 @@ else
 # incompatible with -fomit-frame-pointer with current GCC, so we don't use
 # -fomit-frame-pointer with FUNCTION_TRACER.
 ifndef CONFIG_FUNCTION_TRACER
-KBUILD_CFLAGS	+= -fomit-frame-pointer
+KBUILD_CFLAGS	+= -fno-omit-frame-pointer #-fomit-frame-pointer
 endif
 endif
 
@@ -890,8 +905,16 @@ firmware_install: FORCE
 
 # ---------------------------------------------------------------------------
 # Kernel headers
+# This section is used for exporting Kernel Headers for use by user space.
+# Kbuild defines destination-y: destination directory of all headers in the dir & header-y: headers to install.
+# destination-y must be defined (and not blank) in the Kbuild files (otherwise hdr-dst will override)!
+# subdirectories to visit are also defined inside the Kbuild files.
+#include include/asm-arm/arch-avalanche/generic/Kbuild
+#kernel-headers-dir := $(TARGET_HOME)/ti/include/asm-arm/arch-avalanche/generic/
+#update := cp -uf  $(addprefix $(destination-y), $(header-y))
 
 #Default location for installed headers
+# use destination-y := include/ in Kbuild for top level
 export INSTALL_HDR_PATH = $(objtree)/usr
 
 hdr-inst := -rR -f $(srctree)/scripts/Makefile.headersinst obj
@@ -919,6 +942,14 @@ headers_install: __headers
 	  $(error Headers not exportable for the $(SRCARCH) architecture))
 	$(Q)$(MAKE) $(hdr-inst)=include/uapi
 	$(Q)$(MAKE) $(hdr-inst)=arch/$(hdr-arch)/include/uapi/asm $(hdr-dst)
+ifeq ($(DOCSIS_SOC),PUMA6)
+	$(Q)$(MAKE) $(hdr-inst)=include/asm-$(hdr-arch)/arch-avalanche/puma6 $(hdr-dst)
+endif
+ifeq ($(DOCSIS_SOC),PUMA7)
+	$(Q)$(MAKE) $(hdr-inst)=include/asm-$(hdr-arch)/arch-avalanche/puma7 $(hdr-dst)
+endif
+	$(Q)$(MAKE) $(hdr-inst)=include/asm-$(hdr-arch)/arch-avalanche/generic $(hdr-dst)
+	$(Q)$(update) $(kernel-headers-dir)
 
 PHONY += headers_check_all
 headers_check_all: headers_install_all

@@ -10,6 +10,10 @@
  *	as published by the Free Software Foundation; either version
  *	2 of the License, or (at your option) any later version.
  */
+/*
+Includes Intel Corporation's changes/modifications dated: 2014.
+Changed/modified portions - Copyright © 2014, Intel Corporation.
+*/
 
 #include <linux/kernel.h>
 #include <linux/netdevice.h>
@@ -382,4 +386,7 @@ void br_dev_setup(struct net_device *dev)
 	br_netfilter_rtable_init(br);
 	br_stp_timer_init(br);
 	br_multicast_init(br);
+#ifdef CONFIG_TI_L2_SELECTIVE_PACKET_HANDLING
+    br->selective_packet_handler = NULL;
+#endif /* CONFIG_TI_L2_SELECTIVE_PACKET_HANDLING */
 }

@@ -1,3 +1,8 @@
+/*
+Includes Intel Corporation's changes/modifications dated: 2014.
+Changed/modified portions - Copyright © 2014, Intel Corporation.
+*/
+
 #ifndef _LINUX_DMA_MAPPING_H
 #define _LINUX_DMA_MAPPING_H
 
@@ -236,4 +241,5 @@ struct dma_attrs;
 #define dma_unmap_len_set(PTR, LEN_NAME, VAL)    do { } while (0)
 #endif
 
+extern void consistent_sync(void *vaddr, size_t size, int direction);
 #endif

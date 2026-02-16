@@ -17,6 +17,10 @@
  *		as published by the Free Software Foundation; either version
  *		2 of the License, or (at your option) any later version.
  */
+/*
+Includes Intel Corporation's changes/modifications dated: 2014.
+Changed/modified portions - Copyright © 2014, Intel Corporation.
+*/
 
 #ifndef _UAPI_LINUX_IF_ETHER_H
 #define _UAPI_LINUX_IF_ETHER_H
@@ -31,8 +35,13 @@
 #define ETH_ALEN	6		/* Octets in one ethernet addr	 */
 #define ETH_HLEN	14		/* Total octets in header.	 */
 #define ETH_ZLEN	60		/* Min. octets in frame sans FCS */
+#ifdef CONFIG_INTEL_PP_TUNNEL_SUPPORT  // Support 1800 MTU
+#define ETH_DATA_LEN	1800		/* Max. octets in payload	 */
+#define ETH_FRAME_LEN	1814		/* Max. octets in frame sans FCS */
+#else
 #define ETH_DATA_LEN	1500		/* Max. octets in payload	 */
 #define ETH_FRAME_LEN	1514		/* Max. octets in frame sans FCS */
+#endif
 #define ETH_FCS_LEN	4		/* Octets in the FCS		 */
 
 /*

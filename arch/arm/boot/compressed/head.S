@@ -8,8 +8,38 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
+/*
+Includes Intel Corporation's changes/modifications dated: 2014.
+Changed/modified portions - Copyright © 2014, Intel Corporation.
+*/
+
+/* Copyright 2008, Texas Instruments Incorporated
+ *
+ * This program has been modified from its original operation by 
+ * Texas Instruments to do the following:
+ * 
+ * Explanation of modification:
+ *  Increased stack size for lzma support
+ *  
+ *
+ * THIS MODIFIED SOFTWARE AND DOCUMENTATION ARE PROVIDED
+ * "AS IS," AND TEXAS INSTRUMENTS MAKES NO REPRESENTATIONS
+ * OR WARRENTIES, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+ * TO, WARRANTIES OF MERCHANTABILITY OR FITNESS FOR ANY
+ * PARTICULAR PURPOSE OR THAT THE USE OF THE SOFTWARE OR
+ * DOCUMENTATION WILL NOT INFRINGE ANY THIRD PARTY PATENTS,
+ * COPYRIGHTS, TRADEMARKS OR OTHER RIGHTS.
+ * See The GNU General Public License for more details.
+ *
+ * These changes are covered under version 2 of the GNU General Public License,
+ * dated June 1991.
+ */ 
+
 #include <linux/linkage.h>
 #include <asm/assembler.h>
+
+#define ATAG_CORE 0x54410001
+#define ATAG_MEM 0x54410002
 
 	.arch	armv7-a
 /*
@@ -171,9 +201,37 @@ not_angel:
 
 #ifdef CONFIG_AUTO_ZRELADDR
 		@ determine final kernel image address
-		mov	r4, pc
+#ifdef CONFIG_ARM_PATCH_PHYS_VIRT
+		@ try get from atags first
+		ldr r0, [r8, #4]
+		ldr r1, =ATAG_CORE
+		cmp r0, r1
+		bne 4f	@ atag_core not found. not a atags list
+		mov r0, r8  @ atags pointer. r0 = current atag pointer
+		mov r1, #-1	@ keeps minimal address from all mem atags
+1:		ldr r2, [r0, #4]	@ atag.hdr.tag
+		cmp r2, #0	@ atag_none
+		beq 3f
+		ldr r3, =ATAG_MEM
+		cmp r2, r3
+		bne 2f
+		ldr r2, [r0, #0xc]	@ mem start (skip hdr + mem.size)
+		cmp r2, r1
+		bhi 2f
+		mov r1, r2
+2:		ldr r3, [r0, #0]	@ atag size
+		mov r3, r3, LSL#2
+		add r0, r0, r3
+		b 1b
+3:		mov r4, r1
+		adds r1, r1, #1	@ check if it's still -1
+		bne 1f
+
+		@ so we have failed to take start mem from atags, try mask
+#endif
+4:		mov	r4, pc
 		and	r4, r4, #0xf8000000
-		add	r4, r4, #TEXT_OFFSET
+1:		add	r4, r4, #TEXT_OFFSET
 #else
 		ldr	r4, =zreladdr
 #endif
@@ -1290,5 +1348,9 @@ reloc_code_end:
 
 		.align
 		.section ".stack", "aw", %nobits
+#ifndef CONFIG_KERNEL_COMPRESS_7ZIP
 .L_user_stack:	.space	4096
+#else
+.L_user_stack:	.space	8192
+#endif
 .L_user_stack_end:

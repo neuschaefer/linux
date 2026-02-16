@@ -1,3 +1,5 @@
+# Includes Intel Corporation's changes/modifications dated: 2014.
+# Changed/modified portions - Copyright © 2014, Intel Corporation.
 # UAPI Header export list
 header-y += ip_tables.h
 header-y += ipt_CLUSTERIP.h
@@ -9,3 +11,4 @@ header-y += ipt_ULOG.h
 header-y += ipt_ah.h
 header-y += ipt_ecn.h
 header-y += ipt_ttl.h
+header-y += ipt_TRIGGER.h

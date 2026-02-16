@@ -26,6 +26,7 @@ obj-$(CONFIG_BRIDGE_EBT_ARPREPLY) += ebt_arpreply.o
 obj-$(CONFIG_BRIDGE_EBT_MARK_T) += ebt_mark.o
 obj-$(CONFIG_BRIDGE_EBT_DNAT) += ebt_dnat.o
 obj-$(CONFIG_BRIDGE_EBT_REDIRECT) += ebt_redirect.o
+obj-$(CONFIG_BRIDGE_EBT_FORWARD) += ebt_forward.o
 obj-$(CONFIG_BRIDGE_EBT_SNAT) += ebt_snat.o
 
 # watchers

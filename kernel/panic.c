@@ -5,6 +5,11 @@
  */
 
 /*
+ * Includes Intel Corporation's changes/modifications dated: 2017.
+ * Changed/modified portions - Copyright (c) 2017, Intel Corporation.
+ */
+
+/*
  * This function is used through-out the kernel (including mm and fs)
  * to indicate a major problem.
  */
@@ -66,11 +71,16 @@ void __weak panic_smp_self_stop(void)
  *
  *	This function never returns.
  */
+#ifdef CONFIG_FULL_PANIC
 void panic(const char *fmt, ...)
 {
-	static DEFINE_SPINLOCK(panic_lock);
 	static char buf[1024];
 	va_list args;
+#else
+void tiny_panic(int a, ...)
+{
+#endif
+	static DEFINE_SPINLOCK(panic_lock);
 	long i, i_next = 0;
 	int state = 0;
 
@@ -97,10 +107,16 @@ void panic(const char *fmt, ...)
 
 	console_verbose();
 	bust_spinlocks(1);
+
+#ifdef CONFIG_FULL_PANIC
 	va_start(args, fmt);
 	vsnprintf(buf, sizeof(buf), fmt, args);
 	va_end(args);
 	printk(KERN_EMERG "Kernel panic - not syncing: %s\n",buf);
+#else
+	printk(KERN_EMERG "Kernel panic - not syncing\n");
+#endif
+
 #ifdef CONFIG_DEBUG_BUGVERBOSE
 	/*
 	 * Avoid nested stack-dumping if a panic occurs during oops processing
@@ -127,7 +143,11 @@ void panic(const char *fmt, ...)
 	 * Run any panic handlers, including those that might need to
 	 * add information to the kmsg dump output.
 	 */
+#ifdef CONFIG_FULL_PANIC
 	atomic_notifier_call_chain(&panic_notifier_list, 0, buf);
+#else
+	atomic_notifier_call_chain(&panic_notifier_list, 0, "");
+#endif
 
 	kmsg_dump(KMSG_DUMP_PANIC);
 
@@ -187,8 +207,11 @@ void panic(const char *fmt, ...)
 	}
 }
 
+#ifdef CONFIG_FULL_PANIC
 EXPORT_SYMBOL(panic);
-
+#else
+EXPORT_SYMBOL(tiny_panic);
+#endif
 
 struct tnt {
 	u8	bit;

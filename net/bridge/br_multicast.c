@@ -34,6 +34,10 @@
 
 #include "br_private.h"
 
+#ifdef CONFIG_TI_PACKET_PROCESSOR
+#include <linux/ti_hil.h>
+#endif
+
 static void br_multicast_start_querier(struct net_bridge *br,
 				       struct bridge_mcast_query *query);
 unsigned int br_mdb_rehash_seq;
@@ -717,6 +721,17 @@ static int br_ip4_multicast_add_group(struct net_bridge *br,
 	br_group.proto = htons(ETH_P_IP);
 	br_group.vid = vid;
 
+#ifdef CONFIG_TI_PACKET_PROCESSOR
+	if (group && port && port->dev)
+	{
+		struct hil_mr_ipaddr hil_ip;
+		hil_ip.type = HIL_MR_IPV4;
+		hil_ip.addr.ip4.s_addr = group;
+		hil_ip.vpid = port->dev->vpid_handle;
+		ti_hil_pp_event (MC_SESSION_ADD_MEMBER, (void *)&hil_ip);
+	}
+#endif// CONFIG_TI_PACKET_PROCESSOR
+
 	return br_multicast_add_group(br, port, &br_group);
 }
 
@@ -734,6 +749,17 @@ static int br_ip6_multicast_add_group(struct net_bridge *br,
 	br_group.u.ip6 = *group;
 	br_group.proto = htons(ETH_P_IPV6);
 	br_group.vid = vid;
+
+#ifdef CONFIG_TI_PACKET_PROCESSOR
+	if (group && port && port->dev)
+	{
+		struct hil_mr_ipaddr hil_ip;
+		hil_ip.type = HIL_MR_IPV6;
+		memcpy(&(hil_ip.addr.ip6), group, sizeof(struct in6_addr));
+		hil_ip.vpid = port->dev->vpid_handle;
+		ti_hil_pp_event (MC_SESSION_ADD_MEMBER, (void *)&hil_ip);
+	}
+#endif// CONFIG_TI_PACKET_PROCESSOR
 
 	return br_multicast_add_group(br, port, &br_group);
 }
@@ -1412,6 +1438,17 @@ static void br_ip4_multicast_leave_group(struct net_bridge *br,
 	br_group.proto = htons(ETH_P_IP);
 	br_group.vid = vid;
 
+#ifdef CONFIG_TI_PACKET_PROCESSOR
+	if (group && port && port->dev)
+	{
+		struct hil_mr_ipaddr hil_ip;
+		hil_ip.type = HIL_MR_IPV4;
+		hil_ip.addr.ip4.s_addr = group;
+		hil_ip.vpid = port->dev->vpid_handle;
+		ti_hil_pp_event (MC_SESSION_DEL_MEMBER, (void *)&hil_ip);
+	}
+#endif// CONFIG_TI_PACKET_PROCESSOR
+
 	br_multicast_leave_group(br, port, &br_group, &br->ip4_querier, query);
 }
 
@@ -1432,6 +1469,17 @@ static void br_ip6_multicast_leave_group(struct net_bridge *br,
 	br_group.u.ip6 = *group;
 	br_group.proto = htons(ETH_P_IPV6);
 	br_group.vid = vid;
+
+#ifdef CONFIG_TI_PACKET_PROCESSOR
+	if (group && port && port->dev)
+	{
+		struct hil_mr_ipaddr hil_ip;
+		hil_ip.type = HIL_MR_IPV6;
+		memcpy(&(hil_ip.addr.ip6), group, sizeof(struct in6_addr));
+		hil_ip.vpid = port->dev->vpid_handle;
+		ti_hil_pp_event (MC_SESSION_DEL_MEMBER, (void *)&hil_ip);
+	}
+#endif// CONFIG_TI_PACKET_PROCESSOR
 
 	br_multicast_leave_group(br, port, &br_group, &br->ip6_querier, query);
 }

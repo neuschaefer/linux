@@ -1,3 +1,5 @@
+# Includes Intel Corporation's changes/modifications dated: 2014.
+# Changed/modified portions - Copyright © 2014, Intel Corporation.
 #
 # Sensor device configuration
 #
@@ -7,6 +9,56 @@ menu "I2C Hardware Bus support"
 
 comment "PC SMBus host controller drivers"
 	depends on PCI
+
+config I2C_AVALANCHE
+	tristate "TI I2C Controller"
+	depends on  ARCH_AVALANCHE  && I2C 
+	default y
+	select I2C_ALGOAVALANCHE
+	help
+	  If you say yes to this option, support will be included for the
+	  built-in I2C interface on the Texas Instruments I2C controller.
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called  avalanche-i2c-bus.
+
+config I2C_DMA_AVALANCHE
+	tristate "Intel I2C_DMA Controller"
+	depends on ARCH_AVALANCHE  && I2C_AVALANCHE && I2C 
+	default y
+	help
+	  If you say yes to this option, support will be included for the
+	  built-in I2C interface on the Intel I2C controller.
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called  avalanche-i2c-dma-bus (P6 only, silicon stepping C0 and above). 
+
+config I2C_AVALANCHE_FORCE_POLLED_MODE
+    int "Force Polled Mode (0 or 1)"
+    default 0  
+    depends on I2C_AVALANCHE
+	help
+	  Set 1 for Polling mode
+	  Set 0 for Interrupt mode
+
+config I2C_AVALANCHE_CLOCK
+    int "Clock frequency (1000Hz to 400000Hz)"
+    default 400000
+    depends on I2C_AVALANCHE
+	help
+	  This Driver supports 100KHz(standard mode ),400KHz(Fast mode),
+	  Value as low as 1000Hz(1KHz) to 400000Hz(400KHz)is allowed to support
+	  the slower devices.
+
+config I2C_AVALANCHE_SPIKE_FILTER
+    int "Sampling  (0 to 7 clocks)"
+    default 0
+    depends on I2C_AVALANCHE
+	help
+	  For noisy environments, selectable spike filtering is available for 
+	  IIC data and clock signals.The spike filter evaluates the incoming 
+	  signal for a selected number of chip clocks Signal stability can be 
+	  evaluated for up to eight chip clock cycles <Range: 0 to 7>
 
 config I2C_ALI1535
 	tristate "ALI 1535"

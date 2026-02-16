@@ -13,6 +13,11 @@
  *     - JMicron (hardware and technical support)
  */
 
+/* 
+ * Includes Intel Corporation's changes/modifications dated: 2014. 
+ * Changed/modified portions - Copyright © 2012-2017 , Intel Corporation.   
+ */ 
+
 #include <linux/delay.h>
 #include <linux/highmem.h>
 #include <linux/io.h>
@@ -29,6 +34,9 @@
 #include <linux/mmc/host.h>
 #include <linux/mmc/card.h>
 #include <linux/mmc/slot-gpio.h>
+#if (defined(CONFIG_ARCH_GEN3) && defined(CONFIG_HW_MUTEXES))
+#include <asm-arm/arch-avalanche/generic/hw_mutex_ctrl.h>
+#endif
 
 #include "sdhci.h"
 
@@ -79,52 +87,71 @@ static void sdhci_runtime_pm_bus_off(struct sdhci_host *host)
 
 static void sdhci_dumpregs(struct sdhci_host *host)
 {
-	pr_debug(DRIVER_NAME ": =========== REGISTER DUMP (%s)===========\n",
+	pr_err(DRIVER_NAME ": =========== REGISTER DUMP (%s)===========\n",
 		mmc_hostname(host->mmc));
 
-	pr_debug(DRIVER_NAME ": Sys addr: 0x%08x | Version:  0x%08x\n",
+	pr_err(DRIVER_NAME ": Sys addr:  0x%08x | Version:  0x%08x\n",
 		sdhci_readl(host, SDHCI_DMA_ADDRESS),
 		sdhci_readw(host, SDHCI_HOST_VERSION));
-	pr_debug(DRIVER_NAME ": Blk size: 0x%08x | Blk cnt:  0x%08x\n",
+	pr_err(DRIVER_NAME ": Blk size:  0x%08x | Blk cnt:  0x%08x\n",
 		sdhci_readw(host, SDHCI_BLOCK_SIZE),
 		sdhci_readw(host, SDHCI_BLOCK_COUNT));
-	pr_debug(DRIVER_NAME ": Argument: 0x%08x | Trn mode: 0x%08x\n",
+	pr_err(DRIVER_NAME ": Argument:  0x%08x | Trn mode: 0x%08x\n",
 		sdhci_readl(host, SDHCI_ARGUMENT),
 		sdhci_readw(host, SDHCI_TRANSFER_MODE));
-	pr_debug(DRIVER_NAME ": Present:  0x%08x | Host ctl: 0x%08x\n",
+	pr_err(DRIVER_NAME ": Present:   0x%08x | Host ctl: 0x%08x\n",
 		sdhci_readl(host, SDHCI_PRESENT_STATE),
 		sdhci_readb(host, SDHCI_HOST_CONTROL));
-	pr_debug(DRIVER_NAME ": Power:    0x%08x | Blk gap:  0x%08x\n",
+	pr_err(DRIVER_NAME ": Power:     0x%08x | Blk gap:  0x%08x\n",
 		sdhci_readb(host, SDHCI_POWER_CONTROL),
 		sdhci_readb(host, SDHCI_BLOCK_GAP_CONTROL));
-	pr_debug(DRIVER_NAME ": Wake-up:  0x%08x | Clock:    0x%08x\n",
+	pr_err(DRIVER_NAME ": Wake-up:   0x%08x | Clock:    0x%08x\n",
 		sdhci_readb(host, SDHCI_WAKE_UP_CONTROL),
 		sdhci_readw(host, SDHCI_CLOCK_CONTROL));
-	pr_debug(DRIVER_NAME ": Timeout:  0x%08x | Int stat: 0x%08x\n",
+	pr_err(DRIVER_NAME ": Timeout:   0x%08x | Int stat: 0x%08x\n",
 		sdhci_readb(host, SDHCI_TIMEOUT_CONTROL),
 		sdhci_readl(host, SDHCI_INT_STATUS));
-	pr_debug(DRIVER_NAME ": Int enab: 0x%08x | Sig enab: 0x%08x\n",
+	pr_err(DRIVER_NAME ": Int enab:  0x%08x | Sig enab: 0x%08x\n",
 		sdhci_readl(host, SDHCI_INT_ENABLE),
 		sdhci_readl(host, SDHCI_SIGNAL_ENABLE));
-	pr_debug(DRIVER_NAME ": AC12 err: 0x%08x | Slot int: 0x%08x\n",
+	pr_err(DRIVER_NAME ": AC12 err:  0x%08x | Slot int: 0x%08x\n",
 		sdhci_readw(host, SDHCI_ACMD12_ERR),
 		sdhci_readw(host, SDHCI_SLOT_INT_STATUS));
-	pr_debug(DRIVER_NAME ": Caps:     0x%08x | Caps_1:   0x%08x\n",
+	pr_err(DRIVER_NAME ": Caps:      0x%08x | Caps_1:   0x%08x\n",
 		sdhci_readl(host, SDHCI_CAPABILITIES),
 		sdhci_readl(host, SDHCI_CAPABILITIES_1));
-	pr_debug(DRIVER_NAME ": Cmd:      0x%08x | Max curr: 0x%08x\n",
+	pr_err(DRIVER_NAME ": Cmd:       0x%08x | Max curr: 0x%08x\n",
 		sdhci_readw(host, SDHCI_COMMAND),
 		sdhci_readl(host, SDHCI_MAX_CURRENT));
-	pr_debug(DRIVER_NAME ": Host ctl2: 0x%08x\n",
+	pr_err(DRIVER_NAME ": Host ctl2: 0x%08x\n",
 		sdhci_readw(host, SDHCI_HOST_CONTROL2));
 
 	if (host->flags & SDHCI_USE_ADMA)
-		pr_debug(DRIVER_NAME ": ADMA Err: 0x%08x | ADMA Ptr: 0x%08x\n",
+		pr_err(DRIVER_NAME ": ADMA Err:  0x%08x | ADMA Ptr: 0x%08x\n",
 		       readl(host->ioaddr + SDHCI_ADMA_ERROR),
 		       readl(host->ioaddr + SDHCI_ADMA_ADDRESS));
-
-	pr_debug(DRIVER_NAME ": ===========================================\n");
+#ifdef CONFIG_ARCH_GEN3
+	pr_err(DRIVER_NAME ": -------------------------------------------\n");
+    pr_err(DRIVER_NAME ": H/W mutex:      %s\n",(EMMC_HW_MUTEX_IS_LOCKED()==0?"Free":"Locked"));
+	pr_err(DRIVER_NAME ": Dbg trace:      0x%0.8X\n",host->debug_trace);
+    pr_err(DRIVER_NAME ": Tasklet:        State: 0x%0.8X | Count=%d\n", host->finish_tasklet.state, host->finish_tasklet.count); 
+    pr_err(DRIVER_NAME ": Current thread: State: 0x%0.8X | Name:'%s'\n", current->state, current->comm); 
+    if (host->irq_thread)
+    {
+        pr_err(DRIVER_NAME ": IRQ thread:     State: 0x%0.8X | Name:'%s' \n", host->irq_thread->state, host->irq_thread->comm);
+    }
+#endif
+	pr_err(DRIVER_NAME ": ===========================================\n");
 }
+
+
+#ifdef CONFIG_ARCH_GEN3
+void sdhci_dump_status(struct sdhci_host *host)
+{
+    sdhci_dumpregs(host);
+}
+EXPORT_SYMBOL_GPL(sdhci_dump_status);
+#endif
 
 /*****************************************************************************\
  *                                                                           *
@@ -976,9 +1003,18 @@ static void sdhci_finish_data(struct sdhci_host *host)
 			sdhci_reset(host, SDHCI_RESET_DATA);
 		}
 
+#ifdef CONFIG_ARCH_GEN3
+	    host->debug_trace |= SDHCI_DEBUG_TRACE_FINISH_DATA_SEND_CMD12;
+#endif
 		sdhci_send_command(host, data->stop);
-	} else
+	} 
+	else
+	{
+#ifdef CONFIG_ARCH_GEN3
+    host->debug_trace |= SDHCI_DEBUG_TRACE_FINISH_DATA_SCHED_TASKLET;
+#endif
 		tasklet_schedule(&host->finish_tasklet);
+	}
 }
 
 static void sdhci_send_command(struct sdhci_host *host, struct mmc_command *cmd)
@@ -1013,6 +1049,10 @@ static void sdhci_send_command(struct sdhci_host *host, struct mmc_command *cmd)
 		timeout--;
 		mdelay(1);
 	}
+
+#ifdef CONFIG_ARCH_GEN3
+    host->debug_trace |= SDHCI_DEBUG_TRACE_START_TIMER;
+#endif
 
 	mod_timer(&host->timer, jiffies + 10 * HZ);
 
@@ -1081,15 +1121,34 @@ static void sdhci_finish_command(struct sdhci_host *host)
 	/* Finished CMD23, now send actual command. */
 	if (host->cmd == host->mrq->sbc) {
 		host->cmd = NULL;
+#ifdef CONFIG_ARCH_GEN3
+    host->debug_trace |= SDHCI_DEBUG_TRACE_FINISH_CMD23_SEND_CMD;
+#endif
 		sdhci_send_command(host, host->mrq->cmd);
 	} else {
 
 		/* Processed actual command. */
 		if (host->data && host->data_early)
+		{
+#ifdef CONFIG_ARCH_GEN3
+			host->debug_trace |= SDHCI_DEBUG_TRACE_FINISH_CMD_EARLY_DATA;
+#endif
 			sdhci_finish_data(host);
+		}
 
 		if (!host->cmd->data)
+		{
+#ifdef CONFIG_ARCH_GEN3
+			host->debug_trace |= SDHCI_DEBUG_TRACE_FINISH_CMD_SCHED_TASKLET;
+#endif
 			tasklet_schedule(&host->finish_tasklet);
+		}
+		else
+		{
+#ifdef CONFIG_ARCH_GEN3
+			host->debug_trace |= SDHCI_DEBUG_TRACE_FINISH_CMD_WITH_DATA;
+#endif
+		}
 
 		host->cmd = NULL;
 	}
@@ -1333,7 +1392,13 @@ static void sdhci_request(struct mmc_host *mmc, struct mmc_request *mrq)
 
 	sdhci_runtime_pm_get(host);
 
+	present = mmc_gpio_get_cd(host->mmc);
+
 	spin_lock_irqsave(&host->lock, flags);
+
+#ifdef CONFIG_ARCH_GEN3
+    host->debug_trace = SDHCI_DEBUG_TRACE_START_NEW_REQUEST;
+#endif
 
 	WARN_ON(host->mrq != NULL);
 
@@ -1361,7 +1426,6 @@ static void sdhci_request(struct mmc_host *mmc, struct mmc_request *mrq)
 	 *     zero: cd-gpio is used, and card is removed
 	 *     one: cd-gpio is used, and card is present
 	 */
-	present = mmc_gpio_get_cd(host->mmc);
 	if (present < 0) {
 		/* If polling, assume that the card is always present. */
 		if (host->quirks & SDHCI_QUIRK_BROKEN_CARD_DETECTION)
@@ -1370,9 +1434,22 @@ static void sdhci_request(struct mmc_host *mmc, struct mmc_request *mrq)
 			present = sdhci_readl(host, SDHCI_PRESENT_STATE) &
 					SDHCI_CARD_PRESENT;
 	}
+#ifdef CONFIG_ARCH_GEN3
+    /* Check if clock is set correctly - P7 ATOM might shutdown mmc */
+    if (!(sdhci_readw(host, SDHCI_CLOCK_CONTROL) & SDHCI_CLOCK_INT_EN)) 
+    {
+        pr_err("%s: Internal clock is not enable !!!.\n", mmc_hostname(host->mmc));
+        sdhci_dumpregs(host);
+        present = 0;
+    }
+#endif
 
 	if (!present || host->flags & SDHCI_DEVICE_DEAD) {
 		host->mrq->cmd->error = -ENOMEDIUM;
+#ifdef CONFIG_ARCH_GEN3
+		pr_err("%s: No device !!!.\n", mmc_hostname(host->mmc));
+		sdhci_dumpregs(host);
+#endif
 		tasklet_schedule(&host->finish_tasklet);
 	} else {
 		u32 present_state;
@@ -1401,9 +1478,19 @@ static void sdhci_request(struct mmc_host *mmc, struct mmc_request *mrq)
 		}
 
 		if (mrq->sbc && !(host->flags & SDHCI_AUTO_CMD23))
+		{
+#ifdef CONFIG_ARCH_GEN3
+			host->debug_trace |= SDHCI_DEBUG_TRACE_SEND_CMD_SET_BLOCK_COUNT;
+#endif
 			sdhci_send_command(host, mrq->sbc);
+		}
 		else
+		{
+#ifdef CONFIG_ARCH_GEN3
+			host->debug_trace |= SDHCI_DEBUG_TRACE_SEND_CMD;
+#endif
 			sdhci_send_command(host, mrq->cmd);
+		}
 	}
 
 	mmiowb();
@@ -1847,6 +1934,7 @@ static int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode)
 
 	host = mmc_priv(mmc);
 
+    
 	sdhci_runtime_pm_get(host);
 	disable_irq(host->irq);
 	spin_lock(&host->lock);
@@ -1971,7 +2059,10 @@ static int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode)
 		ctrl = sdhci_readw(host, SDHCI_HOST_CONTROL2);
 		tuning_loop_counter--;
 		timeout--;
-		mdelay(1);
+		
+		/* eMMC spec does not require a delay between tuning cycles */
+		if (opcode == MMC_SEND_TUNING_BLOCK)
+			mdelay(1);
 	} while (ctrl & SDHCI_CTRL_EXEC_TUNING);
 
 	/*
@@ -2004,12 +2095,11 @@ out:
 			host->tuning_count * HZ);
 		/* Tuning mode 1 limits the maximum data length to 4MB */
 		mmc->max_blk_count = (4 * 1024 * 1024) / mmc->max_blk_size;
-	} else {
+	} else if (host->flags & SDHCI_USING_RETUNING_TIMER) {
 		host->flags &= ~SDHCI_NEEDS_RETUNING;
 		/* Reload the new initial value for timer */
-		if (host->tuning_mode == SDHCI_TUNING_MODE_1)
-			mod_timer(&host->tuning_timer, jiffies +
-				host->tuning_count * HZ);
+		mod_timer(&host->tuning_timer, jiffies +
+			host->tuning_count * HZ);
 	}
 
 	/*
@@ -2061,15 +2151,18 @@ static void sdhci_card_event(struct mmc_host *mmc)
 {
 	struct sdhci_host *host = mmc_priv(mmc);
 	unsigned long flags;
+	int present;
 
 	/* First check if client has provided their own card event */
 	if (host->ops->card_event)
 		host->ops->card_event(host);
 
+	present = sdhci_do_get_cd(host);
+
 	spin_lock_irqsave(&host->lock, flags);
 
 	/* Check host->mrq first in case we are runtime suspended */
-	if (host->mrq && !sdhci_do_get_cd(host)) {
+	if (host->mrq && !present) {
 		pr_err("%s: Card removed during transfer!\n",
 			mmc_hostname(host->mmc));
 		pr_err("%s: Resetting controller.\n",
@@ -2121,18 +2214,32 @@ static void sdhci_tasklet_finish(unsigned long param)
 
 	host = (struct sdhci_host*)param;
 
+#ifdef CONFIG_ARCH_GEN3
+    host->debug_trace |= SDHCI_DEBUG_TRACE_FINISH_TASKLET_START;
+#endif
+
 	spin_lock_irqsave(&host->lock, flags);
+
+
 
         /*
          * If this tasklet gets rescheduled while running, it will
          * be run again afterwards but without any active request.
          */
 	if (!host->mrq) {
+#ifdef CONFIG_ARCH_GEN3
+        pr_err("%s: tasklet run without mmc request \n", mmc_hostname(host->mmc));
+#endif
 		spin_unlock_irqrestore(&host->lock, flags);
 		return;
 	}
 
 	del_timer(&host->timer);
+
+#ifdef CONFIG_ARCH_GEN3
+    host->debug_trace |= SDHCI_DEBUG_TRACE_STOP_TIMER;
+#endif
+
 
 	mrq = host->mrq;
 
@@ -2168,6 +2275,9 @@ static void sdhci_tasklet_finish(unsigned long param)
 	mmiowb();
 	spin_unlock_irqrestore(&host->lock, flags);
 
+#ifdef CONFIG_ARCH_GEN3
+    host->debug_trace |= SDHCI_DEBUG_TRACE_REQUEST_DONE;
+#endif
 	mmc_request_done(host->mmc, mrq);
 	sdhci_runtime_pm_put(host);
 }
@@ -2198,6 +2308,12 @@ static void sdhci_timeout_timer(unsigned long data)
 			tasklet_schedule(&host->finish_tasklet);
 		}
 	}
+#ifdef CONFIG_ARCH_GEN3
+    else
+    {
+        pr_warning("%s: Timeout waiting for hardware interrupt with no active request.\n", mmc_hostname(host->mmc));
+    }
+#endif
 
 	mmiowb();
 	spin_unlock_irqrestore(&host->lock, flags);
@@ -2210,7 +2326,8 @@ static void sdhci_tuning_timer(unsigned long data)
 
 	host = (struct sdhci_host *)data;
 
-	spin_lock_irqsave(&host->lock, flags);
+    spin_lock_irqsave(&host->lock, flags);
+
 
 	host->flags |= SDHCI_NEEDS_RETUNING;
 
@@ -2227,6 +2344,10 @@ static void sdhci_cmd_irq(struct sdhci_host *host, u32 intmask)
 {
 	BUG_ON(intmask == 0);
 
+#ifdef CONFIG_ARCH_GEN3
+    host->debug_trace |= SDHCI_DEBUG_TRACE_RCEV_IRQ_CMD;
+#endif
+
 	if (!host->cmd) {
 		pr_err("%s: Got command interrupt 0x%08x even "
 			"though no command operation was in progress.\n",
@@ -2242,6 +2363,9 @@ static void sdhci_cmd_irq(struct sdhci_host *host, u32 intmask)
 		host->cmd->error = -EILSEQ;
 
 	if (host->cmd->error) {
+#ifdef CONFIG_ARCH_GEN3
+		host->debug_trace |= SDHCI_DEBUG_TRACE_RCEV_IRQ_CMD_ERROR;
+#endif
 		tasklet_schedule(&host->finish_tasklet);
 		return;
 	}
@@ -2305,6 +2429,10 @@ static void sdhci_data_irq(struct sdhci_host *host, u32 intmask)
 {
 	u32 command;
 	BUG_ON(intmask == 0);
+
+#ifdef CONFIG_ARCH_GEN3
+    host->debug_trace |= SDHCI_DEBUG_TRACE_RCEV_IRQ_DATA;
+#endif
 
 	/* CMD19 generates _only_ Buffer Read Ready interrupt */
 	if (intmask & SDHCI_INT_DATA_AVAIL) {
@@ -2395,7 +2523,13 @@ static void sdhci_data_irq(struct sdhci_host *host, u32 intmask)
 				 * things in the proper order.
 				 */
 				host->data_early = 1;
+#ifdef CONFIG_ARCH_GEN3
+				host->debug_trace |= SDHCI_DEBUG_TRACE_FINISH_DATA_EARLY;
+#endif
 			} else {
+#ifdef CONFIG_ARCH_GEN3
+				host->debug_trace |= SDHCI_DEBUG_TRACE_FINISH_DATA;
+#endif
 				sdhci_finish_data(host);
 			}
 		}
@@ -2408,6 +2542,28 @@ static irqreturn_t sdhci_irq(int irq, void *dev_id)
 	struct sdhci_host *host = dev_id;
 	u32 intmask, unexpected = 0;
 	int cardint = 0, max_loops = 16;
+
+#ifdef CONFIG_ARCH_GEN3
+#ifdef CONFIG_HW_MUTEXES
+	/* eMMC card interrupt can be classified as:
+	 * 1: Insert/Remove interrupt
+	 * 2: Data/Command interrupt
+	 * 3: Unexpected error interrupt
+	 * It is assumed that interrupts happen only when a task owns the 
+	 * HW Mutex
+	 */
+	
+    if (MMC_HOST_SUPPORTS_HW_MUTEX(host->mmc)) {
+	  if (!EMMC_HW_MUTEX_IS_LOCKED()) {
+	      return IRQ_NONE;
+	  }
+	}
+#endif
+#endif
+
+#ifdef CONFIG_ARCH_GEN3
+    host->debug_trace |= SDHCI_DEBUG_TRACE_RCEV_IRQ;
+#endif
 
 	spin_lock(&host->lock);
 
@@ -2504,8 +2660,14 @@ out:
 	/*
 	 * We have to delay this as it calls back into the driver.
 	 */
-	if (cardint)
+	if (cardint && host->mmc->sdio_irqs)
 		mmc_signal_sdio_irq(host->mmc);
+
+#ifdef CONFIG_ARCH_GEN3
+    /* Clear ITNC - In Puma for LEVEL interrupts source, the INTC must be clear,
+       to avoid a second dummy intterrupt */
+     ack_irq(host->irq);
+#endif
 
 	return result;
 }
@@ -2646,7 +2808,7 @@ static int sdhci_runtime_pm_put(struct sdhci_host *host)
 
 static void sdhci_runtime_pm_bus_on(struct sdhci_host *host)
 {
-	if (host->runtime_suspended || host->bus_on)
+	if (host->bus_on)
 		return;
 	host->bus_on = true;
 	pm_runtime_get_noresume(host->mmc->parent);
@@ -2654,7 +2816,7 @@ static void sdhci_runtime_pm_bus_on(struct sdhci_host *host)
 
 static void sdhci_runtime_pm_bus_off(struct sdhci_host *host)
 {
-	if (host->runtime_suspended || !host->bus_on)
+	if (!host->bus_on)
 		return;
 	host->bus_on = false;
 	pm_runtime_put_noidle(host->mmc->parent);
@@ -2796,7 +2958,18 @@ int sdhci_add_host(struct sdhci_host *host)
 		caps[1] = (host->quirks & SDHCI_QUIRK_MISSING_CAPS) ?
 			host->caps1 :
 			sdhci_readl(host, SDHCI_CAPABILITIES_1);
+#ifdef CONFIG_ARCH_GEN3
+    pr_warning("%s: Caps0 = 0x%X\n",mmc_hostname(host->mmc),caps[0]);
+    pr_warning("%s: Caps1 = 0x%X\n",mmc_hostname(host->mmc),caps[1]);
 
+    /* Puma7: Disable timer tuning */
+    if ((caps[1] & SDHCI_RETUNING_TIMER_COUNT_MASK) != 0)
+    {
+        pr_warning("%s: Disable priodic tuning\n",mmc_hostname(host->mmc));
+        caps[1] &=  ~SDHCI_RETUNING_TIMER_COUNT_MASK;
+    }
+    
+#endif
 	if (host->quirks & SDHCI_QUIRK_FORCE_DMA)
 		host->flags |= SDHCI_USE_SDMA;
 	else if (!(caps[0] & SDHCI_CAN_DO_SDMA))
@@ -3002,11 +3175,13 @@ int sdhci_add_host(struct sdhci_host *host)
 		/* SD3.0: SDR104 is supported so (for eMMC) the caps2
 		 * field can be promoted to support HS200.
 		 */
-		mmc->caps2 |= MMC_CAP2_HS200;
+		if (!(host->quirks2 & SDHCI_QUIRK2_BROKEN_HS200))
+			mmc->caps2 |= MMC_CAP2_HS200;
 	} else if (caps[1] & SDHCI_SUPPORT_SDR50)
 		mmc->caps |= MMC_CAP_UHS_SDR50;
 
-	if (caps[1] & SDHCI_SUPPORT_DDR50)
+	if ((caps[1] & SDHCI_SUPPORT_DDR50) &&
+		!(host->quirks2 & SDHCI_QUIRK2_BROKEN_DDR50))
 		mmc->caps |= MMC_CAP_UHS_DDR50;
 
 	/* Does the host need tuning for SDR50? */
@@ -3039,7 +3214,6 @@ int sdhci_add_host(struct sdhci_host *host)
 	/* Re-tuning mode supported by the Host Controller */
 	host->tuning_mode = (caps[1] & SDHCI_RETUNING_MODE_MASK) >>
 			     SDHCI_RETUNING_MODE_SHIFT;
-
 	ocr_avail = 0;
 
 	host->vmmc = regulator_get_optional(mmc_dev(mmc), "vmmc");
@@ -3226,6 +3400,10 @@ int sdhci_add_host(struct sdhci_host *host)
 		goto untasklet;
 	}
 
+#if defined (CONFIG_ARCH_GEN3) && defined (CONFIG_INTEL_IRQ_THREAD_CHANGE_PRIORITY)
+    host->irq_thread = irq_set_sched(host->irq,SCHED_FIFO,60);
+#endif
+
 #ifdef CONFIG_MMC_DEBUG
 	sdhci_dumpregs(host);
 #endif
@@ -3288,6 +3466,7 @@ void sdhci_remove_host(struct sdhci_host *host, int dead)
 				" transfer!\n", mmc_hostname(host->mmc));
 
 			host->mrq->cmd->error = -ENOMEDIUM;
+			sdhci_dumpregs(host);
 			tasklet_schedule(&host->finish_tasklet);
 		}
 

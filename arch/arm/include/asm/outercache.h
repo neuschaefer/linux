@@ -16,12 +16,20 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+ * 
+ * Includes Intel Corporation's changes/modifications dated: Sep.2015.
+ * Changed/modified portions - Copyright © 2015, Intel Corporation
+ * Port back following changes from kernel 4.0
+ *  1. add l2x0_regs variable
+ *  2. add configure and write_sec function pointers to outer_cache_fns struct
  */
 
 #ifndef __ASM_OUTERCACHE_H
 #define __ASM_OUTERCACHE_H
 
 #include <linux/types.h>
+
+struct l2x0_regs;
 
 struct outer_cache_fns {
 	void (*inv_range)(unsigned long, unsigned long);
@@ -35,6 +43,10 @@ struct outer_cache_fns {
 #endif
 	void (*set_debug)(unsigned long);
 	void (*resume)(void);
+
+	/* This is an ARM L2C thing */
+	void (*write_sec)(unsigned long, unsigned);
+	void (*configure)(const struct l2x0_regs *);
 };
 
 extern struct outer_cache_fns outer_cache;

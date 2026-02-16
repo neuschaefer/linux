@@ -17,6 +17,10 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
+/*
+ * Includes Intel Corporation's changes/modifications dated: [10/03/2016].
+ * Changed/modified portions - Copyright © [2016], Intel Corporation.
+ */
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
@@ -64,6 +68,10 @@
 #include <linux/atomic.h>
 
 #include "l2tp_core.h"
+
+#ifdef CONFIG_TI_PACKET_PROCESSOR
+#include <linux/ti_hil.h>
+#endif
 
 #define L2TP_DRV_VERSION	"V2.0"
 
@@ -1849,6 +1857,11 @@ EXPORT_SYMBOL_GPL(__l2tp_session_unhash);
  */
 int l2tp_session_delete(struct l2tp_session *session)
 {
+#ifdef CONFIG_TI_PACKET_PROCESSOR
+	/* For L2TPv3 - Generate the HIL Event indicating that the L2TPv3 session has been deleted. */
+	if (session->tunnel->version == L2TP_HDR_VER_3)
+		ti_hil_pp_event (TI_L2TP_ENTRY_DELETED, (void *)session);
+#endif// CONFIG_TI_PACKET_PROCESSOR
 	if (session->ref)
 		(*session->ref)(session);
 	__l2tp_session_unhash(session);
@@ -1963,8 +1976,14 @@ struct l2tp_session *l2tp_session_create(int priv_size, struct l2tp_tunnel *tunn
 		}
 
 		/* Ignore management session in session count value */
-		if (session->session_id != 0)
+		if (session->session_id != 0) {
 			atomic_inc(&l2tp_session_count);
+#ifdef CONFIG_TI_PACKET_PROCESSOR
+			/* For L2TPv3 (PP does not support send_seq option) - Generate the HIL Event indicating that the L2TPv3 session has been created. */
+			if ((tunnel->version == L2TP_HDR_VER_3) && (!session->send_seq))
+				ti_hil_pp_event (TI_L2TP_ENTRY_CREATED, (void *)session);
+#endif// CONFIG_TI_PACKET_PROCESSOR
+		}
 	}
 
 	return session;

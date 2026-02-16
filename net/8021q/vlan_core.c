@@ -48,6 +48,16 @@ bool vlan_do_receive(struct sk_buff **skbp)
 	}
 
 	skb->priority = vlan_get_ingress_priority(vlan_dev, skb->vlan_tci);
+
+#ifdef CONFIG_TI_PACKET_PROCESSOR
+    /* 
+     * Need to save the vpid vlan_tci before it will erased
+     * We will use it later in the ingress hook to reproduce 
+     * the vlan_tci of the real internal vpid's Vlan. 
+     */
+    skb->vpid_vlan_tci = vlan_tx_tag_get(skb); 
+#endif
+
 	skb->vlan_tci = 0;
 
 	rx_stats = this_cpu_ptr(vlan_dev_priv(vlan_dev)->vlan_pcpu_stats);

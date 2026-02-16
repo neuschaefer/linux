@@ -1,0 +1,50 @@
+#include/asm-arm/arch-avalanche/generic/Kbuild
+#
+# destination-y is the destination directory and is relative to ti/
+# it must be defined and not blank! (if top level is required use destination-y := include/).
+#
+# header-y is a list of headers to be exported.
+# header-y also indicates which subdirectories to visit (use trailing '/').
+#
+destination-y := include/asm-arm/arch-avalanche/generic/
+header-y += _tistdtypes.h
+header-y += pal.h
+header-y += pal_defs.h
+header-y += pal_osCache.h
+header-y += pal_osList_inline.h
+header-y += pal_osMutex_inline.h
+header-y += pal_osSem_inline.h
+header-y += pal_osWait_inline.h
+header-y += pal_sysWdtimer.h
+header-y += pal_vlynqOs.h
+header-y += pal_cppi41.h
+header-y += pal_os.h
+header-y += pal_osCache_inline.h
+header-y += pal_osMem.h
+header-y += pal_osProtect.h
+header-y += pal_osTimer.h
+header-y += pal_vlynq.h
+header-y += pal_cppi41cfg.h
+header-y += pal_osBuf.h
+header-y += pal_osCfg.h
+header-y += pal_osMem_inline.h
+header-y += pal_osProtect_inline.h
+header-y += pal_osTimer_inline.h
+header-y += pal_sysPsc.h
+header-y += pal_vlynqDev.h
+header-y += pal_cppi41pvt.h
+header-y += pal_osBuf_inline.h
+header-y += pal_osList.h
+header-y += pal_osMutex.h
+header-y += pal_osSem.h
+header-y += pal_osWait.h
+header-y += pal_sysTimer16.h
+header-y += pal_vlynqIoctl.h
+header-y += led_hal.h
+header-y += led_manager.h
+header-y += led_platform.h
+header-y += avalanche_pdsp_api.h
+header-y += avalanche_pp_api.h
+header-y += time_capture_drv.h
+header-y += sram_api.h
+header-y += arm_atom_mbx.h

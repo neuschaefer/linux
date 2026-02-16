@@ -11,6 +11,11 @@
  *	2 of the License, or (at your option) any later version.
  */
 
+/* 
+ * Includes Intel Corporation's changes/modifications dated: [11/07/2011].
+ * Changed/modified portions - Copyright © [2011], Intel Corporation.
+ */
+
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/rculist.h>
@@ -18,6 +23,7 @@
 #include <linux/times.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
+#include <linux/ti_hil.h>
 #include <linux/jhash.h>
 #include <linux/random.h>
 #include <linux/slab.h>
@@ -25,6 +31,10 @@
 #include <asm/unaligned.h>
 #include <linux/if_vlan.h>
 #include "br_private.h"
+
+#ifdef CONFIG_INTEL_MAX_BRIDGE_MACS_LIMIT
+static int fdb_insert_cnt = 0;
+#endif
 
 static struct kmem_cache *br_fdb_cache __read_mostly;
 static int fdb_insert(struct net_bridge *br, struct net_bridge_port *source,
@@ -87,6 +97,12 @@ static void fdb_delete(struct net_bridge *br, struct net_bridge_fdb_entry *f)
 	hlist_del_rcu(&f->hlist);
 	fdb_notify(br, f, RTM_DELNEIGH);
 	call_rcu(&f->rcu, fdb_rcu_free);
+
+#ifdef CONFIG_INTEL_MAX_BRIDGE_MACS_LIMIT
+	if (fdb_insert_cnt >= 1) {
+		fdb_insert_cnt--;
+	}
+#endif
 }
 
 void br_fdb_changeaddr(struct net_bridge_port *p, const unsigned char *newaddr)
@@ -187,7 +203,24 @@ void br_fdb_cleanup(unsigned long _data)
 				continue;
 			this_timer = f->updated + delay;
 			if (time_before_eq(this_timer, jiffies))
-				fdb_delete(br, f);
+			{
+#ifdef CONFIG_TI_PACKET_PROCESSOR			
+                /*  Generate a HIL Packet Processor event indicating that the FDB entry 
+                 *  is being deleted. Notifications are sent only for non-local FDB 
+                 *  entries as local traffic is not accelerated through PP. */
+                if(!f->is_local)
+                    ti_hil_pp_event(TI_BRIDGE_FDB_DELETED, (void*)f);
+
+
+                /*  Check if the PP has a session alive for this FDB entry 
+                 *   ACTIVE     - DONT delete the FDB entry.
+                 *   NOT ACTIVE - Delete the FDB entry. */
+                if (!(f->ti_pp_fdb_status & TI_PP_FDB_ACTIVE))
+		    	    fdb_delete(br, f);
+#else
+                    fdb_delete(br, f);
+#endif
+			}
 			else if (time_before(this_timer, next_timer))
 				next_timer = this_timer;
 		}
@@ -390,6 +423,13 @@ static struct net_bridge_fdb_entry *fdb_create(struct hlist_head *head,
 {
 	struct net_bridge_fdb_entry *fdb;
 
+#ifdef CONFIG_INTEL_MAX_BRIDGE_MACS_LIMIT
+    if (fdb_insert_cnt >= CONFIG_INTEL_MAX_BRIDGE_MACS) {
+        printk(KERN_WARNING "\n fdb_create reached max bridge macs limit \n");
+		return 0;
+    }
+#endif
+
 	fdb = kmem_cache_alloc(br_fdb_cache, GFP_ATOMIC);
 	if (fdb) {
 		memcpy(fdb->addr.addr, addr, ETH_ALEN);
@@ -398,7 +438,26 @@ static struct net_bridge_fdb_entry *fdb_create(struct hlist_head *head,
 		fdb->is_local = 0;
 		fdb->is_static = 0;
 		fdb->updated = fdb->used = jiffies;
+#ifdef CONFIG_TI_PACKET_PROCESSOR
+        /* Initialize the Status flag to INACTIVE by default. If 
+         * the event TI_BRIDGE_FDB_CREATED is indeed handled, then 
+         * this flag must be set to TI_PP_FDB_ACTIVE so that it 
+         * can be synced up with PP when FDB entry expires in the 
+         * bridge. If the status flag is not set active, it is assumed 
+         * that the TI_BRIDGE_FDB_* events are not handled and thus 
+         * bridge takes complete control over the fdb entry deletion */
+        fdb->ti_pp_fdb_status = TI_PP_FDB_INACTIVE;
+#endif
 		hlist_add_head_rcu(&fdb->hlist, head);
+#ifdef CONFIG_TI_PACKET_PROCESSOR
+        /* Indicate to the HIL layer that a non-local FDB entry has been created. */
+        if (!fdb->is_local)
+            ti_hil_pp_event(TI_BRIDGE_FDB_CREATED, (void *)fdb);
+#endif
+
+#ifdef CONFIG_INTEL_MAX_BRIDGE_MACS_LIMIT
+        fdb_insert_cnt++;
+#endif
 	}
 	return fdb;
 }
@@ -473,6 +532,10 @@ void br_fdb_update(struct net_bridge *br, struct net_bridge_port *source,
 			/* fastpath: update of existing entry */
 			fdb->dst = source;
 			fdb->updated = jiffies;
+#ifdef CONFIG_TI_PACKET_PROCESSOR
+            /* Indicate to the HIL layer that an FDB entry has been updated. */
+            ti_hil_pp_event(TI_BRIDGE_FDB_CREATED, (void *)fdb);
+#endif
 		}
 	} else {
 		spin_lock(&br->hash_lock);

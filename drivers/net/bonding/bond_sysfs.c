@@ -1836,3 +1836,108 @@ void bond_prepare_sysfs_group(struct bonding *bond)
 	bond->dev->sysfs_groups[0] = &bonding_group;
 }
 
+/* sysfs handlers */
+ssize_t bonding_show_man_linkprop(struct device *dev, struct device_attribute *attr,
+		char *buf)
+{
+	struct slave * slave;
+
+	printk(KERN_ERR"bonding_show_man_linkprop\n");
+
+	slave = container_of(attr, struct slave, man_linkprop);
+
+	return scnprintf(buf, (ssize_t)PAGE_SIZE, "%d %d %d\n", slave->man_link, slave->man_speed, slave->man_duplex);
+}
+
+ssize_t bonding_store_man_linkprop(struct device *dev, struct device_attribute *attr,
+		 const char *buf, size_t count)
+{
+	struct slave * slave;
+    int man_link;
+    int man_speed;
+    int man_duplex;
+    int link_changed;
+    int link_prev;
+    int prev_speed;
+    int prev_duplex;
+
+	slave = container_of(attr, struct slave, man_linkprop);
+
+	sscanf(buf,"%d %d %d", &man_link, &man_speed, &man_duplex);
+
+	link_prev = slave->man_link;
+	prev_speed = slave->man_duplex;
+	prev_duplex = man_duplex;
+	link_changed = (prev_speed != man_speed) || (prev_duplex != man_duplex);
+
+	slave->man_link   = man_link;
+	slave->man_speed  = man_speed;
+	slave->man_duplex = man_duplex;
+
+	switch(man_link) {
+	    case 1:
+	    	switch (link_prev) {
+	    	case 1: /* UP->UP */
+	    		if (link_changed) {
+	    			bond_slave_netdev_event(NETDEV_CHANGE, slave->dev);
+	    		}
+	    		break;
+
+	    	case -1: /* AUTODETECT->UP */
+			    bond_slave_netdev_event(NETDEV_UP, slave->dev);
+			    break;
+
+	    	case 0:  /* DOWN->UP */
+			    bond_slave_netdev_event(NETDEV_UP, slave->dev);
+			    break;
+
+	    	default: 
+	    		/* kernel overrun */
+                break;
+	    	}
+	    	break;
+
+	    case 0: /* ANY->DOWN */
+	    	if (link_prev != 0) {
+	    	    bond_slave_netdev_event(NETDEV_DOWN, slave->dev);
+	    	}
+	    	break;
+
+	    case -1:
+	    	switch (link_prev) {
+	    	case 1: /* UP->AUTODETECT */
+	    		if (IS_UP(slave->dev)) {
+	    		   bond_slave_netdev_event(NETDEV_CHANGE, slave->dev);
+	    		}
+	    		else
+	    		{
+		    	   bond_slave_netdev_event(NETDEV_DOWN, slave->dev);
+	    		}
+	    		break;
+
+	    	case 0: /* DOWN->AUTODETECT */
+	    		if (IS_UP(slave->dev)) {
+	    			bond_slave_netdev_event(NETDEV_UP, slave->dev);
+	    		}
+	    		break;
+
+	    	case -1: /* AUTODETECT->AUTODETECT */
+	    		break; /* nothing to do */
+
+	    	default:
+	    		/* kernel overrun */
+	      		break;
+	    	}
+	    	break;
+
+	    default:
+	    	/* illegal value. recover previous values */
+	    	slave->man_link = link_prev;
+	    	slave->man_speed  = prev_speed;
+	    	slave->man_duplex = prev_duplex;
+	    	break;
+
+	}
+	return count;
+}
+

@@ -106,6 +106,13 @@ config WM8350_WATCHDOG
 # ALPHA Architecture
 
 # ARM Architecture
+config ARM_AVALANCHE_WDTIMER
+        tristate "Avalanche Watch Dog Timer support"
+	depends on WATCHDOG && (MACH_PUMA5 || MACH_PUMA6 || MACH_PUMA7)
+        default y
+        help
+      Choose Y here if you wish to use the Avalanche Watch Dog Timer
+      facility. If unsure, choose Y.
 
 config ARM_SP805_WATCHDOG
 	tristate "ARM SP805 Watchdog"

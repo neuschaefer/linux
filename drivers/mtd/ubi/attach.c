@@ -89,7 +89,11 @@
 #include <linux/random.h>
 #include "ubi.h"
 
+#ifdef CONFIG_MTD_UBI_DEBUG
 static int self_check_ai(struct ubi_device *ubi, struct ubi_attach_info *ai);
+#else
+#define  self_check_ai(ubi, ai) 0
+#endif
 
 /* Temporary variables used during scanning */
 static struct ubi_ec_hdr *ech;
@@ -1482,6 +1486,7 @@ out_ai:
 	return err;
 }
 
+#ifdef CONFIG_MTD_UBI_DEBUG
 /**
  * self_check_ai - check the attaching information.
  * @ubi: UBI device description object
@@ -1752,3 +1757,4 @@ out:
 	dump_stack();
 	return -EINVAL;
 }
+#endif /* CONFIG_MTD_UBI_DEBUG */

@@ -7,6 +7,10 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
+/*
+Includes Intel Corporation's changes/modifications dated: 2014.
+Changed/modified portions - Copyright © 2014, Intel Corporation.
+*/
 
 #include <linux/module.h>
 #include <linux/types.h>
@@ -16,6 +20,9 @@
 #include <net/xfrm.h>
 #include <linux/jhash.h>
 #include <linux/rtnetlink.h>
+#ifdef CONFIG_TI_PACKET_PROCESSOR
+#include <linux/ti_hil.h>
+#endif
 
 #include <net/netfilter/nf_conntrack.h>
 #include <net/netfilter/nf_conntrack_core.h>
@@ -427,6 +434,7 @@ nf_nat_setup_info(struct nf_conn *ct,
 		ct->status |= IPS_DST_NAT_DONE;
 	else
 		ct->status |= IPS_SRC_NAT_DONE;
+
 
 	return NF_ACCEPT;
 }

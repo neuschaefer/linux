@@ -27,6 +27,10 @@
  *
  * Inspired by sdhci-pci.c, by Pierre Ossman
  */
+/* 
+ * Includes Intel Corporation's changes/modifications dated: 2014. 
+ * Changed/modified portions - Copyright © 2012-2017 , Intel Corporation.
+ */ 
 
 #include <linux/err.h>
 #include <linux/module.h>
@@ -156,7 +160,11 @@ struct sdhci_host *sdhci_pltfm_init(struct platform_device *pdev,
 	}
 
 	host->irq = platform_get_irq(pdev, 0);
-
+/* 
+    in Puma we do not use ioremap, ioumap, request_mem_region and release_mem_region - virtual addresses are
+    predefined.
+*/
+#ifndef CONFIG_ARCH_GEN3
 	if (!request_mem_region(iomem->start, resource_size(iomem),
 		mmc_hostname(host->mmc))) {
 		dev_err(&pdev->dev, "cannot request region\n");
@@ -170,7 +178,10 @@ struct sdhci_host *sdhci_pltfm_init(struct platform_device *pdev,
 		ret = -ENOMEM;
 		goto err_remap;
 	}
-
+#else
+	/* Get virtual address */
+	host->ioaddr = (unsigned int __iomem *)(iomem->start);
+#endif
 	/*
 	 * Some platforms need to probe the controller to be able to
 	 * determine which caps should be used.
@@ -183,7 +194,9 @@ struct sdhci_host *sdhci_pltfm_init(struct platform_device *pdev,
 	return host;
 
 err_remap:
+#ifndef CONFIG_ARCH_GEN3
 	release_mem_region(iomem->start, resource_size(iomem));
+#endif
 err_request:
 	sdhci_free_host(host);
 err:
@@ -195,10 +208,12 @@ EXPORT_SYMBOL_GPL(sdhci_pltfm_init);
 void sdhci_pltfm_free(struct platform_device *pdev)
 {
 	struct sdhci_host *host = platform_get_drvdata(pdev);
+#ifndef CONFIG_ARCH_GEN3
 	struct resource *iomem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 
 	iounmap(host->ioaddr);
 	release_mem_region(iomem->start, resource_size(iomem));
+#endif
 	sdhci_free_host(host);
 }
 EXPORT_SYMBOL_GPL(sdhci_pltfm_free);
@@ -216,7 +231,17 @@ int sdhci_pltfm_register(struct platform_device *pdev,
 
 	sdhci_get_of_property(pdev);
 
-	ret = sdhci_add_host(host);
+#ifdef CONFIG_ARCH_GEN3
+	MMC_LOCK_HW_MUTEX(host->mmc);
+    pr_info("sdhci-pltfm: For dual boot with APP-CPU, disable all writes to host controller during initialization \n");
+    host->flags |= SDHCI_DISABLE_REGISTER_WRITE;  /* For non-destructive initialization, disable all writes to host controller */
+#endif
+     ret = sdhci_add_host(host);
+#ifdef CONFIG_ARCH_GEN3
+    host->flags &= ~SDHCI_DISABLE_REGISTER_WRITE;  /* enable writes to host controller */
+    MMC_UNLOCK_HW_MUTEX(host->mmc);
+#endif
+
 	if (ret)
 		sdhci_pltfm_free(pdev);
 

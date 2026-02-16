@@ -329,8 +329,8 @@ static int __init ptp_init(void)
 		pr_err("ptp: failed to allocate device region\n");
 		goto no_region;
 	}
-
-	ptp_class->dev_groups = ptp_groups;
+//INANAGO_PORTING
+	//ptp_class->dev_groups = ptp_groups;
 	pr_info("PTP clock support registered\n");
 	return 0;
 

@@ -10,6 +10,13 @@
  * the Free Software Foundation; either version 2 of the License, or (at
  * your option) any later version.
  */
+
+/* 
+ * Includes Intel Corporation's changes/modifications dated: 2017. 
+ * Changed/modified portions - Copyright © 2017 , Intel Corporation.   
+ */ 
+
+
 #ifndef __SDHCI_HW_H
 #define __SDHCI_HW_H
 
@@ -403,6 +410,11 @@ extern void sdhci_enable_irq_wakeups(struct sdhci_host *host);
 #ifdef CONFIG_PM_RUNTIME
 extern int sdhci_runtime_suspend_host(struct sdhci_host *host);
 extern int sdhci_runtime_resume_host(struct sdhci_host *host);
+#endif
+
+
+#ifdef CONFIG_ARCH_GEN3
+extern void sdhci_dump_status(struct sdhci_host *host);
 #endif
 
 #endif /* __SDHCI_HW_H */

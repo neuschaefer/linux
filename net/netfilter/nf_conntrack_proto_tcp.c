@@ -7,6 +7,10 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
+/*
+Includes Intel Corporation's changes/modifications dated: 2014.
+Changed/modified portions - Copyright © 2014, Intel Corporation.
+*/
 
 #include <linux/types.h>
 #include <linux/timer.h>
@@ -858,6 +862,33 @@ static int tcp_packet(struct nf_conn *ct,
 		     & IP_CT_TCP_FLAG_CLOSE_INIT)
 		    || (ct->proto.tcp.last_dir == dir
 		        && ct->proto.tcp.last_index == TCP_RST_SET)) {
+#ifdef CONFIG_TI_PACKET_PROCESSOR
+                /* Check if the ORIGINAL Tuple is being accelerated? */
+                if ((!IS_TI_PP_SESSION_CT_INVALID(ct->tuplehash[IP_CT_DIR_ORIGINAL].ti_pp_session_handle)) &&
+                    (1 == ct->tuplehash[IP_CT_DIR_ORIGINAL].ti_pp_sessions_count))
+                {
+                    /* YES. There is no point in accelerating this; since the session will be deleted. */
+#ifdef CONFIG_MACH_PUMA5
+                    if (ti_ppm_delete_session (ct->tuplehash[IP_CT_DIR_ORIGINAL].ti_pp_session_handle, NULL) < 0)
+                        printk ("ERROR: Unable to delete the ORIGINAL session\n");
+#else
+                    ti_hil_pp_event(TI_CT_NETFILTER_DELETE_SESSION, (void *)ct->tuplehash[IP_CT_DIR_ORIGINAL].ti_pp_session_handle);
+#endif
+                }
+
+                /* Check if the REPLY Tuple is being accelerated? */
+                if ((!IS_TI_PP_SESSION_CT_INVALID(ct->tuplehash[IP_CT_DIR_REPLY].ti_pp_session_handle)) &&
+                    (1 == ct->tuplehash[IP_CT_DIR_REPLY].ti_pp_sessions_count))
+                {
+                    /* YES. There is no point in accelerating this; since the session will be deleted. */
+#ifdef CONFIG_MACH_PUMA5
+                    if (ti_ppm_delete_session (ct->tuplehash[IP_CT_DIR_REPLY].ti_pp_session_handle, NULL) < 0)
+                        printk ("ERROR: Unable to delete the REPLY session\n");
+#else
+                    ti_hil_pp_event(TI_CT_NETFILTER_DELETE_SESSION, (void *)ct->tuplehash[IP_CT_DIR_REPLY].ti_pp_session_handle);
+#endif
+                }
+#endif /* CONFIG_TI_PACKET_PROCESSOR */
 			/* Attempt to reopen a closed/aborted connection.
 			 * Delete this connection and look up again. */
 			spin_unlock_bh(&ct->lock);
@@ -1004,11 +1035,33 @@ static int tcp_packet(struct nf_conn *ct,
 		break;
 	}
 
-	if (!tcp_in_window(ct, &ct->proto.tcp, dir, index,
-			   skb, dataoff, th, pf)) {
-		spin_unlock_bh(&ct->lock);
-		return -NF_ACCEPT;
-	}
+#ifdef CONFIG_TI_PACKET_PROCESSOR
+    /* TCP Window tracking does not make sense if the sessions are being accelerated. Thus
+     * we added this check... Maybe a better way is to make the window tracking more resilient. 
+     * Check here to see if both of the sessions are not accelerated and if so be the case do the 
+     * window checking else skip it! */
+
+    if (IS_TI_PP_SESSION_CT_IDLE(ct->tuplehash[IP_CT_DIR_ORIGINAL].ti_pp_session_handle) &&
+        IS_TI_PP_SESSION_CT_IDLE(ct->tuplehash[IP_CT_DIR_REPLY   ].ti_pp_session_handle))
+#endif
+	{
+		if (!tcp_in_window(ct, &ct->proto.tcp, dir, index,
+				   skb, dataoff, th, pf)) {
+			spin_unlock_bh(&ct->lock);
+			return -NF_ACCEPT;
+		}
+    }
+#ifdef CONFIG_TI_PACKET_PROCESSOR
+    else
+    {
+        if (ct->tuplehash[dir].ti_pp_session_handle == TI_PP_SESSION_CT_TCP_UPDATE)
+        {
+            ct->proto.tcp.seen[dir].td_end = 0;   
+            ct->tuplehash[dir].ti_pp_session_handle = TI_PP_SESSION_CT_IDLE;
+            tcp_in_window(ct, &ct->proto.tcp, dir, index,skb, dataoff, th, pf);
+        }
+    }
+#endif
      in_window:
 	/* From now on we have got in-window packets */
 	ct->proto.tcp.last_index = index;

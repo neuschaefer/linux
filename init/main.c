@@ -83,6 +83,7 @@
 #include <asm/setup.h>
 #include <asm/sections.h>
 #include <asm/cacheflush.h>
+#include <asm-arm/arch-avalanche/generic/time_capture_drv.h>
 
 #ifdef CONFIG_X86_LOCAL_APIC
 #include <asm/smp.h>
@@ -843,11 +844,13 @@ static int __ref kernel_init(void *unused)
 		pr_err("Failed to execute %s.  Attempting defaults...\n",
 			execute_command);
 	}
+    TC_setEventTime(TIME_CAPTURE_EVENT_RCS);
 	if (!run_init_process("/sbin/init") ||
 	    !run_init_process("/etc/init") ||
 	    !run_init_process("/bin/init") ||
 	    !run_init_process("/bin/sh"))
 		return 0;
+
 
 	panic("No init found.  Try passing init= option to kernel. "
 	      "See Linux Documentation/init.txt for guidance.");

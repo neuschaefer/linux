@@ -10,6 +10,13 @@
  * published by the Free Software Foundation.
  */
 
+/******************************************************************
+ 
+ Includes Intel Corporation's changes/modifications dated: 07/2011.
+ Changed/modified portions - Copyright(c) 2011-2017, Intel Corporation. 
+
+******************************************************************/
+
 #include <linux/err.h>
 #include <linux/slab.h>
 #include <linux/stat.h>
@@ -274,6 +281,9 @@ static int mmc_read_ext_csd(struct mmc_card *card, u8 *ext_csd)
 	int err = 0, idx;
 	unsigned int part_size;
 	u8 hc_erase_grp_sz = 0, hc_wp_grp_sz = 0;
+#ifdef CONFIG_ARCH_GEN3
+	int i;
+#endif
 
 	BUG_ON(!card);
 
@@ -292,13 +302,12 @@ static int mmc_read_ext_csd(struct mmc_card *card, u8 *ext_csd)
 		}
 	}
 
+	/*
+	 * The EXT_CSD format is meant to be forward compatible. As long
+	 * as CSD_STRUCTURE does not change, all values for EXT_CSD_REV
+	 * are authorized, see JEDEC JESD84-B50 section B.8.
+	 */
 	card->ext_csd.rev = ext_csd[EXT_CSD_REV];
-	if (card->ext_csd.rev > 7) {
-		pr_err("%s: unrecognised EXT_CSD revision %d\n",
-			mmc_hostname(card->host), card->ext_csd.rev);
-		err = -EINVAL;
-		goto out;
-	}
 
 	card->ext_csd.raw_sectors[0] = ext_csd[EXT_CSD_SEC_CNT + 0];
 	card->ext_csd.raw_sectors[1] = ext_csd[EXT_CSD_SEC_CNT + 1];
@@ -315,6 +324,20 @@ static int mmc_read_ext_csd(struct mmc_card *card, u8 *ext_csd)
 		if (card->ext_csd.sectors > (2u * 1024 * 1024 * 1024) / 512)
 			mmc_card_set_blockaddr(card);
 	}
+
+#ifdef CONFIG_ARCH_GEN3
+	/* INANGO_PORING: it's now in vanilla. should be ported */
+	card->ext_csd.boot_size_mult = ext_csd[EXT_CSD_BOOT_MULT];
+	card->ext_csd.boot_config = ext_csd[EXT_CSD_PART_CONFIG];
+
+	/* should be initialized since used from ioctl to get info.
+	 * most probably should be rewritten to use new api and don't use
+	 * gp_size in ioctl at all.
+	 */
+	for (i = 0; i < 4; i++) {
+		card->ext_csd.gp_size[i] = 0;
+	}
+#endif
 
 	card->ext_csd.raw_card_type = ext_csd[EXT_CSD_CARD_TYPE];
 	mmc_select_card_type(card);
@@ -431,12 +454,27 @@ static int mmc_read_ext_csd(struct mmc_card *card, u8 *ext_csd)
 				!ext_csd[EXT_CSD_GP_SIZE_MULT + idx * 3 + 1] &&
 				!ext_csd[EXT_CSD_GP_SIZE_MULT + idx * 3 + 2])
 					continue;
+#ifdef CONFIG_ARCH_GEN3
+				if (card->ext_csd.rev == 4) {
+					/* obsoleted standard JESD84-A44 */
+					part_size =
+					(ext_csd[EXT_CSD_GP_SIZE_MULT + idx * 3 + 2]
+						* 64) +
+					(ext_csd[EXT_CSD_GP_SIZE_MULT + idx * 3 + 1]
+						* 8) +
+					ext_csd[EXT_CSD_GP_SIZE_MULT + idx * 3];
+				} else {
+#endif
+				/* standard JESD84-A441 */
 				part_size =
 				(ext_csd[EXT_CSD_GP_SIZE_MULT + idx * 3 + 2]
 					<< 16) +
 				(ext_csd[EXT_CSD_GP_SIZE_MULT + idx * 3 + 1]
 					<< 8) +
 				ext_csd[EXT_CSD_GP_SIZE_MULT + idx * 3];
+#ifdef CONFIG_ARCH_GEN3
+				}
+#endif
 				part_size *= (size_t)(hc_erase_grp_sz *
 					hc_wp_grp_sz);
 				mmc_part_add(card, part_size << 19,

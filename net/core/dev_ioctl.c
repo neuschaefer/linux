@@ -563,3 +563,4 @@ int dev_ioctl(struct net *net, unsigned int cmd, void __user *arg)
 		return -ENOTTY;
 	}
 }
+EXPORT_SYMBOL(dev_ioctl);

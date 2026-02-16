@@ -52,8 +52,11 @@ obj-$(CONFIG_TELCLOCK)		+= tlclk.o
 obj-$(CONFIG_MWAVE)		+= mwave/
 obj-$(CONFIG_AGP)		+= agp/
 obj-$(CONFIG_PCMCIA)		+= pcmcia/
-
+obj-$(CONFIG_ARM_AVALANCHE_LCD) += avalanche_lcd/
+obj-$(CONFIG_ARM_AVALANCHE_COLORED_LED) += avalanche_led/
+obj-$(CONFIG_ARM_AVALANCHE_KEYPAD) += avalanche_keypad/
 obj-$(CONFIG_HANGCHECK_TIMER)	+= hangcheck-timer.o
+obj-$(CONFIG_ARM_AVALANCHE_VLYNQ) += avalanche_vlynq/
 obj-$(CONFIG_TCG_TPM)		+= tpm/
 
 obj-$(CONFIG_PS3_FLASH)		+= ps3flash.o

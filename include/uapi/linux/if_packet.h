@@ -52,6 +52,14 @@ struct sockaddr_ll {
 #define PACKET_FANOUT			18
 #define PACKET_TX_HAS_OFF		19
 
+/*
+*  Intel Extension:
+*  Data structure for passing auxilliary data for layer 2 packets
+*/ 
+#ifdef CONFIG_TI_AUXDATA_SOCKOPT
+#define TI_AUXDATA              24
+#endif
+
 #define PACKET_FANOUT_HASH		0
 #define PACKET_FANOUT_LB		1
 #define PACKET_FANOUT_CPU		2
@@ -85,6 +93,20 @@ struct tpacket_auxdata {
 	__u16		tp_vlan_tci;
 	__u16		tp_padding;
 };
+
+/*
+*  Intel Extension:
+*   Data structure for passing auxilliary data for layer 2 packets
+*/ 
+#ifdef CONFIG_TI_AUXDATA_SOCKOPT
+struct ti_auxdata
+{
+#ifdef CONFIG_TI_META_DATA
+	int	ti_meta_info;
+    int	ti_meta_info2;
+#endif
+};
+#endif
 
 /* Rx ring - header status */
 #define TP_STATUS_KERNEL	      0

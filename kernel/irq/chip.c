@@ -10,6 +10,12 @@
  * Detailed information is available in Documentation/DocBook/genericirq
  */
 
+/*
+ * Includes Intel Corporation's changes/modifications dated: 2012.
+ * Changed/modified portions - Copyright © 2012 , Intel Corporation.
+ */
+
+
 #include <linux/irq.h>
 #include <linux/msi.h>
 #include <linux/module.h>
@@ -233,6 +239,14 @@ void irq_disable(struct irq_desc *desc)
 		desc->irq_data.chip->irq_disable(&desc->irq_data);
 		irq_state_set_masked(desc);
 	}
+}
+
+void irq_ack(struct irq_desc *desc)
+{
+    if (desc->irq_data.chip->irq_ack)
+    {
+        desc->irq_data.chip->irq_ack(&desc->irq_data);
+    }
 }
 
 void irq_percpu_enable(struct irq_desc *desc, unsigned int cpu)

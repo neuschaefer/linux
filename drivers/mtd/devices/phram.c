@@ -14,6 +14,10 @@
  * Example:
  *	phram=swap,64Mi,128Mi phram=test,900Mi,1Mi
  */
+/*
+Includes Intel Corporation's changes/modifications dated: 2014.
+Changed/modified portions - Copyright © 2014, Intel Corporation.
+*/
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
@@ -25,6 +29,10 @@
 #include <linux/moduleparam.h>
 #include <linux/slab.h>
 #include <linux/mtd/mtd.h>
+#include <linux/mtd/partitions.h>
+#include <linux/ctype.h>
+
+#include "../mtdcore.h"
 
 struct phram_mtd_list {
 	struct mtd_info mtd;
@@ -32,6 +40,7 @@ struct phram_mtd_list {
 };
 
 static LIST_HEAD(phram_list);
+static struct mtd_info *curr_mtd = NULL;
 
 static int phram_erase(struct mtd_info *mtd, struct erase_info *instr)
 {
@@ -125,10 +134,14 @@ static int register_device(char *name, unsigned long start, unsigned long len)
 	new->mtd.writesize = 1;
 
 	ret = -EAGAIN;
-	if (mtd_device_register(&new->mtd, NULL, 0)) {
-		pr_err("Failed to register new device\n");
+	if (add_mtd_device(&new->mtd))
+	{
+		pr_err("Failed to register new device (add_mtd_device)\n");
 		goto out2;
 	}
+
+    /* Save for later use */
+    curr_mtd = &new->mtd;
 
 	list_add_tail(&new->list, &phram_list);
 	return 0;
@@ -163,8 +176,12 @@ static int parse_num32(uint32_t *num32, const char *token)
 {
 	char *endp;
 	unsigned long n;
+    int base = 0;
 
-	n = ustrtoul(token, &endp, 0);
+    if (token[0] == '0' && toupper(token[1]) == 'X')
+        base = 16;
+
+    n = ustrtoul(token, &endp, base);
 	if (*endp)
 		return -EINVAL;
 
@@ -224,6 +241,7 @@ static int __init phram_setup(const char *val)
 	uint32_t len;
 	int i, ret;
 
+
 	if (strnlen(val, sizeof(buf)) >= sizeof(buf))
 		parse_err("parameter too long\n");
 
@@ -260,6 +278,33 @@ static int __init phram_setup(const char *val)
 		pr_info("%s device: %#x at %#x\n", name, len, start);
 	else
 		kfree(name);
+
+	/* Intel code below */
+#ifdef CONFIG_MTD_CMDLINE_PARTS
+	/* Since this is from the command line, check if there are MTD partitions on  */
+	/* this device                                                                */
+	if (curr_mtd != NULL) {
+		int	 nr_parts = 0;
+		struct mtd_partition	*parts = NULL;
+		static const char *part_probes[] = { "cmdlinepart", NULL,};
+		int i;
+
+		nr_parts = parse_mtd_partitions(curr_mtd,part_probes, &parts, 0);
+
+		if (nr_parts > 0) {
+			for (i = 0; i < nr_parts; i++){
+				printk("partitions[%d] = ""{.name = %s, .offset = 0x%.8llx,"
+				".size = 0x%.8llx (%lluK) }\n",i, parts[i].name,
+				parts[i].offset,parts[i].size,
+				parts[i].size / 1024);
+			}
+			add_mtd_partitions(curr_mtd, parts, nr_parts);
+		}
+
+		curr_mtd = NULL;
+	}
+#endif
+
 
 	return ret;
 }

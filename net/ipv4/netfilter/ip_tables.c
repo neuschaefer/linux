@@ -9,6 +9,13 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
+
+/*
+    Includes Intel Corporation's changes/modifications dated: [Mar.2017].
+    Changed/modified portions - Copyright © 2017, Intel Corporation
+    1. PP Hook
+*/
+
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 #include <linux/cache.h>
 #include <linux/capability.h>
@@ -28,8 +35,13 @@
 
 #include <linux/netfilter/x_tables.h>
 #include <linux/netfilter_ipv4/ip_tables.h>
+#include <linux/ti_hil.h>
 #include <net/netfilter/nf_log.h>
 #include "../../netfilter/xt_repldata.h"
+
+#ifdef CONFIG_TI_PACKET_PROCESSOR
+#include <linux/ti_hil.h>
+#endif
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Netfilter Core Team <coreteam@netfilter.org>");
@@ -424,6 +436,20 @@ ipt_do_table(struct sk_buff *skb,
 	*stackptr = origptr;
  	xt_write_recseq_end(addend);
  	local_bh_enable();
+
+#ifdef CONFIG_TI_PACKET_PROCESSOR
+    if (acpar.hotdrop)
+    {
+        ti_hil_pp_event (TI_CT_NETFILTER_DISCARD_PKT, (void *)skb);
+    }
+    else
+    {
+        if (verdict == NF_DROP)
+        {
+            ti_hil_pp_event(TI_CT_NETFILTER_DISCARD_PKT, (void *)skb);
+        }
+    }
+#endif
 
 #ifdef DEBUG_ALLOW_ALL
 	return NF_ACCEPT;
@@ -1230,6 +1256,9 @@ __do_replace(struct net *net, const char *name, unsigned int valid_hooks,
 		ret = -EFAULT;
 	vfree(counters);
 	xt_table_unlock(t);
+#ifdef CONFIG_TI_PACKET_PROCESSOR
+    ti_hil_pp_event (TI_CT_NETFILTER_TABLE_UPDATE, (void *)t);
+#endif //CONFIG_TI_PACKET_PROCESSOR
 	return ret;
 
  put_module:

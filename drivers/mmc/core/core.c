@@ -10,6 +10,14 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
+
+ /******************************************************************
+ +
+ + Includes Intel Corporation's changes/modifications dated: 05/2012.
+ + Changed/modified portions - Copyright(c) 2012-2017, Intel Corporation.
+ +
+ +******************************************************************/
+ 
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
@@ -42,6 +50,9 @@
 #include "mmc_ops.h"
 #include "sd_ops.h"
 #include "sdio_ops.h"
+#if defined(CONFIG_ARCH_GEN3) && defined(CONFIG_HW_MUTEXES)
+#include <linux/mmc/sdhci.h>
+#endif
 
 /* If the device is not responding */
 #define MMC_CORE_TIMEOUT_MS	(10 * 60 * 1000) /* 10 minute timeout */
@@ -328,8 +339,10 @@ EXPORT_SYMBOL(mmc_start_bkops);
  */
 static void mmc_wait_data_done(struct mmc_request *mrq)
 {
-	mrq->host->context_info.is_done_rcv = true;
-	wake_up_interruptible(&mrq->host->context_info.wait);
+	struct mmc_context_info *context_info = &mrq->host->context_info;
+
+	context_info->is_done_rcv = true;
+	wake_up_interruptible(&context_info->wait);
 }
 
 static void mmc_wait_done(struct mmc_request *mrq)
@@ -910,6 +923,23 @@ int __mmc_claim_host(struct mmc_host *host, atomic_t *abort)
 		wake_up(&host->wq);
 	spin_unlock_irqrestore(&host->lock, flags);
 	remove_wait_queue(&host->wq, &wait);
+#if defined(CONFIG_ARCH_GEN3) && defined(CONFIG_HW_MUTEXES)
+    spin_lock_irqsave(&host->lock, flags);
+    /*
+    * mmc_claim_host is the start point of a set of MMC operations.
+    * Lock HW Mutex at the first time when a task owned the controller.
+    */
+    if ((host->claimer == current) &&
+        (host->claim_cnt == 1)     &&
+        ((host->caps2 & MMC_CAP2_RESCAN_ACTIVE) == 0)) {
+        spin_unlock_irqrestore(&host->lock, flags);
+        MMC_LOCK_HW_MUTEX(host);
+    }
+    else
+    {
+        spin_unlock_irqrestore(&host->lock, flags);
+    }
+#endif
 	if (host->ops->enable && !stop && host->claim_cnt == 1)
 		host->ops->enable(host);
 	return stop;
@@ -938,6 +968,20 @@ int mmc_try_claim_host(struct mmc_host *host)
 	spin_unlock_irqrestore(&host->lock, flags);
 	if (host->ops->enable && claimed_host && host->claim_cnt == 1)
 		host->ops->enable(host);
+#if defined(CONFIG_ARCH_GEN3) && defined(CONFIG_HW_MUTEXES)
+        spin_lock_irqsave(&host->lock, flags);
+    /* Lock HW Mutex at the first time when a task owned the controller. */
+    if ((host->claimer == current) &&
+        (host->claim_cnt == 1)     &&
+        ((host->caps2 & MMC_CAP2_RESCAN_ACTIVE) == 0)) {
+        spin_unlock_irqrestore(&host->lock, flags);
+        MMC_LOCK_HW_MUTEX(host);
+    }
+    else
+    {
+        spin_unlock_irqrestore(&host->lock, flags);
+    }
+#endif
 	return claimed_host;
 }
 EXPORT_SYMBOL(mmc_try_claim_host);
@@ -966,6 +1010,16 @@ void mmc_release_host(struct mmc_host *host)
 		host->claimed = 0;
 		host->claimer = NULL;
 		spin_unlock_irqrestore(&host->lock, flags);
+#if defined(CONFIG_ARCH_GEN3) && defined(CONFIG_HW_MUTEXES)
+        /*
+        * mmc_release_host is the end point of a set of MMC operations.
+        * Unlock the HW Mutex when a task doesn't own the controller
+        */
+        if ((host->caps2 & MMC_CAP2_RESCAN_ACTIVE) == 0)
+        {
+            MMC_UNLOCK_HW_MUTEX(host);
+        }
+#endif
 		wake_up(&host->wq);
 	}
 }
@@ -2484,12 +2538,21 @@ void mmc_rescan(struct work_struct *work)
 	}
 
 	mmc_claim_host(host);
+#if defined(CONFIG_ARCH_GEN3)
+    host->caps2 |= MMC_CAP2_RESCAN_ACTIVE; /* Prevent Release and re-take HW_Mutex during rescan */
+    mmc_power_cycle(host);
+#endif /* CONFIG_ARCH_GEN3 */
+
+    /* To change back */
 	for (i = 0; i < ARRAY_SIZE(freqs); i++) {
 		if (!mmc_rescan_try_freq(host, max(freqs[i], host->f_min)))
 			break;
 		if (freqs[i] <= host->f_min)
 			break;
 	}
+#if defined(CONFIG_ARCH_GEN3)
+    host->caps2 &= ~MMC_CAP2_RESCAN_ACTIVE;
+#endif
 	mmc_release_host(host);
 
  out:
@@ -2679,6 +2742,11 @@ int mmc_resume_host(struct mmc_host *host)
 }
 EXPORT_SYMBOL(mmc_resume_host);
 
+#ifdef CONFIG_ARCH_GEN3
+extern struct mutex mmc_ioctl_mutex;
+extern int mmc_in_suspend;
+#endif
+
 /* Do the card removal on suspend if card is assumed removeable
  * Do that in pm notifier while userspace isn't yet frozen, so we will be able
    to sync the card.
@@ -2691,9 +2759,17 @@ int mmc_pm_notify(struct notifier_block *notify_block,
 	unsigned long flags;
 	int err = 0;
 
+#ifdef CONFIG_ARCH_GEN3
+    mutex_lock(&mmc_ioctl_mutex);
+#endif
+
 	switch (mode) {
 	case PM_HIBERNATION_PREPARE:
 	case PM_SUSPEND_PREPARE:
+	case PM_RESTORE_PREPARE:
+#ifdef CONFIG_ARCH_GEN3
+        mmc_in_suspend = 1;
+#endif
 		spin_lock_irqsave(&host->lock, flags);
 		host->rescan_disable = 1;
 		spin_unlock_irqrestore(&host->lock, flags);
@@ -2721,12 +2797,18 @@ int mmc_pm_notify(struct notifier_block *notify_block,
 	case PM_POST_HIBERNATION:
 	case PM_POST_RESTORE:
 
+#ifdef CONFIG_ARCH_GEN3
+        mmc_in_suspend = 0;
+#endif
 		spin_lock_irqsave(&host->lock, flags);
 		host->rescan_disable = 0;
 		spin_unlock_irqrestore(&host->lock, flags);
 		mmc_detect_change(host, 0);
 
 	}
+#ifdef CONFIG_ARCH_GEN3
+    mutex_unlock(&mmc_ioctl_mutex);
+#endif
 
 	return 0;
 }

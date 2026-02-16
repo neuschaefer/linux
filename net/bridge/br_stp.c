@@ -10,8 +10,13 @@
  *	as published by the Free Software Foundation; either version
  *	2 of the License, or (at your option) any later version.
  */
+/* 
+ * Includes Intel Corporation's changes/modifications dated: [11/07/2011].
+ * Changed/modified portions - Copyright © [2011], Intel Corporation.
+ */
 #include <linux/kernel.h>
 #include <linux/rculist.h>
+#include <linux/ti_hil.h>
 
 #include "br_private.h"
 #include "br_private_stp.h"
@@ -407,6 +412,9 @@ static void br_make_forwarding(struct net_bridge_port *p)
 		p->state = BR_STATE_FORWARDING;
 		br_topology_change_detection(br);
 		del_timer(&p->forward_delay_timer);
+#ifdef CONFIG_TI_PACKET_PROCESSOR	
+		ti_hil_pp_event(TI_BRIDGE_PORT_FORWARD, (void *)p->dev);
+#endif //CONFIG_TI_PACKET_PROCESSOR
 	} else if (br->stp_enabled == BR_KERNEL_STP)
 		p->state = BR_STATE_LISTENING;
 	else

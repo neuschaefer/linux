@@ -1,8 +1,10 @@
+# Includes Intel Corporation's changes/modifications dated: 2014.
+# Changed/modified portions - Copyright © 2014, Intel Corporation.
 #
 # Block layer core configuration
 #
 menuconfig BLOCK
-       bool "Enable the block layer" if EXPERT
+       bool "Enable the block layer"
        default y
        help
 	 Provide block layer support for the kernel.

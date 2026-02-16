@@ -32,6 +32,10 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
+/*
+Includes Intel Corporation's changes/modifications dated: 2014.
+Changed/modified portions - Copyright © 2014, Intel Corporation.
+*/
 
 #include <linux/kernel.h>
 #include <linux/list.h>
@@ -106,8 +110,11 @@ static int service_tx_status_request(
 		struct musb_ep	*ep;
 		u16		tmp;
 		void __iomem	*regs;
-
+#ifdef CONFIG_MACH_PUMA5
+		epnum = (u8) le16_to_cpu(ctrlrequest->wIndex);
+#else
 		epnum = (u8) ctrlrequest->wIndex;
+#endif
 		if (!epnum) {
 			result[0] = 0;
 			break;
@@ -238,15 +245,24 @@ __acquires(musb->lock)
 		case USB_REQ_SET_ADDRESS:
 			/* change it after the status stage */
 			musb->set_address = true;
+#ifdef CONFIG_MACH_PUMA5
+			musb->address = (u8) (le16_to_cpu(ctrlrequest->wValue) & 0x7f);
+#else
 			musb->address = (u8) (ctrlrequest->wValue & 0x7f);
+#endif
 			handled = 1;
 			break;
 
 		case USB_REQ_CLEAR_FEATURE:
 			switch (recip) {
 			case USB_RECIP_DEVICE:
+#ifdef CONFIG_MACH_PUMA5
+				if (le16_to_cpu(ctrlrequest->wValue)
+						!= USB_DEVICE_REMOTE_WAKEUP)
+#else
 				if (ctrlrequest->wValue
 						!= USB_DEVICE_REMOTE_WAKEUP)
+#endif
 					break;
 				musb->may_wakeup = 0;
 				handled = 1;
@@ -254,8 +270,15 @@ __acquires(musb->lock)
 			case USB_RECIP_INTERFACE:
 				break;
 			case USB_RECIP_ENDPOINT:{
-				const u8		epnum =
-					ctrlrequest->wIndex & 0x0f;
+                /*Workaround for Free-BSD*/
+                printk(KERN_WARNING "Ignored clear halt for ep\n");
+                handled = 1;
+                break;
+#ifdef CONFIG_MACH_PUMA5
+				const u8 epnum = le16_to_cpu(ctrlrequest->wIndex) & 0x0f;
+#else
+				const u8 epnum = ctrlrequest->wIndex & 0x0f;
+#endif
 				struct musb_ep		*musb_ep;
 				struct musb_hw_ep	*ep;
 				struct musb_request	*request;
@@ -321,17 +344,17 @@ __acquires(musb->lock)
 			switch (recip) {
 			case USB_RECIP_DEVICE:
 				handled = 1;
-				switch (ctrlrequest->wValue) {
+				switch (le16_to_cpu(ctrlrequest->wValue)) {
 				case USB_DEVICE_REMOTE_WAKEUP:
 					musb->may_wakeup = 1;
 					break;
 				case USB_DEVICE_TEST_MODE:
 					if (musb->g.speed != USB_SPEED_HIGH)
 						goto stall;
-					if (ctrlrequest->wIndex & 0xff)
+					if (le16_to_cpu(ctrlrequest->wIndex) & 0xff)
 						goto stall;
 
-					switch (ctrlrequest->wIndex >> 8) {
+					switch (le16_to_cpu(ctrlrequest->wIndex) >> 8) {
 					case 1:
 						pr_debug("TEST_J\n");
 						/* TEST_J */
@@ -355,31 +378,6 @@ __acquires(musb->lock)
 						pr_debug("TEST_PACKET\n");
 						musb->test_mode_nr =
 							MUSB_TEST_PACKET;
-						break;
-
-					case 0xc0:
-						/* TEST_FORCE_HS */
-						pr_debug("TEST_FORCE_HS\n");
-						musb->test_mode_nr =
-							MUSB_TEST_FORCE_HS;
-						break;
-					case 0xc1:
-						/* TEST_FORCE_FS */
-						pr_debug("TEST_FORCE_FS\n");
-						musb->test_mode_nr =
-							MUSB_TEST_FORCE_FS;
-						break;
-					case 0xc2:
-						/* TEST_FIFO_ACCESS */
-						pr_debug("TEST_FIFO_ACCESS\n");
-						musb->test_mode_nr =
-							MUSB_TEST_FIFO_ACCESS;
-						break;
-					case 0xc3:
-						/* TEST_FORCE_HOST */
-						pr_debug("TEST_FORCE_HOST\n");
-						musb->test_mode_nr =
-							MUSB_TEST_FORCE_HOST;
 						break;
 					default:
 						goto stall;
@@ -405,9 +403,6 @@ __acquires(musb->lock)
 						goto stall;
 					musb->g.a_alt_hnp_support = 1;
 					break;
-				case USB_DEVICE_DEBUG_MODE:
-					handled = 0;
-					break;
 stall:
 				default:
 					handled = -EINVAL;
@@ -420,7 +415,7 @@ stall:
 
 			case USB_RECIP_ENDPOINT:{
 				const u8		epnum =
-					ctrlrequest->wIndex & 0x0f;
+					le16_to_cpu(ctrlrequest->wIndex) & 0x0f;
 				struct musb_ep		*musb_ep;
 				struct musb_hw_ep	*ep;
 				void __iomem		*regs;
@@ -428,12 +423,12 @@ stall:
 				u16			csr;
 
 				if (epnum == 0 || epnum >= MUSB_C_NUM_EPS ||
-				    ctrlrequest->wValue	!= USB_ENDPOINT_HALT)
+				    le16_to_cpu(ctrlrequest->wValue)	!= USB_ENDPOINT_HALT)
 					break;
 
 				ep = musb->endpoints + epnum;
 				regs = ep->regs;
-				is_in = ctrlrequest->wIndex & USB_DIR_IN;
+				is_in = le16_to_cpu(ctrlrequest->wIndex) & USB_DIR_IN;
 				if (is_in)
 					musb_ep = &ep->ep_in;
 				else
@@ -560,13 +555,15 @@ static void ep0_txstate(struct musb *musb)
 	fifo_src = (u8 *) request->buf + request->actual;
 	fifo_count = min((unsigned) MUSB_EP0_FIFOSIZE,
 		request->length - request->actual);
-	musb_write_fifo(&musb->endpoints[0], fifo_count, fifo_src);
-	request->actual += fifo_count;
+	if (fifo_count > 0)
+	{
+		musb_write_fifo(&musb->endpoints[0], fifo_count, fifo_src);
+		request->actual += fifo_count;
+	}
 
 	/* update the flags */
-	if (fifo_count < MUSB_MAX_END0_PACKET
-			|| (request->actual == request->length
-				&& !request->zero)) {
+	if (!request->zero && (fifo_count < MUSB_MAX_END0_PACKET
+			|| request->actual == request->length)) {
 		musb->ep0_state = MUSB_EP0_STAGE_STATUSOUT;
 		csr |= MUSB_CSR0_P_DATAEND;
 	} else

@@ -254,6 +254,7 @@ struct mmc_host {
 #define MMC_CAP_UHS_SDR50	(1 << 17)	/* Host supports UHS SDR50 mode */
 #define MMC_CAP_UHS_SDR104	(1 << 18)	/* Host supports UHS SDR104 mode */
 #define MMC_CAP_UHS_DDR50	(1 << 19)	/* Host supports UHS DDR50 mode */
+#define MMC_CAP_RUNTIME_RESUME	(1 << 20)	/* Resume at runtime_resume. */
 #define MMC_CAP_DRIVER_TYPE_A	(1 << 23)	/* Host supports Driver Type A */
 #define MMC_CAP_DRIVER_TYPE_C	(1 << 24)	/* Host supports Driver Type C */
 #define MMC_CAP_DRIVER_TYPE_D	(1 << 25)	/* Host supports Driver Type D */
@@ -281,6 +282,15 @@ struct mmc_host {
 				 MMC_CAP2_PACKED_WR)
 #define MMC_CAP2_NO_PRESCAN_POWERUP (1 << 14)	/* Don't power up before scan */
 #define MMC_CAP2_SANITIZE	(1 << 15)		/* Support Sanitize */
+#define MMC_CAP2_POLL_R1B_BUSY	(1 << 16)	/* host poll R1B busy*/
+#define MMC_CAP2_HS400_1_8V	(1 << 17)	/* Can support HS400 1.8V */
+#define MMC_CAP2_HS400_1_2V	(1 << 18)	/* Can support HS400 1.2V */
+#define MMC_CAP2_HS400		(MMC_CAP2_HS400_1_8V | \
+				 MMC_CAP2_HS400_1_2V)
+#define MMC_CAP2_CAN_DO_CMDQ	(1 << 19)
+#define MMC_CAP2_NO_SHUTDOWN_BUS (1 << 20)      /* Don't allow shutdown callback
+						   for shared mmc.*/
+#define MMC_CAP2_RESCAN_ACTIVE  (1 << 21)   /* For disabling H/W mutex during rescan */
 
 	mmc_pm_flag_t		pm_caps;	/* supported pm features */
 

@@ -473,6 +473,66 @@ config SPI_TI_SSP
 	  This selects an SPI master implementation using a TI sequencer
 	  serial port.
 
+config SPI_TI_CODEC
+	bool "SPI interface in TI Codec implementation"
+	depends on SPI_MASTER && ARCH_AVALANCHE
+	help
+	  SPI master controller in TI Codec implementation.
+
+if SPI_TI_CODEC
+config SPI_TI_CODEC_ZSI_MODE
+	bool "ZSI mode"
+    default n
+	help
+	  Enable ZSI mode in SPI CODEC Driver.
+
+
+config SPI_TI_CODEC_NO_ZSI_3_WIRE_MODE
+	bool "No ZSI- 3 wIRE mode"
+    default n
+	help
+	  In case ZSI mode is disabled enable 3 wire mode in SPI CODEC Driver.
+
+config VOICE_VCODEC
+	bool "VCODEC"
+    default n
+	help
+	  Enable VCODEC access.
+
+config VOICE_VCODEC_INIT_CONFIG_SSI
+        bool "VCODEC init time config SSI"
+    default n
+        help
+          Enable VCODEC access during IOSFSB boot time.
+endif # SPI_TI_CODEC
+
+choice
+    prompt "SPI Operating Mode"
+    depends on ARCH_AVALANCHE && SPI 
+    default SPI_POLLING_MODE
+    help
+      Specifies the operating mode. Available mode - Pure Interrupt,
+      Polling and tasklet
+
+config SPI_INTERRUPT_MODE
+    boolean "SPI Pure Interrupt Mode"
+    help
+      Works in pure interrupt mode. Interrupts will be generated for
+      every word.
+
+config SPI_TASKLET_MODE
+    boolean "SPI Tasklet Mode"
+    help
+      Works in tasklet mode. Only one interrupt will be generated for
+      each transfer and the remaining transfer happens in a tasklet
+
+config SPI_POLLING_MODE
+    boolean "SPI Polling Mode"
+    help
+      Works in polling mode. (Not recommended)
+
+endchoice
+
 config SPI_TOPCLIFF_PCH
 	tristate "Intel EG20T PCH/LAPIS Semicon IOH(ML7213/ML7223/ML7831) SPI"
 	depends on PCI

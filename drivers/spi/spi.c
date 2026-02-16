@@ -638,6 +638,13 @@ static int spi_init_queue(struct spi_master *master)
 		sched_setscheduler(master->kworker_task, SCHED_FIFO, &param);
 	}
 
+#if defined (CONFIG_MACH_PUMA5) || defined (CONFIG_MACH_PUMA6) || defined (CONFIG_MACH_PUMA7)
+    param.sched_priority = 95 ;
+    dev_info(&master->dev,
+        "will run message pump with RR %d priority\n", param.sched_priority);
+    sched_setscheduler(master->kworker_task, SCHED_RR, &param);
+#endif
+
 	return 0;
 }
 

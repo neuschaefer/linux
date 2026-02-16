@@ -1,5 +1,7 @@
+# Includes Intel Corporation's changes/modifications dated: 2014.
+# Changed/modified portions - Copyright © 2014, Intel Corporation.
 menu "Customise DVB Frontends"
-	visible if !MEDIA_SUBDRV_AUTOSELECT
+	depends on !MEDIA_SUBDRV_AUTOSELECT
 
 comment "Multistandard (satellite) frontends"
 	depends on DVB_CORE

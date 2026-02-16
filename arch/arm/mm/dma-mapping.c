@@ -9,6 +9,10 @@
  *
  *  DMA uncached mapping support.
  */
+/*
+Includes Intel Corporation's changes/modifications dated: 2014.
+Changed/modified portions - Copyright © 2014, Intel Corporation.
+*/
 #include <linux/module.h>
 #include <linux/mm.h>
 #include <linux/gfp.h>
@@ -1031,6 +1035,30 @@ static int __init dma_debug_do_init(void)
 	return 0;
 }
 fs_initcall(dma_debug_do_init);
+
+/*
+ * Make an area consistent for devices.
+ */
+void consistent_sync(void *vaddr, size_t size, int direction)
+{
+	unsigned long start = (unsigned long)vaddr;
+	unsigned long end   = start + size;
+
+	switch (direction) {
+	case DMA_FROM_DEVICE:		/* invalidate only */
+		dmac_inv_range((void*)start, (void*)end);
+		break;
+	case DMA_TO_DEVICE:		/* writeback only */
+		dmac_clean_range((void*)start, (void*)end);
+		break;
+	case DMA_BIDIRECTIONAL:		/* writeback and invalidate */
+		dmac_flush_range((void*)start, (void*)end);
+		break;
+	default:
+		BUG();
+	}
+}
+EXPORT_SYMBOL(consistent_sync);
 
 #ifdef CONFIG_ARM_DMA_USE_IOMMU
 

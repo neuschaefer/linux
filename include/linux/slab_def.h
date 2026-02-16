@@ -1,3 +1,7 @@
+/*
+Includes Intel Corporation's changes/modifications dated: 2014.
+Changed/modified portions - Copyright © 2014, Intel Corporation.
+*/
 #ifndef _LINUX_SLAB_DEF_H
 #define	_LINUX_SLAB_DEF_H
 
@@ -87,5 +91,7 @@ struct kmem_cache {
 	 * Do not add fields after array[]
 	 */
 };
+
+#define kmem_cache_t kmem_cache
 
 #endif	/* _LINUX_SLAB_DEF_H */

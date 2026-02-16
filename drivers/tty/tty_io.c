@@ -62,7 +62,11 @@
  * Move do_SAK() into process context.  Less stack use in devfs functions.
  * alloc_tty_struct() always uses kmalloc()
  *			 -- Andrew Morton <andrewm@uow.edu.eu> 17Mar01
- */
+ *
+ *
+ * Includes Intel Corporation's changes/modifications dated: [01/24/2013].
+ * Changed/modified portions - Copyright © [2011], Intel Corporation.
+*/
 
 #include <linux/types.h>
 #include <linux/major.h>
@@ -1203,6 +1207,10 @@ static ssize_t tty_write(struct file *file, const char __user *buf,
 
 	if (tty_paranoia_check(tty, file_inode(file), "tty_write"))
 		return -EIO;
+    /* in case TCOOFF ioctl was called*/
+	if (tty->flow_stopped == 1) {
+		return count;
+	}
 	if (!tty || !tty->ops->write ||
 		(test_bit(TTY_IO_ERROR, &tty->flags)))
 			return -EIO;

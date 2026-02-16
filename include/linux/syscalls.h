@@ -8,6 +8,11 @@
  * See the file COPYING for more details.
  */
 
+/*
+ * Includes Intel Corporation's changes/modifications dated: 2017.
+ * Changed/modified portions - Copyright (c) 2017, Intel Corporation.
+ */
+
 #ifndef _LINUX_SYSCALLS_H
 #define _LINUX_SYSCALLS_H
 
@@ -847,4 +852,5 @@ asmlinkage long sys_process_vm_writev(pid_t pid,
 asmlinkage long sys_kcmp(pid_t pid1, pid_t pid2, int type,
 			 unsigned long idx1, unsigned long idx2);
 asmlinkage long sys_finit_module(int fd, const char __user *uargs, int flags);
+asmlinkage long sys_arm_cache_flush(void);
 #endif

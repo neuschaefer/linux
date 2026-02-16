@@ -18,6 +18,11 @@
  * 	Mitsuru KANDA @USAGI and
  * 	YOSHIFUJI Hideaki @USAGI: Remove ipv6_parse_exthdrs().
  */
+ /*
+Includes Intel Corporation's changes/modifications dated: [2/3/2014]. 
+Changed/modified portions - Copyright © [2014], Intel Corporation. 
+*/
+
 
 #include <linux/errno.h>
 #include <linux/types.h>
@@ -46,6 +51,7 @@
 #include <net/xfrm.h>
 #include <net/inet_ecn.h>
 
+extern int intel_ns_handler (struct net_device *dev,struct in6_addr* dst_addr,unsigned char banned_flags);
 
 int ip6_rcv_finish(struct sk_buff *skb)
 {
@@ -178,10 +184,24 @@ int ipv6_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt
 		}
 	}
 
+#ifdef CONFIG_INTEL_NS_DEVICE_FILTER
+/* filter neighbour solicit packets not targeted to the device*/
+    if (hdr->nexthdr == IPPROTO_ICMPV6)
+    {
+        struct icmp6hdr *icmpv6_hdr;
+        icmpv6_hdr = icmp6_hdr(skb);
+        if (icmpv6_hdr->icmp6_type == NDISC_NEIGHBOUR_SOLICITATION)
+        {
+			if (intel_ns_handler (skb->dev,&(hdr->daddr),IFA_F_TENTATIVE) == 0)
+				goto drop; 	 
+        }
+    }
+#endif
 	rcu_read_unlock();
 
 	/* Must drop socket now because of tproxy. */
 	skb_orphan(skb);
+
 
 	return NF_HOOK(NFPROTO_IPV6, NF_INET_PRE_ROUTING, skb, dev, NULL,
 		       ip6_rcv_finish);

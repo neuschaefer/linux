@@ -13,6 +13,10 @@
  *   04-Dec-1997	RMK	Updated for new arch/arm/time.c
  *   13=Jun-2004	DS	Moved to arch/arm/common b/c shared w/CLPS7500
  */
+/*
+Includes Intel Corporation's changes/modifications dated: 2014.
+Changed/modified portions - Copyright © 2014, Intel Corporation.
+*/
 #include <linux/timex.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
@@ -75,7 +79,7 @@ ioc_timer_interrupt(int irq, void *dev_id)
 
 static struct irqaction ioc_timer_irq = {
 	.name		= "timer",
-	.flags		= IRQF_DISABLED,
+	.flags		= IRQF_DISABLED| IRQF_NODELAY,
 	.handler	= ioc_timer_interrupt
 };
 

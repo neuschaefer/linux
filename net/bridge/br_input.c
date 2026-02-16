@@ -10,6 +10,15 @@
  *	as published by the Free Software Foundation; either version
  *	2 of the License, or (at your option) any later version.
  */
+/*
+         Includes Intel Corporation's changes/modifications dated: [Dec.2013].
+         Changed/modified portions - Copyright © 2013, Intel Corporation
+         1. WARN on NULL pointer in br_handle_frame()
+ 
+         Includes Intel Corporation's changes/modifications dated: [May.2014].
+         Changed/modified portions - Copyright © 2014, Intel Corporation
+         2. Skip Link Local spacial proccess for L2VPN packets in br_handle_frame()
+*/
 
 #include <linux/slab.h>
 #include <linux/kernel.h>
@@ -19,6 +28,15 @@
 #include <linux/export.h>
 #include <linux/rculist.h>
 #include "br_private.h"
+
+#ifdef CONFIG_TI_L2_SELECTIVE_FORWARDER
+extern int ti_selective_packet_handler (struct sk_buff *skb);
+#endif /* CONFIG_TI_L2_SELECTIVE_FORWARDER */
+
+#ifdef CONFIG_INTEL_L2VPN_L2CP_FORWARD
+extern int intel_l2vpn_packet_handler (struct sk_buff *skb, int *l2vpnRelate);
+#endif /* CONFIG_INTEL_L2VPN_L2CP_FORWARD */
+
 
 /* Hook for brouter */
 br_should_route_hook_t __rcu *br_should_route_hook __read_mostly;
@@ -74,8 +92,32 @@ int br_handle_frame_finish(struct sk_buff *skb)
 	if (!br_allowed_ingress(p->br, nbp_get_vlan_info(p), skb, &vid))
 		goto drop;
 
-	/* insert into forwarding database after filtering to avoid spoofing */
 	br = p->br;
+
+
+#ifdef CONFIG_BRIDGE_NETFILTER
+#ifdef CONFIG_BRIDGE_EBT_FORWARD
+	/* Check for predetermined forwarding ebtables rule */
+	if (skb->bridge_forward_port) {
+		BR_INPUT_SKB_CB(skb)->brdev = br->dev;
+		if(br->dev->flags & IFF_PROMISC) {
+			/* Forward the frame and send a copy to the bridge interface */
+			skb2=skb;
+			br_forward(skb->bridge_forward_port, skb, skb2);
+			if(skb2)
+				return br_pass_frame_up(skb2);
+		}
+		else {
+			/* Forward packet only to destination port */
+			skb2=NULL;
+			br_forward(skb->bridge_forward_port, skb, skb2);
+			goto out;
+		}
+	}
+#endif
+#endif
+
+	/* insert into forwarding database after filtering to avoid spoofing */
 	if (p->flags & BR_LEARNING)
 		br_fdb_update(br, p, eth_hdr(skb)->h_source, vid);
 
@@ -100,6 +142,12 @@ int br_handle_frame_finish(struct sk_buff *skb)
 		skb2 = skb;
 		unicast = false;
 	} else if (is_multicast_ether_addr(dest)) {
+#ifdef CONFIG_TI_L2_SELECTIVE_FORWARDER
+        /* If return value is zero indicates fall back to default behavior */
+        if (ti_selective_packet_handler(skb) != 0) {			
+            goto out;
+		}
+#endif /* CONFIG_TI_L2_SELECTIVE_FORWARDER */
 		mdst = br_mdb_get(br, skb, vid);
 		if ((mdst || BR_INPUT_SKB_CB_MROUTERS_ONLY(skb)) &&
 		    br_multicast_querier_exists(br, eth_hdr(skb))) {
@@ -126,8 +174,14 @@ int br_handle_frame_finish(struct sk_buff *skb)
 		if (dst) {
 			dst->used = jiffies;
 			br_forward(dst->dst, skb, skb2);
-		} else
+		} else {
+#ifdef CONFIG_TI_L2_SELECTIVE_FORWARDER
+			/* If return value is zero indicates fall back to default behavior */
+			if (ti_selective_packet_handler(skb) != 0)
+				goto out;
+#endif /* CONFIG_TI_L2_SELECTIVE_FORWARDER */
 			br_flood_forward(br, skb, skb2, unicast);
+		}
 	}
 
 	if (skb2)
@@ -163,6 +217,11 @@ rx_handler_result_t br_handle_frame(struct sk_buff **pskb)
 	const unsigned char *dest = eth_hdr(skb)->h_dest;
 	br_should_route_hook_t *rhook;
 
+#ifdef CONFIG_INTEL_L2VPN_L2CP_FORWARD
+        int l2vpnRelated = 0;
+#endif /* CONFIG_INTEL_L2VPN_L2CP_FORWARD */
+
+
 	if (unlikely(skb->pkt_type == PACKET_LOOPBACK))
 		return RX_HANDLER_PASS;
 
@@ -173,9 +232,35 @@ rx_handler_result_t br_handle_frame(struct sk_buff **pskb)
 	if (!skb)
 		return RX_HANDLER_CONSUMED;
 
+	/*this cond was added for skb->ti_selective_forward will receive later on the correct vlan device*/
+#ifdef CONFIG_TI_DOCSIS_INPUT_DEV
+	if(!skb->ti_docsis_input_dev) {
+		skb->ti_docsis_input_dev = skb->dev;
+	}
+#endif
+
 	p = br_port_get_rcu(skb->dev);
 
+	if (WARN(p == NULL, "%s - %d: br_port_get_rcu(skb->dev) returned NULL, dropping packet (dev == %s)", 
+	         __func__, __LINE__, skb->dev ? skb->dev->name : "NULL"))
+	{
+		/* Cannot continue since the following lines require p != NULL */
+		/* What should we do with this packet???? */
+		goto drop;
+	}
+
 	if (unlikely(is_link_local_ether_addr(dest))) {
+#ifdef CONFIG_INTEL_L2VPN_L2CP_FORWARD
+        /* Check if the packet is L2VPN related. If so, skip link local special proccess. */
+        /* Upstream L2VPN packets will be handle Link Local packets in Docsis Bridge */
+        if (!intel_l2vpn_packet_handler(skb, &l2vpnRelated)) 
+        {
+            if (l2vpnRelated)
+            {
+                goto forward;
+            }
+        }
+#endif /* CONFIG_INTEL_L2VPN_L2CP_FORWARD */
 		/*
 		 * See IEEE 802.1D Table 7-10 Reserved addresses
 		 *
@@ -231,7 +316,12 @@ forward:
 	case BR_STATE_LEARNING:
 		if (ether_addr_equal(p->br->dev->dev_addr, dest))
 			skb->pkt_type = PACKET_HOST;
-
+#ifdef CONFIG_BRIDGE_NETFILTER
+#ifdef CONFIG_BRIDGE_EBT_FORWARD
+		/* Initialize bridge bridge_forward_port so prerouting rule can populate it */
+		skb->bridge_forward_port = NULL;	
+#endif
+#endif
 		NF_HOOK(NFPROTO_BRIDGE, NF_BR_PRE_ROUTING, skb, skb->dev, NULL,
 			br_handle_frame_finish);
 		break;

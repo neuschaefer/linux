@@ -20,6 +20,10 @@
     Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
     MA 02110-1301 USA.							     */
 /* ------------------------------------------------------------------------- */
+/*
+Includes Intel Corporation's changes/modifications dated: 2014.
+Changed/modified portions - Copyright © 2014, Intel Corporation.
+*/
 
 /* With some changes from Kyösti Mälkki <kmalkki@cc.hut.fi> and
    Frodo Looijaard <frodol@dds.nl> */
@@ -475,6 +479,7 @@ void i2c_unlock_adapter(struct i2c_adapter *);
 #define I2C_CLASS_HWMON		(1<<0)	/* lm_sensors, ... */
 #define I2C_CLASS_DDC		(1<<3)	/* DDC bus on graphics adapters */
 #define I2C_CLASS_SPD		(1<<7)	/* Memory modules */
+#define I2C_CLASS_ALL		(UINT_MAX) /* all of the above */
 
 /* Internal numbers to terminate lists */
 #define I2C_CLIENT_END		0xfffeU

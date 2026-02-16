@@ -11,6 +11,11 @@
  *	2 of the License, or (at your option) any later version.
  */
 
+/* 
+ * Includes Intel Corporation's changes/modifications dated: [11/07/2011].
+ * Changed/modified portions - Copyright © [2011], Intel Corporation.
+ */
+
 #include <linux/err.h>
 #include <linux/slab.h>
 #include <linux/kernel.h>
@@ -19,6 +24,7 @@
 #include <linux/skbuff.h>
 #include <linux/if_vlan.h>
 #include <linux/netfilter_bridge.h>
+#include <linux/ti_hil.h>
 #include "br_private.h"
 
 static int deliver_clone(const struct net_bridge_port *prev,
@@ -216,6 +222,9 @@ void br_flood_deliver(struct net_bridge *br, struct sk_buff *skb, bool unicast)
 void br_flood_forward(struct net_bridge *br, struct sk_buff *skb,
 		      struct sk_buff *skb2, bool unicast)
 {
+#ifdef CONFIG_TI_PACKET_PROCESSOR
+    ti_hil_pp_event (TI_BRIDGE_PACKET_FLOODED, (void*)skb);
+#endif// CONFIG_TI_PACKET_PROCESSOR
 	br_flood(br, skb, skb2, __br_forward, unicast);
 }
 

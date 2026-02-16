@@ -23,6 +23,11 @@
  *	Ville Nuorvala
  *		Fixed routing subtrees.
  */
+/*
+         Includes Intel Corporation's changes/modifications dated: [Dec.2013].
+         Changed/modified portions - Copyright © 2011, Intel Corporation
+         1. PP Hook
+*/
 
 #define pr_fmt(fmt) "IPv6: " fmt
 
@@ -65,6 +70,10 @@
 #include <linux/sysctl.h>
 #endif
 
+#ifdef CONFIG_TI_PACKET_PROCESSOR
+#include <linux/ti_hil.h>
+#endif
+
 enum rt6_nud_state {
 	RT6_NUD_FAIL_HARD = -2,
 	RT6_NUD_FAIL_SOFT = -1,
@@ -98,9 +107,16 @@ static struct rt6_info *rt6_add_route_info(struct net *net,
 					   const struct in6_addr *prefix, int prefixlen,
 					   const struct in6_addr *gwaddr, int ifindex,
 					   unsigned int pref);
+static struct rt6_info *rt6_add_route_info_by_table(struct net *net,
+					   const struct in6_addr *prefix, int prefixlen,
+					   const struct in6_addr *gwaddr, int ifindex,
+					   unsigned int pref, u32 table_id);
 static struct rt6_info *rt6_get_route_info(struct net *net,
 					   const struct in6_addr *prefix, int prefixlen,
 					   const struct in6_addr *gwaddr, int ifindex);
+static struct rt6_info *rt6_get_route_info_by_table(struct net *net,
+					   const struct in6_addr *prefix, int prefixlen,
+					   const struct in6_addr *gwaddr, int ifindex, u32 table_id);
 #endif
 
 static u32 *ipv6_cow_metrics(struct dst_entry *dst, unsigned long old)
@@ -688,6 +704,11 @@ static struct rt6_info *rt6_select(struct fib6_node *fn, int oif, int strict)
 int rt6_route_rcv(struct net_device *dev, u8 *opt, int len,
 		  const struct in6_addr *gwaddr)
 {
+    return rt6_route_rcv_by_table(dev, opt, len, gwaddr, RT6_TABLE_DFLT);
+}
+int rt6_route_rcv_by_table(struct net_device *dev, u8 *opt, int len,
+		  const struct in6_addr *gwaddr, u32 table_id)
+{
 	struct net *net = dev_net(dev);
 	struct route_info *rinfo = (struct route_info *) opt;
 	struct in6_addr prefix_buf, *prefix;
@@ -731,10 +752,10 @@ int rt6_route_rcv(struct net_device *dev, u8 *opt, int len,
 	}
 
 	if (rinfo->prefix_len == 0)
-		rt = rt6_get_dflt_router(gwaddr, dev);
+		rt = rt6_get_dflt_router_by_table(gwaddr, dev, table_id);
 	else
-		rt = rt6_get_route_info(net, prefix, rinfo->prefix_len,
-					gwaddr, dev->ifindex);
+		rt = rt6_get_route_info_by_table(net, prefix, rinfo->prefix_len,
+					gwaddr, dev->ifindex, (table_id == RT6_TABLE_DFLT ? RT6_TABLE_INFO : table_id));
 
 	if (rt && !lifetime) {
 		ip6_del_rt(rt);
@@ -742,8 +763,8 @@ int rt6_route_rcv(struct net_device *dev, u8 *opt, int len,
 	}
 
 	if (!rt && lifetime)
-		rt = rt6_add_route_info(net, prefix, rinfo->prefix_len, gwaddr, dev->ifindex,
-					pref);
+		rt = rt6_add_route_info_by_table(net, prefix, rinfo->prefix_len, gwaddr, dev->ifindex,
+					pref, table_id);
 	else if (rt)
 		rt->rt6i_flags = RTF_ROUTEINFO |
 				 (rt->rt6i_flags & ~RTF_PREF_MASK) | RTF_PREF(pref);
@@ -1927,11 +1948,17 @@ static struct rt6_info *rt6_get_route_info(struct net *net,
 					   const struct in6_addr *prefix, int prefixlen,
 					   const struct in6_addr *gwaddr, int ifindex)
 {
+    return rt6_get_route_info_by_table(net, prefix, prefixlen, gwaddr, ifindex, RT6_TABLE_INFO);
+}
+static struct rt6_info *rt6_get_route_info_by_table(struct net *net,
+					   const struct in6_addr *prefix, int prefixlen,
+					   const struct in6_addr *gwaddr, int ifindex, u32 table_id)
+{
 	struct fib6_node *fn;
 	struct rt6_info *rt = NULL;
 	struct fib6_table *table;
 
-	table = fib6_get_table(net, RT6_TABLE_INFO);
+	table = fib6_get_table(net, table_id);
 	if (!table)
 		return NULL;
 
@@ -1960,8 +1987,15 @@ static struct rt6_info *rt6_add_route_info(struct net *net,
 					   const struct in6_addr *gwaddr, int ifindex,
 					   unsigned int pref)
 {
+    return rt6_add_route_info_by_table(net, prefix, prefixlen, gwaddr, ifindex, pref, RT6_TABLE_INFO);
+}
+static struct rt6_info *rt6_add_route_info_by_table(struct net *net,
+					   const struct in6_addr *prefix, int prefixlen,
+					   const struct in6_addr *gwaddr, int ifindex,
+					   unsigned int pref, u32 table_id)
+{
 	struct fib6_config cfg = {
-		.fc_table	= RT6_TABLE_INFO,
+		.fc_table	= table_id,
 		.fc_metric	= IP6_RT_PRIO_USER,
 		.fc_ifindex	= ifindex,
 		.fc_dst_len	= prefixlen,
@@ -1981,16 +2015,20 @@ static struct rt6_info *rt6_add_route_info(struct net *net,
 
 	ip6_route_add(&cfg);
 
-	return rt6_get_route_info(net, prefix, prefixlen, gwaddr, ifindex);
+	return rt6_get_route_info_by_table(net, prefix, prefixlen, gwaddr, ifindex, table_id);
 }
 #endif
 
 struct rt6_info *rt6_get_dflt_router(const struct in6_addr *addr, struct net_device *dev)
 {
+    return rt6_get_dflt_router_by_table(addr, dev, RT6_TABLE_DFLT);
+}
+struct rt6_info *rt6_get_dflt_router_by_table(const struct in6_addr *addr, struct net_device *dev, u32 table_id)
+{
 	struct rt6_info *rt;
 	struct fib6_table *table;
 
-	table = fib6_get_table(dev_net(dev), RT6_TABLE_DFLT);
+	table = fib6_get_table(dev_net(dev), table_id);
 	if (!table)
 		return NULL;
 
@@ -2011,8 +2049,14 @@ struct rt6_info *rt6_add_dflt_router(const struct in6_addr *gwaddr,
 				     struct net_device *dev,
 				     unsigned int pref)
 {
+    return rt6_add_dflt_router_by_table(gwaddr, dev, pref, RT6_TABLE_DFLT);
+}
+struct rt6_info *rt6_add_dflt_router_by_table(const struct in6_addr *gwaddr,
+				     struct net_device *dev,
+				     unsigned int pref, u32 table_id)
+{
 	struct fib6_config cfg = {
-		.fc_table	= RT6_TABLE_DFLT,
+		.fc_table	= table_id,
 		.fc_metric	= IP6_RT_PRIO_USER,
 		.fc_ifindex	= dev->ifindex,
 		.fc_flags	= RTF_GATEWAY | RTF_ADDRCONF | RTF_DEFAULT |
@@ -2026,7 +2070,7 @@ struct rt6_info *rt6_add_dflt_router(const struct in6_addr *gwaddr,
 
 	ip6_route_add(&cfg);
 
-	return rt6_get_dflt_router(gwaddr, dev);
+	return rt6_get_dflt_router_by_table(gwaddr, dev, table_id);
 }
 
 void rt6_purge_dflt_routers(struct net *net)
@@ -2140,7 +2184,14 @@ static int ip6_pkt_drop(struct sk_buff *skb, u8 code, int ipstats_mib_noroutes)
 
 static int ip6_pkt_discard(struct sk_buff *skb)
 {
-	return ip6_pkt_drop(skb, ICMPV6_NOROUTE, IPSTATS_MIB_INNOROUTES);
+    int ret;
+#ifdef CONFIG_TI_PACKET_PROCESSOR
+    /* Create a NULL PP device, to drop all dropped packets before they reach the host */
+    ti_hil_pp_event (TI_IP_DISCARD_PKT_IPV6, (void *)skb);
+#endif //CONFIG_TI_PACKET_PROCESSOR	
+    /* "ip6_pkt_drop" include kfree_skb(skb), thats why we must do the PP event before that function - PP evevt use the skb pointer */
+	ret = ip6_pkt_drop(skb, ICMPV6_NOROUTE, IPSTATS_MIB_INNOROUTES);
+    return ret;
 }
 
 static int ip6_pkt_discard_out(struct sk_buff *skb)

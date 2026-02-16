@@ -2,6 +2,10 @@
  * Rusty Russell (C)2000 -- This code is GPL.
  * Patrick McHardy (c) 2006-2012
  */
+/*
+Includes Intel Corporation's changes/modifications dated: 2014.
+Changed/modified portions - Copyright © 2014, Intel Corporation.
+*/
 
 #include <linux/kernel.h>
 #include <linux/slab.h>
@@ -15,6 +19,7 @@
 #include <net/protocol.h>
 #include <net/netfilter/nf_queue.h>
 #include <net/dst.h>
+#include <linux/ti_hil.h>
 
 #include "nf_internals.h"
 
@@ -220,6 +225,39 @@ void nf_reinject(struct nf_queue_entry *entry, unsigned int verdict)
 	case NF_STOLEN:
 		break;
 	default:
+#ifdef CONFIG_TI_PACKET_PROCESSOR
+		{
+			int skip_pp_discard=0;
+			struct ethhdr* ptr_ethhdr = NULL;
+
+#define MAC_ISMULTICAST( pa, hw )    ( ((pa)->hw[0] & 0x01)  ) 
+#define MAC_ISBROADCAST( pa, hw ) ( ~0xFF ==( (~(pa)->hw[0]) | \
+                                              (~(pa)->hw[1]) | \
+                                              (~(pa)->hw[2]) | \
+                                              (~(pa)->hw[3]) | \
+                                              (~(pa)->hw[4]) | \
+                                              (~(pa)->hw[5]) ))
+
+			ptr_ethhdr = eth_hdr(skb);
+
+			if (  ptr_ethhdr)
+			{
+				/* Check if the package is the multicast type, but not a broadcast */
+				if (  ( ! (MAC_ISBROADCAST (ptr_ethhdr, h_dest)) )  &&
+					  (   MAC_ISMULTICAST (ptr_ethhdr, h_dest))  )
+				{
+					skip_pp_discard=1;
+					printk(KERN_DEBUG "NF_DROP :Multicast pkg, Do not create PP drop session\n" );
+				}
+			}
+
+			if ( ! skip_pp_discard )
+			{
+				ti_hil_pp_event (TI_CT_NETFILTER_DISCARD_PKT, (void *)skb);
+			}
+		}       
+
+#endif //CONFIG_TI_PACKET_PROCESSOR	
 		kfree_skb(skb);
 	}
 	rcu_read_unlock();

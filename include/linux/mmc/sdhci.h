@@ -8,6 +8,14 @@
  * the Free Software Foundation; either version 2 of the License, or (at
  * your option) any later version.
  */
+
+/***************************************************************************
+ 
+ Includes Intel Corporation's changes/modifications dated: 12/2011, 11/2013.
+ Changed/modified portions - Copyright(c) 2011-2017, Intel Corporation. 
+
+****************************************************************************/
+
 #ifndef LINUX_MMC_SDHCI_H
 #define LINUX_MMC_SDHCI_H
 
@@ -16,6 +24,10 @@
 #include <linux/types.h>
 #include <linux/io.h>
 #include <linux/mmc/host.h>
+#ifdef CONFIG_ARCH_GEN3
+#include <linux/sched.h>
+#include <asm-arm/arch-avalanche/generic/hw_mutex_ctrl.h>
+#endif
 
 struct sdhci_host {
 	/* Data set by hardware interface driver */
@@ -98,6 +110,16 @@ struct sdhci_host {
 #define SDHCI_QUIRK2_CARD_ON_NEEDS_BUS_ON		(1<<4)
 /* Controller has a non-standard host control register */
 #define SDHCI_QUIRK2_BROKEN_HOST_CONTROL		(1<<5)
+/* Controller does not support HS200 */
+#define SDHCI_QUIRK2_BROKEN_HS200			(1<<6)
+#define SDHCI_QUIRK2_TUNING_POLL			(1<<7)
+#define SDHCI_QUIRK2_FAKE_VDD				(1<<8)
+/* Two or more processors access the controller, HW mutex is needed to avoid
+	control conflicts. */
+#define SDHCI_QUIRK2_HW_MUTEX               (1<<9)
+/* Controller does not support DDR50 */
+#define SDHCI_QUIRK2_BROKEN_DDR50			(1<<10)
+
 
 	int irq;		/* Device IRQ */
 	void __iomem *ioaddr;	/* Mapped address */
@@ -131,6 +153,10 @@ struct sdhci_host {
 #define SDHCI_SDIO_IRQ_ENABLED	(1<<9)	/* SDIO irq enabled */
 #define SDHCI_SDR104_NEEDS_TUNING (1<<10)	/* SDR104/HS200 needs tuning */
 #define SDHCI_USING_RETUNING_TIMER (1<<11)	/* Host is using a retuning timer for the card */
+#ifdef CONFIG_ARCH_GEN3
+/* Two or more processors access the controller, HW Mutex is necessary to avoid confliction*/
+#define SDHCI_DISABLE_REGISTER_WRITE    (1<<16)	/* Disable write on Host Driver - for non-destructive initialization  */
+#endif
 
 	unsigned int version;	/* SDHCI spec. version */
 
@@ -181,6 +207,65 @@ struct sdhci_host {
 #define SDHCI_TUNING_MODE_1	0
 	struct timer_list	tuning_timer;	/* Timer for tuning */
 
+#ifdef CONFIG_ARCH_GEN3
+    struct task_struct *irq_thread;
+    unsigned int debug_trace;      /* For mmc debug: Store the mmc trace flow */
+    #define SDHCI_DEBUG_TRACE_START_NEW_REQUEST          (1<<0)
+    #define SDHCI_DEBUG_TRACE_START_TIMER                (1<<1)
+    #define SDHCI_DEBUG_TRACE_SEND_CMD_SET_BLOCK_COUNT   (1<<2)
+    #define SDHCI_DEBUG_TRACE_SEND_CMD                   (1<<3)
+    #define SDHCI_DEBUG_TRACE_RCEV_IRQ                   (1<<4)
+    #define SDHCI_DEBUG_TRACE_RCEV_IRQ_CMD               (1<<5)
+    #define SDHCI_DEBUG_TRACE_RCEV_IRQ_CMD_ERROR         (1<<6)
+    #define SDHCI_DEBUG_TRACE_FINISH_CMD23_SEND_CMD      (1<<7)
+    #define SDHCI_DEBUG_TRACE_FINISH_CMD_EARLY_DATA      (1<<8)
+    #define SDHCI_DEBUG_TRACE_FINISH_CMD_SCHED_TASKLET   (1<<9)
+    #define SDHCI_DEBUG_TRACE_FINISH_CMD_WITH_DATA       (1<<10)
+    #define SDHCI_DEBUG_TRACE_RCEV_IRQ_DATA              (1<<11)
+    #define SDHCI_DEBUG_TRACE_FINISH_DATA                (1<<12)
+    #define SDHCI_DEBUG_TRACE_FINISH_DATA_EARLY          (1<<13)
+    #define SDHCI_DEBUG_TRACE_FINISH_DATA_SEND_CMD12     (1<<14)
+    #define SDHCI_DEBUG_TRACE_FINISH_DATA_SCHED_TASKLET  (1<<15)
+    #define SDHCI_DEBUG_TRACE_FINISH_TASKLET_START       (1<<16)
+    #define SDHCI_DEBUG_TRACE_STOP_TIMER                 (1<<17)
+    #define SDHCI_DEBUG_TRACE_REQUEST_DONE               (1<<18)
+#endif
+
+
+
 	unsigned long private[0] ____cacheline_aligned;
 };
+
+#ifdef CONFIG_ARCH_GEN3
+
+#define SDHCI_HOST_SUPPORTS_HW_MUTEX(sdhci) \
+		((sdhci)->quirks2 & SDHCI_QUIRK2_HW_MUTEX)
+#define MMC_HOST_SUPPORTS_HW_MUTEX(mmc) SDHCI_HOST_SUPPORTS_HW_MUTEX( ((struct sdhci_host*)mmc->private))
+
+#define EMMC_HW_MUTEX_IS_LOCKED() hw_mutex_is_locked(HW_MUTEX_EMMC)
+
+#define MMC_LOCK_HW_MUTEX(mmc)                                               \
+do {                                                                         \
+    struct sdhci_host *sdhci = (struct sdhci_host*)mmc->private;             \
+    if (SDHCI_HOST_SUPPORTS_HW_MUTEX(sdhci))                                 \
+    {                                                                        \
+        hw_mutex_lock(HW_MUTEX_EMMC);                                        \
+        enable_irq(sdhci->irq);                                              \
+  }                                                                          \
+} while(0)
+
+#define MMC_UNLOCK_HW_MUTEX(mmc)                                             \
+do{                                                                          \
+  struct sdhci_host *sdhci = (struct sdhci_host*)mmc->private;               \
+  if (SDHCI_HOST_SUPPORTS_HW_MUTEX(sdhci))                                   \
+  {                                                                          \
+      disable_irq(sdhci->irq);                                               \
+      hw_mutex_unlock(HW_MUTEX_EMMC);                                          \
+  }                                                                          \
+} while(0)
+
+
+
+#endif /* CONFIG_ARCH_GEN3 */
+
 #endif /* LINUX_MMC_SDHCI_H */

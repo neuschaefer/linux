@@ -1,3 +1,7 @@
+/*
+Includes Intel Corporation's changes/modifications dated: [23/3/2015]. 
+Changed/modified portions - Copyright © [2015], Intel Corporation.   All Rights Reserved
+*/
 #include <linux/err.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
@@ -12,6 +16,7 @@ int sysctl_tcp_fastopen __read_mostly;
 
 struct tcp_fastopen_context __rcu *tcp_fastopen_ctx;
 
+#ifdef CONFIG_CRYPTO
 static DEFINE_SPINLOCK(tcp_fastopen_ctx_lock);
 
 static void tcp_fastopen_ctx_free(struct rcu_head *head)
@@ -21,9 +26,11 @@ static void tcp_fastopen_ctx_free(struct rcu_head *head)
 	crypto_free_cipher(ctx->tfm);
 	kfree(ctx);
 }
+#endif
 
 int tcp_fastopen_reset_cipher(void *key, unsigned int len)
 {
+#ifdef CONFIG_CRYPTO
 	int err;
 	struct tcp_fastopen_context *ctx, *octx;
 
@@ -56,6 +63,8 @@ error:		kfree(ctx);
 	if (octx)
 		call_rcu(&octx->rcu, tcp_fastopen_ctx_free);
 	return err;
+#endif
+	return -ENOMEM; /* just randomly chosen error code */
 }
 
 /* Computes the fastopen cookie for the IP path.
@@ -67,6 +76,7 @@ error:		kfree(ctx);
 void tcp_fastopen_cookie_gen(__be32 src, __be32 dst,
 			     struct tcp_fastopen_cookie *foc)
 {
+#ifdef CONFIG_CRYPTO
 	__be32 path[4] = { src, dst, 0, 0 };
 	struct tcp_fastopen_context *ctx;
 
@@ -77,8 +87,10 @@ void tcp_fastopen_cookie_gen(__be32 src, __be32 dst,
 		foc->len = TCP_FASTOPEN_COOKIE_SIZE;
 	}
 	rcu_read_unlock();
+#endif
 }
 
+#ifdef CONFIG_CRYPTO
 static int __init tcp_fastopen_init(void)
 {
 	__u8 key[TCP_FASTOPEN_KEY_LENGTH];
@@ -89,3 +101,5 @@ static int __init tcp_fastopen_init(void)
 }
 
 late_initcall(tcp_fastopen_init);
+#endif
+

@@ -1,9 +1,21 @@
+# Includes Intel Corporation's changes/modifications dated: 2014.
+# Changed/modified portions - Copyright © 2014, Intel Corporation.
 #
 # I2C algorithm drivers configuration
 #
 
 menu "I2C Algorithms"
-	visible if !I2C_HELPER_AUTO
+	depends on !I2C_HELPER_AUTO
+
+config I2C_ALGOAVALANCHE
+	tristate "I2C TI-Avalanche interfaces"
+	depends on ARCH_AVALANCHE && I2C 
+	default y
+	help
+	  Supports the TI I2C Algorithm.
+
+	  This support is also available as a module.  If so, the module 
+	  will be called avalanche-i2c-algo.
 
 config I2C_ALGOBIT
 	tristate "I2C bit-banging interfaces"

@@ -22,8 +22,16 @@
  *
  *		Moved to /usr/include/linux for NET3
  */
+/*
+Includes Intel Corporation's changes/modifications dated: 2014.
+Changed/modified portions - Copyright © 2014, Intel Corporation.
+*/
 #ifndef _LINUX_NETDEVICE_H
 #define _LINUX_NETDEVICE_H
+
+#ifndef CONFIG_ARM_AVALANCHE_SOC
+#include <linux/avalanche/puma7/puma7_defs.h>
+#endif
 
 #include <linux/pm_qos.h>
 #include <linux/timer.h>
@@ -36,6 +44,14 @@
 #include <linux/percpu.h>
 #include <linux/rculist.h>
 #include <linux/dmaengine.h>
+#ifdef CONFIG_TI_PACKET_PROCESSOR
+#ifndef CONFIG_ARM_AVALANCHE_SOC
+#include <linux/avalanche/generic/avalanche_pp_api.h>
+#else
+#include <linux/ti_ppm.h>
+#include <asm-arm/arch-avalanche/generic/avalanche_pp_api.h>
+#endif
+#endif /* CONFIG_TI_PACKET_PROCESSOR */
 #include <linux/workqueue.h>
 #include <linux/dynamic_queue_limits.h>
 
@@ -154,6 +170,15 @@ static inline bool dev_xmit_complete(int rc)
 #else
 #define MAX_HEADER (LL_MAX_HEADER + 48)
 #endif
+
+#ifdef CONFIG_TI_DEVICE_INDEX_REUSE
+/* Maximum number of net devices supported. TI L2 Selective forwarder uses
+ * 64 bits to mark the packet to indicate the device on which the packets should
+ * be forwarded. Hence Max Device Index is limited to 64.
+ * Do not increment the number.
+ */
+#define TI_MAX_DEVICE_INDEX     64
+#endif /* CONFIG_TI_DEVICE_INDEX_REUSE */
 
 /*
  *	Old network device statistics. Fields are native words
@@ -1402,6 +1427,74 @@ struct net_device {
 #endif
 #if IS_ENABLED(CONFIG_NETPRIO_CGROUP)
 	struct netprio_map __rcu *priomap;
+#endif
+
+#ifdef CONFIG_TI_DEVICE_PROTOCOL_HANDLING
+    int (*packet_handler)(struct sk_buff *skb);
+#endif
+
+#ifdef CONFIG_INTEL_NS_DEVICE_FILTER
+   int (*ns_handler)(struct net_device *dev,struct	in6_addr* dst_addr,unsigned char banned_flags);
+#endif
+
+#ifdef CONFIG_TI_EGRESS_HOOK
+    int (*egress_hook)(struct sk_buff *skb);
+#endif
+
+#ifdef CONFIG_TI_DOCSIS_EGRESS_HOOK
+    int (*docsis_egress_hook)(struct sk_buff *skb);
+#endif
+
+#ifdef CONFIG_TI_GW_EGRESS_HOOK
+    int (*gw_egress_hook)(struct sk_buff *skb);
+#endif
+
+#ifdef CONFIG_TI_PACKET_PROCESSOR
+    /* PPM Device Information. Each networking device can be considered as a VPID
+     * instance executing on a PID. The PID is created when the hardware associated
+     * with the device has been initialized; the VPID Information is initialized and
+     * every subsequent call to bring the interface UP and DOWN results in VPID
+     * creation and deletion. Virtual networking interfaces do not have a matching
+     * VPID. So if the PID handle is -1 then there is no VPID manipulation done on the
+     * device. */
+    int         pid_handle;
+    int         vpid_handle;
+
+    /* The VPID Information block which is associated with the networking device.
+     * This field is kept in the networking device because it gives us a convenient
+     * place to store all the VPID specific information. As mentioned above not all
+     * networking devices are a networking endpoint. In such cases the values in this
+     * structure are ignored. */
+#ifdef CONFIG_MACH_PUMA5
+    TI_PP_VPID                  vpid_block;
+#else
+    AVALANCHE_PP_VPID_INFO_t    vpid_block;
+#endif
+
+#if PUMA7_OR_NEWER_SOC_TYPE
+    int (*netdev_copy_priv_hook)(struct net_device *newDev, struct net_device *origDev);
+
+    /* For GMAC it will be set with NULL. for VLAN netdev we will set the original netdev pointer */
+    struct net_device   *parentDev;
+
+    /* Hook for letting the net device set its own PSI during session creation */
+    int (*netdev_set_psi_hook)(Uint32 *psi, struct sk_buff *skb, struct net_device *dev);
+#endif
+
+    /* There QoS may be defined either for physical or virtual device
+       The QoS setting hooks are being triggered by PID creation.
+       In case there is a need in alternative QoS scheme to be created it can be
+       specified by setting the  qos_virtual_scheme_idx to a valid non default index
+       This alternative scheme creation is being triggered from VPID creation.
+       It has to be defined by the appropriate device drived */
+#define NETDEV_PP_QOS_PROFILE_DEFAULT   (-1)
+    int qos_virtual_scheme_idx;
+
+    int (*qos_setup_hook)   (struct net_device *dev_p);
+    int (*qos_shutdown_hook)(struct net_device *dev_p);
+    int (*qos_select_hook)  (struct sk_buff    *skb);
+    void (*qos_get_params_hook)  (struct net_device *dev, Uint16 *egressQ, Uint32 *rate, Uint32 *shaper);
+    int devInstance;
 #endif
 	/* phy device may attach itself for hardware timestamping */
 	struct phy_device *phydev;
@@ -3115,6 +3208,12 @@ do {								\
 	0;							\
 })
 #endif
+
+
+#ifdef CONFIG_TI_DEVICE_PROTOCOL_HANDLING
+extern int ti_register_protocol_handler (struct net_device* dev, int (*packet_handler)(struct sk_buff *skb));
+extern int ti_deregister_protocol_handler (struct net_device* dev);
+#endif /* CONFIG_TI_DEVICE_PROTOCOL_HANDLING */
 
 /*
  *	The list of packet types we will receive (as opposed to discard)

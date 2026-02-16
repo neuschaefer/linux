@@ -102,6 +102,9 @@ struct packet_sock {
 	unsigned int		running:1,	/* prot_hook is attached*/
 				auxdata:1,
 				origdev:1,
+#ifdef CONFIG_TI_AUXDATA_SOCKOPT
+                ti_auxdata:1,
+#endif
 				has_vnet_hdr:1;
 	int			ifindex;	/* bound device		*/
 	__be16			num;

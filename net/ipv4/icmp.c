@@ -61,6 +61,10 @@
  *	  This would also greatly simply some upper layer error handlers. --AK
  *
  */
+/*
+Includes Intel Corporation's changes/modifications dated: 2014.
+Changed/modified portions - Copyright © 2014, Intel Corporation.
+*/
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
@@ -350,6 +354,10 @@ static void icmp_reply(struct icmp_bxm *icmp_param, struct sk_buff *skb)
 
 	inet->tos = ip_hdr(skb)->tos;
 	daddr = ipc.addr = ip_hdr(skb)->saddr;
+#ifdef CONFIG_TI_META_DATA
+    /* Initialize the meta-information. */
+    ipc.ti_meta_info = 0;
+#endif
 	saddr = fib_compute_spec_dst(skb);
 	ipc.opt = NULL;
 	ipc.tx_flags = 0;
@@ -363,6 +371,10 @@ static void icmp_reply(struct icmp_bxm *icmp_param, struct sk_buff *skb)
 	fl4.saddr = saddr;
 	fl4.flowi4_tos = RT_TOS(ip_hdr(skb)->tos);
 	fl4.flowi4_proto = IPPROTO_ICMP;
+#ifdef CONFIG_INTEL_DOCSIS_ICMP_IIF
+	if(skb->docsis_icmp_iif)
+		fl4.flowi4_oif = skb->docsis_icmp_iif,
+#endif /* CONFIG_INTEL_DOCSIS_ICMP_IIF */
 	security_skb_classify_flow(skb, flowi4_to_flowi(&fl4));
 	rt = ip_route_output_key(net, &fl4);
 	if (IS_ERR(rt))
@@ -608,6 +620,11 @@ void icmp_send(struct sk_buff *skb_in, int type, int code, __be32 info)
 	ipc.addr = iph->saddr;
 	ipc.opt = &icmp_param->replyopts.opt;
 	ipc.tx_flags = 0;
+
+#ifdef CONFIG_TI_META_DATA
+    /* Initialize the meta-information. */
+    ipc.ti_meta_info = 0;
+#endif
 
 	rt = icmp_route_lookup(net, &fl4, skb_in, iph, saddr, tos,
 			       type, code, icmp_param);

@@ -17,6 +17,10 @@
  *      as published by the Free Software Foundation; either version
  *      2 of the License, or (at your option) any later version.
  */
+/*
+Includes Intel Corporation's changes/modifications dated: 2014.
+Changed/modified portions - Copyright © 2014, Intel Corporation.
+*/
 
 #ifndef _UAPI_LINUX_IN6_H
 #define _UAPI_LINUX_IN6_H
@@ -287,4 +291,24 @@ enum {
  * ...
  * MRT6_MAX
  */
+
+#ifdef CONFIG_TI_IP_PKTINFO_SOCKOPT
+#define TI_IPV6_PKTINFO	81
+#endif
+/*
+*  TI Extension:
+*   data structure for passing the needed information
+*   about the incoming packet. Currently we only need a small element
+*/
+#ifdef CONFIG_TI_IP_PKTINFO_SOCKOPT
+# ifndef TI_PKTINFO_STRUCT
+# define TI_PKTINFO_STRUCT
+struct ti_pktinfo
+{
+	int		ifcpe_side;
+    char    mac_addr[6];
+};
+# endif
+#endif
+
 #endif /* _UAPI_LINUX_IN6_H */

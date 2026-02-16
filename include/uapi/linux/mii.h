@@ -156,6 +156,9 @@ struct mii_ioctl_data {
 	__u16		reg_num;
 	__u16		val_in;
 	__u16		val_out;
+#if PUMA7_OR_NEWER_SOC_TYPE
+    __u16		mdio_num;
+#endif	
 };
 
 #endif /* _UAPI__LINUX_MII_H__ */

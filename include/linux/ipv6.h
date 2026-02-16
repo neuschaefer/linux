@@ -1,3 +1,7 @@
+/*
+Includes Intel Corporation's changes/modifications dated: 2014.
+Changed/modified portions - Copyright © 2014, Intel Corporation.
+*/
 #ifndef _IPV6_H
 #define _IPV6_H
 
@@ -12,6 +16,7 @@ struct ipv6_devconf {
 	__s32		hop_limit;
 	__s32		mtu6;
 	__s32		accept_ra;
+    __s32		accept_ra_table;
 	__s32		accept_redirects;
 	__s32		autoconf;
 	__s32		dad_transmits;
@@ -31,6 +36,7 @@ struct ipv6_devconf {
 	__s32		max_addresses;
 	__s32		accept_ra_defrtr;
 	__s32		accept_ra_pinfo;
+    __s32		accept_ra_pinfo_autoconf;
 #ifdef CONFIG_IPV6_ROUTER_PREF
 	__s32		accept_ra_rtr_pref;
 	__s32		rtr_probe_interval;
@@ -193,7 +199,12 @@ struct ipv6_pinfo {
                                 rxflow:1,
 				rxtclass:1,
 				rxpmtu:1,
+#ifdef CONFIG_TI_IP_PKTINFO_SOCKOPT
+				rxorigdstaddr:1,
+				ti_rxinfo:1;
+#else
 				rxorigdstaddr:1;
+#endif
 				/* 2 bits hole */
 		} bits;
 		__u16		all;

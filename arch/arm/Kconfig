@@ -1,3 +1,5 @@
+# Includes Intel Corporation's changes/modifications dated: 2014, 2017.
+# Changed/modified portions - Copyright (c) 2014-2017, Intel Corporation.
 config ARM
 	bool
 	default y
@@ -29,7 +31,7 @@ config ARM
 	select HAVE_CONTEXT_TRACKING
 	select HAVE_C_RECORDMCOUNT
 	select HAVE_DEBUG_KMEMLEAK
-	select HAVE_DMA_API_DEBUG
+	#select HAVE_DMA_API_DEBUG
 	select HAVE_DMA_ATTRS
 	select HAVE_DMA_CONTIGUOUS if MMU
 	select HAVE_DYNAMIC_FTRACE if (!XIP_KERNEL)
@@ -145,16 +147,20 @@ config STACKTRACE_SUPPORT
 	bool
 	default y
 
+config LOCKDEP_SUPPORT
+	bool
+	default y
+
+config TRACE_IRQFLAGS_SUPPORT
+	bool "IRQ-flags tracing support"
+	default y
+
 config HAVE_LATENCYTOP_SUPPORT
 	bool
 	depends on !SMP
 	default y
 
 config LOCKDEP_SUPPORT
-	bool
-	default y
-
-config TRACE_IRQFLAGS_SUPPORT
 	bool
 	default y
 
@@ -225,6 +231,7 @@ config VECTORS_BASE
 config ARM_PATCH_PHYS_VIRT
 	bool "Patch physical to virtual translations at runtime" if EMBEDDED
 	default y
+	depends on MACH_PUMA6 || MACH_PUMA7 
 	depends on !XIP_KERNEL && MMU
 	depends on !ARCH_REALVIEW || !SPARSEMEM
 	help
@@ -238,6 +245,18 @@ config ARM_PATCH_PHYS_VIRT
 	  Only disable this option if you know that you do not require
 	  this feature (eg, building a kernel for a single machine) and
 	  you need to shrink the kernel to the minimal size.
+
+config ARM_PATCH_PHYS_VIRT_16BIT
+	bool "Extend physical to virtual translations"
+	default n
+	depends on ARM_PATCH_PHYS_VIRT
+	help
+	  This option extends the physical to virtual translation patching
+	  to allow physical memory down to a theoretical minimum of 64K
+	  boundaries (actual minimum is 1M).
+
+config RUNTIME_PHYS_OFFSET
+	bool
 
 config NEED_MACH_GPIO_H
 	bool
@@ -289,10 +308,12 @@ config MMU
 # The "ARM system type" choice list is ordered alphabetically by option
 # text.  Please add new entries in the option alphabetic order.
 #
-choice
-	prompt "ARM system type"
-	default ARCH_VERSATILE if !MMU
-	default ARCH_MULTIPLATFORM if MMU
+#choice
+#	prompt "ARM system type"
+#	default ARCH_VERSATILE if !MMU
+#	default ARCH_MULTIPLATFORM if MMU
+#
+#endchoice
 
 config ARCH_MULTIPLATFORM
 	bool "Allow multiple platforms to be selected"
@@ -367,6 +388,23 @@ config ARCH_AT91
 	help
 	  This enables support for systems based on Atmel
 	  AT91RM9200 and AT91SAM9* processors.
+
+
+config ARCH_AVALANCHE
+	bool "Intel Avalanche (Puma5, Puma6, Puma7...)"
+	select ARM_AVALANCHE_SOC
+	select CPU_V6
+	select CPU_V6K
+	select ICST
+	select ARM_AMBA
+	select HAVE_CLK
+	select GENERIC_CLOCKEVENTS
+	select NEED_MACH_MEMORY_H
+	help
+	  Support for Intel's Avalanche Platform
+
+
+source "arch/arm/mach-avalanche/Kconfig"
 
 config ARCH_CLPS711X
 	bool "Cirrus Logic CLPS711x/EP721x/EP731x-based"
@@ -873,7 +911,7 @@ config ARCH_OMAP1
 	help
 	  Support for older TI OMAP1 (omap7xx, omap15xx or omap16xx)
 
-endchoice
+#endchoice
 
 menu "Multiple platform selection"
 	depends on ARCH_MULTIPLATFORM
@@ -1566,8 +1604,11 @@ choice
 		bool "1G/3G user/kernel split"
 endchoice
 
+# PAGE_OFFSET made configurable since some code doesn't use memory.h header
+# but get page_offset some other way. unified-image (P6+) does not suffer from such problem.
 config PAGE_OFFSET
 	hex
+	prompt "Virtual start address of the first bank of RAM" if ARM && !ARM_PATCH_PHYS_VIRT
 	default 0x40000000 if VMSPLIT_1G
 	default 0x80000000 if VMSPLIT_2G
 	default 0xC0000000
@@ -1712,6 +1753,8 @@ config ARM_ASM_UNIFIED
 
 config AEABI
 	bool "Use the ARM EABI to compile the kernel"
+	depends on !CPU_32v4
+	default y	
 	help
 	  This option allows for the kernel to be compiled using the latest
 	  ARM ABI (aka EABI).  This is only useful if you are using a user
@@ -1804,6 +1847,7 @@ config FORCE_MAX_ZONEORDER
 	range 11 64 if ARCH_SHMOBILE
 	default "12" if SOC_AM33XX
 	default "9" if SA1111
+    default "14" if (ARCH_AVALANCHE && MACH_PUMA7)
 	default "11"
 	help
 	  The kernel memory allocator divides physically contiguous memory

@@ -9,6 +9,10 @@
  *		Changes to use preallocated sigqueue structures
  *		to allow signals to be sent reliably.
  */
+/*
+Includes Intel Corporation's changes/modifications dated: 2014.
+Changed/modified portions - Copyright © 2014, Intel Corporation.
+*/
 
 #include <linux/slab.h>
 #include <linux/export.h>
@@ -1517,6 +1521,14 @@ force_sigsegv(int sig, struct task_struct *p)
 	force_sig(SIGSEGV, p);
 	return 0;
 }
+
+int
+kill_proc(pid_t pid, int sig, int priv)
+{
+        return kill_proc_info(sig, __si_special(priv), pid);
+}
+EXPORT_SYMBOL(kill_proc);
+
 
 int kill_pgrp(struct pid *pid, int sig, int priv)
 {

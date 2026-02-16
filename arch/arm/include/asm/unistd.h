@@ -10,12 +10,18 @@
  * Please forward _all_ changes to this file to rmk@arm.linux.org.uk,
  * no matter what the change is.  Thanks!
  */
+
+/*
+ * Includes Intel Corporation's changes/modifications dated: 2017.
+ * Changed/modified portions - Copyright (c) 2017, Intel Corporation.
+ */
+
 #ifndef __ASM_ARM_UNISTD_H
 #define __ASM_ARM_UNISTD_H
 
 #include <uapi/asm/unistd.h>
 
-#define __NR_syscalls  (380)
+#define __NR_syscalls  (384)
 #define __ARM_NR_cmpxchg		(__ARM_NR_BASE+0x00fff0)
 
 #define __ARCH_WANT_STAT64

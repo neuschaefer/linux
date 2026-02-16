@@ -7,6 +7,10 @@
  * Detailed information is available in Documentation/DocBook/genericirq
  *
  */
+/*
+Includes Intel Corporation's changes/modifications dated: 2014.
+Changed/modified portions - Copyright © 2014, Intel Corporation.
+*/
 #include <linux/irq.h>
 #include <linux/slab.h>
 #include <linux/export.h>
@@ -14,7 +18,10 @@
 #include <linux/kernel_stat.h>
 #include <linux/radix-tree.h>
 #include <linux/bitmap.h>
-
+#ifdef CONFIG_INTEL_IRQ_THREAD_CHANGE_PRIORITY
+#include <linux/sched.h>
+#include <linux/sched/rt.h>
+#endif
 #include "internals.h"
 
 /*
@@ -91,6 +98,10 @@ static void desc_set_defaults(unsigned int irq, struct irq_desc *desc, int node,
 	for_each_possible_cpu(cpu)
 		*per_cpu_ptr(desc->kstat_irqs, cpu) = 0;
 	desc_smp_init(desc, node);
+#ifdef CONFIG_INTEL_IRQ_THREAD_CHANGE_PRIORITY
+	desc->sched_priority = MAX_USER_RT_PRIO/2;
+	desc->policy = SCHED_FIFO;
+#endif
 }
 
 int nr_irqs = NR_IRQS;

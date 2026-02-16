@@ -31,6 +31,10 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
+/*
+Includes Intel Corporation's changes/modifications dated: 2014.
+Changed/modified portions - Copyright © 2014, Intel Corporation.
+*/
 
 #ifndef __MUSB_GADGET_H
 #define __MUSB_GADGET_H
@@ -143,5 +147,6 @@ extern const struct usb_ep_ops musb_g_ep0_ops;
 extern void musb_g_giveback(struct musb_ep *, struct usb_request *, int);
 
 extern void musb_ep_restart(struct musb *, struct musb_request *);
+extern int musb_gadget_set_halt(struct usb_ep *ep, int value);
 
 #endif		/* __MUSB_GADGET_H */

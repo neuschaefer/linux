@@ -1190,7 +1190,7 @@ static unsigned int fanout_demux_rnd(struct packet_fanout *f,
 				     struct sk_buff *skb,
 				     unsigned int num)
 {
-	return reciprocal_divide(prandom_u32(), num);
+	return prandom_u32_max(num);
 }
 
 static unsigned int fanout_demux_rollover(struct packet_fanout *f,
@@ -1475,6 +1475,41 @@ oom:
 	return 0;
 }
 
+/*
+*  Intel Extension:
+*   Pass information received in cmsg to the skb
+*/ 
+#ifdef CONFIG_TI_AUXDATA_SOCKOPT
+static int packet_cmsg_send(struct sk_buff *skb, struct msghdr *msg){
+    struct cmsghdr *cmsg;
+
+    for (cmsg = CMSG_FIRSTHDR(msg); cmsg; cmsg = CMSG_NXTHDR(msg, cmsg)) {
+        if (!CMSG_OK(msg, cmsg))
+                return -EINVAL;
+        if (cmsg->cmsg_level != SOL_PACKET)
+                continue;
+        switch (cmsg->cmsg_type) {
+
+            case TI_AUXDATA:
+            {
+                struct ti_auxdata *ti_aux;
+                if (cmsg->cmsg_len != CMSG_LEN(sizeof(struct ti_auxdata)))
+                        return -EINVAL;
+                ti_aux = (struct ti_auxdata *)CMSG_DATA(cmsg);
+                /* Now copy supported TI auxilliary data to skb */
+#ifdef CONFIG_TI_META_DATA
+                skb->ti_meta_info = ti_aux->ti_meta_info;
+                skb->ti_meta_info2 = ti_aux->ti_meta_info2;
+#endif
+                break;
+            }
+        }
+    }
+
+    return 0;
+}
+#endif
+
 
 /*
  *	Output a raw packet to a device layer. This bypasses all the other
@@ -1584,6 +1619,14 @@ retry:
 	skb->dev = dev;
 	skb->priority = sk->sk_priority;
 	skb->mark = sk->sk_mark;
+
+#ifdef CONFIG_TI_AUXDATA_SOCKOPT
+    if (pkt_sk(sk)->ti_auxdata) {
+        if((err = packet_cmsg_send(skb, msg))){
+            goto out_unlock;
+        }
+    }
+#endif
 
 	sock_tx_timestamp(sk, &skb_shinfo(skb)->tx_flags);
 
@@ -2168,6 +2211,14 @@ static int tpacket_snd(struct packet_sock *po, struct msghdr *msg)
 		__packet_set_status(po, ph, TP_STATUS_SENDING);
 		atomic_inc(&po->tx_ring.pending);
 
+#ifdef CONFIG_TI_AUXDATA_SOCKOPT
+        if (po->ti_auxdata) {
+            if ((err = packet_cmsg_send(skb, msg))) {
+                goto out_status;
+            }
+        }
+#endif
+
 		status = TP_STATUS_SEND_REQUEST;
 		err = dev_queue_xmit(skb);
 		if (unlikely(err > 0)) {
@@ -2402,6 +2453,14 @@ static int packet_snd(struct socket *sock,
 	/*
 	 *	Now send it
 	 */
+
+#ifdef CONFIG_TI_AUXDATA_SOCKOPT
+    if (po->ti_auxdata) {
+        if ((err = packet_cmsg_send(skb, msg))) {
+            goto out_unlock;
+        }
+    }
+#endif
 
 	err = dev_queue_xmit(skb);
 	if (err > 0 && (err = net_xmit_errno(err)) != 0)
@@ -2821,6 +2880,21 @@ static int packet_recvmsg(struct kiocb *iocb, struct socket *sock,
 		put_cmsg(msg, SOL_PACKET, PACKET_AUXDATA, sizeof(aux), &aux);
 	}
 
+/*
+* TI extension - Copy TI metadata and other desired layer 2 info 
+* into a cmsg that userspace can read 
+*/
+#ifdef CONFIG_TI_AUXDATA_SOCKOPT
+    if (pkt_sk(sk)->ti_auxdata) {
+        struct ti_auxdata ti_aux;
+#ifdef CONFIG_TI_META_DATA
+        ti_aux.ti_meta_info = skb->ti_meta_info;
+        ti_aux.ti_meta_info2 = skb->ti_meta_info2;
+#endif
+        put_cmsg(msg, SOL_PACKET, TI_AUXDATA, sizeof(ti_aux), &ti_aux);
+    }
+#endif
+
 	/*
 	 *	Free or return the buffer as appropriate. Again this
 	 *	hides all the races and re-entrancy issues from us.
@@ -3154,6 +3228,20 @@ packet_setsockopt(struct socket *sock, int level, int optname, char __user *optv
 		po->auxdata = !!val;
 		return 0;
 	}
+#ifdef CONFIG_TI_AUXDATA_SOCKOPT
+    case TI_AUXDATA:
+    {
+        int val;
+
+		if (optlen < sizeof(val))
+			return -EINVAL;
+		if (copy_from_user(&val, optval, sizeof(val)))
+			return -EFAULT;
+
+        po->ti_auxdata = !!val;
+        return 0;
+    }
+#endif
 	case PACKET_ORIGDEV:
 	{
 		int val;
@@ -3263,6 +3351,11 @@ static int packet_getsockopt(struct socket *sock, int level, int optname,
 	case PACKET_AUXDATA:
 		val = po->auxdata;
 		break;
+#ifdef CONFIG_TI_AUXDATA_SOCKOPT
+    case TI_AUXDATA:
+        val = po->ti_auxdata;
+        break;
+#endif
 	case PACKET_ORIGDEV:
 		val = po->origdev;
 		break;

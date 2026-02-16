@@ -1,0 +1,11 @@
+#include/asm-arm/arch-avalanche/puma7/Kbuild
+#
+# destination-y is the destination directory and is relative to ti/
+# it must be defined and not blank! (if top level is required use destination-y := include/).
+#
+# header-y is a list of headers to be exported.
+# header-y also indicates which subdirectories to visit (use trailing '/').
+#
+destination-y := include/
+header-y += puma_spi_master_proxy.h
+

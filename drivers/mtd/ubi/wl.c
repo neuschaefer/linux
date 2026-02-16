@@ -134,11 +134,18 @@
  */
 #define WL_MAX_FAILURES 32
 
+#ifdef CONFIG_MTD_UBI_DEBUG
 static int self_check_ec(struct ubi_device *ubi, int pnum, int ec);
 static int self_check_in_wl_tree(const struct ubi_device *ubi,
 				 struct ubi_wl_entry *e, struct rb_root *root);
 static int self_check_in_pq(const struct ubi_device *ubi,
 			    struct ubi_wl_entry *e);
+#else
+#define self_check_ec(ubi, pnum, ec) 0
+#define self_check_in_wl_tree(ubi, e, root)
+#define self_check_in_pq(ubi, e) 0
+#endif
+
 
 #ifdef CONFIG_MTD_UBI_FASTMAP
 /**
@@ -2036,6 +2043,8 @@ void ubi_wl_close(struct ubi_device *ubi)
 	kfree(ubi->lookuptbl);
 }
 
+#ifdef CONFIG_MTD_UBI_DEBUG
+
 /**
  * self_check_ec - make sure that the erase counter of a PEB is correct.
  * @ubi: UBI device description object
@@ -2131,3 +2140,5 @@ static int self_check_in_pq(const struct ubi_device *ubi,
 	dump_stack();
 	return -EINVAL;
 }
+
+#endif /* CONFIG_MTD_UBI_DEBUG */

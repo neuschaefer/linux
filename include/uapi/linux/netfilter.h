@@ -1,3 +1,7 @@
+/*
+Includes Intel Corporation's changes/modifications dated: 2014.
+Changed/modified portions - Copyright © 2014, Intel Corporation.
+*/
 #ifndef _UAPI__LINUX_NETFILTER_H
 #define _UAPI__LINUX_NETFILTER_H
 
@@ -19,6 +23,9 @@
  * number or errno values. Not nice, but better than additional function
  * arguments. */
 #define NF_VERDICT_MASK 0x000000ff
+#ifdef CONFIG_TI_PACKET_PROCESSOR
+#define NF_VERDICT_FLAG_PP_BYPASS		0x00000100
+#endif  /* CONFIG_TI_PACKET_PROCESSOR */
 
 /* extra verdict flags have mask 0x0000ff00 */
 #define NF_VERDICT_FLAG_QUEUE_BYPASS	0x00008000

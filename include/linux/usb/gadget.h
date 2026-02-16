@@ -11,6 +11,10 @@
  *
  * This software is licensed under the GNU GPL version 2.
  */
+/*
+Includes Intel Corporation's changes/modifications dated: 2014.
+Changed/modified portions - Copyright © 2014, Intel Corporation.
+*/
 
 #ifndef __LINUX_USB_GADGET_H
 #define __LINUX_USB_GADGET_H
@@ -166,6 +170,7 @@ struct usb_ep_ops {
  */
 struct usb_ep {
 	void			*driver_data;
+	unsigned int	private_data;
 
 	const char		*name;
 	const struct usb_ep_ops	*ops;

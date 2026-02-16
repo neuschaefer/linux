@@ -29,7 +29,11 @@
 #include <linux/export.h>
 #include "ubi.h"
 
+#ifdef CONFIG_MTD_UBI_DEBUG
 static int self_check_volumes(struct ubi_device *ubi);
+#else
+#define self_check_volumes(ubi) 0
+#endif
 
 static ssize_t vol_attribute_show(struct device *dev,
 				  struct device_attribute *attr, char *buf);
@@ -837,6 +841,8 @@ fail:
 	return -EINVAL;
 }
 
+#ifdef CONFIG_MTD_UBI_DEBUG
+
 /**
  * self_check_volumes - check information about all volumes.
  * @ubi: UBI device description object
@@ -858,3 +864,4 @@ static int self_check_volumes(struct ubi_device *ubi)
 
 	return err;
 }
+#endif

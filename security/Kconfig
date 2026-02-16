@@ -167,5 +167,11 @@ config DEFAULT_SECURITY
 	default "yama" if DEFAULT_SECURITY_YAMA
 	default "" if DEFAULT_SECURITY_DAC
 
+config INTEL_UART_ENABLE_CONTROL
+	bool "UART Enable control"
+	default n
+	help
+	  Add support to enable/disable the UART during runtime.
+
 endmenu
 

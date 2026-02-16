@@ -12,6 +12,12 @@
  *  have a non-standard calling sequence on the Linux/arm
  *  platform.
  */
+
+/*
+ * Includes Intel Corporation's changes/modifications dated: 2017.
+ * Changed/modified portions - Copyright (c) 2017, Intel Corporation.
+ */
+
 #include <linux/export.h>
 #include <linux/errno.h>
 #include <linux/sched.h>
@@ -27,6 +33,7 @@
 #include <linux/ipc.h>
 #include <linux/uaccess.h>
 #include <linux/slab.h>
+#include <asm/cacheflush.h>
 
 /*
  * Since loff_t is a 64 bit type we avoid a lot of ABI hassle
@@ -36,4 +43,10 @@ asmlinkage long sys_arm_fadvise64_64(int fd, int advice,
 				     loff_t offset, loff_t len)
 {
 	return sys_fadvise64_64(fd, offset, len, advice);
+}
+
+asmlinkage long sys_arm_cache_flush(void)
+{
+	__cpuc_flush_user_all();
+	return 0;
 }

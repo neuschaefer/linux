@@ -11,6 +11,14 @@
  *  MMC card bus driver model
  */
 
+/******************************************************************
+ 
+ Includes Intel Corporation's changes/modifications dated: 10/2011.
+ Changed/modified portions - Copyright(c) 2011-2017, Intel Corporation. 
+
+******************************************************************/
+
+
 #include <linux/export.h>
 #include <linux/device.h>
 #include <linux/err.h>
@@ -223,7 +231,9 @@ static struct bus_type mmc_bus_type = {
 	.uevent		= mmc_bus_uevent,
 	.probe		= mmc_bus_probe,
 	.remove		= mmc_bus_remove,
+#ifndef CONFIG_ARCH_GEN3
 	.shutdown	= mmc_bus_shutdown,
+#endif
 	.pm		= &mmc_bus_pm_ops,
 };
 

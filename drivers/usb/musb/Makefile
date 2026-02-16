@@ -1,14 +1,20 @@
+# Includes Intel Corporation's changes/modifications dated: 2014.
+# Changed/modified portions - Copyright © 2014, Intel Corporation.
 #
 # for USB OTG silicon based on Mentor Graphics INVENTRA designs
 #
+
+ccflags-$(CONFIG_USB_DEBUG) := -DDEBUG
+ccflags-$(CONFIG_USB_GADGET_DEBUG) := -DDEBUG
 
 obj-$(CONFIG_USB_MUSB_HDRC) += musb_hdrc.o
 
 musb_hdrc-y := musb_core.o
 
 musb_hdrc-$(CONFIG_USB_MUSB_HOST)$(CONFIG_USB_MUSB_DUAL_ROLE) += musb_virthub.o musb_host.o
-musb_hdrc-$(CONFIG_USB_MUSB_GADGET)$(CONFIG_USB_MUSB_DUAL_ROLE) += musb_gadget_ep0.o musb_gadget.o
+musb_hdrc-$(CONFIG_USB_MUSB_GADGET)$(CONFIG_USB_MUSB_DUAL_ROLE) += musb_gadget_ep0.o ../gadget/udc-core.o musb_gadget.o
 musb_hdrc-$(CONFIG_DEBUG_FS)			+= musb_debugfs.o
+musb_hdrc-$(CONFIG_MACH_PUMA5)              += puma5.o
 
 # Hardware Glue Layer
 obj-$(CONFIG_USB_MUSB_OMAP2PLUS)		+= omap2430.o
@@ -29,7 +35,7 @@ obj-$(CONFIG_USB_MUSB_AM335X_CHILD)		+= musb_am335x.o
 # though PIO is always there to back up DMA, and for ep0
 
 musb_hdrc-$(CONFIG_USB_INVENTRA_DMA)		+= musbhsdma.o
-musb_hdrc-$(CONFIG_USB_TI_CPPI_DMA)		+= cppi_dma.o
+musb_hdrc-$(CONFIG_USB_TI_CPPI_DMA)		+= cppi41_dma.o
 musb_hdrc-$(CONFIG_USB_TUSB_OMAP_DMA)		+= tusb6010_omap.o
 musb_hdrc-$(CONFIG_USB_UX500_DMA)		+= ux500_dma.o
 musb_hdrc-$(CONFIG_USB_TI_CPPI41_DMA)		+= musb_cppi41.o

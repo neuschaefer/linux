@@ -71,6 +71,33 @@
  * 		J Hadi Salim	:	- Backlog queue sampling
  *				        - netif_rx() feedback
  */
+/*----------------------------------------------------------------------------
+// Copyright 2007, Texas Instruments Incorporated
+//
+// This program has been modified from its original operation by Texas Instruments
+// to do the following:
+//
+// 1. Device Specific Protocol Handling.
+// 2. TI Meta Data Extension Console Dump for debugging.
+// 3. Device Index Reuse
+// 4. TI Layer 2 Selective Forwarder
+// 5. TI Packet Processor Enhancements
+// 6. TI Egress Hook Feature.
+//
+// THIS MODIFIED SOFTWARE AND DOCUMENTATION ARE PROVIDED
+// "AS IS," AND TEXAS INSTRUMENTS MAKES NO REPRESENTATIONS
+// OR WARRENTIES, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+// TO, WARRANTIES OF MERCHANTABILITY OR FITNESS FOR ANY
+// PARTICULAR PURPOSE OR THAT THE USE OF THE SOFTWARE OR
+// DOCUMENTATION WILL NOT INFRINGE ANY THIRD PARTY PATENTS,
+// COPYRIGHTS, TRADEMARKS OR OTHER RIGHTS.
+//
+// These changes are covered as per original license
+//-----------------------------------------------------------------------------*/
+/*
+ * Includes Intel Corporation's changes/modifications dated: [10/03/2016].
+ * Changed/modified portions - Copyright © [2016], Intel Corporation.
+ */
 
 #include <asm/uaccess.h>
 #include <linux/bitops.h>
@@ -114,6 +141,7 @@
 #include <linux/dmaengine.h>
 #include <linux/err.h>
 #include <linux/ctype.h>
+#include <linux/ti_hil.h>
 #include <linux/if_arp.h>
 #include <linux/if_vlan.h>
 #include <linux/ip.h>
@@ -336,6 +364,34 @@ static inline void netdev_set_addr_lockdep_class(struct net_device *dev)
 {
 }
 #endif
+
+#ifdef CONFIG_TI_DEVICE_PROTOCOL_HANDLING
+extern int ti_protocol_handler (struct net_device* dev, struct sk_buff *skb);
+#endif
+
+#ifdef CONFIG_TI_DEVICE_INDEX_REUSE
+extern int ti_dev_new_index(struct net *net);
+#endif /* CONFIG_TI_DEVICE_INDEX_REUSE */
+
+#ifdef CONFIG_TI_L2_SELECTIVE_FORWARDER
+extern void ti_save_netdevice_info(struct net_device *dev);
+extern void ti_free_netdevice_info(struct net_device *dev);
+#endif /* CONFIG_TI_L2_SELECTIVE_FORWARDER */
+
+
+#ifdef CONFIG_TI_EGRESS_HOOK
+extern int ti_egress_hook_handler (struct net_device* dev, struct sk_buff *skb);
+#endif /* CONFIG_TI_EGRESS_HOOK */
+
+
+#ifdef CONFIG_TI_DOCSIS_EGRESS_HOOK
+extern int ti_docsis_egress_hook_handler (struct net_device* dev, struct sk_buff *skb);
+#endif /* CONFIG_TI_DOCSIS_EGRESS_HOOK */
+
+
+#ifdef CONFIG_TI_GW_EGRESS_HOOK
+extern int ti_gw_egress_hook_handler (struct net_device* dev, struct sk_buff *skb);
+#endif /* CONFIG_TI_GW_EGRESS_HOOK */
 
 /*******************************************************************************
 
@@ -2808,6 +2864,28 @@ int dev_queue_xmit(struct sk_buff *skb)
 
 	skb_reset_mac_header(skb);
 
+    /* Print the Message on the console indicating that the meta-data is succesfully available
+     * till the core networking device layers. */
+#ifdef CONFIG_TI_META_DATA_CONSOLE_DUMP
+    if (skb->ti_meta_info != 0x0)
+        printk ("Core Networking Device Layer: %s SKB 0x%p has META Data 0x%x\n", skb->dev->name, skb, skb->ti_meta_info);
+#endif /* CONFIG_TI_META_DATA_CONSOLE_DUMP */
+
+#ifdef CONFIG_TI_GW_EGRESS_HOOK
+    if (ti_gw_egress_hook_handler(dev, skb) < 0)
+       return rc;
+#endif /* CONFIG_TI_GW_EGRESS_HOOK */
+
+#ifdef CONFIG_TI_EGRESS_HOOK
+    if (ti_egress_hook_handler(dev, skb) < 0)
+       return rc;
+#endif /* CONFIG_TI_EGRESS_HOOK */
+
+#ifdef CONFIG_TI_DOCSIS_EGRESS_HOOK
+    if (ti_docsis_egress_hook_handler(dev, skb) < 0)
+       return rc;
+#endif /* CONFIG_TI_DOCSIS_EGRESS_HOOK */
+
 	/* Disable soft irqs for various locks below. Also
 	 * stops preemption for RCU.
 	 */
@@ -3502,11 +3580,24 @@ static int __netif_receive_skb_core(struct sk_buff *skb, bool pfmemalloc)
 		skb_reset_transport_header(skb);
 	skb_reset_mac_len(skb);
 
+
+
 	pt_prev = NULL;
 
 	rcu_read_lock();
 
 another_round:
+#ifdef CONFIG_TI_DEVICE_PROTOCOL_HANDLING
+    /* Pass the packet to the device specific protocol handler */
+    if (ti_protocol_handler (skb->dev, skb) < 0)
+    {
+        /* Device Specific Protocol handler has "captured" the packet
+         * and does not want to send it up the networking stack; so
+         * return immediately. */
+        ret = NET_RX_SUCCESS;
+		goto unlock;
+    }
+#endif /* CONFIG_TI_DEVICE_PROTOCOL_HANDLING */
 	skb->skb_iif = skb->dev->ifindex;
 
 	__this_cpu_inc(softnet_data.processed);
@@ -3913,9 +4004,16 @@ static gro_result_t napi_skb_finish(gro_result_t ret, struct sk_buff *skb)
 
 	case GRO_MERGED_FREE:
 		if (NAPI_GRO_CB(skb)->free == NAPI_GRO_FREE_STOLEN_HEAD)
+        {
+        #if PUMA7_OR_NEWER_SOC_TYPE && CONFIG_TI_PACKET_PROCESSOR
+            kfree_skb_intel_cookie( SKB_GET_COOKIE_P(skb) );
+        #endif
 			kmem_cache_free(skbuff_head_cache, skb);
-		else
-			__kfree_skb(skb);
+        }
+        else
+        {
+            __kfree_skb(skb);
+        }
 		break;
 
 	case GRO_HELD:
@@ -5235,6 +5333,14 @@ EXPORT_SYMBOL(dev_get_phys_port_id);
  */
 static int dev_new_index(struct net *net)
 {
+#ifdef CONFIG_TI_DEVICE_INDEX_REUSE
+    /* Original implementation does not limit the number of indexes that
+     * can be allocated. This can cause data overflow.
+     * The "index reuse feature" limits the number of devices to 32 and reuses
+     * freed up indexes.
+    */
+    return (ti_dev_new_index(net));
+#else
 	int ifindex = net->ifindex;
 	for (;;) {
 		if (++ifindex <= 0)
@@ -5242,6 +5348,7 @@ static int dev_new_index(struct net *net)
 		if (!__dev_get_by_index(net, ifindex))
 			return net->ifindex = ifindex;
 	}
+#endif /* CONFIG_TI_DEVICE_INDEX_REUSE */
 }
 
 /* Delayed registration/unregisteration */
@@ -5619,8 +5726,22 @@ int register_netdevice(struct net_device *dev)
 	}
 
 	ret = -EBUSY;
-	if (!dev->ifindex)
+	if (!dev->ifindex) {
 		dev->ifindex = dev_new_index(net);
+#ifdef CONFIG_TI_DEVICE_INDEX_REUSE
+		/* Original dev_new_index() implementation gaurantees a unique device
+		 * index by not limiting on the number of devices that can be registered.
+		 * The "index reuse feature" limits the number of devices to 32. Free
+		 * the allocated divert_blk
+		 */
+
+		if (dev->ifindex == -1)
+		{
+			ret = -EINVAL;
+			goto err_uninit;
+		}
+#endif /* CONFIG_TI_DEVICE_INDEX_REUSE */
+	}
 	else if (__dev_get_by_index(net, dev->ifindex))
 		goto err_uninit;
 
@@ -5678,6 +5799,10 @@ int register_netdevice(struct net_device *dev)
 
 	dev_init_scheduler(dev);
 	dev_hold(dev);
+#ifdef CONFIG_TI_L2_SELECTIVE_FORWARDER
+    /* Store the netdevice pointer in global array */
+    ti_save_netdevice_info(dev);
+#endif /* CONFIG_TI_L2_SELECTIVE_FORWARDER */
 	list_netdevice(dev);
 	add_device_randomness(dev->dev_addr, dev->addr_len);
 
@@ -6079,6 +6204,27 @@ struct net_device *alloc_netdev_mqs(int sizeof_priv, const char *name,
 	INIT_LIST_HEAD(&dev->upper_dev_list);
 	INIT_LIST_HEAD(&dev->lower_dev_list);
 	dev->priv_flags = IFF_XMIT_DST_RELEASE;
+#ifdef CONFIG_TI_PACKET_PROCESSOR
+    /* Initialize the PID and VPID handle. By default the devices are not attached
+     * to the Packet Processor PDSP. The PID handle will be overwritten by the
+     * driver if this networking device is also a PHYSICAL device. The VPID handle
+     * is overwritten by the PROFILE if this networking device is a networking
+     * endpoint i.e. connected to the bridge or IP stack. */
+    dev->pid_handle     = -1;
+    dev->vpid_handle    = -1;
+    memset ((void *)&dev->vpid_block, 0xFF, sizeof(dev->vpid_block));
+#if !(PUMA7_OR_NEWER_SOC_TYPE)
+    dev->vpid_block.qos_clusters_count = 0;
+#endif
+#ifdef CONFIG_MACH_PUMA5
+    dev->vpid_block.priv_vpid_flags = 0;
+#else
+    dev->vpid_block.flags = 0;
+#endif
+    
+
+    dev->qos_virtual_scheme_idx = NETDEV_PP_QOS_PROFILE_DEFAULT;
+#endif /* CONFIG_TI_PACKET_PROCESSOR */
 	setup(dev);
 
 	dev->num_tx_queues = txqs;
@@ -6192,6 +6338,10 @@ EXPORT_SYMBOL(synchronize_net);
 void unregister_netdevice_queue(struct net_device *dev, struct list_head *head)
 {
 	ASSERT_RTNL();
+#ifdef CONFIG_TI_L2_SELECTIVE_FORWARDER
+    /* Clear the netdevice pointer stored in the global array */
+    ti_free_netdevice_info(dev);
+#endif /* CONFIG_TI_L2_SELECTIVE_FORWARDER */
 
 	if (head) {
 		list_move_tail(&dev->unreg_list, head);
@@ -6710,6 +6860,35 @@ static int __init net_dev_init(void)
 
 	if (register_pernet_subsys(&netdev_net_ops))
 		goto out;
+
+#ifdef CONFIG_TI_PACKET_PROCESSOR
+    /* Initialize the HIL Core Layer. */
+    if (ti_hil_initialize() < 0)
+    {
+        printk ("Error: Unable to initialize the HIL Core\n");
+        return -1;
+    }
+#endif /* CONFIG_TI_PACKET_PROCESSOR */
+
+#ifdef CONFIG_TI_HIL_PROFILE_INTRUSIVE
+    {
+        extern TI_HIL_PROFILE hil_intrusive_profile;
+
+        /* Load the Intrusive mode HIL Profile for the system */
+        if (ti_hil_register_profile(&hil_intrusive_profile) < 0)
+            return -1;
+    }
+#endif /* CONFIG_TI_HIL_PROFILE_INTRUSIVE */
+
+#ifdef CONFIG_TI_HIL_PROFILE_STATIC
+    {
+        extern TI_HIL_PROFILE hil_static_profile;
+
+        /* Load the Static HIL Profile for the system */
+        if (ti_hil_register_profile(&hil_static_profile) < 0)
+            return -1;
+    }
+#endif /* CONFIG_TI_HIL_PROFILE_STATIC */
 
 	/*
 	 *	Initialise the packet receive queues.

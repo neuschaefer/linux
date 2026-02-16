@@ -7,6 +7,11 @@
  * This file contains driver APIs to the irq subsystem.
  */
 
+/*
+ * Includes Intel Corporation's changes/modifications dated: 2012-2017.
+ * Changed/modified portions - Copyright © 2012-2017 , Intel Corporation.
+ */
+
 #define pr_fmt(fmt) "genirq: " fmt
 
 #include <linux/irq.h>
@@ -478,6 +483,27 @@ out:
 }
 EXPORT_SYMBOL(enable_irq);
 
+/**
+ *  ack_irq - ACK handling of an irq
+ *  @irq: Interrupt to ACK
+ *
+ *  ACKs the selected interrupt line.
+ *
+ */
+void ack_irq(unsigned int irq)
+{
+    struct irq_desc *desc = irq_to_desc(irq);
+
+    if (!desc)
+    {
+        return;
+    }
+
+    irq_ack(desc);
+}
+EXPORT_SYMBOL(ack_irq);
+
+
 static int set_irq_wake_real(unsigned int irq, unsigned int on)
 {
 	struct irq_desc *desc = irq_to_desc(irq);
@@ -945,9 +971,13 @@ __setup_irq(unsigned int irq, struct irq_desc *desc, struct irqaction *new)
 	 */
 	if (new->thread_fn && !nested) {
 		struct task_struct *t;
+#ifndef CONFIG_INTEL_IRQ_THREAD_CHANGE_PRIORITY
 		static const struct sched_param param = {
 			.sched_priority = MAX_USER_RT_PRIO/2,
 		};
+#else
+		struct sched_param param = { 0, };
+#endif
 
 		t = kthread_create(irq_thread, new, "irq/%d-%s", irq,
 				   new->name);
@@ -956,7 +986,19 @@ __setup_irq(unsigned int irq, struct irq_desc *desc, struct irqaction *new)
 			goto out_mput;
 		}
 
+#ifndef CONFIG_INTEL_IRQ_THREAD_CHANGE_PRIORITY
 		sched_setscheduler_nocheck(t, SCHED_FIFO, &param);
+#else
+		if (desc->policy == SCHED_NORMAL)
+		{
+			set_user_nice(t, desc->sched_priority);
+		}
+		else
+		{
+			param.sched_priority = desc->sched_priority;
+			sched_setscheduler_nocheck(t, desc->policy, &param);
+		}
+#endif
 
 		/*
 		 * We keep the reference to the task struct even if
@@ -1220,6 +1262,63 @@ int setup_irq(unsigned int irq, struct irqaction *act)
 	return retval;
 }
 EXPORT_SYMBOL_GPL(setup_irq);
+
+
+#ifdef CONFIG_INTEL_IRQ_THREAD_CHANGE_PRIORITY
+
+/**
+ *	irq_set_sched - set thread priority for an interrupt
+ *	@irq:      Interrupt line to set.
+ *  @policy:   irq thread policy for the interrupt (SCHED_NORMAL
+ *         | SCHED_FIFO)
+ *  @priority: irq thread priority for the interrupt
+ *  For NORMAL: +19 - -20
+ *  For FIFO:     1 -  99.
+ *
+ * Used to statically set the interrupt thread policy and
+ * priority. 
+ * 
+ *  On failure, it returns MULL.
+ *  On success, it return to IRQ thread task structure.
+ */
+struct task_struct *irq_set_sched(unsigned int irq, int policy, unsigned int priority)
+{
+    int retval = NULL;
+	unsigned long flags;
+    struct sched_param param;
+	struct irq_desc *desc = irq_get_desc_buslock(irq, &flags, IRQ_GET_DESC_CHECK_GLOBAL);
+
+	if (!desc)
+		return NULL;
+
+	if (WARN(!desc->irq_data.chip,KERN_ERR "irq_set_sched before setup/request_irq: irq %u\n", irq))
+    {
+        retval = NULL;
+		goto out;
+    }
+
+    desc->policy = policy;
+    desc->sched_priority = priority;
+
+    if (desc->policy == SCHED_NORMAL)
+    {
+        set_user_nice(desc->action->thread, desc->sched_priority); 
+    }
+    else
+    {
+        param.sched_priority = desc->sched_priority;
+        sched_setscheduler_nocheck(desc->action->thread, desc->policy, &param);
+    }
+
+    out:
+	irq_put_desc_busunlock(desc, flags);
+
+	return desc->action->thread;
+}
+EXPORT_SYMBOL_GPL(irq_set_sched);
+
+
+#endif
 
 /*
  * Internal function to unregister an irqaction - used to free

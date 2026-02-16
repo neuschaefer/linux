@@ -56,6 +56,10 @@
  *		2 of the License, or (at your option) any later version.
  *
  */
+/* 
+ * Includes Intel Corporation's changes/modifications dated: [11/07/2011].
+* Changed/modified portions - Copyright © [2011], Intel Corporation.
+*/
 
 #include <linux/string.h>
 #include <linux/module.h>
@@ -88,6 +92,11 @@
 #define PPPOE_HASH_BITS 4
 #define PPPOE_HASH_SIZE (1 << PPPOE_HASH_BITS)
 #define PPPOE_HASH_MASK	(PPPOE_HASH_SIZE - 1)
+
+#ifdef CONFIG_TI_PACKET_PROCESSOR
+int ti_pp_ppp_vpid_info = 0;
+int ti_pp_ppp_sid = 0;
+#endif //CONFIG_TI_PACKET_PROCESSOR
 
 static int __pppoe_xmit(struct sock *sk, struct sk_buff *skb);
 
@@ -655,6 +664,14 @@ static int pppoe_connect(struct socket *sock, struct sockaddr *uservaddr,
 		if (!dev)
 			goto err_put;
 
+#ifdef CONFIG_TI_PACKET_PROCESSOR
+        /* Save the VPID information block from the Parent PID. This
+         * will be used for creating the VPID by the Packet Processor
+         * when the PPPoX interface is actually created. Also save the PPP 
+         * session id so that it can be communicated to the HIL PP for its use. */
+        ti_pp_ppp_vpid_info = (int)&dev->vpid_block;       
+        ti_pp_ppp_sid = sp->sa_addr.pppoe.sid;
+#endif //CONFIG_TI_PACKET_PROCESSOR
 		po->pppoe_dev = dev;
 		po->pppoe_ifindex = dev->ifindex;
 		pn = pppoe_pernet(net);

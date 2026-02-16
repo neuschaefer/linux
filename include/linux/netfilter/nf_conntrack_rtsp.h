@@ -1,0 +1,109 @@
+/* 
+ * 
+ *
+ * Copyright (C) 2013, Intel Ltd.
+ * All Rights Reserved.
+ ** Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions, and the following disclaimer,
+ *    without modification.
+ * 2. The name of the author may not be used to endorse or promote products
+ *    derived from this software without specific prior written permission.
+ *
+ * Alternatively, this software may be distributed under the terms of the
+ * GNU General Public License ("GPL").
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE FOR
+ * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ *
+   You should have received a copy of the GNU General Public License 
+   along with this program; if not, write to the Free Software 
+   Foundation, Inc., 51 Franklin St - Fifth Floor, Boston, MA 02110-1301 USA.
+   The full GNU General Public License is included in this distribution 
+   in the file called LICENSE.GPL.
+
+   Contact Information:
+    Intel Corporation
+    2200 Mission College Blvd.
+    Santa Clara, CA  97052/*
+ * RTSP extension for IP connection tracking.
+ * (C) 2003 by Tom Marshall <tmarshall at real.com>
+ * based on ip_conntrack_irc.h
+ *
+ *      This program is free software; you can redistribute it and/or
+ *      modify it under the terms of the GNU General Public License
+ *      as published by the Free Software Foundation; either version
+ *      2 of the License, or (at your option) any later version.
+ *
+ * 2013-03-04: Il'inykh Sergey <sergeyi at inango-sw.com>. Inango Systems Ltd
+ *	- conditional compilation for kernel 3.7
+ *	- port mapping improvements
+*/
+#ifndef _IP_CONNTRACK_RTSP_H
+#define _IP_CONNTRACK_RTSP_H
+
+#include <linux/version.h>
+
+//#define IP_NF_RTSP_DEBUG 1
+#define IP_NF_RTSP_VERSION "0.7"
+
+#ifdef __KERNEL__
+/* port block types */
+typedef enum {
+    pb_single,  /* client_port=x */
+    pb_range,   /* client_port=x-y */
+    pb_discon   /* client_port=x/y (rtspbis) */
+} portblock_t;
+
+/* We record seq number and length of rtsp headers here, all in host order. */
+
+/*
+ * This structure is per expected connection.  It is a member of struct
+ * ip_conntrack_expect.  The TCP SEQ for the conntrack expect is stored
+ * there and we are expected to only store the length of the data which
+ * needs replaced.  If a packet contains multiple RTSP messages, we create
+ * one expected connection per message.
+ *
+ * We use these variables to mark the entire header block.  This may seem
+ * like overkill, but the nature of RTSP requires it.  A header may appear
+ * multiple times in a message.  We must treat two Transport headers the
+ * same as one Transport header with two entries.
+ */
+struct ip_ct_rtsp_expect
+{
+    u_int32_t   len;        /* length of header block */
+    portblock_t pbtype;     /* Type of port block that was requested */
+    u_int16_t   loport;     /* Port that was requested, low or first */
+    u_int16_t   hiport;     /* Port that was requested, high or second */
+#if 0
+    uint        method;     /* RTSP method */
+    uint        cseq;       /* CSeq from request */
+#endif
+};
+
+extern unsigned int (*nf_nat_rtsp_hook)(struct sk_buff *skb,
+					enum ip_conntrack_info ctinfo,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,7,0)
+					unsigned int protoff,
+#endif
+					unsigned int matchoff,
+					unsigned int matchlen,
+					struct ip_ct_rtsp_expect *prtspexp,
+					struct nf_conntrack_expect *rtp_exp,
+					struct nf_conntrack_expect *rtcp_exp);
+
+#define RTSP_PORT   554
+
+#endif /* __KERNEL__ */
+
+#endif /* _IP_CONNTRACK_RTSP_H */
+

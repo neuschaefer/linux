@@ -31,6 +31,10 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
+/*
+Includes Intel Corporation's changes/modifications dated: 2014.
+Changed/modified portions - Copyright © 2014, Intel Corporation.
+*/
 
 /*
  * Inventra (Multipoint) Dual-Role Controller Driver for Linux.
@@ -230,90 +234,120 @@ static struct usb_phy_io_ops musb_ulpi_access = {
 /*
  * Load an endpoint's FIFO
  */
-void musb_write_fifo(struct musb_hw_ep *hw_ep, u16 len, const u8 *src)
+static void musb_fifo_io(u8 * fifo, u8 * buf, u16 len, char is_read)
 {
-	struct musb *musb = hw_ep->musb;
-	void __iomem *fifo = hw_ep->fifo;
-
-	if (unlikely(len == 0))
-		return;
-
-	prefetch((u8 *)src);
-
-	dev_dbg(musb->controller, "%cX ep%d fifo %p count %d buf %p\n",
-			'T', hw_ep->epnum, fifo, len, src);
-
-	/* we can't assume unaligned reads work */
-	if (likely((0x01 & (unsigned long) src) == 0)) {
 		u16	index = 0;
+        /* protection from infinite loop */
+        if (len == 0) return;
 
-		/* best case is 32bit-aligned source address */
-		if ((0x02 & (unsigned long) src) == 0) {
-			if (len >= 4) {
-				iowrite32_rep(fifo, src + index, len >> 2);
+        char size = ((unsigned long)buf & 0x04) ? 4 :
+            ((unsigned long)buf & 0x02) ? 2 : 1;
+#ifndef CONFIG_CPU_LITTLE_ENDIAN
+        u32 *pTemp = (u32 *) buf;
+        u16 *pTmp16 = (u16 *) buf;
+#endif
+        size = (len >= size) ? size : (len >= (size >> 1)) ? (size >> 1) : 1;
+        if (size == 1) {
+                if (is_read)
+                        readsb(fifo, (void *__iomem)buf, len);
+                        else
+                        writesb(fifo, (void *__iomem)buf, len);
+                return;
+        }
+#ifndef CONFIG_CPU_LITTLE_ENDIAN
+        while (len >= size) {
+                switch (size) {
+                case 4:
+                        if (is_read)
+                                *pTemp = cpu_to_le32(*(u32 *) fifo);
+                        else
+                                *(u32 *) fifo = cpu_to_le32(*pTemp);
+                        pTemp++;
+                        break;
+                case 2:
+                        if (is_read)
+                                *pTmp16 = cpu_to_le16(*(u16 *) fifo);
+                        else
+                                *(u16 *) fifo = cpu_to_le16(*pTmp16);
+                        pTmp16++;
+                        break;
+                }
+                len -= size;
+                index += size;
+        }
+#else
+        switch (size) {
+        case 4:
+                if (is_read)
+                        readsl(fifo, buf, len >> 2);
+                else
+                        writesl(fifo, (void *__iomem)(buf), len >> 2);
 				index += len & ~0x03;
+                break;
+        case 2:
+                if (is_read)
+                        readsw(fifo, buf, len >> 1);
+                 else
+                        writesw(fifo, (void *__iomem)(buf), len >> 1);
+                index += len & ~0x01;
+                break;
 			}
+#endif
 			if (len & 0x02) {
-				musb_writew(fifo, 0, *(u16 *)&src[index]);
+                if (is_read)
+                        *(u16 *) & buf[index] =
+                            cpu_to_le16(musb_readw(fifo, 0));
+                else
+                        musb_writew(fifo, 0,
+                                    cpu_to_le16(*(u16 *) & buf[index]));
 				index += 2;
 			}
-		} else {
-			if (len >= 2) {
-				iowrite16_rep(fifo, src + index, len >> 1);
-				index += len & ~0x01;
+                if (len & 0x01) {
+                if (is_read)
+                        buf[index] = musb_readb(fifo, 0);
+                else
+                        musb_writeb(fifo, 0, buf[index]);
 			}
 		}
-		if (len & 0x01)
-			musb_writeb(fifo, 0, src[index]);
+void musb_write_fifo(struct musb_hw_ep *hw_ep, u16 wCount, const u8 * pSource)
+{
+		struct musb *musb = hw_ep->musb;
+        void __iomem *fifo = hw_ep->fifo;
+        prefetch((u8 *) pSource);
+        dev_dbg(musb->controller, "%cX ep%d fifo %p count %d buf %p\n",
+            'T', hw_ep->epnum, fifo, wCount, pSource);
+       /* we can't assume unaligned reads work */
+        if (likely((0x01 & (unsigned long)pSource) == 0)) {
+                /* best case is 32bit-aligned source address */
+                if ((0x02 & (unsigned long)pSource) == 0) {
+                        musb_fifo_io(fifo, (u8 *) pSource, wCount, 0);
 	} else  {
-		/* byte aligned */
-		iowrite8_rep(fifo, src, len);
+                        musb_fifo_io(fifo, (u8 *) pSource, wCount, 0);
+                }
+        } else {
+                musb_fifo_io(fifo, (u8 *) pSource, wCount, 0);
 	}
 }
 
-#if !defined(CONFIG_USB_MUSB_AM35X)
-/*
- * Unload an endpoint's FIFO
- */
-void musb_read_fifo(struct musb_hw_ep *hw_ep, u16 len, u8 *dst)
+void musb_read_fifo(struct musb_hw_ep *hw_ep, u16 wCount, u8 * pDest)
 {
 	struct musb *musb = hw_ep->musb;
 	void __iomem *fifo = hw_ep->fifo;
-
-	if (unlikely(len == 0))
-		return;
-
 	dev_dbg(musb->controller, "%cX ep%d fifo %p count %d buf %p\n",
-			'R', hw_ep->epnum, fifo, len, dst);
+            'R', hw_ep->epnum, fifo, wCount, pDest);
 
 	/* we can't assume unaligned writes work */
-	if (likely((0x01 & (unsigned long) dst) == 0)) {
-		u16	index = 0;
-
+        if (likely((0x01 & (unsigned long)pDest) == 0)) {
 		/* best case is 32bit-aligned destination address */
-		if ((0x02 & (unsigned long) dst) == 0) {
-			if (len >= 4) {
-				ioread32_rep(fifo, dst, len >> 2);
-				index = len & ~0x03;
-			}
-			if (len & 0x02) {
-				*(u16 *)&dst[index] = musb_readw(fifo, 0);
-				index += 2;
-			}
+                if ((0x02 & (unsigned long)pDest) == 0) {
+                        musb_fifo_io(fifo, pDest, wCount, 1);
 		} else {
-			if (len >= 2) {
-				ioread16_rep(fifo, dst, len >> 1);
-				index = len & ~0x01;
+                        musb_fifo_io(fifo, pDest, wCount, 1);
 			}
-		}
-		if (len & 0x01)
-			dst[index] = musb_readb(fifo, 0);
 	} else  {
-		/* byte aligned */
-		ioread8_rep(fifo, dst, len);
+                musb_fifo_io(fifo, pDest, wCount, 1);
 	}
 }
-#endif
 
 #endif	/* normal PIO */
 
@@ -654,7 +688,7 @@ static irqreturn_t musb_stage0_irq(struct musb *musb, u8 int_usb,
 				break;
 		case OTG_STATE_B_PERIPHERAL:
 			musb_g_suspend(musb);
-			musb->is_active = otg->gadget->b_hnp_enable;
+			musb->is_active = otg->gadget && otg->gadget->b_hnp_enable;
 			if (musb->is_active) {
 				musb->xceiv->state = OTG_STATE_B_WAIT_ACON;
 				dev_dbg(musb->controller, "HNP: Setting timer for b_ase0_brst\n");
@@ -942,6 +976,7 @@ void musb_start(struct musb *musb)
 
 	/* put into basic highspeed mode and start session */
 	musb_writeb(regs, MUSB_POWER, MUSB_POWER_ISOUPDATE
+			| MUSB_POWER_SOFTCONN
 			| MUSB_POWER_HSENAB
 			/* ENSUSPEND wedges tusb */
 			/* | MUSB_POWER_ENSUSPEND */
@@ -956,11 +991,12 @@ void musb_start(struct musb *musb)
 	 * (b) vbus present/connect IRQ, peripheral mode;
 	 * (c) peripheral initiates, using SRP
 	 */
-	if (musb->port_mode != MUSB_PORT_MODE_HOST &&
-			(devctl & MUSB_DEVCTL_VBUS) == MUSB_DEVCTL_VBUS) {
-		musb->is_active = 1;
-	} else {
+	if (musb->port_mode == MUSB_PORT_MODE_HOST) {
+		/* assume ID pin is hard-wired to ground */
 		devctl |= MUSB_DEVCTL_SESSION;
+	} else /* peripheral is enabled */ {
+		if ((devctl & MUSB_DEVCTL_VBUS) == MUSB_DEVCTL_VBUS)
+			musb->is_active = 1;
 	}
 
 	musb_platform_enable(musb);
@@ -1075,8 +1111,10 @@ static struct musb_fifo_cfg mode_2_cfg[] = {
 { .hw_ep_num = 1, .style = FIFO_RX,   .maxpacket = 512, },
 { .hw_ep_num = 2, .style = FIFO_TX,   .maxpacket = 512, },
 { .hw_ep_num = 2, .style = FIFO_RX,   .maxpacket = 512, },
-{ .hw_ep_num = 3, .style = FIFO_RXTX, .maxpacket = 256, },
-{ .hw_ep_num = 4, .style = FIFO_RXTX, .maxpacket = 256, },
+{ .hw_ep_num = 3, .style = FIFO_TX,   .maxpacket = 512, },
+{ .hw_ep_num = 3, .style = FIFO_RX,   .maxpacket = 512, },
+{ .hw_ep_num = 4, .style = FIFO_TX,   .maxpacket = 512, },
+{ .hw_ep_num = 4, .style = FIFO_RX,   .maxpacket = 256, },
 };
 
 /* mode 3 - fits in 4KB */
@@ -1655,6 +1693,58 @@ musb_mode_store(struct device *dev, struct device_attribute *attr,
 }
 static DEVICE_ATTR(mode, 0644, musb_mode_show, musb_mode_store);
 
+#ifdef CONFIG_PM
+static int musb_resume(struct device *dev);
+static int musb_suspend(struct device *dev);
+extern puma5_usb_power_up(struct musb     *);
+extern puma5_usb_power_down(struct musb     *);
+
+static ssize_t
+musb_power_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	struct musb *musb = dev_to_musb(dev);
+	unsigned long flags;
+	unsigned int val;
+	spin_lock_irqsave(&musb->lock, flags);
+    val = musb->power_status;
+	spin_unlock_irqrestore(&musb->lock, flags);
+	return sprintf(buf, "%d\n", val);
+}
+
+static ssize_t
+musb_power_store(struct device *dev, struct device_attribute *attr,
+		const char *buf, size_t n)
+{
+	struct musb	*musb = dev_to_musb(dev);
+	unsigned long	flags;
+	unsigned short	status = 1;
+    unsigned short   val;
+	if (sscanf(buf, "%hu", &val) < 1) {
+		dev_err(dev, "Invalid power value\n");
+		return -EINVAL;
+	}
+
+    spin_lock_irqsave(&musb->lock, flags);
+    if (val == 3) {
+        musb->power_status = val;
+        musb_suspend(dev);
+    } else if (val == 0) {
+        musb->power_status = val;
+        musb_resume(dev);
+    } else {
+        status = 0;
+    }
+	spin_unlock_irqrestore(&musb->lock, flags);
+	if (status == 0) {
+		dev_err(dev, "Wrong power value\n");
+		return -EINVAL;
+	}
+
+	return n;
+}
+static DEVICE_ATTR(musbpower, 0644, musb_power_show, musb_power_store);
+#endif
+
 static ssize_t
 musb_vbus_store(struct device *dev, struct device_attribute *attr,
 		const char *buf, size_t n)
@@ -1727,6 +1817,9 @@ static struct attribute *musb_attributes[] = {
 	&dev_attr_mode.attr,
 	&dev_attr_vbus.attr,
 	&dev_attr_srp.attr,
+#ifdef CONFIG_PM
+	&dev_attr_musbpower.attr,
+#endif
 	NULL
 };
 
@@ -2015,6 +2108,7 @@ static int musb_probe(struct platform_device *pdev)
 		return -ENODEV;
 
 	base = devm_ioremap_resource(dev, iomem);
+	base = (void *)iomem->start;	
 	if (IS_ERR(base))
 		return PTR_ERR(base);
 
@@ -2198,17 +2292,82 @@ static int musb_suspend(struct device *dev)
 	struct musb	*musb = dev_to_musb(dev);
 	unsigned long	flags;
 
-	spin_lock_irqsave(&musb->lock, flags);
+#ifndef CONFIG_MACH_PUMA5
+	if (!musb->clock)
+		return 0;
+#endif
+
+    musb_save_context(musb);
+
+	spin_trylock_irqsave(&musb->lock, flags);
 
 	if (is_peripheral_active(musb)) {
 		/* FIXME force disconnect unless we know USB will wake
 		 * the system up quickly enough to respond ...
 		 */
+#ifdef CONFIG_MACH_PUMA5
+                puma5_usb_power_down(musb);
+                printk("suspend: usb power down\n");
+#endif
 	} else if (is_host_active(musb)) {
+#ifdef CONFIG_MACH_PUMA5   
+                printk("host suspend: usb power down\n");
+                musb_stop(musb);
+                mdelay(100);
+                puma5_usb_power_down(musb);
+#endif
 		/* we know all the children are suspended; sometimes
 		 * they will even be wakeup-enabled.
 		 */
 	}
+#ifndef CONFIG_MACH_PUMA5
+	if (musb->set_clock)
+		musb->set_clock(musb->clock, 0);
+	else
+		clk_disable(musb->clock);
+#endif
+	spin_unlock_irqrestore(&musb->lock, flags);
+	return 0;
+}
+
+static int musb_resume(struct device *dev)
+{
+	unsigned long	flags;
+	struct platform_device *pdev = to_platform_device(dev);
+	struct musb	*musb = dev_to_musb(&pdev->dev);
+
+#ifndef CONFIG_MACH_PUMA5
+	if (!musb->clock)
+		return 0;
+#endif
+
+	spin_trylock_irqsave(&musb->lock, flags);
+
+#ifndef CONFIG_MACH_PUMA5
+	if (musb->set_clock)
+		musb->set_clock(musb->clock, 1);
+	else
+		clk_enable(musb->clock);
+#endif
+
+	/* for static cmos like DaVinci, register values were preserved
+	 * unless for some reason the whole soc powered down and we're
+	 * not treating that as a whole-system restart (e.g. swsusp)
+	 */
+
+        if (is_peripheral_active(musb)) {
+#ifdef CONFIG_MACH_PUMA5
+                printk("resume: usb power up\n");
+                puma5_usb_power_up(musb);
+#endif
+        } else if (is_host_active(musb)) {
+#ifdef CONFIG_MACH_PUMA5           
+                printk("host resume: usb power up\n");
+                puma5_usb_power_up(musb);
+                musb_start(musb);
+#endif                
+        }
+
 
 	spin_unlock_irqrestore(&musb->lock, flags);
 	return 0;
@@ -2216,6 +2375,11 @@ static int musb_suspend(struct device *dev)
 
 static int musb_resume_noirq(struct device *dev)
 {
+	struct platform_device *pdev = to_platform_device(dev);
+	struct musb	*musb = dev_to_musb(&pdev->dev);
+
+	musb_restore_context(musb);
+
 	/* for static cmos like DaVinci, register values were preserved
 	 * unless for some reason the whole soc powered down or the USB
 	 * module got reset through the PSC (vs just being disabled).
@@ -2281,8 +2445,33 @@ static struct platform_driver musb_driver = {
 
 static int __init musb_init(void)
 {
+#ifdef CONFIG_USB_MUSB_HOST
 	if (usb_disabled())
 		return 0;
+#endif
+
+	pr_info("%s: version " MUSB_VERSION ", "
+#ifdef CONFIG_MUSB_PIO_ONLY
+		"pio"
+#elif defined(CONFIG_USB_TI_CPPI_DMA)
+		"cppi-dma"
+#elif defined(CONFIG_USB_INVENTRA_DMA)
+		"musb-dma"
+#elif defined(CONFIG_USB_TUSB_OMAP_DMA)
+		"tusb-omap-dma"
+#else
+		"?dma?"
+#endif
+		", "
+#ifdef CONFIG_USB_MUSB_DUAL_ROLE
+		"otg (peripheral+host)"
+#elif defined(CONFIG_USB_MUSB_GADGET)
+		"peripheral"
+#elif defined(CONFIG_USB_MUSB_HOST)
+		"host"
+#endif
+		"\n",
+		musb_driver_name);
 
 	return platform_driver_register(&musb_driver);
 }

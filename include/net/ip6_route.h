@@ -118,15 +118,23 @@ extern struct rt6_info *addrconf_dst_alloc(struct inet6_dev *idev,
  */
 extern struct rt6_info *	rt6_get_dflt_router(const struct in6_addr *addr,
 						    struct net_device *dev);
+extern struct rt6_info *	rt6_get_dflt_router_by_table(const struct in6_addr *addr,
+						    struct net_device *dev, u32 table_id);
 extern struct rt6_info *	rt6_add_dflt_router(const struct in6_addr *gwaddr,
 						    struct net_device *dev,
 						    unsigned int pref);
+extern struct rt6_info *	rt6_add_dflt_router_by_table(const struct in6_addr *gwaddr,
+						    struct net_device *dev,
+						    unsigned int pref, u32 table_id);
 
 extern void			rt6_purge_dflt_routers(struct net *net);
 
 extern int			rt6_route_rcv(struct net_device *dev,
 					      u8 *opt, int len,
 					      const struct in6_addr *gwaddr);
+extern int			rt6_route_rcv_by_table(struct net_device *dev,
+					      u8 *opt, int len,
+					      const struct in6_addr *gwaddr, u32 table_id);
 
 extern void ip6_update_pmtu(struct sk_buff *skb, struct net *net, __be32 mtu,
 			    int oif, u32 mark);

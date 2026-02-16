@@ -5,6 +5,10 @@
  *
  * This file contains the /proc/irq/ handling code.
  */
+/*
+Includes Intel Corporation's changes/modifications dated: 2014.
+Changed/modified portions - Copyright © 2014, Intel Corporation.
+*/
 
 #include <linux/irq.h>
 #include <linux/gfp.h>
@@ -12,7 +16,12 @@
 #include <linux/seq_file.h>
 #include <linux/interrupt.h>
 #include <linux/kernel_stat.h>
-
+#ifdef CONFIG_INTEL_IRQ_THREAD_CHANGE_PRIORITY
+#include <linux/uaccess.h>
+#include <linux/sched.h>
+#include <linux/sched/rt.h>
+#include <linux/parser.h>
+#endif
 #include "internals.h"
 
 static struct proc_dir_entry *root_irq_dir;
@@ -307,6 +316,111 @@ void register_handler_proc(unsigned int irq, struct irqaction *action)
 
 #define MAX_NAMELEN 10
 
+
+#ifdef CONFIG_INTEL_IRQ_THREAD_CHANGE_PRIORITY
+
+#define POLICY_POS 0
+#define PRIORITY_POS 1
+static int irq_schedule_param_proc_show(struct seq_file *m, void *v)
+{
+
+	struct irq_desc *desc = irq_to_desc((long) m->private);
+    /* SCHED_ISO: reserved but not implemented yet */
+    seq_printf(m,"\n The schedule param command usage: \n"
+                             "\t<schedule_policy(SCHED_NORMAL=0)> \t<schedule_priority[-20..19]>\n"
+                             "\t<schedule_policy(SCHED_FIFO=1)>   \t<schedule_priority[1...99]>\n"
+                             "\t<schedule_policy(SCHED_RR=2)>     \t<schedule_priority[1...99]>\n" 
+                             "\t<schedule_policy(SCHED_BATCH=3)>  \t<schedule_priority[0...99]>\n"   
+                             "\t<schedule_policy(SCHED_IDLE=5)>   \t<schedule_priority[0...99]>\n");
+	seq_printf(m, "schedule param:\n\tschedule_policy %d\n" "\tschedule_priority %d\n",
+		   desc->policy, desc->sched_priority);
+	return 0;
+}
+static ssize_t irq_schedule_param_proc_write(struct file *file,
+		const char __user *buffer, size_t count, loff_t *pos)
+{
+	unsigned int irq = (int)(long)PDE_DATA(file->f_path.dentry->d_inode);
+	struct irq_desc *desc = irq_to_desc(irq);
+    unsigned long flags;
+    int tmp,err,i;
+    char    proc_buffer[10], *value, *pbuf;
+   
+    if (count < PRIORITY_POS +1)
+    { 
+        printk("irq_schedule_param_proc_write:wrong argc\n");
+        return -EINVAL;
+       
+    }
+     /* Copy from user space. */
+    if (copy_from_user (&proc_buffer, buffer, count))
+    {
+        printk("irq_schedule_param_proc_write:copy_from_user failure\n");
+        return -EFAULT;
+    }
+    pbuf = &proc_buffer[0];
+    proc_buffer[count]='\0';
+    raw_spin_lock_irqsave(&desc->lock, flags);
+    for (i = 0; i < (PRIORITY_POS + 1); i++) {
+          value = strsep(&pbuf, " ");
+          if (value != NULL) { 
+              if(kstrtoint(strstrip(value),0,&tmp))
+              {
+                   printk("irq_schedule_param_proc_write:kstrtoint failure proc_buffer=%s value=%s\n",proc_buffer,value);
+                   err = -EINVAL; 
+                   goto out;
+              }
+              switch(i){
+              case POLICY_POS:
+                    if (tmp != SCHED_FIFO && tmp != SCHED_RR &&
+                                tmp != SCHED_NORMAL && tmp != SCHED_BATCH &&
+                                tmp != SCHED_IDLE)
+                    {
+                        printk("irq_schedule_param_proc_write:policy failure\n");
+                        err = -EINVAL;  
+                        goto out;
+                    }
+                    desc->policy = tmp;   
+                  break;
+              case PRIORITY_POS:
+                  if(tmp<0 || tmp > MAX_USER_RT_PRIO-1)
+                  {
+                       printk("irq_schedule_param_proc_write:priority failure\n");
+                       err = -EINVAL;  
+                       goto out;
+                  }
+                  desc->sched_priority = tmp;
+                  break;
+              }
+          }
+          else
+          {  
+
+              err = -EINVAL;
+              goto out;
+          }
+
+    }
+    err = count;
+out:
+	raw_spin_unlock_irqrestore(&desc->lock, flags);
+    
+	return err;
+}
+static int irq_schedule_param_proc_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, irq_schedule_param_proc_show, PDE_DATA(inode));
+}
+
+static const struct file_operations irq_schedule_param_proc_fops = {
+	.open		= irq_schedule_param_proc_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+	.write		= irq_schedule_param_proc_write,
+};
+
+#endif
+
 void register_irq_proc(unsigned int irq, struct irq_desc *desc)
 {
 	char name [MAX_NAMELEN];
@@ -341,6 +455,10 @@ void register_irq_proc(unsigned int irq, struct irq_desc *desc)
 
 	proc_create_data("spurious", 0444, desc->dir,
 			 &irq_spurious_proc_fops, (void *)(long)irq);
+#ifdef CONFIG_INTEL_IRQ_THREAD_CHANGE_PRIORITY
+	proc_create_data("schedule_param", 0600, desc->dir,
+			 &irq_schedule_param_proc_fops, (void *)(long)irq);
+#endif
 }
 
 void unregister_irq_proc(unsigned int irq, struct irq_desc *desc)
@@ -356,6 +474,9 @@ void unregister_irq_proc(unsigned int irq, struct irq_desc *desc)
 	remove_proc_entry("node", desc->dir);
 #endif
 	remove_proc_entry("spurious", desc->dir);
+#ifdef CONFIG_INTEL_IRQ_THREAD_CHANGE_PRIORITY
+	remove_proc_entry("schedule_param", desc->dir);
+#endif
 
 	memset(name, 0, MAX_NAMELEN);
 	sprintf(name, "%u", irq);

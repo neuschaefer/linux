@@ -240,6 +240,35 @@ static int ct_seq_show(struct seq_file *s, void *v)
 	if (ct_show_delta_time(s, ct))
 		goto release;
 
+#ifdef CONFIG_TI_PACKET_PROCESSOR
+    /* Check if the ORIGINAL connection tracking entry has been accelerated or not? */
+    if (ct->tuplehash[IP_CT_DIR_ORIGINAL].ti_pp_session_handle == 0xFFFF)
+    {
+        /* Conntrack was not accelerated so indicate so. */
+    	if (seq_printf(s, "[ORG XXX] "))
+	    	goto release;
+    }
+    else
+    {
+        /* Conntrack was accelerated so dump the session handle. */
+    	if (seq_printf(s, "ORG %d ", ct->tuplehash[IP_CT_DIR_ORIGINAL].ti_pp_session_handle))
+	    	goto release;
+    }
+    /* Check if the REPLY connection tracking entry has been accelerated or not? */
+    if (ct->tuplehash[IP_CT_DIR_REPLY].ti_pp_session_handle == 0xFFFF)
+    {
+        /* Conntrack was not accelerated so indicate so. */
+    	if (seq_printf(s, "[REPLY XXX] "))
+	    	goto release;
+    }
+    else
+    {
+        /* Conntrack was accelerated so dump the session handle. */
+    	if (seq_printf(s, "REPLY %d ", ct->tuplehash[IP_CT_DIR_REPLY].ti_pp_session_handle))
+	    	goto release;
+    }
+#endif /* CONFIG_TI_PACKET_PROCESSOR */
+
 	if (seq_printf(s, "use=%u\n", atomic_read(&ct->ct_general.use)))
 		goto release;
 

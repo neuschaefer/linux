@@ -1,0 +1,50 @@
+/*
+ *
+ * puma6_clk_cntl.h 
+ * Description:
+ * see below
+ *
+ *
+ */
+
+
+#ifndef _PUMA6_CLK_CNTL_H_
+#define _PUMA6_CLK_CNTL_H_
+
+/* Macro to Init the Puma6 clk DB */
+#define PUMA6_INIT_CLK_DB_ENTRIES \
+        PUMA6_INIT_CLK_DB_ENTRY(PUMA6_ARM_CLK_VAL,       PAL_SYS_CLKC_ARM)         \
+        PUMA6_INIT_CLK_DB_ENTRY(PUMA6_C55_CLK_VAL,       PAL_SYS_CLKC_C55)         \
+        PUMA6_INIT_CLK_DB_ENTRY(PUMA6_BBU_CLK_VAL,       PAL_SYS_CLKC_BBU)         \
+        PUMA6_INIT_CLK_DB_ENTRY(PUMA6_WDT_CLK_VAL,       PAL_SYS_CLKC_WDT)         \
+        PUMA6_INIT_CLK_DB_ENTRY(PUMA6_RAM_CLK,           PAL_SYS_CLKC_RAM)         \
+        PUMA6_INIT_CLK_DB_ENTRY(PUMA6_TIMER0_CLK_VAL,    PAL_SYS_CLKC_TIMER0)      \
+        PUMA6_INIT_CLK_DB_ENTRY(PUMA6_TIMER1_CLK_VAL,    PAL_SYS_CLKC_TIMER1)      \
+        PUMA6_INIT_CLK_DB_ENTRY(PUMA6_TIMER2_CLK_VAL,    PAL_SYS_CLKC_TIMER2)      \
+        PUMA6_INIT_CLK_DB_ENTRY(PUMA6_UART0_CLK_VAL,     PAL_SYS_CLKC_UART0)       \
+        PUMA6_INIT_CLK_DB_ENTRY(PUMA6_UART1_CLK_VAL,     PAL_SYS_CLKC_UART1)       \
+        PUMA6_INIT_CLK_DB_ENTRY(PUMA6_UART2_CLK_VAL,     PAL_SYS_CLKC_UART2)       \
+        PUMA6_INIT_CLK_DB_ENTRY(PUMA6_BOOT_CFG_CLK_VAL,  PAL_SYS_CLKC_BOOT_CFG)    \
+        PUMA6_INIT_CLK_DB_ENTRY(PUMA6_TDM_CLK_VAL,       PAL_SYS_CLKC_TDM)         \
+        PUMA6_INIT_CLK_DB_ENTRY(PUMA6_CODEC_SPI_CLK_VAL, PAL_SYS_CLKC_CODEC_SPI)   \
+        PUMA6_INIT_CLK_DB_ENTRY(PUMA6_TDM10_CLK_VAL,     PAL_SYS_CLKC_TDM10)       \
+        PUMA6_INIT_CLK_DB_ENTRY(PUMA6_TDM11_CLK_VAL,     PAL_SYS_CLKC_TDM11)       \
+        PUMA6_INIT_CLK_DB_ENTRY(PUMA6_I2C_CLK_VAL,       PAL_SYS_CLKC_I2C)         \
+        PUMA6_INIT_CLK_DB_ENTRY(PUMA6_PERF_MON_CLK_VAL,  PAL_SYS_CLKC_PERF_MON)    \
+        PUMA6_INIT_CLK_DB_ENTRY(PUMA6_C55_2_CLK_VAL,     PAL_SYS_CLKC_C55_2)       \
+        PUMA6_INIT_CLK_DB_ENTRY(PUMA6_INTC_CLK_VAL,      PAL_SYS_CLKC_INTC)        \
+        PUMA6_INIT_CLK_DB_ENTRY(PUMA6_SSX_CLK_VAL,       PAL_SYS_CLKC_SSX)
+
+/** \enum PAL_SYS_CLKC_ID_T
+	\brief Enum used to identify the module whose frequency has to be set/get
+
+*/
+#define PUMA6_INIT_CLK_DB_ENTRY(clk_value, clk_index) clk_index,
+typedef enum PAL_SYS_CLKC_ID_tag 
+{
+    PUMA6_INIT_CLK_DB_ENTRIES
+    PAL_SYS_CLKC_MAX_ID       /* This is not a real clock. Used to find clock id end */
+}PAL_SYS_CLKC_ID_T;
+#undef PUMA6_INIT_CLK_DB_ENTRY
+
+#endif

@@ -1,6 +1,8 @@
 /*
  * RNDIS MSG parser
  *
+ * Version:     $Id: rndis.c,v 1.19 2004/03/25 21:33:46 robert Exp $
+ *
  * Authors:	Benedikt Spranger, Pengutronix
  *		Robert Schwebel, Pengutronix
  *
@@ -19,6 +21,32 @@
  *
  * Copyright (C) 2004 by David Brownell
  *		updates to merge with Linux 2.6, better match RNDIS spec
+ */
+/*
+Includes Intel Corporation's changes/modifications dated: 2014.
+Changed/modified portions - Copyright © 2014, Intel Corporation.
+*/
+
+/* Copyright 2008, Texas Instruments Incorporated
+ *
+ * This program has been modified from its original operation by 
+ * Texas Instruments to do the following:
+ * 
+ * Explanation of modification:
+ *  fixes/changes from Puma5
+ *  
+ *
+ * THIS MODIFIED SOFTWARE AND DOCUMENTATION ARE PROVIDED
+ * "AS IS," AND TEXAS INSTRUMENTS MAKES NO REPRESENTATIONS
+ * OR WARRENTIES, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+ * TO, WARRANTIES OF MERCHANTABILITY OR FITNESS FOR ANY
+ * PARTICULAR PURPOSE OR THAT THE USE OF THE SOFTWARE OR
+ * DOCUMENTATION WILL NOT INFRINGE ANY THIRD PARTY PATENTS,
+ * COPYRIGHTS, TRADEMARKS OR OTHER RIGHTS.
+ * See The GNU General Public License for more details.
+ *
+ * These changes are covered under version 2 of the GNU General Public License,
+ * dated June 1991.
  */
 
 #include <linux/module.h>
@@ -88,6 +116,9 @@ static const u32 oid_supported_list[] =
 	RNDIS_OID_GEN_MAXIMUM_TOTAL_SIZE,
 	RNDIS_OID_GEN_MEDIA_CONNECT_STATUS,
 	RNDIS_OID_GEN_PHYSICAL_MEDIUM,
+#ifdef CONFIG_MACH_PUMA5
+	RNDIS_OID_GEN_RNDIS_CONFIG_PARAMETER,
+#endif
 
 	/* the statistical stuff */
 	RNDIS_OID_GEN_XMIT_OK,
@@ -158,6 +189,11 @@ static const u32 oid_supported_list[] =
 #endif	/* RNDIS_PM */
 };
 
+#ifdef CONFIG_MACH_PUMA5
+static void string_to_unicode (char *string, u16 *unicode_string, u16 *length);
+static u8 unicode_to_macnibble (u16 value);
+static int rndis_indicate_status_msg (int configNr, u32 status);
+#endif
 
 /* NDIS Functions */
 static int gen_ndis_query_resp(int configNr, u32 OID, u8 *buf,
@@ -313,7 +349,11 @@ static int gen_ndis_query_resp(int configNr, u32 OID, u8 *buf,
 	/* mandatory */
 	case RNDIS_OID_GEN_CURRENT_PACKET_FILTER:
 		pr_debug("%s: RNDIS_OID_GEN_CURRENT_PACKET_FILTER\n", __func__);
+#ifdef CONFIG_MACH_PUMA5
+		*outbuf = cpu_to_le32 (*(u16 *)rndis_per_dev_params[configNr].filter);
+#else
 		*outbuf = cpu_to_le32(*rndis_per_dev_params[configNr].filter);
+#endif
 		retval = 0;
 		break;
 
@@ -335,7 +375,11 @@ static int gen_ndis_query_resp(int configNr, u32 OID, u8 *buf,
 
 	case RNDIS_OID_GEN_PHYSICAL_MEDIUM:
 		pr_debug("%s: RNDIS_OID_GEN_PHYSICAL_MEDIUM\n", __func__);
-		*outbuf = cpu_to_le32(0);
+#ifdef CONFIG_MACH_PUMA5
+		*outbuf = cpu_to_le32 (2);
+#else	
+	*outbuf = cpu_to_le32(0);
+#endif
 		retval = 0;
 		break;
 
@@ -404,6 +448,143 @@ static int gen_ndis_query_resp(int configNr, u32 OID, u8 *buf,
 		}
 		break;
 
+#ifdef	RNDIS_OPTIONAL_STATS
+	case OID_GEN_DIRECTED_BYTES_XMIT:
+		pr_debug("%s: OID_GEN_DIRECTED_BYTES_XMIT\n", __func__);
+		/*
+		 * Aunt Tilly's size of shoes
+		 * minus antarctica count of penguins
+		 * divided by weight of Alpha Centauri
+		 */
+		if (rndis_per_dev_params [configNr].stats) {
+			*outbuf = cpu_to_le32 (
+				(rndis_per_dev_params [configNr]
+					.stats->tx_packets -
+				 rndis_per_dev_params [configNr]
+					 .stats->tx_errors -
+				 rndis_per_dev_params [configNr]
+					 .stats->tx_dropped)
+				* 123);
+			retval = 0;
+		}
+		break;
+
+	case OID_GEN_DIRECTED_FRAMES_XMIT:
+		pr_debug("%s: OID_GEN_DIRECTED_FRAMES_XMIT\n", __func__);
+		/* dito */
+		if (rndis_per_dev_params [configNr].stats) {
+			*outbuf = cpu_to_le32 (
+				(rndis_per_dev_params [configNr]
+					.stats->tx_packets -
+				 rndis_per_dev_params [configNr]
+					 .stats->tx_errors -
+				 rndis_per_dev_params [configNr]
+					 .stats->tx_dropped)
+				/ 123);
+			retval = 0;
+		}
+		break;
+
+	case OID_GEN_MULTICAST_BYTES_XMIT:
+		pr_debug("%s: OID_GEN_MULTICAST_BYTES_XMIT\n", __func__);
+		if (rndis_per_dev_params [configNr].stats) {
+			*outbuf = cpu_to_le32 (rndis_per_dev_params [configNr]
+					.stats->multicast*1234);
+			retval = 0;
+		}
+		break;
+
+	case OID_GEN_MULTICAST_FRAMES_XMIT:
+		pr_debug("%s: OID_GEN_MULTICAST_FRAMES_XMIT\n", __func__);
+		if (rndis_per_dev_params [configNr].stats) {
+			*outbuf = cpu_to_le32 (rndis_per_dev_params [configNr]
+					.stats->multicast);
+			retval = 0;
+		}
+		break;
+
+	case OID_GEN_BROADCAST_BYTES_XMIT:
+		pr_debug("%s: OID_GEN_BROADCAST_BYTES_XMIT\n", __func__);
+		if (rndis_per_dev_params [configNr].stats) {
+			*outbuf = cpu_to_le32 (rndis_per_dev_params [configNr]
+					.stats->tx_packets/42*255);
+			retval = 0;
+		}
+		break;
+
+	case OID_GEN_BROADCAST_FRAMES_XMIT:
+		pr_debug("%s: OID_GEN_BROADCAST_FRAMES_XMIT\n", __func__);
+		if (rndis_per_dev_params [configNr].stats) {
+			*outbuf = cpu_to_le32 (rndis_per_dev_params [configNr]
+					.stats->tx_packets/42);
+			retval = 0;
+		}
+		break;
+
+	case OID_GEN_DIRECTED_BYTES_RCV:
+		pr_debug("%s: OID_GEN_DIRECTED_BYTES_RCV\n", __func__);
+		*outbuf = __constant_cpu_to_le32 (0);
+		retval = 0;
+		break;
+
+	case OID_GEN_DIRECTED_FRAMES_RCV:
+		pr_debug("%s: OID_GEN_DIRECTED_FRAMES_RCV\n", __func__);
+		*outbuf = __constant_cpu_to_le32 (0);
+		retval = 0;
+		break;
+
+	case OID_GEN_MULTICAST_BYTES_RCV:
+		pr_debug("%s: OID_GEN_MULTICAST_BYTES_RCV\n", __func__);
+		if (rndis_per_dev_params [configNr].stats) {
+			*outbuf = cpu_to_le32 (rndis_per_dev_params [configNr]
+					.stats->multicast * 1111);
+			retval = 0;
+		}
+		break;
+
+	case OID_GEN_MULTICAST_FRAMES_RCV:
+		pr_debug("%s: OID_GEN_MULTICAST_FRAMES_RCV\n", __func__);
+		if (rndis_per_dev_params [configNr].stats) {
+			*outbuf = cpu_to_le32 (rndis_per_dev_params [configNr]
+					.stats->multicast);
+			retval = 0;
+		}
+		break;
+
+	case OID_GEN_BROADCAST_BYTES_RCV:
+		pr_debug("%s: OID_GEN_BROADCAST_BYTES_RCV\n", __func__);
+		if (rndis_per_dev_params [configNr].stats) {
+			*outbuf = cpu_to_le32 (rndis_per_dev_params [configNr]
+					.stats->rx_packets/42*255);
+			retval = 0;
+		}
+		break;
+
+	case OID_GEN_BROADCAST_FRAMES_RCV:
+		pr_debug("%s: OID_GEN_BROADCAST_FRAMES_RCV\n", __func__);
+		if (rndis_per_dev_params [configNr].stats) {
+			*outbuf = cpu_to_le32 (rndis_per_dev_params [configNr]
+					.stats->rx_packets/42);
+			retval = 0;
+		}
+		break;
+
+	case OID_GEN_RCV_CRC_ERROR:
+		pr_debug("%s: OID_GEN_RCV_CRC_ERROR\n", __func__);
+		if (rndis_per_dev_params [configNr].stats) {
+			*outbuf = cpu_to_le32 (rndis_per_dev_params [configNr]
+					.stats->rx_crc_errors);
+			retval = 0;
+		}
+		break;
+
+	case OID_GEN_TRANSMIT_QUEUE_LENGTH:
+		pr_debug("%s: OID_GEN_TRANSMIT_QUEUE_LENGTH\n", __func__);
+		*outbuf = __constant_cpu_to_le32 (0);
+		retval = 0;
+		break;
+#endif	/* RNDIS_OPTIONAL_STATS */
+
 	/* ieee802.3 OIDs (table 4-3) */
 
 	/* mandatory */
@@ -411,9 +592,15 @@ static int gen_ndis_query_resp(int configNr, u32 OID, u8 *buf,
 		pr_debug("%s: RNDIS_OID_802_3_PERMANENT_ADDRESS\n", __func__);
 		if (rndis_per_dev_params[configNr].dev) {
 			length = ETH_ALEN;
+#ifdef CONFIG_MACH_PUMA5
+			 memcpy (outbuf,
+                                rndis_per_dev_params [configNr].perm_mac,
+                                length);
+#else
 			memcpy(outbuf,
 				rndis_per_dev_params[configNr].host_mac,
 				length);
+#endif
 			retval = 0;
 		}
 		break;
@@ -442,7 +629,11 @@ static int gen_ndis_query_resp(int configNr, u32 OID, u8 *buf,
 	case RNDIS_OID_802_3_MAXIMUM_LIST_SIZE:
 		pr_debug("%s: RNDIS_OID_802_3_MAXIMUM_LIST_SIZE\n", __func__);
 		/* Multicast base address only */
+#ifdef CONFIG_MACH_PUMA5
+		*outbuf = cpu_to_le32(32); /* TAG0008 */
+#else
 		*outbuf = cpu_to_le32(1);
+#endif
 		retval = 0;
 		break;
 
@@ -476,6 +667,64 @@ static int gen_ndis_query_resp(int configNr, u32 OID, u8 *buf,
 		*outbuf = cpu_to_le32(0);
 		retval = 0;
 		break;
+
+#ifdef	RNDIS_OPTIONAL_STATS
+	case OID_802_3_XMIT_DEFERRED:
+		pr_debug("%s: OID_802_3_XMIT_DEFERRED\n", __func__);
+		/* TODO */
+		break;
+
+	case OID_802_3_XMIT_MAX_COLLISIONS:
+		pr_debug("%s: OID_802_3_XMIT_MAX_COLLISIONS\n", __func__);
+		/* TODO */
+		break;
+
+	case OID_802_3_RCV_OVERRUN:
+		pr_debug("%s: OID_802_3_RCV_OVERRUN\n", __func__);
+		/* TODO */
+		break;
+
+	case OID_802_3_XMIT_UNDERRUN:
+		pr_debug("%s: OID_802_3_XMIT_UNDERRUN\n", __func__);
+		/* TODO */
+		break;
+
+	case OID_802_3_XMIT_HEARTBEAT_FAILURE:
+		pr_debug("%s: OID_802_3_XMIT_HEARTBEAT_FAILURE\n", __func__);
+		/* TODO */
+		break;
+
+	case OID_802_3_XMIT_TIMES_CRS_LOST:
+		pr_debug("%s: OID_802_3_XMIT_TIMES_CRS_LOST\n", __func__);
+		/* TODO */
+		break;
+
+	case OID_802_3_XMIT_LATE_COLLISIONS:
+		pr_debug("%s: OID_802_3_XMIT_LATE_COLLISIONS\n", __func__);
+		/* TODO */
+		break;
+#endif	/* RNDIS_OPTIONAL_STATS */
+
+#ifdef	RNDIS_PM
+	/* power management OIDs (table 4-5) */
+	case OID_PNP_CAPABILITIES:
+		pr_debug("%s: OID_PNP_CAPABILITIES\n", __func__);
+
+		/* for now, no wakeup capabilities */
+		length = sizeof (struct NDIS_PNP_CAPABILITIES);
+		memset(outbuf, 0, length);
+		retval = 0;
+		break;
+	case OID_PNP_QUERY_POWER:
+		pr_debug("%s: OID_PNP_QUERY_POWER D%d\n", __func__,
+				le32_to_cpup((__le32 *) buf) - 1);
+		/* only suspend is a real power state, and
+		 * it can't be entered by OID_PNP_SET_POWER...
+		 */
+		length = 0;
+		retval = 0;
+		break;
+#endif
 
 	default:
 		pr_warning("%s: query unknown OID 0x%08X\n",
@@ -532,6 +781,9 @@ static int gen_ndis_set_resp(u8 configNr, u32 OID, u8 *buf, u32 buf_len,
 		 * what makes the packet flow start and stop, like
 		 * activating the CDC Ethernet altsetting.
 		 */
+#ifdef	RNDIS_PM
+update_linkstate:
+#endif
 		retval = 0;
 		if (*params->filter) {
 			params->state = RNDIS_DATA_INITIALIZED;
@@ -548,8 +800,88 @@ static int gen_ndis_set_resp(u8 configNr, u32 OID, u8 *buf, u32 buf_len,
 	case RNDIS_OID_802_3_MULTICAST_LIST:
 		/* I think we can ignore this */
 		pr_debug("%s: RNDIS_OID_802_3_MULTICAST_LIST\n", __func__);
+#ifdef CONFIG_MACH_PUMA5
+		/* TAG0010*/
+		memset (rndis_per_dev_params[configNr].mcast_addr, 0,
+                        RNDIS_MAX_MULTICAST_SIZE * 6);
+        memcpy (rndis_per_dev_params[configNr].mcast_addr,
+                buf, buf_len);
+
 		retval = 0;
+
+#else 
+		retval = 0;
+#endif
 		break;
+#ifdef CONFIG_MACH_PUMA5
+	case RNDIS_OID_GEN_RNDIS_CONFIG_PARAMETER:
+		{
+                struct rndis_config_parameter   *param;
+                char   *strbuf;
+                u16    param_name [80], parlen, index = 0;
+                u8      first, second;
+
+
+		param = (struct rndis_config_parameter *) buf;
+                strbuf = buf + cpu_to_le32(param->ParameterNameOffset);
+
+		string_to_unicode ("NetworkAddress", param_name, &parlen);
+                if ((parlen == cpu_to_le32(param->ParameterNameLength)) &&
+                        ((memcmp (param_name, strbuf, parlen) == 0)))
+                {
+                        parlen = cpu_to_le32(param->ParameterValueLength);
+                        strbuf = buf + cpu_to_le32(param->ParameterValueOffset);
+                        while (parlen)
+                        {
+                                first = unicode_to_macnibble (cpu_to_le16p((u16*)strbuf));
+                                strbuf += 2;
+                                second = unicode_to_macnibble (cpu_to_le16p((u16*)strbuf));
+                                strbuf += 2;
+                        if ((first != 0xff) && (second != 0xff))
+                        {
+                                rndis_per_dev_params[configNr].host_mac [index] = (first << 4) | second;
+                                parlen -= 4;
+                                index ++;
+                        } else {
+                                break;
+                        }
+                        }
+                        retval = 0;
+                }
+                }
+
+		break;
+#endif
+
+#ifdef	RNDIS_PM
+	case OID_PNP_SET_POWER:
+		/* The only real power state is USB suspend, and RNDIS requests
+		 * can't enter it; this one isn't really about power.  After
+		 * resuming, Windows forces a reset, and then SET_POWER D0.
+		 * FIXME ... then things go batty; Windows wedges itself.
+		 */
+		i = le32_to_cpup((__force __le32 *)buf);
+		pr_debug("%s: OID_PNP_SET_POWER D%d\n", __func__, i - 1);
+		switch (i) {
+		case NdisDeviceStateD0:
+			*params->filter = params->saved_filter;
+			goto update_linkstate;
+		case NdisDeviceStateD3:
+		case NdisDeviceStateD2:
+		case NdisDeviceStateD1:
+			params->saved_filter = *params->filter;
+			retval = 0;
+			break;
+		}
+		break;
+
+#ifdef	RNDIS_WAKEUP
+	// no wakeup support advertised, so wakeup OIDs always fail:
+	//  - OID_PNP_ENABLE_WAKE_UP
+	//  - OID_PNP_{ADD,REMOVE}_WAKE_UP_PATTERN
+#endif
+
+#endif	/* RNDIS_PM */
 
 	default:
 		pr_warning("%s: set unknown OID 0x%08X, size %d\n",
@@ -577,6 +909,10 @@ static int rndis_init_response(int configNr, rndis_init_msg_type *buf)
 		return -ENOMEM;
 	resp = (rndis_init_cmplt_type *)r->buf;
 
+#ifdef CONFIG_MACH_PUMA5
+	if (!resp) return -ENOMEM;
+#endif
+
 	resp->MessageType = cpu_to_le32(RNDIS_MSG_INIT_C);
 	resp->MessageLength = cpu_to_le32(52);
 	resp->RequestID = buf->RequestID; /* Still LE in msg buffer */
@@ -595,7 +931,16 @@ static int rndis_init_response(int configNr, rndis_init_msg_type *buf)
 	resp->AFListOffset = cpu_to_le32(0);
 	resp->AFListSize = cpu_to_le32(0);
 
-	params->resp_avail(params->v);
+	if (params->ack)
+		params->ack (params->dev);
+#ifdef CONFIG_MACH_PUMA5
+	/* TAG0002 */
+/*
+	if (params->media_state == NDIS_MEDIA_STATE_CONNECTED)
+                rndis_indicate_status_msg (configNr,
+                                          RNDIS_STATUS_MEDIA_CONNECT);
+*/
+#endif
 	return 0;
 }
 
@@ -637,7 +982,9 @@ static int rndis_query_response(int configNr, rndis_query_msg_type *buf)
 	} else
 		resp->Status = cpu_to_le32(RNDIS_STATUS_SUCCESS);
 
-	params->resp_avail(params->v);
+	if (params->ack)
+		params->ack (params->dev);
+
 	return 0;
 }
 
@@ -677,7 +1024,9 @@ static int rndis_set_response(int configNr, rndis_set_msg_type *buf)
 	else
 		resp->Status = cpu_to_le32(RNDIS_STATUS_SUCCESS);
 
-	params->resp_avail(params->v);
+	if (params->ack)
+		params->ack (params->dev);
+
 	return 0;
 }
 
@@ -698,7 +1047,9 @@ static int rndis_reset_response(int configNr, rndis_reset_msg_type *buf)
 	/* resent information */
 	resp->AddressingReset = cpu_to_le32(1);
 
-	params->resp_avail(params->v);
+	if (params->ack)
+		params->ack (params->dev);
+
 	return 0;
 }
 
@@ -721,7 +1072,9 @@ static int rndis_keepalive_response(int configNr,
 	resp->RequestID = buf->RequestID; /* Still LE in msg buffer */
 	resp->Status = cpu_to_le32(RNDIS_STATUS_SUCCESS);
 
-	params->resp_avail(params->v);
+	if (params->ack)
+		params->ack (params->dev);
+
 	return 0;
 }
 
@@ -750,7 +1103,9 @@ static int rndis_indicate_status_msg(int configNr, u32 status)
 	resp->StatusBufferLength = cpu_to_le32(0);
 	resp->StatusBufferOffset = cpu_to_le32(0);
 
-	params->resp_avail(params->v);
+	if (params->ack)
+		params->ack (params->dev);
+
 	return 0;
 }
 
@@ -762,11 +1117,29 @@ int rndis_signal_connect(int configNr)
 					  RNDIS_STATUS_MEDIA_CONNECT);
 }
 EXPORT_SYMBOL(rndis_signal_connect);
-
+#ifdef CONFIG_MACH_PUMA5
+int rndis_signal_disconnect (int configNr, u8 logical)
+#else
 int rndis_signal_disconnect(int configNr)
+#endif
 {
+#ifdef CONFIG_MACH_PUMA5
+        u8      *buf;
+        u32     temp;
+#endif
+
 	rndis_per_dev_params[configNr].media_state
 			= RNDIS_MEDIA_STATE_DISCONNECTED;
+#ifdef CONFIG_MACH_PUMA5
+        if (!logical)
+        {
+
+                rndis_per_dev_params [configNr].state = RNDIS_UNINITIALIZED;
+                while ((buf = rndis_get_next_response (configNr, &temp)))
+                        rndis_free_response (configNr, buf);
+                return 0;
+        } else
+#endif
 	return rndis_indicate_status_msg(configNr,
 					  RNDIS_STATUS_MEDIA_DISCONNECT);
 }
@@ -779,6 +1152,7 @@ void rndis_uninit(int configNr)
 
 	if (configNr >= RNDIS_MAX_CONFIGS)
 		return;
+	rndis_per_dev_params [configNr].used = 0;
 	rndis_per_dev_params[configNr].state = RNDIS_UNINITIALIZED;
 
 	/* drain the response queue */
@@ -789,7 +1163,10 @@ EXPORT_SYMBOL(rndis_uninit);
 
 void rndis_set_host_mac(int configNr, const u8 *addr)
 {
-	rndis_per_dev_params[configNr].host_mac = addr;
+	rndis_per_dev_params[configNr].host_mac = (u8*)addr;
+#ifdef CONFIG_MACH_PUMA5
+	memcpy ((void *)rndis_per_dev_params[configNr].perm_mac, addr, 6);
+#endif
 }
 EXPORT_SYMBOL(rndis_set_host_mac);
 
@@ -832,6 +1209,11 @@ int rndis_msg_parser(u8 configNr, u8 *buf)
 			__func__);
 		params->state = RNDIS_UNINITIALIZED;
 		if (params->dev) {
+#ifdef CONFIG_MACH_PUMA5
+			 memcpy (
+                (void *)rndis_per_dev_params[configNr].host_mac,
+                (void *)rndis_per_dev_params[configNr].perm_mac, 6); 
+#endif
 			netif_carrier_off(params->dev);
 			netif_stop_queue(params->dev);
 		}
@@ -876,18 +1258,17 @@ int rndis_msg_parser(u8 configNr, u8 *buf)
 }
 EXPORT_SYMBOL(rndis_msg_parser);
 
-int rndis_register(void (*resp_avail)(void *v), void *v)
+int rndis_register(int (* rndis_control_ack) (struct net_device *))
 {
 	u8 i;
 
-	if (!resp_avail)
+	if (!rndis_control_ack)
 		return -EINVAL;
 
 	for (i = 0; i < RNDIS_MAX_CONFIGS; i++) {
 		if (!rndis_per_dev_params[i].used) {
 			rndis_per_dev_params[i].used = 1;
-			rndis_per_dev_params[i].resp_avail = resp_avail;
-			rndis_per_dev_params[i].v = v;
+			rndis_per_dev_params[i].ack = rndis_control_ack;
 			pr_debug("%s: configNr = %d\n", __func__, i);
 			return i;
 		}
@@ -904,10 +1285,14 @@ void rndis_deregister(int configNr)
 
 	if (configNr >= RNDIS_MAX_CONFIGS) return;
 	rndis_per_dev_params[configNr].used = 0;
+
+	return;
 }
 EXPORT_SYMBOL(rndis_deregister);
 
-int rndis_set_param_dev(u8 configNr, struct net_device *dev, u16 *cdc_filter)
+int rndis_set_param_dev(u8 configNr, struct net_device *dev, 
+			 struct net_device_stats *stats, 
+			 u16 *cdc_filter)
 {
 	pr_debug("%s:\n", __func__);
 	if (!dev)
@@ -915,6 +1300,7 @@ int rndis_set_param_dev(u8 configNr, struct net_device *dev, u16 *cdc_filter)
 	if (configNr >= RNDIS_MAX_CONFIGS) return -1;
 
 	rndis_per_dev_params[configNr].dev = dev;
+	rndis_per_dev_params [configNr].stats = stats;
 	rndis_per_dev_params[configNr].filter = cdc_filter;
 
 	return 0;
@@ -945,6 +1331,13 @@ int rndis_set_param_medium(u8 configNr, u32 medium, u32 speed)
 	return 0;
 }
 EXPORT_SYMBOL(rndis_set_param_medium);
+
+#ifdef CONFIG_MACH_PUMA5
+u32  rndis_get_param_filter (u8 configNr)
+{
+        return (u32)(*rndis_per_dev_params [configNr].filter);
+}
+#endif
 
 void rndis_add_hdr(struct sk_buff *skb)
 {
@@ -1017,9 +1410,7 @@ static rndis_resp_t *rndis_add_response(int configNr, u32 length)
 	return r;
 }
 
-int rndis_rm_hdr(struct gether *port,
-			struct sk_buff *skb,
-			struct sk_buff_head *list)
+int rndis_rm_hdr(struct sk_buff *skb)
 {
 	/* tmp points to a struct rndis_packet_msg_type */
 	__le32 *tmp = (void *)skb->data;
@@ -1039,7 +1430,6 @@ int rndis_rm_hdr(struct gether *port,
 	}
 	skb_trim(skb, get_unaligned_le32(tmp++));
 
-	skb_queue_tail(list, skb);
 	return 0;
 }
 EXPORT_SYMBOL(rndis_rm_hdr);
@@ -1107,7 +1497,11 @@ static ssize_t rndis_proc_write(struct file *file, const char __user *buffer,
 			break;
 		case 'D':
 		case 'd':
+#ifdef CONFIG_MACH_PUMA5
+			rndis_signal_disconnect(p->confignr,0);
+#else
 			rndis_signal_disconnect(p->confignr);
+#endif
 			break;
 		default:
 			if (fl_speed) p->speed = speed;
@@ -1142,7 +1536,7 @@ static struct proc_dir_entry *rndis_connect_state [RNDIS_MAX_CONFIGS];
 #endif /* CONFIG_USB_GADGET_DEBUG_FILES */
 
 
-static int rndis_init(void)
+int rndis_init(void)
 {
 	u8 i;
 
@@ -1163,6 +1557,11 @@ static int rndis_init(void)
 			pr_debug("\n");
 			return -EIO;
 		}
+		rndis_connect_state [i]->nlink = 1;
+		rndis_connect_state [i]->write_proc = rndis_proc_write;
+		rndis_connect_state [i]->read_proc = rndis_proc_read;
+		rndis_connect_state [i]->data = (void *)
+				(rndis_per_dev_params + i);
 #endif
 		rndis_per_dev_params[i].confignr = i;
 		rndis_per_dev_params[i].used = 0;
@@ -1174,9 +1573,8 @@ static int rndis_init(void)
 
 	return 0;
 }
-module_init(rndis_init);
 
-static void rndis_exit(void)
+void rndis_exit(void)
 {
 #ifdef CONFIG_USB_GADGET_DEBUG_FILES
 	u8 i;
@@ -1188,6 +1586,73 @@ static void rndis_exit(void)
 	}
 #endif
 }
-module_exit(rndis_exit);
+#ifdef CONFIG_MACH_PUMA5
+char  rndis_get_multicast_status (int cfg, const u8 *addr)
+{
+        u32     index = 0;
+        char    status = 0;
 
-MODULE_LICENSE("GPL");
+        while (index < RNDIS_MAX_MULTICAST_SIZE)
+        {
+                if ((rndis_per_dev_params[cfg].mcast_addr[index][0] == addr[0]) &&
+                (rndis_per_dev_params[cfg].mcast_addr[index][1] == addr[1]) &&
+                (rndis_per_dev_params[cfg].mcast_addr[index][2] == addr[2]) &&
+                (rndis_per_dev_params[cfg].mcast_addr[index][3] == addr[3]) &&
+                (rndis_per_dev_params[cfg].mcast_addr[index][4] == addr[4]) &&
+                (rndis_per_dev_params[cfg].mcast_addr[index][5] == addr[5]))
+                {
+                        status = 1;
+                        break;
+                }
+                index++;
+        }
+
+        return status;
+}
+/* TAG0009 */
+static void string_to_unicode (char *string, u16 *unicode_string, u16 *length)
+{
+        u32     index;
+
+        /* The UNICODE string will be twice the length of the ANSI string. */
+        *length = 2 * strlen (string);
+
+        /* Convert the ANSI String to UNICODE format. */
+        for (index = 0; index < strlen (string); index++)
+                unicode_string[index] = cpu_to_le16((u16)(string[index]));
+
+}
+
+static u8 unicode_to_macnibble (u16 value)
+{
+        u8 retval  = 0xff;
+
+        if ( (value >= '0') && (value <= '9') )
+        {
+                retval = value - '0';
+        } else {
+                if ( (value >= 'A') && (value <= 'F') )
+                {
+                        retval = value - '7';
+                } else {
+                        if ( (value >= 'a') && (value <= 'f') )
+                        {
+                                retval = value - 'W';
+                        }
+                }
+        }
+
+        return retval;
+}
+int is_rndis_configured(int configNr)
+{
+
+        if (rndis_per_dev_params [configNr].state == RNDIS_UNINITIALIZED)
+                return 0;
+        else
+	if (rndis_per_dev_params [configNr].state == RNDIS_INITIALIZED)
+                return 1;
+	else
+		return -1;
+}
+#endif

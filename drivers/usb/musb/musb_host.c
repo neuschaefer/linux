@@ -32,6 +32,10 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
+/*
+Includes Intel Corporation's changes/modifications dated: 2014.
+Changed/modified portions - Copyright © 2014, Intel Corporation.
+*/
 
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -1294,6 +1298,8 @@ done:
 		if (dma_channel_status(dma) == MUSB_DMA_STATUS_BUSY) {
 			dma->status = MUSB_DMA_STATUS_CORE_ABORT;
 			(void) musb->dma_controller->channel_abort(dma);
+            /* Added by Hai - the channel was tore down, need to re-allocate in ep_program later? */
+            hw_ep->tx_channel = NULL;
 		}
 
 		/* do the proper sequence to abort the transfer in the
@@ -1639,6 +1645,8 @@ void musb_host_rx(struct musb *musb, u8 epnum)
 		if (dma_channel_status(dma) == MUSB_DMA_STATUS_BUSY) {
 			dma->status = MUSB_DMA_STATUS_CORE_ABORT;
 			(void) musb->dma_controller->channel_abort(dma);
+            /* Added by Hai - the channel was tore down, need to re-allocate later? */
+            hw_ep->rx_channel = NULL;
 			xfer_len = dma->actual_len;
 		}
 		musb_h_flush_rxfifo(hw_ep, MUSB_RXCSR_CLRDATATOG);
@@ -1670,6 +1678,8 @@ void musb_host_rx(struct musb *musb, u8 epnum)
 		if (dma_channel_status(dma) == MUSB_DMA_STATUS_BUSY) {
 			dma->status = MUSB_DMA_STATUS_CORE_ABORT;
 			(void) musb->dma_controller->channel_abort(dma);
+            /* Added by Hai - the channel was tore down, need to re-allocate later? */
+            hw_ep->rx_channel = NULL;
 			xfer_len = dma->actual_len;
 			done = true;
 		}
@@ -2251,12 +2261,22 @@ static int musb_cleanup_urb(struct urb *urb, struct musb_qh *qh)
 
 		dma = is_in ? ep->rx_channel : ep->tx_channel;
 		if (dma) {
+            /*REVISIT: check if we really need to modify dma->status */
+            dma->status = MUSB_DMA_STATUS_CORE_ABORT;
 			status = ep->musb->dma_controller->channel_abort(dma);
 			dev_dbg(musb->controller,
 				"abort %cX%d DMA for urb %p --> %d\n",
 				is_in ? 'R' : 'T', ep->epnum,
 				urb, status);
 			urb->actual_length += dma->actual_len;
+
+            /* Added by Hai */
+            if( is_in ) {
+                ep->rx_channel = NULL;
+            } else {
+                ep->tx_channel = NULL;
+            }
+
 		}
 	}
 

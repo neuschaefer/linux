@@ -1,3 +1,5 @@
+# Includes Intel Corporation's changes/modifications dated: 2014.
+# Changed/modified portions - Copyright © 2014, Intel Corporation.
 # UAPI Header export list
 header-y += ipset/
 header-y += nf_conntrack_common.h
@@ -22,6 +24,7 @@ header-y += xt_CONNMARK.h
 header-y += xt_CONNSECMARK.h
 header-y += xt_CT.h
 header-y += xt_DSCP.h
+header-y += xt_GWMETA.h
 header-y += xt_HMARK.h
 header-y += xt_IDLETIMER.h
 header-y += xt_LED.h
@@ -80,3 +83,4 @@ header-y += xt_tcpmss.h
 header-y += xt_tcpudp.h
 header-y += xt_time.h
 header-y += xt_u32.h
+header-y += xt_webstr.h

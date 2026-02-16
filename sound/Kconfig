@@ -76,17 +76,17 @@ source "sound/isa/Kconfig"
 
 source "sound/pci/Kconfig"
 
-source "sound/ppc/Kconfig"
+#source "sound/ppc/Kconfig"
 
 source "sound/aoa/Kconfig"
 
 source "sound/arm/Kconfig"
 
-source "sound/atmel/Kconfig"
+#source "sound/atmel/Kconfig"
 
 source "sound/spi/Kconfig"
 
-source "sound/mips/Kconfig"
+#source "sound/mips/Kconfig"
 
 source "sound/sh/Kconfig"
 
@@ -100,7 +100,7 @@ source "sound/firewire/Kconfig"
 # here assuming PCMCIA is defined before ALSA
 source "sound/pcmcia/Kconfig"
 
-source "sound/sparc/Kconfig"
+#source "sound/sparc/Kconfig"
 
 source "sound/parisc/Kconfig"
 

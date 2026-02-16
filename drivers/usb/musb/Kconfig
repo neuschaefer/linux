@@ -1,3 +1,5 @@
+# Includes Intel Corporation's changes/modifications dated: 2014.
+# Changed/modified portions - Copyright © 2014, Intel Corporation.
 #
 # USB Dual Role (OTG-ready) Controller Drivers
 # for silicon based on Mentor Graphics INVENTRA designs
@@ -5,8 +7,8 @@
 
 # (M)HDRC = (Multipoint) Highspeed Dual-Role Controller
 config USB_MUSB_HDRC
-	tristate 'Inventra Highspeed Dual Role Controller (TI, ADI, ...)'
-	depends on USB_GADGET
+	bool 'Inventra Highspeed Dual Role Controller (TI, ADI, ...)'
+	depends on (USB || USB_GADGET)
 	help
 	  Say Y here if your system has a dual role high speed USB
 	  controller based on the Mentor Graphics silicon IP.  Then
@@ -43,6 +45,7 @@ config USB_MUSB_HOST
 config USB_MUSB_GADGET
 	bool "Gadget only mode"
 	depends on USB_GADGET
+	select USB_GADGET_DUALSPEED
 	help
 	  Select this when you want to use MUSB in gadget mode only,
 	  thereby the host feature will be regressed.
@@ -60,37 +63,39 @@ choice
 	prompt "Platform Glue Layer"
 
 config USB_MUSB_DAVINCI
-	tristate "DaVinci"
+	bool "DaVinci"
 	depends on ARCH_DAVINCI_DMx
 	depends on BROKEN
 
 config USB_MUSB_DA8XX
-	tristate "DA8xx/OMAP-L1x"
+	bool "DA8xx/OMAP-L1x"
 	depends on ARCH_DAVINCI_DA8XX
 	depends on BROKEN
 
 config USB_MUSB_TUSB6010
-	tristate "TUSB6010"
+	bool "TUSB6010"
+	depends on ARCH_OMAP
 
 config USB_MUSB_OMAP2PLUS
-	tristate "OMAP2430 and onwards"
+	bool "OMAP2430 and onwards"
 	depends on ARCH_OMAP2PLUS
 
 config USB_MUSB_AM35X
-	tristate "AM35x"
+	bool "AM35x"
 	depends on ARCH_OMAP
 
 config USB_MUSB_DSPS
-	tristate "TI DSPS platforms"
+	bool "TI DSPS platforms"
 	select USB_MUSB_AM335X_CHILD
 	depends on OF_IRQ
 
 config USB_MUSB_BLACKFIN
-	tristate "Blackfin"
+	bool "Blackfin"
 	depends on (BF54x && !BF544) || (BF52x && ! BF522 && !BF523)
 
 config USB_MUSB_UX500
-	tristate "U8500 and U5500"
+	bool "U8500 and U5500"
+	depends on (ARCH_U8500 && AB8500_USB) || (ARCH_U5500)
 
 endchoice
 
@@ -124,8 +129,8 @@ config USB_INVENTRA_DMA
 	  Enable DMA transfers using Mentor's engine.
 
 config USB_TI_CPPI_DMA
-	bool 'TI CPPI (Davinci)'
-	depends on USB_MUSB_DAVINCI
+	bool 'TI CPPI (Davinci/Puma5)'
+	depends on (USB_MUSB_DAVINCI || MACH_PUMA5 )
 	help
 	  Enable DMA transfers when TI CPPI DMA is available.
 
