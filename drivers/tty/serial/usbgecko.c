@@ -368,8 +368,8 @@ static void ug_tty_close(struct tty_struct *tty, struct file *filp)
 	mutex_unlock(&adapter->mutex);
 }
 
-static int ug_tty_write(struct tty_struct *tty,
-			const unsigned char *buf, int count)
+static ssize_t ug_tty_write(struct tty_struct *tty,
+			const u8 *buf, size_t count)
 {
 	struct ug_adapter *adapter = tty->driver_data;
 	int index;
@@ -380,17 +380,19 @@ static int ug_tty_write(struct tty_struct *tty,
 
 	index = tty->index;
 	adapter = &ug_adapters[index];
+
 	for (i = 0; i < count; i++)
 		ug_safe_putc(adapter, *buf++);
+
 	return count;
 }
 
-static int ug_tty_write_room(struct tty_struct *tty)
+static unsigned int ug_tty_write_room(struct tty_struct *tty)
 {
 	return 0x123; /* whatever */
 }
 
-static int ug_tty_chars_in_buffer(struct tty_struct *tty)
+static unsigned int ug_tty_chars_in_buffer(struct tty_struct *tty)
 {
 	return 0; /* unbuffered */
 }
@@ -425,7 +427,7 @@ static int ug_tty_init(void)
 
 	retval = tty_register_driver(driver);
 	if (retval) {
-		put_tty_driver(driver);
+		tty_driver_kref_put(driver);
 		return retval;
 	}
 	for (i = 0; i < 2; i++) {
@@ -444,7 +446,7 @@ static void ug_tty_exit(void)
 	ug_tty_driver = NULL;
 	if (driver) {
 		tty_unregister_driver(driver);
-		put_tty_driver(driver);
+		tty_driver_kref_put(driver);
 	}
 }
 
