@@ -22,7 +22,6 @@
 #include <linux/of_address.h>
 #include <linux/of_irq.h>
 #include <linux/of_platform.h>
-#include <linux/dma-mapping.h>
 
 #define DRV_MODULE_NAME	"exi"
 #define DRV_DESCRIPTION	"Nintendo GameCube/Wii EXternal Interface (EXI) driver"
@@ -43,10 +42,10 @@ struct exi_map_id_to_name {
 
 
 static void exi_bus_device_release(struct device *dev);
-static int exi_bus_match(struct device *dev, struct device_driver *drv);
+static int exi_bus_match(struct device *dev, const struct device_driver *drv);
 
 
-static struct bus_type exi_bus_type = {
+struct bus_type exi_bus_type = {
 	.name = "exi",
 	.match = exi_bus_match,
 };
@@ -145,7 +144,7 @@ exi_device_match(const struct exi_device_id *eids,
 /*
  * Internal. Used to check if an exi device is supported by an exi driver.
  */
-static int exi_bus_match(struct device *dev, struct device_driver *drv)
+static int exi_bus_match(struct device *dev, const struct device_driver *drv)
 {
 	struct exi_device *exi_device = to_exi_device(dev);
 	struct exi_driver *exi_driver = to_exi_driver(drv);
@@ -184,7 +183,6 @@ static void exi_device_init(struct exi_device *exi_device,
 	exi_device->dev.bus = &exi_bus_type;
 	dev_set_name(&exi_device->dev, "exi%01x:%01x", channel, device);
 	exi_device->dev.platform_data = to_exi_channel(channel);
-	set_dma_ops(&exi_device->dev, &dma_direct_ops);
 	exi_device->dev.release = exi_device_release;
 }
 
