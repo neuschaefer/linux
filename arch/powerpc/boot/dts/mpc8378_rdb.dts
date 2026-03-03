@@ -9,6 +9,7 @@
 
 / {
 	compatible = "fsl,mpc8378rdb";
+	model = "fsl,mpc8378rdb";
 	#address-cells = <1>;
 	#size-cells = <1>;
 
@@ -39,7 +40,7 @@
 		};
 	};
 
-	memory {
+	memory@0 {
 		device_type = "memory";
 		reg = <0x00000000 0x10000000>;	// 256MB at 0
 	};
