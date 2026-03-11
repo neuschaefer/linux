@@ -158,13 +158,17 @@ void __init register_early_udbg_console(void)
 	if (!udbg_putc)
 		return;
 
-	if (strstr(boot_command_line, "udbg-immortal")) {
-		printk(KERN_INFO "early console immortal !\n");
-		udbg_console.flags &= ~CON_BOOT;
-	}
 	early_console = &udbg_console;
 	register_console(&udbg_console);
 }
+
+static int __init setup_udbg_immortal(char *str)
+{
+	printk(KERN_INFO "early console immortal !\n");
+	udbg_console.flags &= ~CON_BOOT;
+	return 1;
+}
+__setup("udbg-immortal", setup_udbg_immortal);
 
 #if 0   /* if you want to use this as a regular output console */
 console_initcall(register_udbg_console);
